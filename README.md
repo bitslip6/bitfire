@@ -3,21 +3,21 @@ Enterprise class security for Everyone. Web Application Firewall with highly eff
 
 Stop worms, web defacements, malware and other malicious activity on your website.
 
-highly efficient filtering runs in <3ms on most servers.
-Block rate for AWS T2 servers >120 HTTP blocks per second.
-Filtering for ALL bot traffic.  Bot IP address filtering and human javascript verification ensures that all malicious bots are blocked.
-add multi factor (SMS based) authentication for up to 10 site admins
-whitelisted MFA users means admins won't have restricted access
-filter all HTML tags and javascipt onX events as well as DOM injection for popular frameworks like angular, vuejs, etc
-intelligent parsers understand your request (we use <10 regular expressions for filtering)
-customizable profanity filter
-customizable spam list filter
-over 2,000 unique SQL injections and over 10,000 unique XSS injections run in our internal filter tests
-learning WAF slowly locks your site down to just your valid traffic from verified human users
-new contant can be added to locked sites by just visiting the page from a trusted account
-transparent CSRF protection and filtering
-fast country based IP filtering
-daily updated IP block lists
+* highly efficient filtering runs in <3ms on most servers.
+* Block rate for AWS T2 servers >120 HTTP blocks per second.
+* Filtering for ALL bot traffic.  Bot IP address filtering and human javascript verification ensures that all malicious bots are blocked.
+* add multi factor (SMS based) authentication for up to 10 site admins
+* whitelisted MFA users means admins won't have restricted access
+* filter all HTML tags and javascipt onX events as well as DOM injection for popular frameworks like angular, vuejs, etc
+* intelligent parsers understand your request (we use <10 regular expressions for filtering)
+* customizable profanity filter
+* customizable spam list filter
+* * over 2,000 unique SQL injections and over 10,000 unique XSS injections run in our internal filter tests
+* learning WAF slowly locks your site down to just your valid traffic from verified human users
+* new contant can be added to locked sites by just visiting the page from a trusted account
+* transparent CSRF protection and filtering
+* fast country based IP filtering
+* daily updated IP block lists
 
 functional programming design with moslty pure functions and full code coverage gives you peace of mind that your code is solid.
 
