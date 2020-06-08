@@ -4,7 +4,7 @@ Enterprise class security for Everyone. Web Application Firewall with highly eff
 Stop worms, web defacements, malware and other malicious activity on your website.
 
 * highly efficient filtering runs in <3ms on most servers.
-* Block rate for AWS T2 servers >120 HTTP blocks per second.
+* Block rate for AWS T2 micro servers >120 HTTP blocks per second.
 * Filtering for ALL bot traffic.  Bot IP address filtering and human javascript verification ensures that all malicious bots are blocked.
 * add multi factor (SMS based) authentication for up to 10 site admins
 * whitelisted MFA users means admins won't have restricted access
