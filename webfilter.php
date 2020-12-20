@@ -47,17 +47,8 @@ class WebFilter {
     // total: 1361, see recache
     public function __construct(\TF\CacheStorage $cache) {
         
-        // todo: refactor as load_or_cache, but we need deferred recache() AND deferred file()
-        $values = $cache->load_data('webvalues');
-        if ($values === null) {
-            $values = \TF\recache(file(WAF_DIR . "cache/values.raw"));
-            $cache->save_data('webvalues', $values, 60*3600);
-        }
-        $keys = $cache->load_data('webkeys');
-        if ($keys === null) {
-            $keys = \TF\recache(file(WAF_DIR . "cache/keys.raw"));
-            $result =  $cache->save_data('webkeys', $keys, 60*3600);
-        }
+        $values = $cache->load_or_cache("webvalues", 3600*24, '\TF\recache_file', WAF_DIR.'cache/values.raw');
+        $keys = $cache->load_or_cache("webvalues", 3600*24, '\TF\recache_file', WAF_DIR.'cache/keys.raw');
 
         $this->_reducer = \TF\partial('\\BitFIRE\\generic_reducer', $keys, $values);
         $this->_search_sql = \TF\partial('\\BitFIRE\\trivial_reducer', '\\BitFire\\search_sql');
@@ -69,21 +60,22 @@ class WebFilter {
         $block = \TF\Maybe::of(false);
         if (Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
             // TODO: refactor to take block as a Maybe....
-            $block = \TF\map_whilenot($request['GET'], $this->_reducer, false);
-            if (!$block->empty()) { return $block; }
-            $block = \TF\map_whilenot($request['POST'], $this->_reducer, false);
-            if (!$block->empty()) { return $block; }
-            $block = \TF\map_whilenot($request[REQUEST_COOKIE], $this->_reducer, false);
-            if (!$block->empty()) { return $block; }
+            $block->doifnot('\TF\map_whilenot', $request['GET'], $this->_reducer, false);
+            $block->doifnot('\TF\map_whilenot', $request['POST'], $this->_reducer, false);
+            $block->doifnot('\TF\map_whilenot', $request['COOKIE'], $this->_reducer, false);
+            //$block = \TF\map_whilenot($request['GET'], $this->_reducer, false);
+            //if (!$block->empty()) { return $block; }
+            //$block = \TF\map_whilenot($request['POST'], $this->_reducer, false);
+            //if (!$block->empty()) { return $block; }
+            //$block = \TF\map_whilenot($request[REQUEST_COOKIE], $this->_reducer, false);
+            //if (!$block->empty()) { return $block; }
         }
 
         if (Config::enabled(CONFIG_SPAM_FILTER)) {
-            $block = search_spam($request['FULL']);
+            $block = $block->doifnot('BitFire\search_spam', $request['FULL']);
         }
 
-        // UGLY!!! REFACTOR WITH DOIFNOT
-        /*
-        if (!$block->empty()) { return $block; }
+        // no easy way to pass these three parameters, a bit ugly for now...
         if (Config::enabled(CONFIG_SQL_FILTER)) {
             foreach ($request['GET'] as $key => $value) {
                 $block = search_sql($key, $value, $request['GETC'][$key]);
@@ -94,7 +86,6 @@ class WebFilter {
                 if (!$block->empty()) { return $block; }
             }
         }
-*/
 
         return $block;
     }
@@ -195,7 +186,7 @@ function search_spam(string $all_content) : \TF\Maybe {
  * reduce key / value with fn
  */
 function trivial_reducer(callable $fn, string $key, string $value, $ignore) : \TF\Maybe {
-    if (strlen($value) > 1) {
+    if (strlen($value) > 0) {
         return $fn($key, $value);
     }
     return \TF\Maybe::of(false);
@@ -205,7 +196,7 @@ function trivial_reducer(callable $fn, string $key, string $value, $ignore) : \T
  * reduce key / value with fn
  */
 function generic_reducer(array $keys, array $values, string $key, string $value, $ignore) : \TF\Maybe {
-    if (strlen($value) > 1) {
+    if (strlen($value) > 0) {
         return \BitFire\generic($key, $value, $values, $keys);
     }
     return \TF\Maybe::of(false);

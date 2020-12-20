@@ -79,6 +79,21 @@ function throttle_error($code) {
     }
 }
 
+
+class Request
+{
+    public $get;
+    public $post;
+    public $full;
+    public $ip;
+    public $agent;
+    public $referer;
+    public $cookies;
+    public $host;
+    public $method;
+}
+
+
 class MatchType
 {
     protected $_type;

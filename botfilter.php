@@ -64,6 +64,8 @@ class BotFilter {
     public function __construct(\TF\CacheStorage $cache) {
         $this->cache = $cache;
         $this->_constraints = array(
+            FAIL_HONEYPOT => new MatchType(MatchType::CONTAINS, REQUEST_PATH, 'phpunit', BLOCK_SHORT),
+            FAIL_HONEYPOT => new MatchType(MatchType::CONTAINS, REQUEST_PATH, '/wp-json/wp/v2/users', BLOCK_SHORT),
             FAIL_HONEYPOT => new MatchType(MatchType::EXACT, REQUEST_PATH, Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
             FAIL_METHOD => new MatchType(MatchType::NOTIN, REQUEST_METHOD, Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );

@@ -4,7 +4,7 @@ namespace TF;
 interface Storage {
     public function save_data(string $key_name, $data, int $ttl);
     public function load_data(string $key_name);
-    public function load_or_cache(string $key_name, int $ttl, callable $generator, array $data);
+    public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$data);
 }
 
 /**
@@ -102,10 +102,10 @@ class CacheStorage implements Storage {
     /**
      * load the data from cache, else call $generator
      */
-    public function load_or_cache(string $key_name, int $ttl, callable $generator, array $params) {
+    public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$params) {
         assert(self::$_type !== null, "must call set_type before using cache");
         if (($data = $this->load_data($key_name)) === null) {
-            $data = \call_user_func_array($generator, $params);
+            $data = $generator($params);
             $this->save_data($key_name, $data, $ttl);
         }
         return $data;
@@ -143,9 +143,9 @@ class FileStorage implements Storage {
     /**
      * load the data from cache, else call $generator
      */
-    public function load_or_cache(string $key_name, int $ttl, callable $generator, array $data) {
+    public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$data) {
         if (($data = $this->load_data($key_name)) === null) {
-            $data = \call_user_func_array($generator, $data);
+            $data = $generator(...$data);
             $this->save_data($key_name, $data, $ttl);
         }
         return $data;
