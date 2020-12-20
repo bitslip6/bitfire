@@ -292,23 +292,24 @@ if (!function_exists('getallheaders')) {
  * lookbehind: 254
  * total: ct:2 cpu: 1299, wt: 1298
  */
-function recache(array $lines) {
+function recache(array $lines) : array {
     $z = lookahead(trim($lines[0]), '');
     $a = array();
     $block="";
     for ($i=1,$m=count($lines);$i<$m;$i++) {
         $id = hexdec(substr($lines[$i], 0, 4));
-        //echo "id [$id]\n";
         if (between($id, 10000, 90000)) {
-            //echo "T1: id [$id] ($block)\n";
             $a[$id]=trim($block);
             $block="";
         } else {
-            //echo "T2: id [{$lines[$i]}] [$id] ($z)\n";
             $block .= lookbehind($lines[$i], $z);
         }
     }
     return $a;
+}
+
+function recache_file(string $filename) {
+    return recache(file($filename));
 }
 
 /**
