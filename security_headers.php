@@ -6,7 +6,9 @@ use const BitFire\REQUEST_PATH;
 
 const CONFIG_ENFORCE_SSL = "encorfe_ssl_1year";
 
-const FEATURES = array('geolocation', 'midi', 'notifications', 'push', 'sync-xhr', 'microphone', 'gyroscope', 'speaker', 'vibrate', 'fullscreen', 'payment');
+const FEATURE_POLICY = array('geolocation' => '*', 'midi' => 'self', 'notifications' => 'self', 'push' => 'self', 'sync-xhr' => 'self', 'microphone' => 'self', 'gyroscope' => 'self', 'speaker' => 'self', 'vibrate' => 'self', 'fullscreen' => 'self', 'payment' => '*');
+const FEATURE_NAMES = array('geolocation', 'midi', 'notifications', 'push', 'sync-xhr', 'microphone', 'gyroscope', 'speaker', 'vibrate', 'fullscreen', 'payment');
+
 const CSP = array('child-src', 'connect-src', 'default-src', 'font-src',
             'frame-src', 'img-src', 'manifest-src', 'media-src', 'object-src', 'prefetch-src',
             'script-src', 'style-src', 'webrtc-src', 'worker-src', 'base-uri',
@@ -34,21 +36,13 @@ function send_security_headers(array $request) : void {
 
     // set a default feature policy
     if (\BitFire\Config::enabled("default_feature_policy")) {
-        header(array_reduce(default_feature_policy(), function($acc, $item) {
-                return  $acc . "{$item[0]} '{$item[1]}'; ";
+        // TODO: replace with reduce_map
+        header(\TF\map_reduce(FEATURE_POLICY, function($key, $value, $carry) {
+                return  $carry . $key . " '$value'; ";
             }, "Feature-Policy: ") );
     }
     
     if (\BitFire\Config::enabled("nel")) {
         header('{"report_to":"bitfire","max_age":2592000,"include_subdomains":true}');
     }
-}
-
-/**
- * create a default feature policy
- */
-function default_feature_policy() : array {
-    return array_reduce(FEATURES, function(array $policy, $feature) {
-        $policy[$feature] = ($feature == 'geolocation' || $feature == 'payment') ? "*" : "self";
-    }, array());
 }
