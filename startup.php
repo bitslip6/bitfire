@@ -14,7 +14,7 @@ if (!file_exists(BLOCK_DIR)) {
 }
 
 include WAF_DIR."bitfire.php";
-include WAF_DIR."security_headers.php";
+include WAF_DIR."headers.php";
 try {
 	\BitFire\Config::set(parse_ini_file(WAF_DIR . "config.ini", false, INI_SCANNER_TYPED));
 	$bitfire = \BitFire\BitFire::get_instance();
