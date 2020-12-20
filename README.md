@@ -18,6 +18,36 @@
 functional programming design with >90% pure functions ensures stable firewall operation
 
 
+## Install
+To install BitFIRE you will need the following: basic understanding of Linux command line. git, php, root access (optional but prefeered), text editor (vi obviously).  
+* Download from github into any directory outside of your web root.
+* Edit the BitFIRE config.ini and configure any settings.
+* Edit your php.ini and set bitfire/startup.php as your auto_prepend_file (this will load BitFIRE on every php request).  
+* Optionally you can ```php include "/full/path/to/bitfire/startup.php";``` in your main bootstrap file but this configuration will allow anyone to access php scripts in your web root directly bypassing your bootstrap and BitFIRE. For sites that already prevent this direct access this might be a prefferable setup.
+* Restart php
+* Have a beer
+
+
+```shellsession
+# install into any directory, here we use home directory
+$ cd $home
+$ git clone -q https://github.com/bitslip6/bitfire
+# edit config.ini and configure for your site.  see wiki for details
+$ vim bitfire/config.ini
+# now configure BitFire for all php processes (assuming PHP FPM)
+$ php -r 'phpinfo();' | grep php.ini
+Configuration File (php.ini) Path => /etc/php/7.2/cli
+Loaded Configuration File => /etc/php/7.2/cli/php.ini
+$ sudo vim /etc/php/7.2/fpm/php.ini
+# set auto_prepend_file = "/home/user/bitfire/startup.php"
+# now restart php
+$ sudo systemctl restart php7.2-fpm
+# OR
+$ sudo /etc/init.d/php7.2-fpm restart
+```
+
+
+
 ## OWASP top 10 breakdown
  
 ### 1: injection *2:
