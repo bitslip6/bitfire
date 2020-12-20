@@ -14,11 +14,12 @@ if (!file_exists(BLOCK_DIR)) {
 }
 
 include WAF_DIR."bitfire.php";
+include WAF_DIR."security_headers.php";
 try {
 	\BitFire\Config::set(parse_ini_file(WAF_DIR . "config.ini", false, INI_SCANNER_TYPED));
 	$bitfire = \BitFire\BitFire::get_instance();
 	\BitFireHeader\send_security_headers($bitfire->_request);
-	$bitfire->inspect();
+	$block = $bitfire->inspect();
 
 	if (!$block->empty()) {
 		//$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 9 || $elm['cpu'] > 9); }); 
