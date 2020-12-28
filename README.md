@@ -62,4 +62,4 @@ _*1: Free Forever_ - Our free forever services are full unmetered filtering avai
 
 _*2: Premium Filtering_ - Premium filtering features are available free of change for 500 unique visitors each month. 
 
-_*3: MFA / Logging_ - Multifactor and Logging features require server resources and unformtunately we are unable  to provide these features to the community for free.
+_*3: MFA / Logging_ - Multifactor authentication and Extended Logging require server resources and we are unable to provide these features to the community for free.
