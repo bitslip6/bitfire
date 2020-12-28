@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/issues) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
-## Enterprise class security for Everyone. 
+## Enterprise class security for everyone
 
 **True learning Web Application Firewall learns your website and filters input to only allow valid behaviors.**
 **Stop worms, web defacements, bots, spam, malware and other malicious activity on your website.**
