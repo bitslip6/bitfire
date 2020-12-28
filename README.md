@@ -1,9 +1,9 @@
 # bitfire
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Issues](https://img.shields.io/github/issues-raw/tterb/PlayMusic.svg?maxAge=25000)](https://github.com/bitslip6/bitfire/issues)  
-[![Discord Chat](https://img.shields.io/discord/VZ3C3bFK)](https://discord.gg/VZ3C3bFK)  
-https://img.shields.io/badge/<LABEL>-<MESSAGE>-<COLOR>
+[![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/issues)  
+[![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK)  
+[![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 ## Enterprise class security for Everyone. 
 
