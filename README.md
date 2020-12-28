@@ -1,4 +1,10 @@
 # bitfire
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Issues](https://img.shields.io/github/issues-raw/tterb/PlayMusic.svg?maxAge=25000)](https://github.com/bitslip6/bitfire/issues)  
+[![Discord Chat](https://img.shields.io/discord/VZ3C3bFK)](https://discord.gg/VZ3C3bFK)  
+https://img.shields.io/badge/<LABEL>-<MESSAGE>-<COLOR>
+
 ## Enterprise class security for Everyone. 
 
 **True learning Web Application Firewall learns your website and filters input to only allow valid behaviors.**
