@@ -1,0 +1,19 @@
+{
+    "name": "bitslip6/bitfire",
+    "type": "application",
+    "description": "Enterprise bot/spam protection for PHP, XSS/SQLi, HTTP security headers, CSRF, grammer based parsing, <2ms processing time.",
+    "keywords": ["firewall","security", "headers", "xss", "sqli", "csrf", "waf"],
+    "homepage": "https://github.com/bitslip6/bitfire",
+    "license": "LGPL3",
+    "authors": [
+        {
+            "name": "Cory Marsh",
+            "email": "info@bitfire.com",
+            "homepage": "http://bitslip6.com/",
+            "role": "Architect"
+        }
+    ],
+    "require": {
+        "php": ">=7.1.0"
+    },
+}
