@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 
-\tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU); 
+//\tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU); 
 
 // system root paths and timing
 $m0 = microtime(true);
