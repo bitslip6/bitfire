@@ -4,7 +4,7 @@
     "description": "Enterprise bot/spam protection for PHP, XSS/SQLi, HTTP security headers, CSRF, grammer based parsing, <2ms processing time.",
     "keywords": ["firewall","security", "headers", "xss", "sqli", "csrf", "waf"],
     "homepage": "https://github.com/bitslip6/bitfire",
-    "readme": "README.md"
+    "readme": "README.md",
     "license": "LGPL-3.0-or-later",
     "authors": [
         {
@@ -19,7 +19,7 @@
         "issues": "https://github.com/bitslip6/bitfire/issues",
         "chat": "https://discord.com/channels/793172132191928341/793172132673880065",
         "wiki": "https://github.com/bitslip6/bitfire/wiki"
-    }
+    },
     "require": {
         "php": ">=7.1.0"
     },
