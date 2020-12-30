@@ -33,6 +33,10 @@ function send_security_headers(?array $request) : void {
     // set strict transport security (HSTS)
     if (\Bitfire\Config::enabled("enforce_ssl_1year")) {
         header("Strict-Transport-Security: max-age=31536000; preload");
+        if (($_SERVER['REQUEST_SCHEME']??'https') === 'http') {
+             header("Location: https://". $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']);
+             die();
+        }
     }
 
     // set a default feature policy
