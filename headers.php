@@ -26,8 +26,8 @@ function send_security_headers(?array $request) : void {
 
     header("X-Frame-Options: deny");
     header("X-Content-Type-Options: nosniff");
-    header("X-XSS-Protection: 1; report=$path");
-    header("Referer-Policy: strict-origin-when-cross-origin");
+    header("X-XSS-Protection: 1; mode=block");
+    header("Referrer-Policy: strict-origin-when-cross-origin");
     header('Report-To: {"group":"bitfire","max_age":2592000,"endpoints":[{"url"'.$path.'"}],"include_subdomains":true}');
 
     // set strict transport security (HSTS)
@@ -39,8 +39,8 @@ function send_security_headers(?array $request) : void {
     if (\BitFire\Config::enabled("default_feature_policy")) {
         // TODO: replace with reduce_map
         header(\TF\map_reduce(FEATURE_POLICY, function($key, $value, $carry) {
-                return  $carry . $key . " '$value'; ";
-            }, "Feature-Policy: ") );
+                return  $carry . $key . "=('$value'), ";
+            }, "Permissions-Policy: ") );
     }
     
     if (\BitFire\Config::enabled("nel")) {
