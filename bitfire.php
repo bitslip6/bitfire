@@ -17,6 +17,8 @@ const BITFIRE_MAX_PAGES = 200;
 const WAF_MIN_HIT = 25;
 const WAF_MIN_PERCENT = 10;
 
+const CONFIG_WHITELIST_ENABLE='whitelist_enable';
+const CONFIG_BLACKLIST_ENABLE='blacklist_enable';
 const CONFIG_REQUIRE_BROWSER = 'require_full_browser';
 const CONFIG_USER_TRACK_COOKIE = 'user_tracking_cookie';
 const CONFIG_MAX_CACHE_AGE = 'max_cache_age';
