@@ -33,17 +33,7 @@ const FAIL_FILE_UPLOAD = 15012;
 
 class WebFilter {
 
-    protected $os;
-    protected $is_browser;
-    protected $_generic_blocks;
-    protected $_generic_regex;
-    protected $_risky_blocks;
-    protected $_platform_blocks;
-    protected $_xss_blocks;
-    protected $_sitring_blocks;
-
-    protected $_values;
-    protected $_keys;
+    protected $_search_sql;
     protected $_reducer;
 
     public function __construct(\TF\CacheStorage $cache) {
