@@ -11,7 +11,7 @@ interface Storage {
  * trivial cache abstraction with support for apcu, shared memory and zend opcache 
  */
 class CacheStorage implements Storage {
-    protected static $_type = 'nop';
+    protected static $_type = 'shm';
     protected static $_instance = null;
     protected $_shmop = null;
     protected $_shm = null;
@@ -21,7 +21,7 @@ class CacheStorage implements Storage {
         self::$_type = $cache_type;
     }
 
-    public static function get_instance() {
+    public static function get_instance() : CacheStorage {
         if (self::$_instance === null) {
             self::$_instance = new CacheStorage();
         }
@@ -86,7 +86,6 @@ class CacheStorage implements Storage {
                 break;
             case "apcu":
                 $value = \apcu_fetch($key_name, $success);
-                debug(" ^^ load cache [$key_name] [".print_r($value, true). "] [$success]");
                 break;
             case "opcache":
                 @include($this->key2name($key_name));
@@ -105,6 +104,7 @@ class CacheStorage implements Storage {
     public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$params) {
         assert(self::$_type !== null, "must call set_type before using cache");
         if (($data = $this->load_data($key_name)) === null) {
+            
             $data = $generator(...$params);
             $this->save_data($key_name, $data, $ttl);
         }
