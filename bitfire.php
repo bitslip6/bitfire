@@ -52,6 +52,8 @@ const THROTTLE_LOCK_FILE = ".bitfire.lock";
 
 const FAIL_NOT = 0;
 
+const PROFANITY = "anal|anus|arse|ass|asss|bastard|bitch|cock|cocksuck|coon|crap|cunt|cyberfuck|damn|dick|douche|fag|faggot|fuck|fuck\s+you|fuckhole|god damn|gook|homoerotic|hore|lesbian|mother|fucker|motherfuck|motherfucker|negro|nigger|penis|penisfucker|piss|porn|pussy|retard|sex|shit|slut|son\s+of\s+a\s+bitch|tits|viagra|whore";
+
 require_once WAF_DIR."storage.php";
 require_once WAF_DIR."util.php";
 require_once WAF_DIR."english.php";
@@ -344,6 +346,7 @@ class BitFire
         if (!isset($_SERVER['REQUEST_URI'])) { return $block; }
 
 		if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
+            include WAF_DIR."headers.php";
 			\BitFireHeader\send_security_headers($this->_request);
 		}
         
@@ -353,11 +356,15 @@ class BitFire
             $this->bot_filter = new BotFilter($this->cache);
             $block = $this->bot_filter->inspect($this->_request);
         }
+
+        $block->doifnot(array($this, "cache_behind"));
         
         // perform cache behind after bot filtering (don't want to cache bot requests)
+        /*
         if ($block->empty()) {
             $this->cache_behind();
         }
+        */
 
         // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
@@ -366,22 +373,10 @@ class BitFire
             $block = $this->_web_filter->inspect($this->_request);
         }
 
-        // if wordpress is enabled, and we are not an ajax url and a wp-admin page
-        /*
-        if (Config::enabled("wordpress") &&
-            \TF\and_pipe(
-                \TF\partial_right("BitFire\\url_contains", "wp-admin"),
-                "BitFire\is_not_ajax")($this->_request)
-        ) {
-            add_word_press_admin_scripts();
-        }
-        */
-        
         if (!$block->empty()) {
             $ip_data = ($this->bot_filter !== null) ? $this->bot_filter->ip_data : array();
             \BitFire\block_ip($block->value(), $ip_data);
-            //register_shutdown_function('\\BitFire\\log_request', $this->_request, $block->value(), $ip_data);
-            //\BitFire\log_request($this->_request, $block->value(), $ip_data);
+            register_shutdown_function('\\BitFire\\log_request', $this->_request, $block->value(), $ip_data);
         }
 
         return $block;
@@ -605,7 +600,7 @@ function cache_unique() {
  * pure
  */
 function replace_profanity(string $data) : string {
-    return preg_replace('/('.Config::str(CONFIG_PROFANITY).')/', '@#$!%', $data);
+    return preg_replace('/('.PROFANITY.')/', '@#$!%', $data);
 }
 
 
@@ -661,7 +656,7 @@ function param_to_str(array $params, $filter = false) {
     $post_params = array();
     $filtered_names = Config::arr("filtered_logging");
     foreach ($params as $key => &$val) {
-        if ($filter && in_array($key, $filtered_names)) {
+        if ($filtered_names[$key] ?? false) {
             $val = "**FILTERED**";
         } else if (is_array($val) === true) {
             $val = implode(',', $val);
@@ -674,7 +669,7 @@ function param_to_str(array $params, $filter = false) {
 
 
 function block_ip($block, array $ip_data) : void {
-    if (Config::enabled('no_ip_block') || !$block) { return; }
+    if (Config::enabled('allow_ip_block') || !$block) { return; }
     $exp = time();
     if ($block->block_time == 1) {
         $exp += Config::int('short_block_time', 600);

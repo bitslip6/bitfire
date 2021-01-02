@@ -47,6 +47,7 @@ function match_fails(int $fail_code, MatchType $type, $request) : \TF\Maybe {
     if ($type->match($request)) {
         return BitFire::new_block($fail_code, $type->get_field(), $type->matched_data(), 'static match', FAIL_DURATION[$fail_code]??0);
     }
+
     return \TF\Maybe::of(false);
 }
 
@@ -232,15 +233,14 @@ function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
 function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // check if the remote IP is in an allowed list of IPs
     $ip_checks = (strpos($network_regex, ',') > 0) ? explode(',', $network_regex) : array($network_regex);
-    $ip_matches = array_reduce($ip_checks, function($carry, $test_ip) use ($remote_ip) { return $carry || $remote_ip === $test_ip; }, false);
+    $ip_matches = array_reduce($ip_checks, \TF\is_equal_reduced($remote_ip), false);
     if ($ip_matches) { return true; }
 
     // reverse lookup
     $ip = \TF\reverse_ip_lookup($remote_ip)
         ->then(function($value) use ($network_regex) {
             return (preg_match("/$network_regex/", $value)) ? $value : false;
-        })
-        ->then('TF\\ip_lookup');
+        })->then('TF\\ip_lookup');
 
     return $ip() === $remote_ip;
 }
@@ -271,28 +271,17 @@ function validate_host_header(array $valid_domains, array $request) : bool {
  * test if an agent is found in a list of agents
  * $botlist is format "agent match str":reverse ip network:human comment
  */
-function agent_in_list(string $agent, string $ip, array $botlist) : bool {
-    // verify input
-    if (empty($agent) || strlen($agent) <= 1 || count($botlist) < 1) { return false; }
-    // assert(count($botlist) > 0, "can't check empty botlist");
-    //print_r($botlist);
-    //print_r($ip);
-    //print_r($agent);
+function agent_in_list(string $a, string $ip, array $list) : bool {
+    if (empty($a) || strlen($a) <= 1 || count($list) < 1) { return false; }
 
-    foreach ($botlist as $bot) {
-        $parts = explode(":", $bot);
-        // assert(strlen($parts) > 1, "bot definition missing network");
+    foreach ($list as $k => $v) {
 
-        $botmatch = (strlen($parts[0]) < 1) ? 'nosuchstring' : $parts[0];
-        if (stripos($agent, trim($botmatch. ' ')) === false) { continue; }
+        if (stripos($a, $k) === false) { continue; }
 
         // reverse lookup, or just return found
-        if (isset($parts[1])) {
-            return (substr($parts[1], 0, 2) == "AS") ?
-                \BitFireBot\verify_bot_as($ip, $parts[1]) :
-                \BitFireBot\verify_bot_ip($ip, $parts[1]);
-        }
-        return $parts[0];
+        return (substr($v, 0, 2) == "AS") ?
+            \BitFireBot\verify_bot_as($ip, $v) :
+            \BitFireBot\verify_bot_ip($ip, $v);
     }
 
     // no match, return false
