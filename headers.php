@@ -6,7 +6,8 @@ use const BitFire\REQUEST_PATH;
 
 const CONFIG_ENFORCE_SSL = "encorfe_ssl_1year";
 
-const FEATURE_POLICY = array('geolocation' => '*', 'midi' => 'self', 'notifications' => 'self', 'push' => 'self', 'sync-xhr' => 'self', 'microphone' => 'self', 'gyroscope' => 'self', 'speaker' => 'self', 'vibrate' => 'self', 'fullscreen' => 'self', 'payment' => '*');
+const FEATURE_POLICY = array('accelerometer' => 'self', 'ambient-light-sensor' => 'self', 'autoplay' => 'self', 'camera' => 'self', 'geolocation' => '*', 'midi' => 'self', 'notifications' => 'self', 'push' => 'self', 'sync-xhr' => 'self', 'microphone' => 'self', 'gyroscope' => 'self', 'speaker' => 'self', 'vibrate' => 'self', 'fullscreen' => 'self', 'payment' => '*');
+
 const FEATURE_NAMES = array('geolocation', 'midi', 'notifications', 'push', 'sync-xhr', 'microphone', 'gyroscope', 'speaker', 'vibrate', 'fullscreen', 'payment');
 
 const CSP = array('child-src', 'connect-src', 'default-src', 'font-src',
@@ -40,9 +41,14 @@ function send_security_headers(?array $request) : void {
     }
 
     // set a default feature policy
-    if (\BitFire\Config::enabled("default_feature_policy")) {
+    if (\BitFire\Config::enabled("feature_policy")) {
+
+        $policy = array('geolocation' => '', 'midi' => '', 'notifications' => '', 'push' => '', 'sync-xhr' => '', 'microphone' => '', 'gyroscope' => '', 'speaker' => '', 'vibrate' => '', 'fullscreen' => '', 'payment' => '');
+        foreach(\BitFire\Config::arr("allowed_features") as $feature => $value) {
+            $policy[$feature] = $value;
+        }
         // TODO: replace with reduce_map
-        header(\TF\map_reduce(FEATURE_POLICY, function($key, $value, $carry) {
+        header(\TF\map_reduce($policy, function($key, $value, $carry) {
                 return  $carry . $key . "=('$value'), ";
             }, "Permissions-Policy: ") );
     }
