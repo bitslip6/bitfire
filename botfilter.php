@@ -26,12 +26,10 @@ const IPDATA_RR_5M='rr_5m';
 
 const CONFIG_HONEYPOT='honeypot_url';
 const CONFIG_METHODS='allowed_methods';
-const CONFIG_WHITELIST_ENABLE='whitelist_enable';
 const CONFIG_WHITELIST='botwhitelist';
-const CONFIG_BLACKLIST_ENABLE='blacklist_enable';
-const CONFIG_BLACKLIST='blacklist';
 const CONFIG_RATE_LIMIT_ACTION='rate_limit_action';
 const CONFIG_MFA_PAGES='mfa_pages';
+const CONFIG_BLACKLIST='blacklist';
 
 
 const AGENT_OS = 'os';
