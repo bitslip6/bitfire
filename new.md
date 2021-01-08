@@ -1,19 +1,6 @@
 
 <!-- SHIELDS -->
-<!--
-*** I'm using markdown "reference style" links for readability.
-*** Reference links are enclosed in brackets [ ] instead of parentheses ( ).
-*** See the bottom of this document for the declaration of the reference variables
-*** for contributors-url, forks-url, etc. This is an optional, concise syntax you may use.
-*** https://www.markdownguide.org/basic-syntax/#reference-style-links
-
-[![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
--->
-[![Issues][issues-shield]][issues-url]
-[![Apache 2.0 License][license-shield]][license-url]
+[![License: GPL v3](https://img.shields.io/github/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/apache-2.0) [![Issues](https://img.shields.io/github/license/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/issues) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 
 
