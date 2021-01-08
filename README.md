@@ -1,13 +1,49 @@
-# BitFire
+# BitFire 
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/issues) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 ## Enterprise class security for everyone
 
-**True learning Web Application Firewall learns your website and filters input to only allow valid behaviors.**
-**Stop worms, web defacements, bots, spam, malware and other malicious activity on your website.**
+#### Free firewall for all PHP based web servers. Stop worms, web defacements, bots, spam, malware and other malicious activity on your website.
 
-* highly efficient filtering runs in <2ms on most servers.
+
+* Fastest full stack startup and block time of any PHP based firewall (up to 200-300x faster).  
+
+[![Performance](https://img.shields.io/badge/block%20speed-<%201%20ms-yellowgreen?style=for-the-badge)](https://php)
+
+
+
+
+* The only PHP host based fire with complete server side and client side integrity protection. 
+
+* Verify allowed bots (like GoogleBot) by it's origin network (google.com) and prevent bots from impersonating browsers by JavaScript verification challanges that identify real browsers from even the most sophisticated bots.
+
+
+[![Performance](https://img.shields.io/badge/Bot%20Blocking-DNS%20/%20AS-yellowgreen?style=for-the-badge)](https://php)
+[![Performance](https://img.shields.io/badge/Browser%20Verify-Full%20Javascript-yellowgreen?style=for-the-badge)](https://php)
+
+
+* Clientside integrity protection works to seemlesly create browser policy files that prevent attackers from loading malicious scripts that could compromise your user's security.
+
+[![Performance](https://img.shields.io/badge/Client%20Protection-Full%20CSP-yellowgreen?style=for-the-badge)](https://php)
+
+
+* Serverside integrity protection actaully blocks all file modification at the operating system level and only unlocks the server for a liomited time to upgrade or install software when the correct pass phrase is entered.
+
+[![Performance](https://img.shields.io/badge/Site%20Protection-%20OS%20Lock-yellowgreen?style=for-the-badge)](https://php)
+
+* Malware Scanning, SQL Injection, Cross Site Scripting, Server Side Includes, XML Entities and many more, tested before every release
+
+[![Performance](https://img.shields.io/badge/SQLi%20Signatures->%203200-yellowgreen?style=for-the-badge)](https://php)
+[![Performance](https://img.shields.io/badge/XSS%20Signatures->%201100-yellowgreen?style=for-the-badge)](https://php)
+[![Performance](https://img.shields.io/badge/Extra%20Signatures%20->%20900%20-yellowgreen?style=for-the-badge)](https://php)
+
+
+
+Filtering details:
+
+
+* highly efficient filtering runs in <1ms on most servers.
 * Block rate for AWS T2 micro servers >120 full HTTP blocks per second.
 * Filtering for ALL bot traffic.  Bot IP address filtering and human javascript verification ensures that only authorized bots are allowed.
 * add multi factor (SMS based) authentication for up to 10 site admins.
@@ -26,7 +62,7 @@
 functional programming design with moslty pure functions and full code coverage gives you peace of mind that your code is solid.
 
 
-## OWASP top 10 features (honest info)
+## OWASP top 10 features break down (honest info)
  
 ### 1: injection *2:
 out of the box we block all html tags and javascript attributes for XSS protection with whitelisting single url and parameter combinations for any valid pages or trusted users.  We have robust SQL detection that actually parses input for SQL and fails the request.  We also filter any local file paths such as /bin/foobar, /etc/foobar, /sbin/foobar, C:\boot.ini, cmd.exe, etc.  BitFIRE not currently offer LDAP filtering. Drop a feature request in #issues if this is something you would like to see.
