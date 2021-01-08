@@ -30,7 +30,7 @@
 
 * Serverside integrity protection actaully blocks all file modification at the operating system level and only unlocks the server for a liomited time to upgrade or install software when the correct pass phrase is entered.
 
-[![Performance](https://img.shields.io/badge/Site%20Protection-%20OS%20Lock-yellowgreen?style=for-the-badge)](https://php)
+[![Performance](https://img.shields.io/badge/Site%20Protection-%20OS%20File%20Lock-yellowgreen?style=for-the-badge)](https://php)
 
 * Malware Scanning, SQL Injection, Cross Site Scripting, Server Side Includes, XML Entities and many more, tested before every release
 
