@@ -21,7 +21,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/bitslip6/bitfire">
-    <img src="views/logo.png" alt="Logo" width="80" height="80">
+    <img src="views/bitslip.png" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">BitFire</h3>
@@ -118,7 +118,7 @@ You will need a webserver running PHP >= 7.1, a login, sudo access to edit php.i
    or for composer:
    vendor/bin/updatekeys.sh
    ```
-3. *Optional.*  Install by hand.  Edit bitfire/config.ini and change: *_encryption_key_* and *_secret_*.  
+3. *Optional.*  Hand install.  Edit bitfire/config.ini and change: *_encryption_key_* and *_secret_*.  
 Edit your php.ini file (/etc/php/7.4/fpm/php.ini or similar) and set 
 ```ini 
 auto_prepend_file ='/full/path/to/bitfire/startup.php';
@@ -185,7 +185,7 @@ sql_block = true
 ```
 
 6. Enable IP blocking.  By default BitFire will not black list IPS.  We recommend you enable this feature since
-it allows for the fastest possbile drop of request floods for DoS attacks.
+it allows for the fastest possbile drop of request floods for HTTP floods.
 ```ini
 allow_ip_block = true
 ```
@@ -199,14 +199,14 @@ _For detailed documentation, please refer to the [Documentation](https://github.
 <!-- ROADMAP -->
 ## Roadmap
 
-See the [open issues](https://github.com/othneildrew/Best-README-Template/issues) for a list of proposed features (and known issues).
+See the [open issues](https://github.com/bitslip6/bitfire/issues) for a list of proposed features (and known issues).
 
 
 
 <!-- CONTRIBUTING -->
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Additions to the bot whitelist and additional attack signatures or bypasses are **greatly appreciated**.  If your contributions are included you will recieve discounts on comercial licencing for BitFire Pro.
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -219,49 +219,28 @@ Contributions are what make the open source community such an amazing place to b
 <!-- LICENSE -->
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the Apache 2.0 License. See `LICENSE` for more information.
 
 
 
 <!-- CONTACT -->
 ## Contact
 
-Your Name - [@your_twitter](https://twitter.com/your_username) - email@example.com
+Your Name - [@bitslip6](https://twitter.com/bitslip6) - info@bitslip6.com
 
-Project Link: [https://github.com/your_username/repo_name](https://github.com/your_username/repo_name)
+Project Link: [https://github.com/bitslip6/bitfire](https://github.com/bitslip6/bitfire)
 
 
 
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
-* [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
 * [Img Shields](https://shields.io)
 * [Choose an Open Source License](https://choosealicense.com)
-* [GitHub Pages](https://pages.github.com)
-* [Animate.css](https://daneden.github.io/animate.css)
-* [Loaders.css](https://connoratherton.com/loaders)
-* [Slick Carousel](https://kenwheeler.github.io/slick)
-* [Smooth Scroll](https://github.com/cferdinandi/smooth-scroll)
-* [Sticky Kit](http://leafo.net/sticky-kit)
-* [JVectorMap](http://jvectormap.com)
 * [Font Awesome](https://fontawesome.com)
+* [Bootstrap](https://getbootstrap.com)
 
 
 
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
-<!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/othneildrew/Best-README-Template.svg?style=for-the-badge
-[contributors-url]: https://github.com/othneildrew/Best-README-Template/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/othneildrew/Best-README-Template.svg?style=for-the-badge
-[forks-url]: https://github.com/othneildrew/Best-README-Template/network/members
-[stars-shield]: https://img.shields.io/github/stars/othneildrew/Best-README-Template.svg?style=for-the-badge
-[stars-url]: https://github.com/othneildrew/Best-README-Template/stargazers
-[issues-shield]: https://img.shields.io/github/issues/othneildrew/Best-README-Template.svg?style=for-the-badge
-[issues-url]: https://github.com/othneildrew/Best-README-Template/issues
-[license-shield]: https://img.shields.io/github/license/othneildrew/Best-README-Template.svg?style=for-the-badge
-[license-url]: https://github.com/othneildrew/Best-README-Template/blob/master/LICENSE.txt
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/othneildrew
-[product-screenshot]: images/screenshot.png
