@@ -20,7 +20,7 @@
 
 
 [![Performance](https://img.shields.io/badge/Bot%20Blocking-DNS%20/%20AS-yellowgreen?style=for-the-badge)](https://php)
-[![Performance](https://img.shields.io/badge/Browser%20Verify-Full%20Javascript-yellowgreen?style=for-the-badge)](https://php)
+[![Performance](https://img.shields.io/badge/Browser%20Verification-Full%20Javascript-yellowgreen?style=for-the-badge)](https://php)
 
 
 * Clientside integrity protection works to seemlesly create browser policy files that prevent attackers from loading malicious scripts that could compromise your user's security.
