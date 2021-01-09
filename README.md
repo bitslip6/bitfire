@@ -1,6 +1,6 @@
 
 <!-- SHIELDS -->
-[![License: Apache 2](https://img.shields.io/github/license/bitslip6/bitfire)](https://www.apache.org/licenses/LICENSE-2.0)
+[![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](https://www.gnu.org/licenses/agpl-3.0.en.html)
 [![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 
@@ -15,7 +15,7 @@
   <h3 align="center">BitFire</h3>
 
   <p align="center">
-Enterprise class security for everyone
+enterprise class security for everyone
     <br />
     <a href="https://github.com/bitslip6/bitfire/wiki"><strong>Explore the docs »</strong></a>
     <br />
