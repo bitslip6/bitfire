@@ -1,6 +1,7 @@
 
 <!-- SHIELDS -->
-[![License: GPL v3](https://img.shields.io/github/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/apache-2.0) [![Issues](https://img.shields.io/github/license/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/issues) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
+[![License: Apache 2](https://img.shields.io/github/license/bitslip6/bitfire)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Issues](https://img.shields.io/github/license/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/license) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 
 
