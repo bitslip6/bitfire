@@ -1,7 +1,7 @@
 
 <!-- SHIELDS -->
 [![License: Apache 2](https://img.shields.io/github/license/bitslip6/bitfire)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Issues](https://img.shields.io/github/license/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/license) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
+[![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 
 
