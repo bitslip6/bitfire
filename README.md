@@ -95,46 +95,45 @@ You will need a webserver running PHP >= 7.1, a login, sudo access to edit php.i
 
 ### Installation
 
-1. Clone the repo *OR* install via composer
+- *Install via GitHub*
    ```sh
    git clone https://github.com/bitslip6/bitfire.git
+   ./bitfire/updatekeys.sh
+   ```
+- or *Install via Composer*
+   ```
    composer require bitslip6/bitfire
+   ./vendor/bin/updatekeys.sh
    ```
-2. Install.  The update script will create new encryption keys and will prompt to add bitfire your php.ini files.
-   ```
-   bitfire/updatekeys.sh
-   or for composer:
-   vendor/bin/updatekeys.sh
-   ```
-3. *Optional.*  Hand install.  Edit bitfire/config.ini and change: *_encryption_key_* and *_secret_*.  
+- or *Install by hand*
+Edit bitfire/config.ini and change: *_encryption_key_* and *_secret_*.  
 Edit your php.ini file (/etc/php/7.4/fpm/php.ini or similar) and set 
 ```ini 
 auto_prepend_file ='/full/path/to/bitfire/startup.php';
 ```
 
-4. Bitfire is now installed. The default config will not block anything until enabled.  set *_bitfire_enabled_* in `config.ini`
+- *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini`
    ```ini
    bitfire_enabled = true;
    ```
-5. congradulations!  BitFire is installed.
+- Congradulations! Time for a beer
 
 
 
 <!-- SETUP -->
 ## Setup / Configuration Quickstart
 
-
-All BitFire settings are optional.  The default config is very conservative and will only block
+The default config is very conservative and will only block
 bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire
 home directory (your github checkout location, or for composer vendor/bitslip6/bitfire/config.ini)
 
-1. First setup your in-memory cache type.  BitFire stores server state in memory for fast response 
+*1.* First setup your in-memory cache type.  BitFire stores server state in memory for fast response 
 time and supports all PHP in memory caches. We preefeer in order: *shm*, *apcu*, *shmop*.  If you
 are unsure which cache your server supports, see php_info() output.  Look for "shm", "apcu" and "shmop"
 and set *_cache_type_* in `config.ini` to your chosen cache or 'nop' for no cache.
 
 
-2. Next configure a browser honey pot.  Set *_honeypot_url*_ in `config.ini` to anything you like, 
+*2.* Next configure a browser honey pot.  Set *_honeypot_url*_ in `config.ini` to anything you like, 
 or leave the default.  Malicious bots looking for secure areas of your site will read this, request
 the url and get banned for 24 hours.  Good bots will respect the Disallow. Add your url to your robots.txt file:
 ```ini
@@ -147,7 +146,7 @@ Disallow: /not_important/contact
 ```
 
 
-3. Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
+*3.* Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
 require all web browers to prove they support both by enabling *require_full_browser*.  Since >95% of
 all exploit scripts and worms do not support JavaScript or cookies this is the single best protection
 you can install to prevent breakins.  This cookie is non user-identifying and so is fully GDPR compliant
@@ -157,13 +156,13 @@ require_full_browser = true
 ```
 
 
-4. Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
+*4.* Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
 list of common bots included with BitFire.  Refer to our wiki for how to add additional bots.
 ```ini
 whitelist_enable = true
 ```
 
-5. Enable core web filter.  The web filter blocks malicious requets like XSS and SQLi as well as many others.
+*5.* Enable core web filter.  The web filter blocks malicious requets like XSS and SQLi as well as many others.
 The entire web filter can be enabled or disabled with the *web_filter_enabled* parameter.  We recommend
 the following configuration:
 ```ini
@@ -172,7 +171,7 @@ xss_block = true
 sql_block = true
 ```
 
-6. Enable IP blocking.  By default BitFire will not black list IPS.  We recommend you enable this feature since
+*6.* Enable IP blocking.  By default BitFire will not black list IPS.  We recommend you enable this feature since
 it allows for the fastest possbile drop of request floods for HTTP floods.
 ```ini
 allow_ip_block = true
