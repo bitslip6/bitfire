@@ -294,7 +294,7 @@ function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn)
     return if_else($header !== null, 
         function() use ($ctx, $header) {
             return unserialize(shmop_read($ctx['rid'], 
-                $header['offset'], $header['len']), array("allowed_classes" => false)); },
+                $header['offset'], $header['len']), array("allowed_classes" => array('TF\Maybe'))); },
         function() use ($ctx, $key, $ttl, $fn) {
             $data = $fn();
             cuckoo_write($ctx, $key, $ttl, $data);
@@ -312,7 +312,7 @@ function cuckoo_read(array $ctx, string $key)
         unserialize(
             shmop_read($ctx['rid'], 
             $header['offset'],
-            $header['len']), array("allowed_classes" => false));
+            $header['len']), array("allowed_classes" => array('TF\Maybe')));
 }
 
 
@@ -325,6 +325,7 @@ function cuckoo_read(array $ctx, string $key)
  */
 function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void
 {   
+die("init mem\n");
     // some rules about our cache
     assert($items <= 100000, "max 100K items in cache");
     assert($chunk_size <= 16384, "max base chunk_size 16K");

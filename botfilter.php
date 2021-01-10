@@ -79,9 +79,8 @@ class BotFilter {
         // todo: add support for cas
         $t = time();
         if ($this->ip_data === null) {
-            $cnt = $this->cache->load_data('core_ctr');
-            $cnt = ($cnt == null) ? 1 : $cnt + 1;
-            $this->cache->save_data('core_ctr', $cnt, 86400*30);
+
+            $cnt = $this->cache->update_data('core_ctr', function($cnt) { return $cnt+1; }, 0, 86400);
             if ($cnt > 500) { $this->_config = array(); }
             $this->ip_data = array('rr_5t' => $t+60*5, 'rr_5m' => 0, 'rr_1m' => 0, 'rr_1t' => $t+60, 'ref' => \substr(\uniqid(), 5, 8), '404' => 0, '500' => 0);
         }
@@ -149,7 +148,7 @@ class BotFilter {
             }
             $foo = "Location: " . $request['SCHEME'] . '://' . $request['HOST'] . ":" . $request['PORT'] . "$url";
             header($foo);
-            die();
+            exit();
         }
 
         // handle robots
@@ -231,16 +230,20 @@ function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
 function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // check if the remote IP is in an allowed list of IPs
     $ip_checks = (strpos($network_regex, ',') > 0) ? explode(',', $network_regex) : array($network_regex);
-    $ip_matches = array_reduce($ip_checks, \TF\is_equal_reduced($remote_ip), false);
+    $ip_matches = array_reduce($ip_checks, \TF\is_regex_reduced($remote_ip), false);
     if ($ip_matches) { return true; }
 
-    // reverse lookup
+    // fwd and reverse lookup
     $ip = \TF\reverse_ip_lookup($remote_ip)
-        ->then(function($value) use ($network_regex) {
-            return (preg_match("/$network_regex/", $value)) ? $value : false;
-        })->then('TF\\ip_lookup');
+        ->then(function($value) use ($ip_checks) {
+            return array_reduce($ip_checks, \TF\find_regex_reduced($value), false);
+        })->then('TF\\fast_ip_lookup');
 
     return $ip() === $remote_ip;
+}
+
+function fast_verify_bot_as(string $remote_ip, string $network) : bool {
+    return \TF\memoize('\BitFireBot\verify_bot_as', "_bf_as_{$network}_{$remote_ip}", 3600)($remote_ip, $network);
 }
 
 // verify that $remote ip is part of the AS network number $network
@@ -278,7 +281,7 @@ function agent_in_list(string $a, string $ip, array $list) : bool {
 
         // reverse lookup, or just return found
         return (substr($v, 0, 2) == "AS") ?
-            \BitFireBot\verify_bot_as($ip, $v) :
+            \BitFireBot\fast_verify_bot_as($ip, $v) :
             \BitFireBot\verify_bot_ip($ip, $v);
     }
 
@@ -476,8 +479,8 @@ function require_browser_or_die(array $request, \TF\Maybe $cookie) {
     }
 
     //echo make_js_challenge($request[REQUEST_IP],  string $tracking_param, string $encrypt_key, string $utc_name) : string {
-    echo make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE));
-    die();
+    exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
+    
 }
 
 function strip_path_tracking_params(array $request) {
