@@ -1,34 +1,49 @@
 <?php declare(strict_types=1);
 namespace TF;
+/**
+ * TODO: refactor and make more DRY, possibly functional
+ */
 
 interface Storage {
     public function save_data(string $key_name, $data, int $ttl);
     public function load_data(string $key_name);
     public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$data);
+    public function update_data(string $key_name, callable $fn, $init, int $ttl);
 }
 
 /**
  * trivial cache abstraction with support for apcu, shared memory and zend opcache 
  */
 class CacheStorage implements Storage {
-    protected static $_type = 'shm';
+    protected static $_type = 'shmop';
     protected static $_instance = null;
     protected $_shmop = null;
     protected $_shm = null;
+    protected $sems = array();
 
     // a string of, apcu, opcache, shmop, shmem
     public static function set_type(string $cache_type) {
+        assert(in_array($cache_type, array('shm', 'shmop', 'apcu', 'nop')));
+        echo "set type [$cache_type]\n";
         self::$_type = $cache_type;
     }
 
     public static function get_instance() : CacheStorage {
         if (self::$_instance === null) {
-            self::$_instance = new CacheStorage();
+            self::$_instance = new CacheStorage(self::$_type);
         }
         return self::$_instance;
     }
 
-    public function __construct($type = '') {
+    /**
+     * remove all created semaphores...
+     */
+    public function __destruct() {
+        foreach ($this->sems as $sem) { sem_remove($sem); }
+    }
+
+    protected function __construct($type = 'nop') {
+        echo "construct [$type]\n";
         if ($type !== '') { self::$_type = $type; }
         if (self::$_type === "shmop") {
             require_once WAF_DIR . "cuckoo.php";
@@ -47,6 +62,7 @@ class CacheStorage implements Storage {
 
     /**
      * save data to keyname
+     * TODO: add flag for not overwitting important data and not writting transient data to opcache 
      */
     public function save_data(string $key_name, $data, int $seconds) {
         assert(self::$_type !== null, "must call set_type before using cache");
@@ -58,19 +74,53 @@ class CacheStorage implements Storage {
                 $this->_shmop->write($key_name, $seconds, $data);
                 return;
             case "apcu":
-                \apcu_store($key_name, $data, $seconds);
+                \apcu_store("_bitfire:$key_name", $data, $seconds);
                 return;
             case "opcache":
                 $s = var_export($data);
-                $ttl = time() + $seconds; 
-                file_put_contents($this->key2name($key_name), "<?php \$value = $s; \$success = (time() < $ttl);", LOCK_EX);
+                $exp = time() + $seconds; 
+                file_put_contents($this->key2name($key_name), "<?php \$value = $s; \$success = (time() < $exp);", LOCK_EX);
                 return;
             default:
                 return;
         }
     }
 
-    public function load_data(string $key_name) {
+    public function lock(string $key) {
+        $sem = null;
+        if (function_exists('sem_acquire')) {
+            $opt = (PHP_VERSION_ID >= 80000) ? true : 1;
+            $sem = sem_get(crc32($key), 1, 0600, $opt);
+            if (!sem_acquire($sem, true)) { return null; };
+            $this->sems[] = $sem;
+        }
+        return $sem;
+    }
+
+    /**
+     * FIFO buffer or $num_items, ugly, refactor
+     */
+    public function rotate_data(string $key_name, $data, int $num_items) {
+        $sem = $this->lock($key_name);
+        $saved = $this->load_data($key_name);
+        if (!\is_array($saved)) { $saved = array($data); }
+        else { $saved[] = $data; }
+
+        $this->save_data($key_name, array_slice($saved, 0, $num_items), 86400*30);
+        if (function_exists('sem_acquire')) { sem_release(($sem)); }
+    }
+
+    public function update_data(string $key_name, callable $fn, $init, int $ttl) {
+        $sem = $this->lock($key_name);
+        $data = $this->load_data($key_name);
+        if ($data === null) { $data = $init; }
+        $updated = $fn($data);
+        $this->save_data($key_name, $updated, $ttl);
+        if (function_exists('sem_acquire')) { sem_release(($sem)); }
+        return $updated;
+    }
+
+    public function load_data(string $key_name, $init = null) {
         assert(self::$_type !== null, "must call set_type before using cache");
 
         $value = null;
@@ -85,7 +135,7 @@ class CacheStorage implements Storage {
                 $success = ($value !== null);
                 break;
             case "apcu":
-                $value = \apcu_fetch($key_name, $success);
+                $value = \apcu_fetch("_bitfire:$key_name", $success);
                 break;
             case "opcache":
                 @include($this->key2name($key_name));
@@ -95,7 +145,7 @@ class CacheStorage implements Storage {
         }
 
         // force failure to return null
-        return ($success !== false) ? $value : null;
+        return ($success !== false) ? $value : $init;
     }
 
     /**
@@ -104,7 +154,6 @@ class CacheStorage implements Storage {
     public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$params) {
         assert(self::$_type !== null, "must call set_type before using cache");
         if (($data = $this->load_data($key_name)) === null) {
-            
             $data = $generator(...$params);
             $this->save_data($key_name, $data, $ttl);
         }
@@ -138,6 +187,12 @@ class FileStorage implements Storage {
     public function load_data(string $key_name) {
         $contents = file_get_contents($this->_write_path . "{$key_name}.profile");
         return ($contents !== false) ? json_decode($contents, true) : null;
+    }
+
+    public function update_data(string $key_name, callable $fn, $init, int $ttl) {
+        $data = $this->load_data($key_name);
+        if ($data === null) { $data = $init; }
+        $this->save_data($key_name, $fn($data), $ttl);
     }
 
     /**
