@@ -24,7 +24,6 @@ class CacheStorage implements Storage {
     // a string of, apcu, opcache, shmop, shmem
     public static function set_type(string $cache_type) {
         assert(in_array($cache_type, array('shm', 'shmop', 'apcu', 'nop')));
-        echo "set type [$cache_type]\n";
         self::$_type = $cache_type;
     }
 
@@ -43,7 +42,6 @@ class CacheStorage implements Storage {
     }
 
     protected function __construct($type = 'nop') {
-        echo "construct [$type]\n";
         if ($type !== '') { self::$_type = $type; }
         if (self::$_type === "shmop") {
             require_once WAF_DIR . "cuckoo.php";

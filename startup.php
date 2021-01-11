@@ -19,8 +19,6 @@ try {
 
 	$bitfire = \BitFire\BitFire::get_instance();
 	$block = $bitfire->inspect();
-
-    $r  = \TF\CacheStorage::get_instance()->load_data("log_data");
 	if (!$block->empty()) {
 		//$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 9 || $elm['cpu'] > 9); }); 
 		//file_put_contents("/tmp/block.json", json_encode($data, JSON_PRETTY_PRINT));

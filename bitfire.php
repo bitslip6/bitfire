@@ -12,7 +12,7 @@ if (defined('BITFIRE_VER')) { return; }
 const FEATURE_CLASS = array(10000 => 'xss_block', 15000 => 'xss_block', 13000 => 'xss_block', 14000 => 'xss_block', 15000 => 'xss_block');
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 70000 => 0);
-const BITFIRE_VER = 105;
+const BITFIRE_VER = 110;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_COMMAND = "BITFIRE_API";
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/bitconfig.ini");
@@ -129,13 +129,22 @@ class MatchType
         $this->_block_time = $block_time;
     }
 
-    public function match(array $request) : bool {
+    public function match(array $request) {
         $this->_matched = $request[$this->_key] ?? '';
         switch ($this->_type) {
             case MatchType::EXACT: 
                 return $this->_matched === $this->_value;
             case MatchType::CONTAINS: 
-                return strstr($this->_matched, $this->_value) !== false;
+                if (is_array($this->_value)) {
+                    foreach ($this->_value as $v) {
+                        $m = strstr($this->_matched, $v);
+                        if ($m !== false) { 
+                            return $m;
+                        }
+                    }
+                    return false;
+                }
+                return strpos($this->_matched, $this->_value) !== false;
             case MatchType::IN: 
                 return in_array($this->_matched, $this->_value);
             case MatchType::NOTIN: 
@@ -231,7 +240,6 @@ class BitFire
     protected $_ip_data = null;
 
     public $_request = null;
-    private $_page = null;
 
     /** @var BitFire $_instance */
     protected static $_instance = null;
@@ -262,7 +270,7 @@ class BitFire
             $this->_request = process_request($_GET, $_POST, $_SERVER, $_COOKIE);
             
             // we will need cache storage and secure cookies
-            $this->cache = new \TF\CacheStorage(Config::str(CONFIG_CACHE_TYPE, 'shmop'));
+            $this->cache = \TF\CacheStorage::get_instance();
 
             $this->api_call();
             
@@ -342,6 +350,7 @@ class BitFire
                             Config::str(CONFIG_ENCRYPT_KEY),
                             Config::str(CONFIG_USER_TRACK_COOKIE));
                     }
+                    // serve the static page!
                     echo file_get_contents(WAF_DIR . "cache/$page");
                     echo "<!-- cache -->\n";
                     exit();
@@ -400,7 +409,9 @@ class BitFire
         if (!$block->empty()) {
             $ip_data = ($this->bot_filter !== null) ? $this->bot_filter->ip_data : array();
             \BitFire\block_ip($block->value(), $ip_data);
-            register_shutdown_function('\\BitFire\\log_request', $this->_request, $block->value(), $ip_data);
+            register_shutdown_function('\\BitFire\\post_request', $this->_request, $block->value(), $ip_data);
+        } else {
+            register_shutdown_function('\\BitFire\\post_request', $this->_request, null, null);
         }
 
         // dashboard requests
@@ -476,7 +487,7 @@ function process_request(array $get, array $post, array $server, array $cookie =
     // add canonical header values
     $request['REQUESTED_WITH'] = $server['HTTP_X_REQUESTED_WITH'] ?? null;
     $request['FETCH_MODE'] = $server['HTTP_SEC_FETCH_MODE'] ?? null;
-    $request['USER_AGENT'] = $server['HTTP_USER_AGENT'] ?? '';
+    $request[REQUEST_UA] = strtolower($server['HTTP_USER_AGENT']) ?? '';
     $request[REQUEST_SCHEME] = $server['REQUEST_SCHEME'] ?? 'http';
     $request['UPGRADE_INSECURE'] = ($request[REQUEST_SCHEME] == 'http') ? $server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? null : null;
     $request['ACCEPT'] = $server['HTTP_ACCEPT'] ?? 'text/html';
@@ -623,9 +634,21 @@ function replace_profanity(string $data) : string {
 }
 
 
-function log_request(array $request, Block $block, array $ip_data) {
-    $class = intval($block->code / 1000) * 1000;
+function post_request(array $request, ?Block $block, ?array $ip_data) {
+    if ($block === null &&http_response_code() < 300) { return; } 
 
+    // add browser data if available
+    $bot = $whitelist = false;
+    $bot_filter = BitFire::get_instance()->bot_filter;
+    if ($bot_filter !== null) {
+        $bot = $bot_filter->browser['bot'] ?? false;
+        $whitelist = $bot_filter->browser[AGENT_WHITELIST] ?? false;
+    }
+
+    if ($block === null && !$bot) { return; }
+
+
+    $class = intval($block->code / 1000) * 1000;
     $data = array(
         "ip" => $request[REQUEST_IP],
         "ua" => $request[REQUEST_UA] ?? '',
@@ -643,6 +666,8 @@ function log_request(array $request, Block $block, array $ip_data) {
         "match" => $block->value,
         "ver" => BITFIRE_VER,
         "pass" => $block->code === 0 ? true : false,
+        "bot" => $bot,
+        "whitelist" => $whitelist,
         "offset" => 0
     );
     
@@ -656,13 +681,7 @@ function log_request(array $request, Block $block, array $ip_data) {
     }
 
 
-    // add browser data if available
-    $bot_filter = BitFire::get_instance()->bot_filter;
-    if ($bot_filter !== null) {
-        $data["bot"] = $bot_filter->browser['bot'] ?? 'unknown';
-        $data["whitelist"] = $bot_filter->browser[AGENT_WHITELIST] ?? false;
-    }
-
+    
     // cache the last 10 blocks
     $cache = CacheStorage::get_instance();
     $cache->rotate_data("log_data", $data, 10);
