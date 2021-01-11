@@ -444,11 +444,13 @@ function reporting(Block $block) {
     $feature_name =  FEATURE_CLASS[$class] ?? 'bitfire_enabled';
 
     if (Config::str($feature_name) === "report") {
-        $data = array(date('r'), 'block: ' .number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec', $block);
+        $data = array('time' => date('r'),
+            'exec time' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+            'block' => $block);
         $bf = BitFire::get_instance()->bot_filter;
         if ($bf != null) {
-            $data[] = $bf->browser;
-            $data[] = $bf->ip_data;
+            $data['browser'] = $bf->browser;
+            $data['ip'] = $bf->ip_data;
         }
         $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
         file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($data, $opts) . "\n", FILE_APPEND);
