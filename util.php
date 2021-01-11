@@ -22,6 +22,8 @@ function between($data, $min, $max) { return $data >= $min && $data <= $max; }
 function keep_if_key(array $data, callable $fn) { $result = $data; foreach ($data as $key => $item) { if (!$fn($key)) { unset($result[$key]); } return $result; }}
 function if_then_do(callable $test_fn, callable $action, $optionals = null) : callable { return function($argument) use ($test_fn, $action, $optionals) { if ($argument && $test_fn($argument, $optionals)) { $action($argument); }}; }
 function is_equal_reduced($value) : callable { return function($initial, $argument) use ($value) { return ($initial || $argument === $value); }; }
+function is_regex_reduced($value) : callable { return function($initial, $argument) use ($value) { return ($initial || preg_match("/$argument/", $value) >= 1); }; }
+function find_regex_reduced($value) : callable { return function($initial, $argument) use ($value) { return (preg_match("/$argument/", $value) <= 0 ? $initial : $value); }; }
 function is_contain($value) : callable { return function($argument) use ($value) { return (strpos($argument, $value) !== false); }; }
 function is_not_contain($value) : callable { return function($argument) use ($value) { return (strpos($argument, $value) === false); }; }
 function startsWith(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
@@ -44,12 +46,7 @@ function keep_only_size(Maybe $data, int $size) : Maybe { while ($data->size() >
  */
 function memoize(callable $fn, string $key, int $ttl) {
     return function(...$args) use ($fn, $key, $ttl) {
-        $cache = \TF\CacheStorage::get_instance();
-        $result = $cache->load_data($key);
-        if ($result === null) {
-            $result = $fn(...$args);
-            $cache->save_data($key, $result, $ttl);
-        }
+        $result = \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, $fn, ...$args);
         return $result;
     };
 }
@@ -244,7 +241,7 @@ class Maybe {
         return $this->_x;
     }
     public function append($value) : Maybe { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
-    public function size() : int { return is_array($this->_x) ? count($this->_x) : (empty($this->_x)) ? 0 : 1; }
+    public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
     public function extract(string $key, $default = false) : Maybe { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } return new static($default); }
     public function index(int $index) : Maybe { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? false); } return new static(false); }
     public function isa(string $type) { return $this->_x instanceof $type; }
@@ -309,7 +306,7 @@ function recache(array $lines) : array {
 }
 
 function recache_file(string $filename) {
-    return recache(file($filename));
+    return recache(file($filename, FILE_IGNORE_NEW_LINES | FILE_IGNORE_NEW_LINES));
 }
 
 /**
@@ -490,10 +487,12 @@ function reverse_ip_lookup(string $ip) : Maybe {
 function ip_lookup(string $ip, string $type = "A") : Maybe {
     $dns = null;
     assert(in_array($type, array("A", "AAAA", "CNAME", "MX", "NS", "PTR", "SRV", "TXT", "SOA")), "invalid dns query type [$type]");
-
     try {
+        //$url = "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json";
         $raw = bit_http_request("GET", "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json", '', 3);
-        if ($raw != false) {
+        //echo "[$url]\n($raw)\n";
+        //die();
+        if ($raw !== false) {
             $formatted = json_decode($raw, true);
             if (isset($formatted['Authority'])) {
                 $dns = end($formatted['Authority'])['data'] ?? '';
@@ -511,9 +510,7 @@ function ip_lookup(string $ip, string $type = "A") : Maybe {
 
 // memoized version of ip_lookup
 function fast_ip_lookup(string $ip, string $type = "A") : Maybe {
-    die("fast lookup [$ip] [$type]\n");
-    $lookup = \TF\memoize('TF\ip_lookup', "_bf_dns_{$type}_{$ip}", 3600);
-    return $lookup($ip, $type);
+    return \TF\memoize('TF\ip_lookup', "_bf_dns_{$type}_{$ip}", 3600)($ip, $type);
 }
 
 
@@ -565,12 +562,12 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
     //file_put_contents("/tmp/debug.log", $foo);
     $ctx = stream_context_create($params);
     $foo = @file_get_contents($url, false, $ctx);
+    file_put_contents("/tmp/http2.out", "$url\n$foo\n");
     if ($foo === false) {
         $cmd = "curl -X$method --header 'content-Type: '{$optional_headers['Content-Type']}' $url";
         if (strlen($content) > 0) {
             $cmd .= " -d ".escapeshellarg($content);
         }
-        echo "cmd: [$cmd]\n";
         $foo = system($cmd);
     }
 
@@ -733,13 +730,8 @@ function really_writeable(string $filename) : bool {
         (($mode === 6) || ($mode === 7));
 }
 
-function debug(string $line, bool $get_log = false) {
-    static $log = array();
-    if ($get_log) { return $log; }
-
-    $ra = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-    $line2 = time() . " [$ra] $line";
-    $log[] = $line2;
+function debug(string $line) {
+    file_put_contents("/tmp/debug.log", "$line\n", FILE_APPEND);
 }
 
 /**

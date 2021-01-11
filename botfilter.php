@@ -1,6 +1,8 @@
 <?php
 namespace BitFire;
 
+use TF\Maybe;
+
 const BOT_ANS_CODE_POS=2;
 const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
@@ -79,9 +81,8 @@ class BotFilter {
         // todo: add support for cas
         $t = time();
         if ($this->ip_data === null) {
-            $cnt = $this->cache->load_data('core_ctr');
-            $cnt = ($cnt == null) ? 1 : $cnt + 1;
-            $this->cache->save_data('core_ctr', $cnt, 86400*30);
+
+            $cnt = $this->cache->update_data('core_ctr', function($cnt) { return $cnt+1; }, 0, 86400);
             if ($cnt > 500) { $this->_config = array(); }
             $this->ip_data = array('rr_5t' => $t+60*5, 'rr_5m' => 0, 'rr_1m' => 0, 'rr_1t' => $t+60, 'ref' => \substr(\uniqid(), 5, 8), '404' => 0, '500' => 0);
         }
@@ -134,22 +135,22 @@ class BotFilter {
 
         // check the browser cookie answer matches the request
         // TODO: move to a function
-        if ($request[REQUEST_PATH] === "/browser_required") {
-            die(include WAF_DIR . "views/browser_required.phtml");
+        if ($request[REQUEST_PATH] === "/bitfire_browser_required") {
+            exit(include WAF_DIR . "views/browser_required.phtml");
         }
         if (isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
             $url = \BitFireBot\strip_path_tracking_params($request);
             // response answer matches cookie
-            if (($maybe_botcookie->extract('a')()) === intval($request['GET']['_bfa'])) {
+            if (intval($maybe_botcookie->extract('a')()) === intval($request['GET']['_bfa'])) {
                 $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
                     \TF\en_json( array('ip' => $request[REQUEST_IP], 'v' => 2, 'et' => time() + 60*60)));
                 \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
             } else {
-                $url = "/browser_required";
+                $url = "/bitfire_browser_required";
             }
             $foo = "Location: " . $request['SCHEME'] . '://' . $request['HOST'] . ":" . $request['PORT'] . "$url";
             header($foo);
-            die();
+            exit();
         }
 
         // handle robots
@@ -160,7 +161,6 @@ class BotFilter {
                     $request[REQUEST_IP],
                     Config::arr(CONFIG_WHITELIST));
 
-                //\TF\dbg($maybe_block);
                 // set agent whitelist status
                 $this->browser[AGENT_WHITELIST] = !$maybe_block->empty();
 
@@ -168,11 +168,8 @@ class BotFilter {
                 if (!$maybe_block->empty()) { return $maybe_block; }
             } 
             else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
-                $maybe_block = \BitFireBot\blacklist_inspection(
-                    $request[REQUEST_UA],
-                    $request[REQUEST_IP],
-                    file(WAF_DIR . "bad-agent.txt"));
-                if ($maybe_block->isa('\BitFire\Block')) { return $maybe_block; }
+                $maybe_block = \BitFireBot\blacklist_inspection($request, file('bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
+                if (!$maybe_block->empty()) { return $maybe_block; }
             }
         }
         // handle humans
@@ -231,16 +228,20 @@ function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
 function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // check if the remote IP is in an allowed list of IPs
     $ip_checks = (strpos($network_regex, ',') > 0) ? explode(',', $network_regex) : array($network_regex);
-    $ip_matches = array_reduce($ip_checks, \TF\is_equal_reduced($remote_ip), false);
+    $ip_matches = array_reduce($ip_checks, \TF\is_regex_reduced($remote_ip), false);
     if ($ip_matches) { return true; }
 
-    // reverse lookup
+    // fwd and reverse lookup
     $ip = \TF\reverse_ip_lookup($remote_ip)
-        ->then(function($value) use ($network_regex) {
-            return (preg_match("/$network_regex/", $value)) ? $value : false;
-        })->then('TF\\ip_lookup');
+        ->then(function($value) use ($ip_checks) {
+            return array_reduce($ip_checks, \TF\find_regex_reduced($value), false);
+        })->then('TF\\fast_ip_lookup');
 
     return $ip() === $remote_ip;
+}
+
+function fast_verify_bot_as(string $remote_ip, string $network) : bool {
+    return \TF\memoize('\BitFireBot\verify_bot_as', "_bf_as_{$network}_{$remote_ip}", 3600)($remote_ip, $network);
 }
 
 // verify that $remote ip is part of the AS network number $network
@@ -274,11 +275,11 @@ function agent_in_list(string $a, string $ip, array $list) : bool {
 
     foreach ($list as $k => $v) {
 
-        if (stripos($a, $k) === false) { continue; }
+        if (strpos($a, $k) === false) { continue; }
 
         // reverse lookup, or just return found
         return (substr($v, 0, 2) == "AS") ?
-            \BitFireBot\verify_bot_as($ip, $v) :
+            \BitFireBot\fast_verify_bot_as($ip, $v) :
             \BitFireBot\verify_bot_ip($ip, $v);
     }
 
@@ -306,13 +307,11 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
  * returns true if the useragent / ip is not blacklisted, false otherwise
  * PURE
  */
-function blacklist_inspection(string $agent, string $ip, array $blacklist) : \TF\Maybe {
-   
-    // handle blacklisting (less restrictive and slower)
-    if (count($blacklist) > 0) {
-        if (agent_in_list($agent, $ip, $blacklist) !== false) {
-            return BitFire::new_block(FAIL_IS_BLACKLIST, REQUEST_UA, $agent, "user agent blacklist", BLOCK_SHORT);
-        }
+function blacklist_inspection(array $request, array $blacklist) : \TF\Maybe {
+    $match = new \BitFire\MatchType(\BitFire\MatchType::CONTAINS, REQUEST_UA, $blacklist, BLOCK_MEDIUM);
+    $part = $match->match($request);
+    if ($part !== false) {
+        return BitFire::new_block(FAIL_IS_BLACKLIST, "user-agent", $request[REQUEST_UA], $part, BLOCK_MEDIUM);
     }
    
     return \TF\Maybe::of(false);
@@ -435,7 +434,6 @@ e._bitfire=1;
 t=screen.width+"_"+screen.height;
 n=(new Date).getTimezoneOffset(); 
 var p=u.searchParams;
-var p2=u.searchParams.append;
 p.append("'.$tracking_param.'", 1);
 p.append("_bfa",_0x8bab5c());
 p.append("_bfx",t);
@@ -476,15 +474,15 @@ function require_browser_or_die(array $request, \TF\Maybe $cookie) {
     }
 
     //echo make_js_challenge($request[REQUEST_IP],  string $tracking_param, string $encrypt_key, string $utc_name) : string {
-    echo make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE));
-    die();
+    exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
+    
 }
 
 function strip_path_tracking_params(array $request) {
     unset($request['GET']['_bfa']) ;
     unset($request['GET']['_bfx']) ;
     unset($request['GET']['_bfz']) ;
-    unset($request['GET']['_bitf_browser']) ;
+    unset($request['GET'][Config::str(CONFIG_USER_TRACK_PARAM)]) ;
     return($request['PATH'] . '?' . http_build_query($request['GET']));
 }
 
