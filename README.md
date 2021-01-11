@@ -70,9 +70,9 @@ Here's How BitFire is different:
 * ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg) Speed. <1 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
 * ![bot](https://fonts.gstatic.com/s/i/materialicons/dns/v6/24px.svg) Bot authentication. Authenticates good bots like google, facebook, bing, ahrefs, by source network
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparant JavaScript browser verification ensures user's are real
-* Client Integrity. Automatically generate browser policy preventing browser takeover
-* Server Integrity. Prevent atackers from modifying server files with Operating System locks
-* Grammer based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/policy/v6/24px.svg) Client Integrity. Automatically generate browser policy preventing browser takeover
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/lock/v6/24px.svg) Server Integrity. Prevent atackers from modifying server files with Operating System locks
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/text_rotation_none/v6/24px.svg) Grammer based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
 
 
 ### Built With
