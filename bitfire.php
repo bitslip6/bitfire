@@ -10,6 +10,7 @@ if (defined('BITFIRE_VER')) { return; }
  
 // TODO: better block to feature mapping
 const FEATURE_CLASS = array(10000 => 'xss_block', 15000 => 'xss_block', 13000 => 'xss_block', 14000 => 'xss_block', 15000 => 'xss_block');
+
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 70000 => 0);
 const BITFIRE_VER = 110;
@@ -23,6 +24,7 @@ const BITFIRE_MAX_PAGES = 200;
 const WAF_MIN_HIT = 25;
 const WAF_MIN_PERCENT = 10;
 
+const CONFIG_REPORT_FILE='report_file';
 const CONFIG_WHITELIST_ENABLE='whitelist_enable';
 const CONFIG_BLACKLIST_ENABLE='blacklist_enable';
 const CONFIG_REQUIRE_BROWSER = 'require_full_browser';
@@ -322,6 +324,7 @@ class BitFire
     }
 
 
+    // TODO: move this to "pure function"
     // display the cache behind page
     // FIX: replace fail reasons here!
     public function cache_behind() {
@@ -441,6 +444,18 @@ class BitFire
     }
 }
 
+/**
+ * filter reporting features
+ */
+function reporting(Block $block) {
+    $class = ($block->code / 1000) * 1000;
+    $feature_name =  FEATURE_CLASS[$class] ?? 'bitfire_enabled';
+    if (Config::str($feature_name) === "report") {
+        file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($block, JSON_PRETTY_PRINT), FILE_APPEND);
+        return false;
+    }
+    return $block;
+}
 
 /**
  * returns a maybe of the block if no exception exists
