@@ -67,7 +67,7 @@ enterprise class security for everyone
 There are many choices for PHP firewalls to protect your webservers, most can be easily bypassed.
 
 Here's How BitFire is different:
-* ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg)Speed. <1 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
+* ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg) Speed. <1 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
 * ![bot](https://fonts.gstatic.com/s/i/materialicons/dns/v6/24px.svg) Bot authentication. Authenticates good bots like google, facebook, bing, ahrefs, by source network
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparant JavaScript browser verification ensures user's are real
 * Client Integrity. Automatically generate browser policy preventing browser takeover
@@ -226,6 +226,9 @@ Project Link: [https://github.com/bitslip6/bitfire](https://github.com/bitslip6/
 * [Choose an Open Source License](https://choosealicense.com)
 * [Font Awesome](https://fontawesome.com)
 * [Bootstrap](https://getbootstrap.com)
+* [Icons by freepik](https://www.flaticon.com/authors/freepik)
+
+
 
 
 
