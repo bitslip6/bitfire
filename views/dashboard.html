@@ -1,0 +1,718 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="BitFire Dashboard" />
+
+    <!-- Libs CSS -->
+    <!--
+    <link rel="stylesheet" href="https://bitfire.co/dash/flatpicker.min.css" />
+    <link rel="stylesheet" href="https://bitfire.co/dash/feather.css" />
+    <link rel="stylesheet" href="https://bitfire.co/dash/quill.core.css" />
+    -->
+
+    <link rel="stylesheet" href="https://bitfire.co/dash/vs2015.css" />
+
+    <!-- Theme CSS -->
+    <link rel="stylesheet" href="https://bitfire.co/dash/theme.min.css" id="stylesheetLight">
+    <link rel="stylesheet" href="https://bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
+
+    <style>
+      body { display: none; }
+      .chilabel { color: #333; display: block; width: 190px; float: left; margin-right: 0; padding-right: 0;}
+      .pr1 { margin-top: 20px; }
+      .card-body { padding: 0.5rem !important; }
+
+      svg { fill: #977; }
+      svg.white { fill: #1657af; }
+
+    </style>
+    
+    <!-- Title -->
+    <title>BitFire : Control Panel</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
+    <script>
+        window.ERROR = [];
+
+        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
+        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
+        
+        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
+
+        function min(numbers) { return numbers.reduce(min_reducer); }
+        function max(numbers) { return numbers.reduce(max_reducer); }
+        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+
+        function mode(numbers) {
+            // as result can be bimodal or multi-modal,
+            // the returned result is provided as an array
+            // mode of [3, 5, 4, 4, 1, 1, 2, 3] = [1, 3, 4]
+            var modes = [], count = [], i, number, maxIndex = 0;
+         
+            for (i = 0; i < numbers.length; i += 1) {
+                number = numbers[i];
+                count[number] = (count[number] || 0) + 1;
+                if (count[number] > maxIndex) {
+                    maxIndex = count[number];
+                }
+            }
+         
+            for (i in count)
+                if (count.hasOwnProperty(i)) {
+                    if (count[i] === maxIndex) {
+                        modes.push(Number(i));
+                    }
+                }
+         
+            return modes.pop();
+        }
+
+
+        function software_change() {
+          var ver = GBI("software_ver").value;
+          fetch("/upgrade/software/"+ver)
+              .then(response => response.json())
+              .then(data => { 
+                add_info("primary", "software upgrade: " + data.status);
+              }).catch((error) => { console.log("software change error!", error); });
+        }
+        
+       
+        /**
+         * @param string type  primary, secondary, success, danger, warning, info
+         * @param string message a value with the error content (can include HTML markup)
+         */
+        function add_info(type, message) {
+          let msg = {"type": type, "message": message};
+          if (window.ERROR.length > 5) {
+              window.ERROR.pop();
+          }
+          window.ERROR.unshift(msg);
+          
+
+          GBI("error").innerHTML = window.ERROR.reduce((accumulator, value) =>
+          accumulator + "<div class='alert alert-"+value.type+"' role='alert'>" + value.message + "</div>", '');
+        }
+
+        
+
+        function load_temp() {
+            fetch("/temp/setting")
+                .then(response => response.json())
+                .then(data => {
+                    GBI("cputemp").innerHTML = data.cputemp.toFixed(1) + "&#176;";
+                    GBI("vixeltemp").innerHTML = (Math.round(data.vixeltemp*10)/10) + "&#176;";
+                }).catch((error) => {
+                  add_info("danger", "error reading temperature data");
+                });
+
+            window.setTimeout(load_temp, 4000);
+        }
+        
+        function GBI(name) { return document.getElementById(name); }
+        function avg_click(e) {
+            window.CHITON_AVG = !window.CHITON_AVG;
+        }
+
+    </script>
+  </head>
+
+  <body>
+
+
+    <!-- NAVIGATION
+    ================================================== -->
+    
+    
+    <nav class="navbar navbar-vertical fixed-left navbar-expand-md " id="sidebar">
+      <div class="container-fluid">
+
+        <!-- Toggler -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#sidebarCollapse" aria-controls="sidebarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Brand -->
+        <a class="navbar-brand" href="/bitfire">
+          <img src="bitfire.png" class="navbar-brand-img mx-auto" alt="...">
+        </a>
+
+        <!-- Collapse -->
+        <div class="collapse navbar-collapse" id="sidebarCollapse">
+
+          <!-- Navigation -->
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                  <svg data-name="position" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+                  X/Y : </span> <span id="cross">450/90</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                  <svg data-name="position" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+                  Angle</span> <span id="radians">3.145</span>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                  <svg data-name="speedometer" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/></svg>
+                  FPS:
+                </span> <span id="fps">16</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                <svg data-name="snowflake" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg>
+                CPU : </span> <span id="cputemp">60&#176;</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                <svg data-name="snowflake" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg>
+                Vixel : </span> <span id="vixeltemp">60&#176;</span>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Divider -->
+          <hr class="navbar-divider my-3">
+
+          <!-- Heading -->
+          <h6 class="navbar-heading">
+            Settings
+          </h6>
+
+          <!-- Navigation -->
+          <ul class="navbar-nav mb-md-4">
+
+            
+            <li class="nav-item">
+              <a class="nav-link" href="#sidebarCalibration" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarCalibration">
+                <svg data-name="tune" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+                Calibration
+              </a>
+              <div class="collapse " id="sidebarCalibration">
+                <ul class="nav nav-sm flex-column">
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      ADI
+                    </span>
+                    <input type="checkbox" id="adical" name="adical" class="pr1" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Chiton
+                    </span>
+                    <input type="checkbox" checked="checked" id="chitoncal" name="chitoncal" class="pr1" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Planar
+                    </span>
+                    <input type="checkbox" checked="checked" id="planar" name="planar" class="pr1" />
+                  </li>
+                </ul>
+              </div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="#sidebarPerformance" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarPerformance">
+                <svg data-name="shutter_speed" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M15 1H9v2h6V1zm4.03 6.39l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm-.32-5H6.35c.57 1.62 1.82 2.92 3.41 3.56l-.11-.06 2.03-3.5zm5.97-4c-.57-1.6-1.78-2.89-3.34-3.54L12.26 11h5.39zm-7.04 7.83c.45.11.91.17 1.39.17 1.34 0 2.57-.45 3.57-1.19l-2.11-3.9-2.85 4.92zM7.55 8.99C6.59 10.05 6 11.46 6 13c0 .34.04.67.09 1h4.72L7.55 8.99zm8.79 8.14C17.37 16.06 18 14.6 18 13c0-.34-.04-.67-.09-1h-4.34l2.77 5.13zm-3.01-9.98C12.9 7.06 12.46 7 12 7c-1.4 0-2.69.49-3.71 1.29l2.32 3.56 2.72-4.7z"/></svg>
+                Performance
+              </a>
+              <div class="collapse " id="sidebarPerformance">
+                <ul class="nav nav-sm flex-column">
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Delay
+                    </span>
+                    <input type="number" id="interval" name="interval" value="60" style="width:100px; margin-left: 80px;" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Quality
+                    </span>
+                    <input type="number" id="quality" value="90" name="quality" class="pr1" style="width:100px; margin-left: 80px;" />
+                  </li>
+                </ul>
+              </div>
+            </li>
+
+
+            <li class="nav-item">
+              <a class="nav-link" href="#sidebarData" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarData">
+                <svg data-name="image" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                Image
+              </a>
+              <div class="collapse " id="sidebarData">
+                <ul class="nav nav-sm flex-column">
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      IR
+                    </span>
+                    <input type="checkbox" id="depth" name="depth" class="pr1" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Avg
+                    </span>
+                    <input type="checkbox" id="avg" name="avg" class="pr1" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link" style="float: left;">
+                      Max Color  
+                    </span>
+                    <!--
+                    <input class="int_in" id="max_val" name="max_val" type="text" min="0" max="9000" step="10" value="7000" />
+                    -->
+                    <input type="number" id="max_val" name="max_val" value="7000" min="0" max="9000" step="10" style="width:100px; margin-left: 80px;" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link" style="float: left;">
+                      Min Color  
+                    </span>
+                    <!--
+                    <input class="int_in" id="min_val" name="min_val" type="text" min="0" max="9000" step="10" value="0" />
+                    -->
+                    <input type="number" id="min_val" name="min_val" value="0" min="0" max="9000" step="10" style="width:100px; margin-left: 80px;" />
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link" style="float: left;">
+                      Color Type
+                    </span>
+                    <select name="colormode" id="colormode" style="width: 100px; margin-left: 80px;">
+                      <option value="2" selected="selected" style="padding: 3px 5px;">rainbow</option>
+                      <option value="1" style="padding: 3px 5px;">greyscale</option>
+                    </select>
+                  </li>
+                  
+                </ul>
+              </div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="#internalSoftware" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="internalSoftware">
+                <svg height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14zm-1-6h-3V8h-2v5H8l4 4 4-4z"/></svg>
+                Software
+              </a>
+              <div class="collapse " id="internalSoftware">
+                <ul class="nav nav-sm flex-column">
+                  <li class="nav-item">
+                    <select name="software_ver" id="software_ver" style="margin-left: 35px;">
+                      <option selected="selected">Choose version</option>
+                    </select>
+                  </li>
+                  <li class="nav-item">
+                    <a class="btn btn-warning btn-sm" style="float:right" id="debuginfo_btn">Debug Info</a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+
+
+            <li class="nav-item">
+              <a class="nav-link " href="changelog.html">
+                Changelog <span class="badge badge-primary ml-auto">v027</span>
+              </a>
+            </li>
+
+          </ul>
+
+          <!-- Push content down -->
+          <div class="mt-auto"></div>
+
+          
+          <!-- Customize -->
+          <!--
+          <div id="popoverDemo" data-toggle="popover" data-trigger="manual" title="Make Dashkit Your Own!" data-content="Switch the demo to Dark Mode or adjust the navigation layout, icons, and colors!">
+            <a href="#modalDemo" class="btn btn-block btn-primary mb-4" data-toggle="modal">
+              <i class="fe fe-sliders mr-2"></i> Customize
+            </a>
+          </div>
+        -->
+
+         
+        </div> <!-- / .navbar-collapse -->
+
+      </div>
+    </nav>
+
+    
+    
+    <nav class="navbar navbar-vertical navbar-vertical-sm fixed-left navbar-expand-md " id="sidebarSmall">
+      <div class="container-fluid">
+
+        <!-- Toggler -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#sidebarSmallCollapse" aria-controls="sidebarSmallCollapse" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Brand -->
+        <a class="navbar-brand" href="/bitfire">
+          <img src="bitfire.png" class="navbar-brand-img 
+          mx-auto" alt="...">
+        </a>
+
+        <!-- Collapse -->
+        <div class="collapse navbar-collapse" id="sidebarSmallCollapse">
+
+          <!-- Form -->
+          <form class="mt-4 mb-3 d-md-none">
+            <div class="input-group input-group-rounded input-group-merge">
+              <input type="search" class="form-control form-control-rounded form-control-prepended" placeholder="Search" aria-label="Search">
+              <div class="input-group-prepend">
+                <div class="input-group-text">
+                  <span class="fe fe-search"></span>
+                </div>
+              </div>
+            </div>
+          </form>
+
+          <!-- Divider -->
+          <hr class="navbar-divider d-none d-md-block mt-0 mb-3">
+
+          <!-- Navigation -->
+          <ul class="navbar-nav">
+            <li class="nav-item dropright">
+              <a class="nav-link dropdown-toggle active" id="sidebarSmallDashboards" href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="X/Y Cursor Position">
+                <i class="fe fe-home"></i> <span class="d-md-none">X/Y : </span> <span id="cross"></span>
+              </a>
+            </li>
+
+            <li class="nav-item dropright">
+              <a class="nav-link dropdown-toggle active" id="sidebarSmallDashboards" href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="FPS">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M15 1H9v2h6V1zm4.03 6.39l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm-.32-5H6.35c.57 1.62 1.82 2.92 3.41 3.56l-.11-.06 2.03-3.5zm5.97-4c-.57-1.6-1.78-2.89-3.34-3.54L12.26 11h5.39zm-7.04 7.83c.45.11.91.17 1.39.17 1.34 0 2.57-.45 3.57-1.19l-2.11-3.9-2.85 4.92zM7.55 8.99C6.59 10.05 6 11.46 6 13c0 .34.04.67.09 1h4.72L7.55 8.99zm8.79 8.14C17.37 16.06 18 14.6 18 13c0-.34-.04-.67-.09-1h-4.34l2.77 5.13zm-3.01-9.98C12.9 7.06 12.46 7 12 7c-1.4 0-2.69.49-3.71 1.29l2.32 3.56 2.72-4.7z"/></svg>
+                <span class="d-md-none">FPS3 : </span> <span id="fps"></span>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Divider -->
+          <hr class="navbar-divider my-3">
+
+          <!-- Navigation -->
+          <ul class="navbar-nav mb-md-4">
+            <li class="nav-item dropright">
+              <a class="nav-link dropdown-toggle " id="sidebarSmallBasics" href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="Basics">
+                <i class="fe fe-clipboard"></i> <span class="d-md-none">Basics</span>
+              </a>
+              <ul class="dropdown-menu" aria-labelledby="sidebarSmallBasics">
+                <li class="dropdown-header d-none d-md-block">
+                  <h6 class="text-uppercase mb-0">Basics</h6>
+                </li>
+                <li>
+                  <a href="./docs/getting-started.html" class="dropdown-item ">
+                    Getting Started
+                  </a>
+                </li>
+                <li>
+                  <a href="./docs/design-file.html" class="dropdown-item ">
+                    Design File
+                  </a>
+                </li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link " href="./docs/components.html" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Components">
+                <i class="fe fe-book-open"></i> <span class="d-md-none">Components</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link " href="./docs/changelog.html" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Changelog">
+                <i class="fe fe-git-branch"></i> <span class="d-md-none">Changelog</span> <span class="badge badge-primary ml-auto d-md-none">v1.6.1</span>
+              </a>
+            </li>
+          </ul>
+
+          <!-- Push content down -->
+          <div class="mt-auto"></div>
+
+          
+          <!-- Customize -->
+          <div class="mb-4" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Customize">
+            <a href="#modalDemo" class="btn btn-block btn-primary" data-toggle="modal">
+              <i class="fe fe-sliders"></i> <span class="d-md-none ml-2">Customize</span>
+            </a>
+          </div>
+          
+
+          
+          <!-- User (md) -->
+          <div class="navbar-user d-none d-md-flex flex-column" id="sidebarSmallUser">
+
+            <!-- Icon -->
+            <a href="#sidebarModalSearch" class="navbar-user-link mb-3" data-toggle="modal">
+              <span class="icon">
+                <i class="fe fe-search"></i>
+              </span>
+            </a>
+
+            <!-- Icon -->
+            <a href="#sidebarModalActivity" class="navbar-user-link mb-3" data-toggle="modal">
+              <span class="icon">
+                <i class="fe fe-bell"></i>
+              </span>
+            </a>
+
+            <!-- Dropup -->
+            <div class="dropright">
+
+              <!-- Toggle -->
+              <a href="#" id="sidebarSmallIconCopy" class="dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <div class="avatar avatar-sm avatar-online">
+                  <img src="avatar.jpg" class="avatar-img rounded-circle" alt="...">
+                </div>
+              </a>
+
+              <!-- Menu -->
+              <div class="dropdown-menu" aria-labelledby="sidebarSmallIconCopy">
+                <a href="./profile-posts.html" class="dropdown-item">Profile</a>
+                <a href="./account-general.html" class="dropdown-item">Settings</a>
+                <hr class="dropdown-divider">
+                <a href="./sign-in.html" class="dropdown-item">Logout</a>
+              </div>
+
+            </div>
+
+          </div>
+          
+
+        </div> <!-- / .navbar-collapse -->
+
+      </div>
+    </nav>
+
+    
+
+    <!-- MAIN CONTENT
+    ================================================== -->
+    <div class="main-content">
+      
+
+      <!-- HEADER -->
+      <div class="header">
+        <div class="container-fluid">
+
+          <!-- Body -->
+          <div class="header-body">
+            <div class="row align-items-end">
+              <div class="col">
+
+                <!-- Pretitle -->
+                <h6 class="header-pretitle">
+                  BitFire non-commercial: Release 1.1.0
+                </h6>
+
+                <!-- Title -->
+                <h1 class="header-title">
+                  BitFire Dashboard
+                </h1>
+
+              </div>
+              <div class="col-auto">
+
+                <!-- Button -->
+
+                <a href="#!" class="btn btn-primary lift" id="dwn_link">Some Button</a>
+
+              </div>
+            </div> <!-- / .row -->
+          </div> <!-- / .header-body -->
+
+        </div>
+      </div> <!-- / .header -->
+
+      <!-- CARDS -->
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-12 col-lg-6">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>24 Hour Blocks By Type
+                <span class="text-secondary" id="block_total">()</span>
+                </h4>
+              </div>
+              <div class="card-body">
+
+
+            <div class="chart chart-appended">
+              <canvas class="chart-canvas" id="classChart" data-toggle="legend" data-target="#classChartLegend"></canvas>
+            </div>
+            
+            <div class="chart-legend" id="classChartLegend"></div>
+              </div>
+            </div>
+
+          </div>
+          
+          <div class="col-12 col-lg-6">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>24 Hour Blocks By Type
+                <span class="text-secondary" id="block_total">()</span>
+                </h4>
+              </div>
+              <div class="card-body">
+
+
+          <div class="chart">
+            <canvas class="chart-canvas" id="hrChart"></canvas>
+          </div>
+          </div>
+        </div>
+
+        </div>
+      </div>
+
+    </div><!-- / .main-content -->
+
+    <!-- JAVASCRIPT
+    ================================================== -->
+    <!-- Libs JS -->
+    <script src="https://bitfire.co/dash/bootstrap.bundle.min.js"></script>
+    <script src="https://bitfire.co/dash/chart.min.js"></script>
+    <!--
+    <script src="https://bitfire.co/dash/flatpicker.min.js"></script>
+    <script src="https://bitfire.co/dash/dropzone.min.js"></script>
+    <script src="https://bitfire.co/dash/autosize.min.js"></script>
+    <script src="https://bitfire.co/dash/highlight.pack.min.js"></script>
+    <script src="https://bitfire.co/dash/quill.min.js"></script>
+    -->
+    <script src="https://bitfire.co/dash/jquery.mask.min.js"></script>
+    <script src="https://bitfire.co/dash/list.min.js"></script>
+    <script src="https://bitfire.co/dash/select2.min.js"></script>
+    <script src="https://bitfire.co/dash/Chart.extension.js"></script>
+
+    <script>
+      
+      console.log("foobar!");
+
+      function show_bars(chart_id, hr_set) {
+        
+        console.log(hr_set);
+        new Chart(chart_id, {
+    type: 'bar',
+    options: {
+      scales: {
+        yAxes: [{
+          ticks: {
+            callback: function(value) {
+              return value;
+            }
+          }
+        }]
+      }
+    },
+    data: {
+      labels: [...Array(24).keys()],
+      datasets: [{
+        label: 'Block per Hour',
+        data: hr_set,
+        backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
+      }]
+    }
+  });
+      }
+
+      
+      
+      function show_pie(id, data) {
+        GBI("block_total").innerText = "(" + data.total + ")";
+        let data_labels = [];
+        let data_per = [];
+        for (const [key, value] of Object.entries(data.counts)) {
+          data_labels.push(codex[key]);
+          data_per.push(value);
+        }
+
+       new Chart(id, {
+    type: 'doughnut',
+    options: {
+      tooltips: {
+        callbacks: {
+          afterLabel: function() {
+            return ''
+          }
+        }
+      }
+    },
+    data: {
+      labels: data_labels,
+      datasets: [{
+        data: data_per,
+        backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
+      }]
+    }
+  });
+       
+
+      window.setTimeout(function() {
+      let scr = document.createElement('script');
+      scr.setAttribute('src','https://bitfire.co/dash/theme.min.js');
+      document.body.appendChild(scr);
+      }, 100);
+      }
+
+
+      var codex = {
+        10000: "XSS",
+        11000: "XXE",
+        12000: "RCE",
+        13000: "format",
+        14000: "SQLi",
+        15000: "LFI",
+        16000: "web shell",
+        17000: "dot dot",
+        18000: "spam",
+        20000: "bot",
+        70000: "malware"
+      };
+
+      //show_pie("classChart", {"percent": [50, 50], "counts": [100, 100]});
+
+      const request = async () => {
+        console.log("a1");
+        const response1 = await fetch('/bitfire?BITFIRE_API=get_block_types&_secret=<?php echo \Bitfire\Config::str("secret");?>');
+        console.log("a2");
+        const response2 = await fetch('/bitfire?BITFIRE_API=get_hr_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
+        const data1 = await response1.json();
+        const data2 = await response2.json();
+        console.log("a4");
+        show_pie('classChart', data1);
+        show_bars('hrChart', data2);
+      }
+      request();
+
+     
+/*
+      //.then(response => response.json())
+      //.then(data => show_pie('classChart', data));
+      */
+
+    </script>
+
+    <!-- Theme JS -->
+    <script src="https://bitfire.co/dash/dashkit.min.js"></script>
+
+
+    <script>
+    </script>
+  </body>
+</html>

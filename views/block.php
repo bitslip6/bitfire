@@ -12,4 +12,4 @@ print_r($block->value());
 </html>
 <?php 
 file_put_contents("/tmp/block.json", json_encode(\tideways_disable(), JSON_PRETTY_PRINT));
-exit;
+exit();
