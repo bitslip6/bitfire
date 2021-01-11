@@ -163,7 +163,7 @@ list of common bots included with BitFire.  Refer to our wiki for how to add add
 whitelist_enable = true
 ```
 
-*5.* Enable core web filter.  The web filter blocks malicious requets like XSS and SQLi as well as many others.
+*5.* Enable core web filter.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
 The entire web filter can be enabled or disabled with the *web_filter_enabled* parameter.  We recommend
 the following configuration:
 ```ini
@@ -172,8 +172,7 @@ xss_block = true
 sql_block = true
 ```
 
-*6.* Enable IP blocking.  By default BitFire will not black list IPS.  We recommend you enable this feature since
-it allows for the fastest possbile drop of request floods for HTTP floods.
+*6.* Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
 ```ini
 allow_ip_block = true
 ```
