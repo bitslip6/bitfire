@@ -84,15 +84,19 @@ class CacheStorage implements Storage {
         }
     }
 
-    public function lock(string $key) {
+    public function lock(string $key_name) {
         $sem = null;
         if (function_exists('sem_acquire')) {
             $opt = (PHP_VERSION_ID >= 80000) ? true : 1;
-            $sem = sem_get(crc32($key), 1, 0600, $opt);
+            $sem = sem_get(crc32($key_name), 1, 0600, $opt);
             if (!sem_acquire($sem, true)) { return null; };
             $this->sems[] = $sem;
         }
         return $sem;
+    }
+    
+    public function unlock($sem) {
+        if (function_exists('sem_acquire')) { sem_release(($sem)); }
     }
 
     /**
@@ -103,9 +107,8 @@ class CacheStorage implements Storage {
         $saved = $this->load_data($key_name);
         if (!\is_array($saved)) { $saved = array($data); }
         else { $saved[] = $data; }
-
         $this->save_data($key_name, array_slice($saved, 0, $num_items), 86400*30);
-        if (function_exists('sem_acquire')) { sem_release(($sem)); }
+        $this->unlock($sem);
     }
 
     public function update_data(string $key_name, callable $fn, $init, int $ttl) {
@@ -114,7 +117,7 @@ class CacheStorage implements Storage {
         if ($data === null) { $data = $init; }
         $updated = $fn($data);
         $this->save_data($key_name, $updated, $ttl);
-        if (function_exists('sem_acquire')) { sem_release(($sem)); }
+        $this->unlock($sem);
         return $updated;
     }
 
@@ -131,6 +134,7 @@ class CacheStorage implements Storage {
             case "shmop":
                 $value = $this->_shmop->read($key_name);
                 $success = ($value !== null);
+                // echo "\nshmop [$key_name]\n";print_r($value);
                 break;
             case "apcu":
                 $value = \apcu_fetch("_bitfire:$key_name", $success);
