@@ -306,7 +306,7 @@ function recache(array $lines) : array {
 }
 
 function recache_file(string $filename) {
-    return recache(file($filename));
+    return recache(file($filename, FILE_IGNORE_NEW_LINES | FILE_IGNORE_NEW_LINES));
 }
 
 /**
