@@ -64,14 +64,15 @@ enterprise class security for everyone
 
 [![BitFire Screen Shot][product-screenshot]](https://example.com)
 
-There are many choices for PHP firewalls to protect your webservers, 90% can be easily bypassed.
+There are many choices for PHP firewalls to protect your webservers, most can be easily bypassed.
 
 Here's How BitFire is different:
-* Speed. <1 ms block times - BitFire is up to 200x faster than the competition
-* Bot authentication. Verifies allowed bot network origin and blocks all invalid bots
-* Browser verification. Transparant JavaScript browser verification ensures user's are real
+* ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg)Speed. <1 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
+* ![bot](https://fonts.gstatic.com/s/i/materialicons/dns/v6/24px.svg) Bot authentication. Authenticates good bots like google, facebook, bing, ahrefs, by source network
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparant JavaScript browser verification ensures user's are real
 * Client Integrity. Automatically generate browser policy preventing browser takeover
 * Server Integrity. Prevent atackers from modifying server files with Operating System locks
+* Grammer based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
 
 
 ### Built With
