@@ -1,23 +1,22 @@
 <?php declare(strict_types=1);
 namespace TF;
-define("CUCKOO_SLOT_SIZE_BYTES", 15);
-define("CUCKOO_EXP_SIZE_BYTES", 6);
-define("CUCKOO_MAX_SIZE", 65534);
+const CUCKOO_SLOT_SIZE_BYTES = 15;
+const CUCKOO_EXP_SIZE_BYTES = 6;
+const CUCKOO_MAX_SIZE = 65534;
 
+const CUCKOO_READ_EXPIRED = false;
+const CUCKOO_PRIMARY = 1;
+const CUCKOO_ALT = 2;
+const CUCKOO_LOCK = 4;
+const CUCKOO_EMPTY = 8;
+const CUCKOO_FULL = 16;
+const CUCKOO_LOW = 32;
+const CUCKOO_HIGH = 64;
+const CUCKOO_PERM = 128;
 
-define("CUCKOO_READ_EXPIRED", false);
-define("CUCKOO_PRIMARY", 1);
-define("CUCKOO_ALT", 2);
-define("CUCKOO_LOCK", 4);
-define("CUCKOO_EMPTY", 8);
-define("CUCKOO_FULL", 16);
-define("CUCKOO_LOW", 32);
-define("CUCKOO_HIGH", 64);
-define("CUCKOO_PERM", 128);
-
-define("CUCKOO_PERM_MASK", 0 | CUCKOO_PERM | CUCKOO_HIGH | CUCKOO_LOW);
-define("CUCKOO_NOT_MASK", 0 | CUCKOO_PRIMARY | CUCKOO_ALT | CUCKOO_LOCK | CUCKOO_EMPTY | CUCKOO_FULL);
-define("CUCKOO_POSITIONS", [CUCKOO_PRIMARY, CUCKOO_ALT]);
+const CUCKOO_PERM_MASK = 0 | CUCKOO_PERM | CUCKOO_HIGH | CUCKOO_LOW;
+const CUCKOO_NOT_MASK = 0 | CUCKOO_PRIMARY | CUCKOO_ALT | CUCKOO_LOCK | CUCKOO_EMPTY | CUCKOO_FULL;
+const CUCKOO_POSITIONS = [CUCKOO_PRIMARY, CUCKOO_ALT];
 
 // ghetto FP reduce, we use as repeat
 function reduce(int $num, callable $f, $x) {
@@ -227,7 +226,6 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
     return find($key_hashes, function(int $hash, int $index) use ($ctx) {
         return cuckoo_read_header($ctx, $hash, function(array $header) use ($hash, $index, $ctx) {
             // return  empty headers, expired headers, or matching headers
-
             return ($header['expires'] > $ctx['now'] && $header['hash'] === $hash)
                 ? $header : null;
         });
@@ -236,16 +234,13 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
 
 // clear position flags and keep any other flags, then set the position
 // pure
-function set_flag_position(int $flag, int $flag_position): int {
-    $flag = $flag & CUCKOO_PERM_MASK;
-    return $flag | $flag_position;
+function set_flag_priority(int $flag, int $flag_priority): int {
+    return ($flag & CUCKOO_PERM_MASK) | $flag_position;
 }
 
 // clear position flags and keep any other flags, then set the position
-// pure
 function set_flag_priority(int $flag, int $flag_priority): int {
-    $flag = $flag & CUCKOO_NOT_MASK;
-    return $flag | $flag_priority;
+    return ($flag & CUCKOO_NOT_MASK) | $flag_priority;
 }
 
 
@@ -269,8 +264,6 @@ function cuckoo_find_header_for_write(array $ctx, string $key, int $priority): ?
         });
     });
 }
-
-
 
 /**
  * read a previously stored cache key
@@ -318,20 +311,23 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
 
 
     // initial expired memory block (5 bytes)
-    // $exp_full_block = pack("Ln", time() + 60, 0);
-    // $exp_empty_block = pack("Ln", 1, 0);
-    // $exp_block = pack("Ln", time() + 60, 0);
+
+    //$exp_full_block = pack("Ln", time() + 60, 0);
+    //$exp_empty_block = pack("Ln", 1, 0);
+    //$exp_block = pack("Ln", time() + 60, 0);
+
     // initial slot header (15 bytes)
     $header_block = pack("LLLnC", 0, 0, 0, 0, 0 | CUCKOO_EMPTY);
 
-    reduce($items, function($x) use ($exp_empty_block, $exp_full_block, $header_block, $ctx) {
+    //reduce($items, function($x) use ($exp_empty_block, $exp_full_block, $header_block, $ctx) {
+    reduce($items, function($x) use ($header_block, $ctx) {
         shmop_write($ctx['rid'], $header_block, $x * CUCKOO_SLOT_SIZE_BYTES);
         $block = pack("Ln", (mt_rand(1,50) == 2) ? 1 : time() + 60, $x);
         shmop_write($ctx['rid'], $block,    $ctx['mem_start'] + ($x * CUCKOO_EXP_SIZE_BYTES));
         return $x+1;
     }, 0);
 
-    // mark all of the memory as initialized
+    // mark memory as initialized
     shmop_write($ctx['rid'], pack("nnLLL", $items, $chunk_size, $ctx['mem_start'], 0, 0), $ctx['mem_end']);
 }
 
