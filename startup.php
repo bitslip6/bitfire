@@ -15,15 +15,14 @@ include WAF_DIR."bitfire.php";
 try {
 	\BitFire\Config::set(parse_ini_file(WAF_DIR . "config.ini", false, INI_SCANNER_TYPED));
 
-    \BitFire\BitFire::get_instance()
-        ->inspect()
+    $bitfire = \Bitfire\BitFire::get_instance(); 
+    $bitfire->inspect()
         ->then('\BitFire\Reporting')
         ->then(function($block) {
             include WAF_DIR."views/block.php";
             exit();
         })
-        ->doifnot('\BitFire\BitFire::get_instance()->cache_behind()');
-
+        ->doifnot(array($bitfire, 'cache_behind'));
 }
 catch (\Exception $e) {
 }
