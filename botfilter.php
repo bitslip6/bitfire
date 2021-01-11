@@ -469,15 +469,13 @@ function make_challenge_cookie(array $answer, string $ip) : string {
  * add the page that prompts the browser to add a cookie
  */
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
-    // die("! DIE DIE DIE!\n");
-
     if ($cookie->extract('v')() >= 2) {
         return;
     }
 
+    http_response_code(202);
     //echo make_js_challenge($request[REQUEST_IP],  string $tracking_param, string $encrypt_key, string $utc_name) : string {
     exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
-    
 }
 
 function strip_path_tracking_params(array $request) {
