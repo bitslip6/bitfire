@@ -1,23 +1,22 @@
 <?php declare(strict_types=1);
 namespace TF;
-define("CUCKOO_SLOT_SIZE_BYTES", 15);
-define("CUCKOO_EXP_SIZE_BYTES", 6);
-define("CUCKOO_MAX_SIZE", 65534);
+const CUCKOO_SLOT_SIZE_BYTES = 15;
+const CUCKOO_EXP_SIZE_BYTES = 6;
+const CUCKOO_MAX_SIZE = 65534;
 
+const CUCKOO_READ_EXPIRED = false;
+const CUCKOO_PRIMARY = 1;
+const CUCKOO_ALT = 2;
+const CUCKOO_LOCK = 4;
+const CUCKOO_EMPTY = 8;
+const CUCKOO_FULL = 16;
+const CUCKOO_LOW = 32;
+const CUCKOO_HIGH = 64;
+const CUCKOO_PERM = 128;
 
-define("CUCKOO_READ_EXPIRED", false);
-define("CUCKOO_PRIMARY", 1);
-define("CUCKOO_ALT", 2);
-define("CUCKOO_LOCK", 4);
-define("CUCKOO_EMPTY", 8);
-define("CUCKOO_FULL", 16);
-define("CUCKOO_LOW", 32);
-define("CUCKOO_HIGH", 64);
-define("CUCKOO_PERM", 128);
-
-define("CUCKOO_PERM_MASK", 0 | CUCKOO_PERM | CUCKOO_HIGH | CUCKOO_LOW);
-define("CUCKOO_NOT_MASK", 0 | CUCKOO_PRIMARY | CUCKOO_ALT | CUCKOO_LOCK | CUCKOO_EMPTY | CUCKOO_FULL);
-define("CUCKOO_POSITIONS", [CUCKOO_PRIMARY, CUCKOO_ALT]);
+const CUCKOO_PERM_MASK = 0 | CUCKOO_PERM | CUCKOO_HIGH | CUCKOO_LOW;
+const CUCKOO_NOT_MASK = 0 | CUCKOO_PRIMARY | CUCKOO_ALT | CUCKOO_LOCK | CUCKOO_EMPTY | CUCKOO_FULL;
+const CUCKOO_POSITIONS = [CUCKOO_PRIMARY, CUCKOO_ALT];
 
 // ghetto FP reduce, we use as repeat
 function reduce(int $num, callable $f, $x) {
@@ -63,8 +62,7 @@ function power_of_2(int $n): bool {
  * find a key's 2 locations 
  */
 function cuckoo_key(string $key): array {
-    return array(crc32($key));
-    //return array(hexdec(hash('crc32', $key, false)), hexdec(hash('crc32b', $key, false)));
+    return array(crc32($key), crc32("alt-$key-alt"));
 }
 
 /**
@@ -72,9 +70,8 @@ function cuckoo_key(string $key): array {
  * and search for the first free memory chunk...
  * the memory should look for a random slot in the chunk of available memory
  */
-function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array
-{
-    // can't attemnt to store values beyond the max size
+function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array {
+    // can't attempt to store values beyond the max size
     if ($size > CUCKOO_MAX_SIZE) {
         return [null, null];
     }
@@ -87,7 +84,7 @@ function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array
         // find a location to allocate at the end of the stack, if full, defragment and return end of stack
         $ptr = ($ctx['free'] + $block_size >= $ctx['mem_end']) ? cuckoo_mem_defrag($ctx) : $ctx['free'];
 
-        // if we have a location (not full and defrag successful), updatee pointer location
+        // if we have a location (not full and defrag successful), update pointer location
         if ($ptr !== null) {
             $mem = unpack("nitems/nsize/Lfree", shmop_read($ctx['rid'], ($ctx['mem_end']), 8));
             shmop_write($ctx['rid'], pack("nnL", $ctx['slots'], $ctx['chunk_size'], $ptr + $block_size), $ctx['mem_end']);
@@ -103,20 +100,17 @@ function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array
     return [null, $block_size];
 }
 
-function get_lock($ctx): int
-{
+function get_lock($ctx): int {
     $data = unpack("Ltxid/Lexp", shmop_read($ctx['rid'], $ctx['mem_end'] + 8, 8));
     return ($data['exp'] < $ctx['now']) ? 0 : $data['txid'];
 }
 
-function set_lock($ctx, $value): bool
-{
+function set_lock($ctx, $value): bool {
     shmop_write($ctx['rid'], pack("LL", $value, $ctx['now']), $ctx['mem_end'] + 8);
     return (get_lock($ctx) === $value);
 }
 
-function cuckoo_lock_for_write(array $ctx, $block_size): bool
-{
+function cuckoo_lock_for_write(array $ctx, $block_size): bool {
     return until(5, function($idx) use ($ctx) {
 
         $lock = get_lock($ctx);
@@ -133,8 +127,7 @@ function cuckoo_lock_for_write(array $ctx, $block_size): bool
     });
 }
 
-function cuckoo_mem_defrag($ctx): void
-{
+function cuckoo_mem_defrag($ctx): void {
     $final = null;
 
     reduce(intval(ceil($ctx['items'] / 64)), function($x) use ($ctx, &$final) {
@@ -160,8 +153,7 @@ function cuckoo_mem_defrag($ctx): void
  * write $item to $key and expires in ttl_sec
  * will overwrite existing keys with a lower priority
  */
-function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priority = 0 | CUCKOO_LOW ): bool
-{
+function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priority = 0 | CUCKOO_LOW ): bool {
     if (!$ctx['rid']) { return false; }
     
     $header = cuckoo_find_header_for_write($ctx, $key, $priority);
@@ -198,8 +190,7 @@ function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priori
  * len - length of data, open - true/false if the slot is open
  * impure
  */
-function cuckoo_read_header(array $ctx, int $key_hash, callable $fn): ?array
-{
+function cuckoo_read_header(array $ctx, int $key_hash, callable $fn): ?array {
     $slot_num = $key_hash % $ctx['slots'];
     $slot_loc = $slot_num * CUCKOO_SLOT_SIZE_BYTES;
 
@@ -217,8 +208,7 @@ function cuckoo_read_header(array $ctx, int $key_hash, callable $fn): ?array
  * len - length of data, open - true/false if the slot is open
  * impure
  */
-function cuckoo_write_header(array $ctx, array $header): bool
-{
+function cuckoo_write_header(array $ctx, array $header): bool {
     return shmop_write($ctx['rid'], 
         pack("LLLnC", $header['offset'], $header['hash'], $header['expires'], $header['len'], $header['flags']),
         $header['slot_num'] * CUCKOO_SLOT_SIZE_BYTES) === CUCKOO_SLOT_SIZE_BYTES;
@@ -229,14 +219,12 @@ function cuckoo_write_header(array $ctx, array $header): bool
  * find a header for reading
  * impure
  */
-function cuckoo_find_header_for_read(array $ctx, string $key): ?array
-{
+function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
     $key_hashes = cuckoo_key($key);
  
     return find($key_hashes, function(int $hash, int $index) use ($ctx) {
         return cuckoo_read_header($ctx, $hash, function(array $header) use ($hash, $index, $ctx) {
             // return  empty headers, expired headers, or matching headers
-
             return ($header['expires'] > $ctx['now'] && $header['hash'] === $hash)
                 ? $header : null;
         });
@@ -245,26 +233,20 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array
 
 // clear position flags and keep any other flags, then set the position
 // pure
-function set_flag_position(int $flag, int $flag_position): int
-{
-    $flag = $flag & CUCKOO_PERM_MASK;
-    return $flag | $flag_position;
+function set_flag_position(int $flag, int $flag_position): int {
+    return ($flag & CUCKOO_PERM_MASK) | $flag_position;
 }
 
 // clear position flags and keep any other flags, then set the position
-// pure
-function set_flag_priority(int $flag, int $flag_priority): int
-{
-    $flag = $flag & CUCKOO_NOT_MASK;
-    return $flag | $flag_priority;
+function set_flag_priority(int $flag, int $flag_priority): int {
+    return ($flag & CUCKOO_NOT_MASK) | $flag_priority;
 }
 
 
 /**
  * find a header for reading
  */
-function cuckoo_find_header_for_write(array $ctx, string $key, int $priority): ?array
-{
+function cuckoo_find_header_for_write(array $ctx, string $key, int $priority): ?array {
     $key_hashes = cuckoo_key($key);
 
     return find($key_hashes, function(int $hash, int $index) use ($ctx, $priority) {
@@ -282,13 +264,10 @@ function cuckoo_find_header_for_write(array $ctx, string $key, int $priority): ?
     });
 }
 
-
-
 /**
  * read a previously stored cache key
  */
-function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn)
-{
+function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn) {
     if (!$ctx['rid']) { return false; }
     $header = cuckoo_find_header_for_read($ctx, $key);
 
@@ -304,8 +283,7 @@ function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn)
     );
 }
 
-function cuckoo_read(array $ctx, string $key)
-{
+function cuckoo_read(array $ctx, string $key) {
     if (!$ctx['rid']) { return false; }
     $header = cuckoo_find_header_for_read($ctx, $key);
 
@@ -324,9 +302,7 @@ function cuckoo_read(array $ctx, string $key)
  * MEM_EXP - expires_ts
  * MEM - chunk X chunk size bytes
  */
-function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void
-{   
-die("init mem\n");
+function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {   
     // some rules about our cache
     assert($items <= 100000, "max 100K items in cache");
     assert($chunk_size <= 16384, "max base chunk_size 16K");
@@ -334,20 +310,21 @@ die("init mem\n");
 
 
     // initial expired memory block (5 bytes)
-    $exp_full_block = pack("Ln", time() + 60, 0);
-    $exp_empty_block = pack("Ln", 1, 0);
-    $exp_block = pack("Ln", time() + 60, 0);
+    //$exp_full_block = pack("Ln", time() + 60, 0);
+    //$exp_empty_block = pack("Ln", 1, 0);
+    //$exp_block = pack("Ln", time() + 60, 0);
     // initial slot header (15 bytes)
     $header_block = pack("LLLnC", 0, 0, 0, 0, 0 | CUCKOO_EMPTY);
 
-    reduce($items, function($x) use ($exp_empty_block, $exp_full_block, $header_block, $ctx) {
+    //reduce($items, function($x) use ($exp_empty_block, $exp_full_block, $header_block, $ctx) {
+    reduce($items, function($x) use ($header_block, $ctx) {
         shmop_write($ctx['rid'], $header_block, $x * CUCKOO_SLOT_SIZE_BYTES);
         $block = pack("Ln", (mt_rand(1,50) == 2) ? 1 : time() + 60, $x);
         shmop_write($ctx['rid'], $block,    $ctx['mem_start'] + ($x * CUCKOO_EXP_SIZE_BYTES));
         return $x+1;
     }, 0);
 
-    // mark all of the memory as initialized
+    // mark memory as initialized
     shmop_write($ctx['rid'], pack("nnLLL", $items, $chunk_size, $ctx['mem_start'], 0, 0), $ctx['mem_end']);
 }
 
@@ -379,8 +356,7 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
  * @param bool $force_init = false
  * @param string $key = the shmem "key" = 'a'
  */
-function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 1114112, bool $force_init = false, string $key = "a"):array
-{
+function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 1114112, bool $force_init = false, string $key = "a"):array {
     $size = ($items * $chunk_size);
     $entry_end = $items * CUCKOO_SLOT_SIZE_BYTES;
     //$exp_end = ($entry_end + ($items * CUCKOO_EXP_SIZE_BYTES)); 
@@ -411,8 +387,6 @@ function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 11
         }
     }
 
-
-
     return $ctx;
 }
 
@@ -420,7 +394,7 @@ class cuckoo {
     private static $ctx;
 
     public function __construct() {
-        self::$ctx = cuckoo_connect();
+        self::$ctx = cuckoo_connect(15500, 256, 4194304, false, "a");
     }
 
     public static function read($key) {
