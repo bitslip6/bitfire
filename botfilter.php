@@ -178,10 +178,12 @@ class BotFilter {
         }
 
         // request has no host header
-        if (! \BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
-            // allow valid whitelist bots to access the site
-            if (!isset($this->browser[AGENT_WHITELIST])) {
-                return BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+        if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
+            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
+                // allow valid whitelist bots to access the site
+                if (!isset($this->browser[AGENT_WHITELIST])) {
+                    return BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+                }
             }
         }
 
