@@ -241,7 +241,7 @@ class Maybe {
         return $this->_x;
     }
     public function append($value) : Maybe { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
-    public function size() : int { return is_array($this->_x) ? count($this->_x) : (empty($this->_x)) ? 0 : 1; }
+    public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
     public function extract(string $key, $default = false) : Maybe { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } return new static($default); }
     public function index(int $index) : Maybe { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? false); } return new static(false); }
     public function isa(string $type) { return $this->_x instanceof $type; }
@@ -306,7 +306,7 @@ function recache(array $lines) : array {
 }
 
 function recache_file(string $filename) {
-    return recache(file($filename));
+    return recache(file($filename, FILE_IGNORE_NEW_LINES | FILE_IGNORE_NEW_LINES));
 }
 
 /**

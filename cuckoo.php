@@ -63,7 +63,8 @@ function power_of_2(int $n): bool {
  * find a key's 2 locations 
  */
 function cuckoo_key(string $key): array {
-    return array(hexdec(hash('crc32', $key, false)), hexdec(hash('crc32b', $key, false)));
+    return array(crc32($key));
+    //return array(hexdec(hash('crc32', $key, false)), hexdec(hash('crc32b', $key, false)));
 }
 
 /**
