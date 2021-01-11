@@ -141,7 +141,7 @@ class BotFilter {
         if (isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
             $url = \BitFireBot\strip_path_tracking_params($request);
             // response answer matches cookie
-            if (($maybe_botcookie->extract('a')()) === intval($request['GET']['_bfa'])) {
+            if (intval($maybe_botcookie->extract('a')()) === intval($request['GET']['_bfa'])) {
                 $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
                     \TF\en_json( array('ip' => $request[REQUEST_IP], 'v' => 2, 'et' => time() + 60*60)));
                 \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
