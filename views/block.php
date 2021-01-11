@@ -4,12 +4,10 @@
 <h3>reference id: <?php echo \BitFire\BitFire::get_instance()->uid . "\n"; ?>
 <!--
 <?php
+http_response_code(Config::int('response_code', 500));
 echo "BitFire block time: " . \number_format(((\microtime(true) - $m0)*1000), 3) . " ms\n";
-print_r($block->value());
+print_r($block);
 ?>
 -->
 </body>
 </html>
-<?php 
-file_put_contents("/tmp/block.json", json_encode(\tideways_disable(), JSON_PRETTY_PRINT));
-exit();

@@ -4,16 +4,17 @@ namespace BitFire;
 use TF\CacheStorage;
 use TF\Maybe;
 
-// TODO: remove $_cache
-
 if (defined('BITFIRE_VER')) { return; }
  
+
+define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
+const FEATURE_CLASS = array(10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'check_domain', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 50000 => '');
+
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 70000 => 0);
 const BITFIRE_VER = 110;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_COMMAND = "BITFIRE_API";
-define("BITFIRE_CONFIG", dirname(__FILE__) . "/bitconfig.ini");
 
 const BITFIRE_MAX_HASH_COUNT = 20;
 const BITFIRE_MAX_AUDIT = 20;
@@ -21,6 +22,7 @@ const BITFIRE_MAX_PAGES = 200;
 const WAF_MIN_HIT = 25;
 const WAF_MIN_PERCENT = 10;
 
+const CONFIG_REPORT_FILE='report_file';
 const CONFIG_WHITELIST_ENABLE='whitelist_enable';
 const CONFIG_BLACKLIST_ENABLE='blacklist_enable';
 const CONFIG_REQUIRE_BROWSER = 'require_full_browser';
@@ -193,13 +195,6 @@ class Config {
         Config::$_options[$option_name] = $value;
     }
 
-    /**
-     * returns true if Config contains all named parameters
-     */
-    public static function contains(...$names) {
-        return array_reduce($names, function($result, $name) { return $result & isset(Config::$_options[$name]); }, true);
-    }
-
     public static function str(string $name, string $default = '') {
         return Config::$_options[$name] ?? $default;
     }
@@ -214,6 +209,7 @@ class Config {
 
     public static function enabled(string $name, bool $default = false) : bool {
         if (!isset(Config::$_options[$name])) { return $default; }
+        if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report") { return true; }
         return (bool)Config::$_options[$name];
     }
 }
@@ -320,6 +316,7 @@ class BitFire
     }
 
 
+    // TODO: move this to "pure function"
     // display the cache behind page
     // FIX: replace fail reasons here!
     public function cache_behind() {
@@ -439,6 +436,28 @@ class BitFire
     }
 }
 
+/**
+ * filter reporting features
+ */
+function reporting(Block $block) {
+    $class = floor(($block->code / 1000)) * 1000;
+    $feature_name =  FEATURE_CLASS[$class] ?? 'bitfire_enabled';
+
+    if (Config::str($feature_name) === "report") {
+        $data = array('time' => date('r'),
+            'exec time' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+            'block' => $block);
+        $bf = BitFire::get_instance()->bot_filter;
+        if ($bf != null) {
+            $data['browser'] = $bf->browser;
+            $data['ip'] = $bf->ip_data;
+        }
+        $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
+        file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($data, $opts) . "\n", FILE_APPEND);
+        return false;
+    }
+    return $block;
+}
 
 /**
  * returns a maybe of the block if no exception exists
@@ -530,7 +549,9 @@ function get_counts(string $input) : array {
     // match any unicode character in the letter or digit category, 
     // and count the remaining characters 
     if (empty($input)) { return array(); }
-    return \count_chars(\preg_replace('/[\p{L}\d]/iu', '', $input, -1, $count), 1);
+    $input2 = \preg_replace('/[\p{L}\d]/iu', '', $input, -1, $count);
+    if (empty($input2)) { return array(); }
+    return \count_chars($input2, 1);
 }
 
 function get_counts_reduce(array $carry, string $input) : array {
@@ -692,7 +713,6 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     $content = json_encode($data)."\n";
     \TF\bit_http_request("POST", "https://search-bitwaf-jadw3humgpe6ima6hbf6jpffwq.us-west-2.es.amazonaws.com/filtered2/_doc",
     $content, 2, array("Content-Type" => "application/json"));
-    file_put_contents("/tmp/block.json", $content);
 }
 
 /**
