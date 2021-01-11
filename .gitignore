@@ -1,4 +1,4 @@
 .*.swp
-lconf.info
+lconv.info
 callgrind.*
 *.xhprof.json
