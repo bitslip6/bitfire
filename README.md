@@ -223,15 +223,6 @@ Project Link: [https://github.com/bitslip6/bitfire](https://github.com/bitslip6/
 <!-- ACKNOWLEDGEMENTS -->
 ## Acknowledgements
 * [Img Shields](https://shields.io)
-* [Choose an Open Source License](https://choosealicense.com)
 * [Font Awesome](https://fontawesome.com)
 * [Bootstrap](https://getbootstrap.com)
 * [Icons by freepik](https://www.flaticon.com/authors/freepik)
-
-
-
-
-
-
-
-<!-- MARKDOWN LINKS & IMAGES -->
