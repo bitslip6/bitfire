@@ -8,6 +8,8 @@ use TF\Maybe;
 
 if (defined('BITFIRE_VER')) { return; }
  
+// TODO: better block to feature mapping
+const FEATURE_CLASS = array(10000 => 'xss_block', 15000 => 'xss_block', 13000 => 'xss_block', 14000 => 'xss_block', 15000 => 'xss_block');
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 70000 => 0);
 const BITFIRE_VER = 105;
