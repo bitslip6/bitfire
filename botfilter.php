@@ -180,10 +180,12 @@ class BotFilter {
         }
 
         // request has no host header
-        if (! \BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
-            // allow valid whitelist bots to access the site
-            if (!isset($this->browser[AGENT_WHITELIST])) {
-                return BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+        if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
+            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
+                // allow valid whitelist bots to access the site
+                if (!isset($this->browser[AGENT_WHITELIST])) {
+                    return BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+                }
             }
         }
 
@@ -473,6 +475,8 @@ function make_challenge_cookie(array $answer, string $ip) : string {
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
     if ($cookie->extract('v')() < 2) { 
         \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
+        http_response_code(202);
+  
         exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
     }
 }
