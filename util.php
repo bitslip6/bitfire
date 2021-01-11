@@ -562,9 +562,9 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
     //file_put_contents("/tmp/debug.log", $foo);
     $ctx = stream_context_create($params);
     $foo = @file_get_contents($url, false, $ctx);
-    file_put_contents("/tmp/http2.out", "$url\n$foo\n");
+    // file_put_contents("/tmp/http2.out", "$url\n$foo\n");
     if ($foo === false) {
-        $cmd = "curl -X$method --header 'content-Type: '{$optional_headers['Content-Type']}' $url";
+        $cmd = "curl -X$method --header 'content-Type: '{$optional_headers['Content-Type']}' " . escapeshellarg($url);
         if (strlen($content) > 0) {
             $cmd .= " -d ".escapeshellarg($content);
         }

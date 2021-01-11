@@ -3,6 +3,9 @@ namespace BitFire;
 
 use TF\Maybe;
 
+const CACHE_NAME_JS_SEND="send_js";
+const CACHE_NAME_JS_GOOD="good_js";
+
 const BOT_ANS_CODE_POS=2;
 const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
@@ -11,11 +14,13 @@ const FAIL_HONEYPOT=50001;
 const FAIL_PHPUNIT=50004;
 const FAIL_WP_ENUM=50003;
 const FAIL_METHOD=50002;
-const FAIL_INVALID_DOMAIN=20001;
-const FAIL_RR_TOO_HIGH=20005;
+const FAIL_INVALID_DOMAIN=23001;
+const FAIL_RR_TOO_HIGH=26001;
 
-const FAIL_NOT_WHITELIST=20003;
-const FAIL_IS_BLACKLIST=20002;
+const FAIL_HOST_TOO_LONG=22001;
+
+const FAIL_NOT_WHITELIST=24001;
+const FAIL_IS_BLACKLIST=25001;
 
 const BLOCK_LONG=3;
 const BLOCK_MEDIUM=2;
@@ -76,22 +81,18 @@ class BotFilter {
 
     protected function get_ip_data(string $remote_addr) {
         $this->_ip_key = "BITFIRE_IP_$remote_addr";
-        // todo: move ip data to bot filter
-        $this->ip_data = $this->cache->load_data($this->_ip_key);
-        // todo: add support for cas
         $t = time();
-        if ($this->ip_data === null) {
+        // todo: move ip data to bot filter
+        $this->ip_data = $this->cache->update_data($this->_ip_key, function ($data) use ($t){
 
-            $cnt = $this->cache->update_data('core_ctr', function($cnt) { return $cnt+1; }, 0, 86400);
-            if ($cnt > 500) { $this->_config = array(); }
-            $this->ip_data = array('rr_5t' => $t+60*5, 'rr_5m' => 0, 'rr_1m' => 0, 'rr_1t' => $t+60, 'ref' => \substr(\uniqid(), 5, 8), '404' => 0, '500' => 0);
-        }
-        // reset 5 and 1 min counters
-        if ($this->ip_data['rr_1t'] < $t) { $this->ip_data['rr_1m'] = 0; $this->ip_data['rr_1t'] = $t; }
-        if ($this->ip_data['rr_5t'] < $t) { $this->ip_data['rr_5m'] = 0; $this->ip_data['rr_5t'] = $t; }
-        
-        $this->ip_data['rr_1m'] = $this->ip_data['rr_1m'] + 1;
-        $this->ip_data['rr_5m'] = $this->ip_data['rr_5m'] + 1;
+            if ($data['rr_1t'] < $t) { $data['rr_1m'] = 0; $data['rr_1t'] = $t+60; }
+            if ($data['rr_5t'] < $t) { $data['rr_5m'] = 0; $data['rr_5t'] = $t+(60*5); }
+            $data['rr_1m']++;
+            $data['rr_5m']++;
+
+            return $data;
+        }, array('rr_5t' => $t+60*5, 'rr_5m' => 0, 'rr_1m' => 0, 'rr_1t' => $t+60, 'ref' => \substr(\uniqid(), 5, 8), '404' => 0, '500' => 0),
+        60*6);
     }
 
 
@@ -107,7 +108,7 @@ class BotFilter {
         // assert(Config::contains(CONFIG_USER_TRACK_PARAM), FATAL_MISSING_CONFIG);
         
         if (strlen($request[REQUEST_HOST]) > 80) {
-            return BitFire::new_block(20001, "HTTP_HOST", $request[REQUEST_HOST], 'len < 80', BLOCK_SHORT);
+            return BitFire::new_block(FAIL_HOST_TOO_LONG, "HTTP_HOST", $request[REQUEST_HOST], 'len < 80', BLOCK_SHORT);
         }
 
         // ugly, impure crap
@@ -130,7 +131,7 @@ class BotFilter {
         // cpu: 52
         $maybe_block = \TF\map_whilenot($this->_constraints, "\BitFire\match_fails", $request);
         $maybe_block->doifnot('\BitFireBot\validate_rr',
-        Config::int(CONFIG_RR_1M), Config::int(CONFIG_RR_5M), $this->ip_data);
+            Config::int(CONFIG_RR_1M), Config::int(CONFIG_RR_5M), $this->ip_data);
 
 
         // check the browser cookie answer matches the request
@@ -142,6 +143,7 @@ class BotFilter {
             $url = \BitFireBot\strip_path_tracking_params($request);
             // response answer matches cookie
             if (intval($maybe_botcookie->extract('a')()) === intval($request['GET']['_bfa'])) {
+                \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_GOOD, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
                 $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
                     \TF\en_json( array('ip' => $request[REQUEST_IP], 'v' => 2, 'et' => time() + 60*60)));
                 \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
@@ -168,7 +170,7 @@ class BotFilter {
                 if (!$maybe_block->empty()) { return $maybe_block; }
             } 
             else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
-                $maybe_block = \BitFireBot\blacklist_inspection($request, file('bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
+                $maybe_block = \BitFireBot\blacklist_inspection($request, file(WAF_DIR.'bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
                 if (!$maybe_block->empty()) { return $maybe_block; }
             }
         }
@@ -196,9 +198,11 @@ namespace BitFireBot;
 
 use BitFire\BitFire;
 use BitFire\Config;
+use TF\CacheStorage;
 
 use const BitFire\BLOCK_MEDIUM;
 use const BitFire\BLOCK_SHORT;
+use const BitFire\CACHE_NAME_JS_SEND;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\CONFIG_USER_TRACK_PARAM;
@@ -218,7 +222,7 @@ use const BitFire\REQUEST_UA;
 function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
     if ($ip_data[IPDATA_RR_1M] > $rr_1m || $ip_data[IPDATA_RR_5M] > $rr_5m) {
         return BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', 
-        "{$ip_data[IPDATA_RR_1M]} / {$ip_data[IPDATA_RR_5M]}", "$rr_1m / $rr_5m", BLOCK_MEDIUM);
+        $ip_data[IPDATA_RR_1M] . ' / ' . $ip_data[IPDATA_RR_5M], "$rr_1m / $rr_5m", BLOCK_MEDIUM);
     }
     return \TF\Maybe::of(false);
 }
@@ -309,7 +313,7 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
  * returns true if the useragent / ip is not blacklisted, false otherwise
  * PURE
  */
-function blacklist_inspection(array $request, array $blacklist) : \TF\Maybe {
+function blacklist_inspection(array $request, ?array $blacklist) : \TF\Maybe {
     $match = new \BitFire\MatchType(\BitFire\MatchType::CONTAINS, REQUEST_UA, $blacklist, BLOCK_MEDIUM);
     $part = $match->match($request);
     if ($part !== false) {
@@ -469,13 +473,12 @@ function make_challenge_cookie(array $answer, string $ip) : string {
  * add the page that prompts the browser to add a cookie
  */
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
-    if ($cookie->extract('v')() >= 2) {
-        return;
+    if ($cookie->extract('v')() < 2) { 
+        \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
+        http_response_code(202);
+  
+        exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
     }
-
-    http_response_code(202);
-    //echo make_js_challenge($request[REQUEST_IP],  string $tracking_param, string $encrypt_key, string $utc_name) : string {
-    exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
 }
 
 function strip_path_tracking_params(array $request) {

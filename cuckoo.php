@@ -78,10 +78,11 @@ function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array {
 
     // calculate a reasonable blocksize
     $block_size = intval(ceil($size / $ctx['chunk_size']) * $ctx['chunk_size']);
-
+    
+    // echo "shmop: blocksz [$block_size]\n";
     // lock memory
     if (cuckoo_lock_for_write($ctx, $block_size)) {
-        // find a location to allocate at the end of the stack, if full, defragment and return end of stack
+        // find a location to allocate at the end of the stack, if full, defrag and return end of stack
         $ptr = ($ctx['free'] + $block_size >= $ctx['mem_end']) ? cuckoo_mem_defrag($ctx) : $ctx['free'];
 
         // if we have a location (not full and defrag successful), update pointer location
@@ -137,7 +138,6 @@ function cuckoo_mem_defrag($ctx): void {
         $bytes = shmop_read($ctx['rid'], $start_byte, $read_len);
         for($i=0;$i<64;$i++) {
             $header = unpack("Loffset/Lhash/Lexpires/nlen/Cflags", $bytes, $i * CUCKOO_EXP_SIZE_BYTES);
-            //print_r($header);
             if ($header['expires'] > $ctx['now']) {
                 $final .= shmop_read($ctx['rid'], $start_byte, $read_len); 
             }
@@ -163,6 +163,7 @@ function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priori
     $data = serialize($item);
     $size = strlen($data);
 
+    // echo "shmop: $size:[$data]\n";
     // we can't store this much data in the cache...
     if ($size > CUCKOO_MAX_SIZE) { return false; }
 
@@ -233,7 +234,7 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
 
 // clear position flags and keep any other flags, then set the position
 // pure
-function set_flag_position(int $flag, int $flag_position): int {
+function set_flag_priority(int $flag, int $flag_priority): int {
     return ($flag & CUCKOO_PERM_MASK) | $flag_position;
 }
 
@@ -310,9 +311,11 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
 
 
     // initial expired memory block (5 bytes)
+
     //$exp_full_block = pack("Ln", time() + 60, 0);
     //$exp_empty_block = pack("Ln", 1, 0);
     //$exp_block = pack("Ln", time() + 60, 0);
+
     // initial slot header (15 bytes)
     $header_block = pack("LLLnC", 0, 0, 0, 0, 0 | CUCKOO_EMPTY);
 
@@ -384,6 +387,7 @@ function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 11
             $ctx['free'] = $ctx['mem_start'];
         } else {
             $ctx['free'] = $mem['free'];
+            $ctx['free_mem'] = $ctx['mem_end']-$mem['free'];
         }
     }
 
@@ -394,7 +398,7 @@ class cuckoo {
     private static $ctx;
 
     public function __construct() {
-        self::$ctx = cuckoo_connect(15500, 256, 4194304, false, "a");
+        self::$ctx = cuckoo_connect(29000, 128, 29000*128);
     }
 
     public static function read($key) {

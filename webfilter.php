@@ -29,7 +29,7 @@ const FAIL_SQL_COMMENT=14007;
 const SPAM = "100%\s+free|100%\s+satisfied|50%\s+off|all\s+new|best\s+price|discount|for\s+free|fast\s+cash|for\s+just|for\s+you|for\s+only|free\s+gift|free\s+sample|give\s+away|lowest\s+price|luxury|percent+free|prize|sale|click\s+here|click\s+below|deal|meet\s+single|double\s+your|earn\s+per|make\s+money|blockchain|interested\s+in\s+the\s+latest|einkommen";
 
 const FAIL_SPAM = 18000;
-const FAIL_FILE_UPLOAD = 15012;
+const FAIL_FILE_UPLOAD = 21000;
 
 class WebFilter {
 
