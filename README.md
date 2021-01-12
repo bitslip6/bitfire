@@ -161,23 +161,25 @@ all exploit scripts and worms do not support JavaScript or cookies this is the s
 you can install to prevent breakins.  This cookie is non user-identifying and so is fully GDPR compliant
 and does not require a GDPR notification.
 ```ini
-require_full_browser = true
+require_full_browser = report | block
 ```
 
 
 *4*. Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
 list of common bots included with BitFire.  Refer to our wiki for how to add additional bots.
 ```ini
-whitelist_enable = true
+whitelist_enable = report | block
 ```
 
 *5*. Enable core web filter.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
 The entire web filter can be enabled or disabled with the *web_filter_enabled* parameter.  We recommend
 the following configuration:
 ```ini
-web_filter_enabled = true
-xss_block = true
-sql_block = true
+web_filter_enabled = report | block
+xss_block = report | block
+web_block = report | block
+file_block = report | block
+sql_block = report | block
 ```
 
 *6*. Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
