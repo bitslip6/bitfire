@@ -128,15 +128,23 @@ The default config is very conservative and will only block
 bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire
 home directory (your github checkout location, or for composer vendor/bitslip6/bitfire/config.ini)
 
-*1.* First setup your in-memory cache type.  BitFire stores server state in memory for fast response 
-time and supports all PHP in memory caches. We preefeer in order: *shm*, *apcu*, *shmop*.  If you
-are unsure which cache your server supports, see php_info() output.  Look for "shm", "apcu" and "shmop"
+#### Feature flags support 3 values:
+ - *false*: disable the feature
+ - *report*: don't block the traffic but add an entry top the report_file
+ - *block*: block the request
+ we recommend beginning with _report_ and then moving to *block* only after verifying that you would not be blocking good traffic.  https://github.com/bitslip6/bitfire/wiki/block_reporting for details.
+ 
+
+*1*. First setup your in-memory cache type.  BitFire stores server state in memory for fast response 
+time and supports all PHP in memory caches. We preefeer in order: *shmop*, *apcu*, *shm*.  If you
+are unsure which cache your server supports, see php_info() output.  Look for "shmop", "apcu" and "shm"
 and set *_cache_type_* in `config.ini` to your chosen cache or 'nop' for no cache.
 
 
-*2.* Next configure a browser honey pot.  Set *_honeypot_url*_ in `config.ini` to anything you like, 
+*2*. Next configure a browser honey pot.  Set *_honeypot_url*_ in `config.ini` to anything you like, 
 or leave the default.  Malicious bots looking for secure areas of your site will read this, request
-the url and get banned for 24 hours.  Good bots will respect the Disallow. Add your url to your robots.txt file:
+the url and get banned for 24 hours.  Good bots will respect the Disallow and not be effected. Add 
+your url to your robots.txt file:
 ```ini
 honeypot_url = '/not_important/contact'
 ```
@@ -147,7 +155,7 @@ Disallow: /not_important/contact
 ```
 
 
-*3.* Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
+*3*. Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
 require all web browers to prove they support both by enabling *require_full_browser*.  Since >95% of
 all exploit scripts and worms do not support JavaScript or cookies this is the single best protection
 you can install to prevent breakins.  This cookie is non user-identifying and so is fully GDPR compliant
@@ -157,13 +165,13 @@ require_full_browser = true
 ```
 
 
-*4.* Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
+*4*. Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
 list of common bots included with BitFire.  Refer to our wiki for how to add additional bots.
 ```ini
 whitelist_enable = true
 ```
 
-*5.* Enable core web filter.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
+*5*. Enable core web filter.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
 The entire web filter can be enabled or disabled with the *web_filter_enabled* parameter.  We recommend
 the following configuration:
 ```ini
@@ -172,7 +180,7 @@ xss_block = true
 sql_block = true
 ```
 
-*6.* Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
+*6*. Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
 ```ini
 allow_ip_block = true
 ```
