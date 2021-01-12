@@ -130,8 +130,8 @@ home directory (your github checkout location, or for composer vendor/bitslip6/b
 
 #### Feature flags support 3 values:
  - *false*: disable the feature
- - *report*: don't block the traffic but add an entry top the report_file
- - *block*: block the request
+ - *report*: don't block the traffic but add an entry to the report_file (config.ini setting)
+ - *block*: block the request, server response_code (config.ini) from views/block.php
  we recommend beginning with _report_ and then moving to *block* only after verifying that you would not be blocking good traffic.  https://github.com/bitslip6/bitfire/wiki/block_reporting for details.
  
 
