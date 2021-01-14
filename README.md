@@ -235,3 +235,4 @@ Project Link: [https://github.com/bitslip6/bitfire](https://github.com/bitslip6/
 * [Font Awesome](https://fontawesome.com)
 * [Bootstrap](https://getbootstrap.com)
 * [Icons by freepik](https://www.flaticon.com/authors/freepik)
+* [IP2Location](http://lite.ip2location.com)
