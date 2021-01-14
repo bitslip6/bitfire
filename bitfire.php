@@ -185,7 +185,7 @@ class Block {
 }
 
 class Config {
-    private static $_options = null;
+    public static $_options = null;
 
     public static function set(array $options) {
         Config::$_options = $options;
@@ -367,6 +367,15 @@ class BitFire
      * return false if inspection failed...
      */
     public function inspect() : \TF\Maybe {
+        // dashboard requests
+        if ($this->_request[REQUEST_PATH] === "/bitfire") {
+            $report_count = count(file(Config::str("report_file")));
+            $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
+            exit(require WAF_DIR . "views/dashboard.html");
+        }
+
+
+
         $block = \TF\Maybe::of(false);
         if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
 
@@ -407,12 +416,6 @@ class BitFire
             register_shutdown_function('\\BitFire\\post_request', $this->_request, $block->value(), $ip_data);
         } else {
             register_shutdown_function('\\BitFire\\post_request', $this->_request, null, null);
-        }
-
-        // dashboard requests
-        if ($this->_request[REQUEST_PATH] === "/bitfire") {
-            require WAF_DIR . "views/dashboard.html";
-            exit();
         }
 
         return $block;
@@ -457,6 +460,23 @@ function reporting(Block $block) {
         return false;
     }
     return $block;
+}
+
+function alert_or_block($config) : string {
+/*
+    echo "alert or block [$config]\n";
+    //var_dump();
+    var_export($config);
+    echo"\n\n";
+*/
+
+    if ($config === 'report' || $config === 'alert') {
+        return 'report';
+    }
+    if (!$config) {
+        return 'off';
+    }
+    return 'block';
 }
 
 /**
