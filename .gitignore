@@ -1,1 +1,4 @@
 .*.swp
+lcov.info
+callgrind.*
+*.xhprof.json

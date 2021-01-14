@@ -755,7 +755,7 @@ function param_to_str(array $params, $filter = false) {
 
 
 function block_ip($block, array $ip_data) : void {
-    if (Config::enabled('allow_ip_block') || !$block) { return; }
+    if (!Config::enabled('allow_ip_block') || !$block) { return; }
     $exp = time();
     if ($block->block_time == 1) {
         $exp += Config::int('short_block_time', 600);

@@ -1,101 +1,227 @@
-# BitFire 
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire/issues) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
-
-## Enterprise class security for everyone
-
-#### Free firewall for all PHP based web servers. Stop worms, web defacements, bots, spam, malware and other malicious activity on your website.
-
-
-* Fastest full stack startup and block time of any PHP based firewall (up to 200-300x faster).  
-
-[![Performance](https://img.shields.io/badge/block%20speed-<%201%20ms-yellowgreen?style=for-the-badge)](https://php)
+<!-- SHIELDS -->
+[![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](https://www.gnu.org/licenses/agpl-3.0.en.html)
+[![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 
 
+<!-- PROJECT LOGO -->
+<br />
+<p align="center">
+  <a href="https://github.com/bitslip6/bitfire">
+    <img src="views/bitslip.png" alt="Logo" width="80" height="80">
+  </a>
 
-* The only PHP host based fire with complete server side and client side integrity protection. 
+  <h3 align="center">BitFire</h3>
 
-* Verify allowed bots (like GoogleBot) by it's origin network (google.com) and prevent bots from impersonating browsers by JavaScript verification challanges that identify real browsers from even the most sophisticated bots.
-
-
-[![Performance](https://img.shields.io/badge/Bot%20Blocking-DNS%20/%20AS-yellowgreen?style=for-the-badge)](https://php)
-[![Performance](https://img.shields.io/badge/Browser%20Verification-Full%20Javascript-yellowgreen?style=for-the-badge)](https://php)
-
-
-* Clientside integrity protection works to seemlesly create browser policy files that prevent attackers from loading malicious scripts that could compromise your user's security.
-
-[![Performance](https://img.shields.io/badge/Client%20Protection-Full%20CSP-yellowgreen?style=for-the-badge)](https://php)
-
-
-* Serverside integrity protection actaully blocks all file modification at the operating system level and only unlocks the server for a liomited time to upgrade or install software when the correct pass phrase is entered.
-
-[![Performance](https://img.shields.io/badge/Site%20Protection-%20OS%20File%20Lock-yellowgreen?style=for-the-badge)](https://php)
-
-* Malware Scanning, SQL Injection, Cross Site Scripting, Server Side Includes, XML Entities and many more, tested before every release
-
-[![Performance](https://img.shields.io/badge/SQLi%20Signatures->%203200-yellowgreen?style=for-the-badge)](https://php)
-[![Performance](https://img.shields.io/badge/XSS%20Signatures->%201100-yellowgreen?style=for-the-badge)](https://php)
-[![Performance](https://img.shields.io/badge/Extra%20Signatures%20->%20900%20-yellowgreen?style=for-the-badge)](https://php)
-
+  <p align="center">
+enterprise class security for everyone
+    <br />
+    <a href="https://github.com/bitslip6/bitfire/wiki"><strong>Explore the docs »</strong></a>
+    <br />
+    <br /><!--
+    <a href="https://github.com/othneildrew/Best-README-Template">View Demo</a>
+    ·
+    -->
+    <a href="https://github.com/bitslip6/bitfire/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/bitslip6/bitfire/issues">Request Feature</a>
+  </p>
+</p>
 
 
-Filtering details:
+
+<!-- TABLE OF CONTENTS -->
+<details open="open">
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About BitFire</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgements">Acknowledgements</a></li>
+  </ol>
+</details>
 
 
-* highly efficient filtering runs in <1ms on most servers.
-* Block rate for AWS T2 micro servers >120 full HTTP blocks per second.
-* Filtering for ALL bot traffic.  Bot IP address filtering and human javascript verification ensures that only authorized bots are allowed.
-* add multi factor (SMS based) authentication for up to 10 site admins.
-* whitelisted MFA users means admins won't have restricted access.
-* filter all HTML tags and javascipt onX events as well as DOM injection for popular frameworks like angular, vuejs, etc.
-* intelligent parsers understand your request (we use <10 regular expressions for filtering).
-* customizable profanity filter.
-* customizable spam list filter.
-* * over 2,000 unique SQL injections and over 10,000 unique XSS injections run in our internal filter tests.
-* learning WAF slowly locks your site down to just your valid traffic from verified human users.
-* new contant can be added to locked sites by just visiting the page from a trusted account.
-* transparent CSRF protection and filtering.
-* fast country based IP filtering.
-* daily updated IP block lists.
 
-functional programming design with moslty pure functions and full code coverage gives you peace of mind that your code is solid.
+<!-- ABOUT THE PROJECT -->
+## About BitFire
+
+[![BitFire Screen Shot][product-screenshot]](https://example.com)
+
+There are many choices for PHP firewalls to protect your webservers, most can be easily bypassed.
+
+Here's How BitFire is different:
+* ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg) Speed. <1 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
+* ![bot](https://fonts.gstatic.com/s/i/materialicons/dns/v6/24px.svg) Bot authentication. Authenticates good bots like google, facebook, bing, ahrefs, by source network
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparant JavaScript browser verification ensures user's are real
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/policy/v6/24px.svg) Client Integrity. Automatically generate browser policy preventing browser takeover
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/lock/v6/24px.svg) Server Integrity. Prevent atackers from modifying server files with Operating System locks
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/text_rotation_none/v6/24px.svg) Grammer based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
 
 
-## OWASP top 10 features break down (honest info)
- 
-### 1: injection *2:
-out of the box we block all html tags and javascript attributes for XSS protection with whitelisting single url and parameter combinations for any valid pages or trusted users.  We have robust SQL detection that actually parses input for SQL and fails the request.  We also filter any local file paths such as /bin/foobar, /etc/foobar, /sbin/foobar, C:\boot.ini, cmd.exe, etc.  BitFIRE not currently offer LDAP filtering. Drop a feature request in #issues if this is something you would like to see.
+### Built With
 
-### 2: broken authentication *3:
-We don't provide additional authentication services for your end users.  We do however provide MFA authentication for access to your site administration area (wp-admin for eaxmple) and provide filtering for only MFA authenitcated users to access these areas.  This prevents credential stuffing and account takeover for your site administrators.
+BitFire is built from pure PHP and has no external dependencies.  BitFire can take advantage of several PHP shared memory caches including APCu, SHM, shmop and OpCache
+* [PHP](https://php.com)
+* [TinyTest](https://github.com/bitslip6/tinytest)
+* [APCu](https://pecl.php.net/package/APCU)
 
-### 3: sensative data exposure *1:
-We do offer data loss prevention for Credit Card numbers and Social Security numbers.  This feature is not enabled by default and has a noticable performance impact as all rendered web pages must be inspected for credit card numbers or other data before serving them.  We also over custom filtering but do not recomend this for the majority of BitFIRE users.
 
-### 4: XML entities *2:
-Like our Free Forever*3 bot filtering, we do offer xml entity protection on all requests
 
-### 5: Broken Access Control *2:
-Access control services are beyond the scope of even the most advanced firewall.  That's just not what they do.  Anyone who tells you their Firewall provides "fixed" access control for your website, is being less then fully open.
+<!-- GETTING STARTED -->
+## Getting Started
 
-### 6: Security Misconfiguration *2:
-We do provide some security configuration guidance.  For instance we add HTTP security headers to all requests locking them down to best pracctices as well as audit your PHP configuration and provide ini settings suggestions.  We do not alter or fix your operating system configuration, SSL configuration or any security configuration outside of HTTP headers and PHP settings.  Anyone who tells you their firewall solved all security misconfigurations is not telling you the entire truth.
+Security from F to A in 5 minutes https://www.youtube.com/watch?v=DHhEW2otdng
 
-### 7: Cross Site Scripting *1:
-We have a robust testing suite with over 10,000 unique XSS attacks each relase must pass and add to it every month.  Cross site scripting protection is part of our Free Foreever *3 filtering.
+### Prerequisites
 
-### 8: Insecure deserialization *1:
-This is an insidious security issue that can be difficult to fully protect from and has plagued the Java and PHP communities for years.  We include deserialization filtering in our Free Forever filtering and prevent all known deserialization bugs across raw, urlencoded and uploaded files.  Because deserialization is such a complex attack vector we recommend your application not support php deserialization and provide code auditing functionality to restrict it in your code base.
+You will need a webserver running PHP >= 7.1, a login, sudo access to edit php.ini and a text editor.
 
-### 9: Using components with known vulnerabilities *2:
-We are currently developing this feature to add to our core product offering.  Expect first release to support WordPress and Joomla sites as well as npm modules via package.json files.  We plan to cross reference known out of date software with the CVE project to deliver actionalbe information.  Long terms plans begining in 2021 are to add auto update functionality for wordpress and joomla sites.
 
-### 10: Insufficient Logging and Monitoring *3:
-Fortunately you can buy this.  We log all blocked traffic in elastic search and you can see each blocked request and inspect exactly why it was blocked.
+### Installation
 
-_*1: Free Forever_ - Our free forever services are full unmetered filtering available to all of your servers free of charge
+- *Install via GitHub*
+   ```sh
+   git clone https://github.com/bitslip6/bitfire.git
+   ./bitfire/updatekeys.sh
+   ```
+- or *Install via Composer*
+   ```
+   composer require bitslip6/bitfire
+   ./vendor/bin/updatekeys.sh
+   ```
+- or *Install by hand*
+Edit bitfire/config.ini and change: *_encryption_key_* and *_secret_*.  
+Edit your php.ini file (/etc/php/7.4/fpm/php.ini or similar) and set 
+```ini 
+auto_prepend_file ='/full/path/to/bitfire/startup.php';
+```
 
-_*2: Premium Filtering_ - Premium filtering features are available free of change for 500 unique visitors each month. 
+- *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini`
+   ```ini
+   bitfire_enabled = true;
+   ```
+- Congradulations! Time for a beer
 
-_*3: MFA / Logging_ - Multifactor authentication and Extended Logging require server resources and we are unable to provide these features to the community for free.
+
+
+<!-- SETUP -->
+## Setup / Configuration Quickstart
+
+The default config is very conservative and will only block
+bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire
+home directory (your github checkout location, or for composer vendor/bitslip6/bitfire/config.ini)
+
+*1.* First setup your in-memory cache type.  BitFire stores server state in memory for fast response 
+time and supports all PHP in memory caches. We preefeer in order: *shm*, *apcu*, *shmop*.  If you
+are unsure which cache your server supports, see php_info() output.  Look for "shm", "apcu" and "shmop"
+and set *_cache_type_* in `config.ini` to your chosen cache or 'nop' for no cache.
+
+
+*2.* Next configure a browser honey pot.  Set *_honeypot_url*_ in `config.ini` to anything you like, 
+or leave the default.  Malicious bots looking for secure areas of your site will read this, request
+the url and get banned for 24 hours.  Good bots will respect the Disallow. Add your url to your robots.txt file:
+```ini
+honeypot_url = '/not_important/contact'
+```
+
+```ini
+User-agent: *
+Disallow: /not_important/contact
+```
+
+
+*3.* Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
+require all web browers to prove they support both by enabling *require_full_browser*.  Since >95% of
+all exploit scripts and worms do not support JavaScript or cookies this is the single best protection
+you can install to prevent breakins.  This cookie is non user-identifying and so is fully GDPR compliant
+and does not require a GDPR notification.
+```ini
+require_full_browser = true
+```
+
+
+*4.* Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
+list of common bots included with BitFire.  Refer to our wiki for how to add additional bots.
+```ini
+whitelist_enable = true
+```
+
+*5.* Enable core web filter.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
+The entire web filter can be enabled or disabled with the *web_filter_enabled* parameter.  We recommend
+the following configuration:
+```ini
+web_filter_enabled = true
+xss_block = true
+sql_block = true
+```
+
+*6.* Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
+```ini
+allow_ip_block = true
+```
+
+
+
+_For detailed documentation, please refer to the [Documentation](https://github.com/bitslip6/bitfire/wiki)_
+
+
+
+<!-- ROADMAP -->
+## Roadmap
+
+See the [open issues](https://github.com/bitslip6/bitfire/issues) for a list of proposed features (and known issues).
+
+
+
+<!-- CONTRIBUTING -->
+## Contributing
+
+Additions to the bot whitelist and additional attack signatures or bypasses are **greatly appreciated**.  If your contributions are included you will recieve discounts on comercial licencing for BitFire Pro.
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+
+
+<!-- LICENSE -->
+## License
+
+Distributed under the Apache 2.0 License. See `LICENSE` for more information.
+
+
+
+<!-- CONTACT -->
+## Contact
+
+Your Name - [@bitslip6](https://twitter.com/bitslip6) - info@bitslip6.com
+
+Project Link: [https://github.com/bitslip6/bitfire](https://github.com/bitslip6/bitfire)
+
+
+
+<!-- ACKNOWLEDGEMENTS -->
+## Acknowledgements
+* [Img Shields](https://shields.io)
+* [Font Awesome](https://fontawesome.com)
+* [Bootstrap](https://getbootstrap.com)
+* [Icons by freepik](https://www.flaticon.com/authors/freepik)
