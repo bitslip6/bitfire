@@ -376,7 +376,8 @@ class BitFire
                 exit;
             }
 
-            $report_count = count(file(Config::str("report_file")));
+            $x = file(Config::str("report_file"));
+            $report_count = (is_array($x)) ? count($x) : 0;
             $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
             $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str("report_file"), 20, 500)) . ']', true));
             $blocks = add_country(CacheStorage::get_instance()->load_data("log_data"));
@@ -683,7 +684,8 @@ function replace_profanity(string $data) : string {
     return preg_replace('/('.PROFANITY.')/', '@#$!%', $data);
 }
 
-function add_country(array $data) {
+function add_country($data) {
+    if (!is_array($data) || count($data) < 1) { $data['country'] = '-'; return $data; }
     $map = json_decode(file_get_contents(WAF_DIR . "cache/country.json"), true);
     $result = array();
     foreach ($data as $report) {

@@ -767,8 +767,8 @@ function concat(array $input) {
  * read x lines from end of file (line_sz should be > avg length of line)
  */
 function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
-    $st = stat($filename);
-    if (($fh = fopen($filename, "r")) === false) { return ""; }
+    $st = @stat($filename);
+    if (($fh = @fopen($filename, "r")) === false) { return array(); }
     $sz = min(($lines*$line_sz), $st['size']);
     fseek($fh, -$sz, SEEK_END);
     $d = fread($fh, $sz);
