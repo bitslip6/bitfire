@@ -21,12 +21,40 @@
 
     <style>
       body { display: none; }
-      .chilabel { color: #333; display: block; width: 190px; float: left; margin-right: 0; padding-right: 0;}
+      .chilabel { color: #333; display: block; width: 150px; float: left; margin-right: 0; padding-right: 0;}
       .pr1 { margin-top: 20px; }
       .card-body { padding: 0.5rem !important; }
 
       svg { fill: #977; }
       svg.white { fill: #1657af; }
+
+      .btn-group-tiny>.btn {
+        padding: .075rem .25rem;
+        font-size: .4rem;
+        line-height: 1.0;
+        border-radius: .25rem;
+      }
+      .dropdown-toggle {
+        width: 70px;
+      }
+      
+      .nav-sm .nav-link {
+        font-size: .6125rem;
+      }
+
+      .navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
+        padding-left: .5rem;
+        padding-right: 0rem;
+      }
+      
+      /*
+      ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
+      */
+      .dropdown-menu { margin-top: -20px; }
+      
+      thead.details th, th { font-size: 12px; }
+      
+      .popover { max-width: 30rem; }
 
     </style>
     
@@ -45,6 +73,25 @@
         function min(numbers) { return numbers.reduce(min_reducer); }
         function max(numbers) { return numbers.reduce(max_reducer); }
         function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+
+        function toggle(elm, type) {
+          console.log("toggle", elm, type);
+          var e = GBI(elm);
+          e.innerText = type;
+          if (type == "block" || type == "on") {
+            e.classList.remove("btn-warning");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-success");
+          } else if (type == "report" || type == "alert") {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-warning");
+          } else {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-warning");
+            e.classList.add("btn-secondary");
+          }
+        }
 
         function mode(numbers) {
             // as result can be bimodal or multi-modal,
@@ -137,9 +184,10 @@
 
         <!-- Brand -->
         <a class="navbar-brand" href="/bitfire">
-          <img src="bitfire.png" class="navbar-brand-img mx-auto" alt="...">
+          <img src="https://bitslip6.com/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
         </a>
-
+ 
+        <span class="chilabel">24 Hour Totals</span>
         <!-- Collapse -->
         <div class="collapse navbar-collapse" id="sidebarCollapse">
 
@@ -148,41 +196,35 @@
             <li class="nav-item">
               <a class="nav-link" href="#" aria-expanded="false">
                 <span class="chilabel">
-                  <svg data-name="position" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-                  X/Y : </span> <span id="cross">450/90</span>
+                  <svg viewBox="0 0 24 24" fill="black" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                  Alerts: </span> <span id="alerts"><?php echo $report_count; ?></span>
               </a>
             </li>
             <li class="nav-item">
               <a class="nav-link" href="#" aria-expanded="false">
                 <span class="chilabel">
-                  <svg data-name="position" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-                  Angle</span> <span id="radians">3.145</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
+                  Blocks: </span> <span id="blocks">-</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                  <svg xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24" viewBox="0 0 24 24" width="24"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M17,11c0.34,0,0.67,0.04,1,0.09V6.27L10.5,3L3,6.27v4.91c0,4.54,3.2,8.79,7.5,9.82c0.55-0.13,1.08-0.32,1.6-0.55 C11.41,19.47,11,18.28,11,17C11,13.69,13.69,11,17,11z"/><path d="M17,13c-2.21,0-4,1.79-4,4c0,2.21,1.79,4,4,4s4-1.79,4-4C21,14.79,19.21,13,17,13z M17,14.38c0.62,0,1.12,0.51,1.12,1.12 s-0.51,1.12-1.12,1.12s-1.12-0.51-1.12-1.12S16.38,14.38,17,14.38z M17,19.75c-0.93,0-1.74-0.46-2.24-1.17 c0.05-0.72,1.51-1.08,2.24-1.08s2.19,0.36,2.24,1.08C18.74,19.29,17.93,19.75,17,19.75z"/></g></g></svg>
+                  Check: </span> <span id="send"><?php echo $send; ?></span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" aria-expanded="false">
+                <span class="chilabel">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none" fill-rule="evenodd"/><g fill-rule="evenodd"><path d="M9 17l3-2.94c-.39-.04-.68-.06-1-.06-2.67 0-8 1.34-8 4v2h9l-3-3zm2-5c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4"/><path d="M15.47 20.5L12 17l1.4-1.41 2.07 2.08 5.13-5.17 1.4 1.41z"/></g></svg>
+                  Pass: </span> <span id="send"><?php echo $good; ?></span>
               </a>
             </li>
 
-            <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
-                <span class="chilabel">
-                  <svg data-name="speedometer" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.27-10.44zm-9.79 6.84a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/></svg>
-                  FPS:
-                </span> <span id="fps">16</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
-                <span class="chilabel">
-                <svg data-name="snowflake" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg>
-                CPU : </span> <span id="cputemp">60&#176;</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
-                <span class="chilabel">
-                <svg data-name="snowflake" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M22 11h-4.17l3.24-3.24-1.41-1.42L15 11h-2V9l4.66-4.66-1.42-1.41L13 6.17V2h-2v4.17L7.76 2.93 6.34 4.34 11 9v2H9L4.34 6.34 2.93 7.76 6.17 11H2v2h4.17l-3.24 3.24 1.41 1.42L9 13h2v2l-4.66 4.66 1.42 1.41L11 17.83V22h2v-4.17l3.24 3.24 1.42-1.41L13 15v-2h2l4.66 4.66 1.41-1.42L17.83 13H22z"/></svg>
-                Vixel : </span> <span id="vixeltemp">60&#176;</span>
-              </a>
-            </li>
+
           </ul>
+          <br />
 
           <!-- Divider -->
           <hr class="navbar-divider my-3">
@@ -197,144 +239,221 @@
 
             
             <li class="nav-item">
-              <a class="nav-link" href="#sidebarCalibration" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarCalibration">
+              <a class="nav-link" href="#sidebarWebFilter" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarWebFilter">
+                <!--
                 <svg data-name="tune" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
-                Calibration
+                -->
+                <svg height="24" viewBox="0 0 24 24" width="24"><path d="M4.5 11h-2V9H1v6h1.5v-2.5h2V15H6V9H4.5v2zm2.5-.5h1.5V15H10v-4.5h1.5V9H7v1.5zm5.5 0H14V15h1.5v-4.5H17V9h-4.5v1.5zm9-1.5H18v6h1.5v-2h2c.8 0 1.5-.7 1.5-1.5v-1c0-.8-.7-1.5-1.5-1.5zm0 2.5h-2v-1h2v1z"/><path d="M24 24H0V0h24v24z" fill="none"/></svg>
+                &nbsp;Web 
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 7 ) </span>
               </a>
-              <div class="collapse " id="sidebarCalibration">
+              <div class="collapse " id="sidebarWebFilter">
                 <ul class="nav nav-sm flex-column">
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link chilabel" style="float: left;">
-                      ADI
-                    </span>
-                    <input type="checkbox" id="adical" name="adical" class="pr1" />
+                  <li class="nav-item" style="height:30px;">
+                    <!--
+                    <span href="#" class="nav-link chilabel" style="float: left;"> feature </span>
+                    <span type="checkbox"  style="float:right;font-size:12px;" class="pr1">alert</span>
+                    <span type="checkbox"  style="float:right;font-size:12px;" class="pr1">block</span>
+                    -->
                   </li>
 
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
-                      Chiton
+                      Security Headers
                     </span>
-                    <input type="checkbox" checked="checked" id="chitoncal" name="chitoncal" class="pr1" />
+
+                    <div class="btn-group-sm" role="group">
+                      <button id="security_headers" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['security_headers_enabled']; ?> </button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'off')">Off</a>
+                      </div>
+                    </div>
                   </li>
 
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
-                      Planar
+                      Force SSL
                     </span>
-                    <input type="checkbox" checked="checked" id="planar" name="planar" class="pr1" />
+                    <div class="btn-group-sm" role="group">
+                      <button id="force_ssl" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['enforce_ssl_1year']; ?></button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'off')">Off</a>
+                      </div>
+                    </div>
                   </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Spam Filter
+                    </span>
+                    <div class="btn-group-sm" role="group">
+                      <button id="spam_filter" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['spam_filter_enabled']; ?></button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'off')">Off</a>
+                      </div>
+                    </div>
+
+                  </li>
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      XSS Filter
+                    </span>
+                    <div class="btn-group-sm" role="group">
+                      <button id="xss_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['xss_block']; ?></button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'off')">Off</a>
+                      </div>
+                    </div>
+
+                  </li>
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      SQL Filter
+                    </span>
+                    <div class="btn-group-sm" role="group">
+                      <button id="sql_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['sql_block']; ?></button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'off')">Off</a>
+                      </div>
+                    </div>
+
+                  </li>
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Web Filter
+                    </span>
+                    <div class="btn-group-sm" role="group">
+                      <button id="web_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['web_block']; ?></button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('web_block', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('web_block', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('web_block', 'off')">Off</a>
+                      </div>
+                    </div>
+
+                  </li>
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Upload Filter
+                    </span>
+                    <div class="btn-group-sm" role="group">
+                      <button id="file_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['file_block']; ?></button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('file_block', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('file_block', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('file_block', 'off')">Off</a>
+                      </div>
+                    </div>
+
+                  </li>
+
                 </ul>
               </div>
             </li>
+            
 
             <li class="nav-item">
-              <a class="nav-link" href="#sidebarPerformance" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarPerformance">
-                <svg data-name="shutter_speed" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M15 1H9v2h6V1zm4.03 6.39l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm-.32-5H6.35c.57 1.62 1.82 2.92 3.41 3.56l-.11-.06 2.03-3.5zm5.97-4c-.57-1.6-1.78-2.89-3.34-3.54L12.26 11h5.39zm-7.04 7.83c.45.11.91.17 1.39.17 1.34 0 2.57-.45 3.57-1.19l-2.11-3.9-2.85 4.92zM7.55 8.99C6.59 10.05 6 11.46 6 13c0 .34.04.67.09 1h4.72L7.55 8.99zm8.79 8.14C17.37 16.06 18 14.6 18 13c0-.34-.04-.67-.09-1h-4.34l2.77 5.13zm-3.01-9.98C12.9 7.06 12.46 7 12 7c-1.4 0-2.69.49-3.71 1.29l2.32 3.56 2.72-4.7z"/></svg>
-                Performance
+              <a class="nav-link" href="#sidebarBots" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarBots">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17 15.18 9l1.41 1.41L10 17z"/></svg>
+                &nbsp;Bots
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 2 ) </span>
               </a>
-              <div class="collapse " id="sidebarPerformance">
+              <div class="collapse " id="sidebarBots">
                 <ul class="nav nav-sm flex-column">
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
-                      Delay
+                      Allow IP Block
                     </span>
-                    <input type="number" id="interval" name="interval" value="60" style="width:100px; margin-left: 80px;" />
-                  </li>
 
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link chilabel" style="float: left;">
-                      Quality
-                    </span>
-                    <input type="number" id="quality" value="90" name="quality" class="pr1" style="width:100px; margin-left: 80px;" />
+                    <div class="btn-group-sm" role="group">
+                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'on')">On</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'off')">Off</a>
+                      </div>
+                    </div>
                   </li>
                 </ul>
               </div>
-            </li>
+             
 
 
             <li class="nav-item">
-              <a class="nav-link" href="#sidebarData" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarData">
-                <svg data-name="image" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-                Image
+              <a class="nav-link" href="#sidebarSettings" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-7H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-1.75 9c0 .23-.02.46-.05.68l1.48 1.16c.13.11.17.3.08.45l-1.4 2.42c-.09.15-.27.21-.43.15l-1.74-.7c-.36.28-.76.51-1.18.69l-.26 1.85c-.03.17-.18.3-.35.3h-2.8c-.17 0-.32-.13-.35-.29l-.26-1.85c-.43-.18-.82-.41-1.18-.69l-1.74.7c-.16.06-.34 0-.43-.15l-1.4-2.42c-.09-.15-.05-.34.08-.45l1.48-1.16c-.03-.23-.05-.46-.05-.69 0-.23.02-.46.05-.68l-1.48-1.16c-.13-.11-.17-.3-.08-.45l1.4-2.42c.09-.15.27-.21.43-.15l1.74.7c.36-.28.76-.51 1.18-.69l.26-1.85c.03-.17.18-.3.35-.3h2.8c.17 0 .32.13.35.29l.26 1.85c.43.18.82.41 1.18.69l1.74-.7c.16-.06.34 0 .43.15l1.4 2.42c.09.15.05.34-.08.45l-1.48 1.16c.03.23.05.46.05.69z"/></svg>
+                &nbsp;Settings
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 2 ) </span>
               </a>
-              <div class="collapse " id="sidebarData">
+              <div class="collapse " id="sidebarSettings">
                 <ul class="nav nav-sm flex-column">
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
-                      IR
+                      Allow IP Block
                     </span>
-                    <input type="checkbox" id="depth" name="depth" class="pr1" />
-                  </li>
 
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link chilabel" style="float: left;">
-                      Avg
-                    </span>
-                    <input type="checkbox" id="avg" name="avg" class="pr1" />
-                  </li>
-
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link" style="float: left;">
-                      Max Color  
-                    </span>
-                    <!--
-                    <input class="int_in" id="max_val" name="max_val" type="text" min="0" max="9000" step="10" value="7000" />
-                    -->
-                    <input type="number" id="max_val" name="max_val" value="7000" min="0" max="9000" step="10" style="width:100px; margin-left: 80px;" />
-                  </li>
-
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link" style="float: left;">
-                      Min Color  
-                    </span>
-                    <!--
-                    <input class="int_in" id="min_val" name="min_val" type="text" min="0" max="9000" step="10" value="0" />
-                    -->
-                    <input type="number" id="min_val" name="min_val" value="0" min="0" max="9000" step="10" style="width:100px; margin-left: 80px;" />
-                  </li>
-
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link" style="float: left;">
-                      Color Type
-                    </span>
-                    <select name="colormode" id="colormode" style="width: 100px; margin-left: 80px;">
-                      <option value="2" selected="selected" style="padding: 3px 5px;">rainbow</option>
-                      <option value="1" style="padding: 3px 5px;">greyscale</option>
-                    </select>
+                    <div class="btn-group-sm" role="group">
+                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'on')">On</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'off')">Off</a>
+                      </div>
+                    </div>
                   </li>
                   
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Cache Type
+                    </span>
+
+                    <div class="btn-group-sm" role="group">
+                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'shmop')">Shmop</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'apcu')">APCu</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'shm')">SHM</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'nop')">NOP</a>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Response Code
+                    </span>
+
+                    <div class="btn-group-sm" role="group">
+                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <div class="dropdown-menu">
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 200)">200</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 204)">204</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 400)">400</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 401)">401</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 403)">403</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 404)">404</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 406)">406</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 500)">500</a>
+                      </div>
+                    </div>
+                  </li>
+
+
                 </ul>
               </div>
             </li>
-
-            <li class="nav-item">
-              <a class="nav-link" href="#internalSoftware" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="internalSoftware">
-                <svg height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14zm-1-6h-3V8h-2v5H8l4 4 4-4z"/></svg>
-                Software
-              </a>
-              <div class="collapse " id="internalSoftware">
-                <ul class="nav nav-sm flex-column">
-                  <li class="nav-item">
-                    <select name="software_ver" id="software_ver" style="margin-left: 35px;">
-                      <option selected="selected">Choose version</option>
-                    </select>
-                  </li>
-                  <li class="nav-item">
-                    <a class="btn btn-warning btn-sm" style="float:right" id="debuginfo_btn">Debug Info</a>
-                  </li>
-                </ul>
-              </div>
-            </li>
-
-
-            <li class="nav-item">
-              <a class="nav-link " href="changelog.html">
-                Changelog <span class="badge badge-primary ml-auto">v027</span>
-              </a>
-            </li>
-
           </ul>
-
+          <br />
+          <br />
+          <br />
           <!-- Push content down -->
           <div class="mt-auto"></div>
 
@@ -342,7 +461,7 @@
           <!-- Customize -->
           <!--
           <div id="popoverDemo" data-toggle="popover" data-trigger="manual" title="Make Dashkit Your Own!" data-content="Switch the demo to Dark Mode or adjust the navigation layout, icons, and colors!">
-            <a href="#modalDemo" class="btn btn-block btn-primary mb-4" data-toggle="modal">
+            <a href="#modalDemo" class="btn btn-block btn-success mb-4" data-toggle="modal">
               <i class="fe fe-sliders mr-2"></i> Customize
             </a>
           </div>
@@ -447,7 +566,7 @@
           
           <!-- Customize -->
           <div class="mb-4" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Customize">
-            <a href="#modalDemo" class="btn btn-block btn-primary" data-toggle="modal">
+            <a href="#modalDemo" class="btn btn-block btn-success" data-toggle="modal">
               <i class="fe fe-sliders"></i> <span class="d-md-none ml-2">Customize</span>
             </a>
           </div>
@@ -519,10 +638,12 @@
                 <h6 class="header-pretitle">
                   BitFire non-commercial: Release 1.1.0
                 </h6>
+                <p style="font-size:.75rem;color:#666;">BitFire non-commercial is free to use for non commercial websites. 
+                BitFirePro is licensed for commercial use and includes cash back guarantee if your site is compromised.</p>
 
                 <!-- Title -->
                 <h1 class="header-title">
-                  BitFire Dashboard
+                  Free Dashboard
                 </h1>
 
               </div>
@@ -530,7 +651,7 @@
 
                 <!-- Button -->
 
-                <a href="#!" class="btn btn-primary lift" id="dwn_link">Some Button</a>
+                <a href="#!" class="btn btn-success lift" id="dwn_link">Go Pro</a>
 
               </div>
             </div> <!-- / .row -->
@@ -542,7 +663,7 @@
       <!-- CARDS -->
       <div class="container-fluid">
         <div class="row">
-          <div class="col-12 col-lg-6">
+          <div class="col-12 col-lg-4">
             <div class="card card-fill">
               <div class="card-header">
                 <h4>24 Hour Blocks By Type
@@ -552,34 +673,153 @@
               <div class="card-body">
 
 
-            <div class="chart chart-appended">
-              <canvas class="chart-canvas" id="classChart" data-toggle="legend" data-target="#classChartLegend"></canvas>
-            </div>
-            
-            <div class="chart-legend" id="classChartLegend"></div>
+                <div class="chart chart-appended">
+                  <canvas class="chart-canvas" id="classChart" data-toggle="legend" data-target="#classChartLegend"></canvas>
+                </div>
+                <div class="chart-legend" id="classChartLegend"></div>
+
               </div>
             </div>
-
           </div>
           
-          <div class="col-12 col-lg-6">
+          <div class="col-12 col-lg-4">
             <div class="card card-fill">
               <div class="card-header">
-                <h4>24 Hour Blocks By Type
-                <span class="text-secondary" id="block_total">()</span>
+                <h4>24 Hour Blocks By IP
+                <span class="text-secondary" id="ip_total">()</span>
                 </h4>
               </div>
               <div class="card-body">
 
 
-          <div class="chart">
-            <canvas class="chart-canvas" id="hrChart"></canvas>
+                <div class="chart chart-appended">
+                  <canvas class="chart-canvas" id="classChart2" data-toggle="legend" data-target="#classChart2Legend"></canvas>
+                </div>
+                <div class="chart-legend" id="classChart2Legend"></div>
+
+              </div>
+            </div>
           </div>
+
+          
+          <div class="col-12 col-lg-4">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>Blocking By Hour
+                <span class="text-secondary" id="block_sum_total">()</span>
+                </h4>
+              </div>
+              <div class="card-body">
+                <div class="chart">
+                  <canvas class="chart-canvas" id="hrChart"></canvas>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        </div>
+
+        <div class="row">
+          <div class="col-12 col-lg-12">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>Alerts</h4>
+              </div>
+              <div class="card-body">
+
+       
+<table class="table table-sm table-nowrap">
+  <thead class="details">
+    <tr>
+      <th scope="col">Time</th>
+      <th scope="col">IP</th>
+      <th scope="col">Browser</th>
+      <th scope="col">Code</th>
+      <th scope="col">Param</th>
+      <th scope="col">Value</th>
+      <th scope="col">Pattern</th>
+      <th scope="col">Meta</th>
+    </tr>
+  </thead>
+  <tbody style="font-size:10px;">
+    <?php foreach ($reporting as $line) { ?>
+    <tr>
+      <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
+      <td><?php echo $line['ip'] . " " . $line['country']; ?></td>
+      <td><?php echo $line['browser']['browser'] . " v:". $line['browser']['ver'] ?></td>
+      <td><?php echo $line['block']['code']?></td>
+      <td><?php echo htmlspecialchars($line['block']['parameter'])?></td>
+      <td><?php echo htmlspecialchars($line['block']['value'])?></td>
+      <td><?php echo htmlspecialchars($line['block']['pattern'])?></td>
+      <td><?php echo \BitFire\to_meta($line); ?></td>
+    </tr>
+    <?php } ?>
+  </tbody>
+</table>
+              </div>
+            </div>
+          </div>
       </div>
+      
+      <div class="row">
+           <div class="col-12 col-lg-12">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>Blocks</h4>
+              </div>
+              <div class="card-body">
+
+       
+<table class="table table-sm table-nowrap">
+  <thead class="details">
+    <tr>
+      <th scope="col">Time</th>
+      <th scope="col">IP</th>
+      <th scope="col">Browser</th>
+      <th scope="col">Code</th>
+      <th scope="col">Param</th>
+      <th scope="col">Value</th>
+      <th scope="col">Pattern</th>
+    </tr>
+  </thead>
+  <tbody style="font-size:10px;">
+    <?php 
+    //\TF\dbg($blocks);
+    require_once WAF_DIR."botfilter.php";
+    $idx = 0;
+    foreach ($blocks as $line) { ?>
+    <tr>
+      <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
+      <td><?php echo $line['ip'] . " " . $line['country']; ?></td>
+      <td><?php 
+        $tmp = BitFireBot\parse_agent($line['ua']);
+        echo $tmp['browser'] . " v:". $tmp['ver'] ?></td>
+      <td>
+        <a tabindex="<?php echo $idx++;?>" role="button" class="btn btn-sm btn-danger" 
+        data-toggle="popover"
+        data-placement="top"
+        data-trigger="focus"
+        title="Details"
+        data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_PRETTY_PRINT))); ?>">
+        <?php echo $line['eventId']?>
+        </a>
+        </td>
+
+      <td><?php echo htmlspecialchars($line['item'])?></td>
+      <td><?php echo htmlspecialchars($line['match'])?></td>
+      <td><?php echo htmlspecialchars($line['name'])?></td>
+    </tr>
+    <?php } ?>
+  </tbody>
+</table>
+              </div>
+            </div>
+          </div>
+
+      </div>
+
+
+
 
     </div><!-- / .main-content -->
 
@@ -605,6 +845,14 @@
       console.log("foobar!");
 
       function show_bars(chart_id, hr_set) {
+        console.log("show bars", chart_id, hr_set);
+        let total = 0;
+        for(var d in hr_set) {
+          console.log(hr_set[d]);
+          total += hr_set[d];
+        }
+        console.log("total ", total);
+        GBI("block_sum_total").innerText = "(" + total + ")";
         
         console.log(hr_set);
         new Chart(chart_id, {
@@ -633,40 +881,42 @@
 
       
       
-      function show_pie(id, data) {
-        GBI("block_total").innerText = "(" + data.total + ")";
+      function show_pie(id, data, label_fn) {
+        console.log("show pie", id, data);
+
+
         let data_labels = [];
         let data_per = [];
         for (const [key, value] of Object.entries(data.counts)) {
-          data_labels.push(codex[key]);
+          data_labels.push(label_fn(key, value));
           data_per.push(value);
         }
 
-       new Chart(id, {
-    type: 'doughnut',
-    options: {
-      tooltips: {
-        callbacks: {
-          afterLabel: function() {
-            return ''
+        new Chart(id, {
+          type: 'doughnut',
+          options: {
+            tooltips: {
+              callbacks: {
+                afterLabel: function() {
+                  return ''
+                }
+              }
+            }
+          },
+          data: {
+            labels: data_labels,
+            datasets: [{
+              data: data_per,
+              backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
+            }]
           }
-        }
-      }
-    },
-    data: {
-      labels: data_labels,
-      datasets: [{
-        data: data_per,
-        backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
-      }]
-    }
-  });
+        });
        
 
       window.setTimeout(function() {
-      let scr = document.createElement('script');
-      scr.setAttribute('src','https://bitfire.co/dash/theme.min.js');
-      document.body.appendChild(scr);
+        let scr = document.createElement('script');
+        scr.setAttribute('src','https://bitfire.co/dash/theme.min.js');
+        document.body.appendChild(scr);
       }, 100);
       }
 
@@ -685,6 +935,9 @@
         70000: "malware"
       };
 
+      function label_type(key, value) { return codex[key]; }
+      function label_value(key, value) { return key; }
+
       //show_pie("classChart", {"percent": [50, 50], "counts": [100, 100]});
 
       const request = async () => {
@@ -692,13 +945,44 @@
         const response1 = await fetch('/bitfire?BITFIRE_API=get_block_types&_secret=<?php echo \Bitfire\Config::str("secret");?>');
         console.log("a2");
         const response2 = await fetch('/bitfire?BITFIRE_API=get_hr_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
+        console.log("a3");
+        const response3 = await fetch('/bitfire?BITFIRE_API=get_ip_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
         const data1 = await response1.json();
         const data2 = await response2.json();
-        console.log("a4");
-        show_pie('classChart', data1);
+        const data3 = await response3.json();
+
+        console.log("a4", data1);
+        show_pie('classChart', data1, label_type);
+        GBI("block_total").innerText = "(" + data1.total + ")";
+        GBI("blocks").innerText = data1.total;
+        show_pie('classChart2', data3, label_value);
         show_bars('hrChart', data2);
       }
       request();
+
+      function toggle_features() {
+        var elms = document.getElementsByClassName("feature");
+        console.log(elms);
+
+        for (let element of elms) {
+          if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
+            element.classList.remove("btn-success");
+            element.classList.remove("btn-secondary");
+            element.classList.add("btn-warning");
+          } else if (element.innerText.trim() == "block") {
+            element.classList.remove("btn-warning");
+            element.classList.remove("btn-secondary");
+            element.classList.add("btn-success");
+          } else {
+            element.classList.remove("btn-success");
+            element.classList.remove("btn-warning");
+            element.classList.add("btn-secondary");
+          }
+        }
+
+        console.log(elms);
+      }
+      toggle_features();
 
      
 /*

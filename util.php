@@ -453,6 +453,28 @@ function is_ipv6(string $addr) : bool {
     return substr_count($addr, ':') === 5;
 }
 
+function ip_to_file($ip_num) {
+	$n = floor($ip_num/100000000);
+	return "cache/ip.$n.bin";
+}
+
+/**
+ * ugly AF
+ */
+function ip_to_country($ip) : int {
+	$n = ip2long($ip);
+	$d = file_get_contents(WAF_DIR.ip_to_file($n));
+	$len = strlen($d);
+	$off = 0;
+	while ($off < $len) {
+		$data = unpack("Vs/Ve/Cc", $d, $off);
+		if ($data['s'] <= $n && $data['e'] >= $n) { return $data['c']; }
+		$off += 9;
+	}
+	return 0;
+}
+
+
 // reduce a string to a value by iterating over each character
 function str_reduce(string $string, callable $fn, string $prefix = "", string $suffix = "") {
     for ($i=0,$m=strlen($string); $i<$m; $i++) {
@@ -739,6 +761,22 @@ function debug(string $line) {
  */
 function concat(array $input) {
      return array_reduce($input, function($carry, $x) { return $carry.$x; });
+}
+
+/**
+ * read x lines from end of file (line_sz should be > avg length of line)
+ */
+function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
+    $st = stat($filename);
+    if (($fh = fopen($filename, "r")) === false) { return ""; }
+    $sz = min(($lines*$line_sz), $st['size']);
+    fseek($fh, -$sz, SEEK_END);
+    $d = fread($fh, $sz);
+    $eachln = explode("\n", $d);//, -($lines+1), $lines);
+    $lines = min(count($eachln), $lines)-1;
+    if ($lines <= 0) { return array(); }
+    $s = array_splice($eachln, -($lines+1), $lines);
+    return $s;
 }
 
 

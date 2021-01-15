@@ -19,7 +19,7 @@ function get_block_24sum() : array {
         if (!is_array($data)) { $data = BITFIRE_METRICS_INIT; }
         $sum = 0;
         foreach ($data as $code => $value) {
-            $sum += $value;
+            if($code < 100000) { $sum += $value; }
         }
         $result[] = $sum;
     }
@@ -37,11 +37,29 @@ function get_block_24groups() : Metric {
         $data = $cache->load_data("metrics-$i", BITFIRE_METRICS_INIT);
         if (!is_array($data)) { $data = BITFIRE_METRICS_INIT; }
         foreach ($data as $code => $cnt) {
-            if ($cnt > 0) { 
+            if ($code < 100000 && $cnt > 0) { 
                 $tmp = $metric->data[$code] ?? 0;
                 $metric->data[$code] = $tmp + $cnt;
+                $metric->total += $cnt;
             }
-            $metric->total += $cnt;
+        }
+    }
+    return $metric;
+}
+
+function get_ip_24groups() : Metric {
+    $metric = new Metric();
+
+    $cache = CacheStorage::get_instance();
+    for($i=0; $i<25; $i++) {
+        $data = $cache->load_data("metrics-$i", BITFIRE_METRICS_INIT);
+        if (!is_array($data)) { $data = array(); }
+        foreach ($data as $code => $cnt) {
+            if ($code > 100000 && $cnt > 0) { 
+                $tmp = long2ip($code);
+                $metric->data[$tmp] = ($metric->data[$tmp] ?? 0) + $cnt;
+                $metric->total += $cnt;
+            }
         }
     }
     return $metric;
@@ -65,6 +83,19 @@ function get_block_types(array $request) {
 function get_hr_data(array $request) {
     $metrics = get_block_24sum();
     return json_encode($metrics);
+}
+
+function get_ip_data(array $request) {
+    $metrics = get_ip_24groups();
+    $per = array();
+    //str_replace()
+    //htmlsp
+    if ($metrics->total > 0) {
+        foreach ($metrics->data as $code => $value) { $per[$code] = (floor($value / $metrics->total) * 1000)/10; }
+    } else {
+        foreach ($metrics->data as $code => $value) { $per[$code] = 0; }
+    }
+    return json_encode(array("percent" => $per, "counts" => $metrics->data, "total" => $metrics->total));
 }
 
 function make_code(array $request) {
