@@ -4,7 +4,7 @@
 <h3>reference id: <?php echo \BitFire\BitFire::get_instance()->uid . "\n"; ?>
 <!--
 <?php
-http_response_code(Config::int('response_code', 500));
+http_response_code(\BitFire\Config::int('response_code', 500));
 echo "BitFire block time: " . \number_format(((\microtime(true) - $m0)*1000), 3) . " ms\n";
 print_r($block);
 ?>
