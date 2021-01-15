@@ -10,8 +10,8 @@ if (defined('BITFIRE_VER')) { return; }
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
 const FEATURE_CLASS = array(10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'check_domain', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 50000 => '');
 
-const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
-const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 70000 => 0);
+const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
+const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
 const BITFIRE_VER = 110;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_COMMAND = "BITFIRE_API";
@@ -279,7 +279,7 @@ class BitFire
 
             $fn = '\\BitFire\\' . $this->_request['GET'][BITFIRE_COMMAND];
             
-            if (!in_array($fn, BITFIRE_API_FN)) { print_r(BITFIRE_API_FN); exit("unknown function [$fn]"); }
+            if (!in_array($fn, BITFIRE_API_FN)) { exit("unknown function [$fn]"); }
             $result = $fn($this->_request);
             exit ($result);
         }
@@ -369,8 +369,21 @@ class BitFire
     public function inspect() : \TF\Maybe {
         // dashboard requests
         if ($this->_request[REQUEST_PATH] === "/bitfire") {
+
+            if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] !== Config::str('password', 'default_password')) {
+                header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
+                header('HTTP/1.0 401 Unauthorized');
+                exit;
+            }
+
             $report_count = count(file(Config::str("report_file")));
             $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
+            $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str("report_file"), 20, 500)) . ']', true));
+            $blocks = add_country(CacheStorage::get_instance()->load_data("log_data"));
+            $send = CacheStorage::get_instance()->load_data("send_js", 0);
+            $good = CacheStorage::get_instance()->load_data("good_js", 0);
+            //$b2 = add_country($blocks);
+            //\TF\dbg($blocks);
             exit(require WAF_DIR . "views/dashboard.html");
         }
 
@@ -410,14 +423,6 @@ class BitFire
             $block = $this->_web_filter->inspect($this->_request);
         }
 
-        if (!$block->empty()) {
-            $ip_data = ($this->bot_filter !== null) ? $this->bot_filter->ip_data : array();
-            \BitFire\block_ip($block->value(), $ip_data);
-            register_shutdown_function('\\BitFire\\post_request', $this->_request, $block->value(), $ip_data);
-        } else {
-            register_shutdown_function('\\BitFire\\post_request', $this->_request, null, null);
-        }
-
         return $block;
     }
 
@@ -439,6 +444,10 @@ class BitFire
     }
 }
 
+function to_meta(array $line) {
+    return "5m:".$line['rate']['rr_5m'].", 1m:".$line['rate']['rr_1m']." ,v:".$line['browser']['valid'].", ref:".$line['rate']['ref'];
+}
+
 /**
  * filter reporting features
  */
@@ -448,12 +457,13 @@ function reporting(Block $block) {
 
     if (Config::str($feature_name) === "report") {
         $data = array('time' => date('r'),
-            'exec time' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+            'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+            'ip' => BitFire::get_instance()->_request[REQUEST_IP],
             'block' => $block);
         $bf = BitFire::get_instance()->bot_filter;
         if ($bf != null) {
             $data['browser'] = $bf->browser;
-            $data['ip'] = $bf->ip_data;
+            $data['rate'] = $bf->ip_data;
         }
         $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
         file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($data, $opts) . "\n", FILE_APPEND);
@@ -636,12 +646,13 @@ function getIP(string $remote_addr = '127.0.0.2') : string {
     }
 
     // Check prefix, and map ipv4 inside ipv6 address
-    if( substr($addr_bin, 0, strlen($v4mapped_prefix_bin)) == $v4mapped_prefix_bin) {
+    if(substr($addr_bin, 0, strlen($v4mapped_prefix_bin)) == $v4mapped_prefix_bin) {
         $addr_bin = substr($addr_bin, strlen($v4mapped_prefix_bin));
     }
 
     // Convert back to printable address in canonical form
-    return inet_ntop($addr_bin);
+    $x = inet_ntop($addr_bin);
+    return ($x == "::1") ? '127.0.0.1' : $x;
 }
 
 // return true if  request[path] contains url_match
@@ -672,9 +683,20 @@ function replace_profanity(string $data) : string {
     return preg_replace('/('.PROFANITY.')/', '@#$!%', $data);
 }
 
+function add_country(array $data) {
+    $map = json_decode(file_get_contents(WAF_DIR . "cache/country.json"), true);
+    $result = array();
+    foreach ($data as $report) {
+        $code = \TF\ip_to_country($report['ip']);
+        $report['country'] = $map[$code];
+        $result[] = $report; 
+    }
+    return $result;
+}
+
 
 function post_request(array $request, ?Block $block, ?array $ip_data) {
-    if ($block === null &&http_response_code() < 300) { return; } 
+    if ($block === null && http_response_code() < 300) { return; } 
 
     // add browser data if available
     $bot = $whitelist = false;
@@ -721,13 +743,15 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 
 
     
-    // cache the last 10 blocks
+    // cache the last 15 blocks
     $cache = CacheStorage::get_instance();
-    $cache->rotate_data("log_data", $data, 10);
-    $cache->update_data("metrics-".date('H'), function ($metrics) use ($class) {
+    $cache->rotate_data("log_data", $data, 15);
+    $ip = ip2long($request[REQUEST_IP]);
+    $cache->update_data("metrics-".date('G'), function ($metrics) use ($class, $ip) {
         $metrics[$class]++;
+        $metrics[$ip] = ($metrics[$ip] ?? 0) + 1;
         return $metrics;
-    }, BITFIRE_METRICS_INIT, 90000);
+    }, BITFIRE_METRICS_INIT, 86400);
 
 
     $content = json_encode($data)."\n";
