@@ -477,8 +477,6 @@ function make_challenge_cookie(array $answer, string $ip) : string {
  */
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
     if ($cookie->extract('v')() < 2) { 
-		die("b");
-
         \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
         http_response_code(202);
         \BitFire\reporting(new \BitFire\Block(1, 'n/a', 'n/a', 'check JS/Cookies', 0)); // report on block bots

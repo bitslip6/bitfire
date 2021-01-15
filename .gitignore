@@ -3,3 +3,5 @@ test.php
 lcov.info
 callgrind.*
 *.xhprof.json
+tests/*
+test2/*
