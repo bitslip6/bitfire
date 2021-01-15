@@ -5,8 +5,10 @@
 <!--
 <?php
 http_response_code(\BitFire\Config::int('response_code', 500));
-echo "BitFire block time: " . \number_format(((\microtime(true) - $m0)*1000), 3) . " ms\n";
-print_r($block);
+if (\BitFire\Config::enabled('debug')) {
+    echo "BitFire block time: " . \number_format(((\microtime(true) - $m0)*1000), 3) . " ms\n";
+    print_r($block);
+}
 ?>
 -->
 </body>
