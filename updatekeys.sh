@@ -2,15 +2,18 @@
 ver=1.0.4
 where=$( dirname $(realpath "$0") )
 config="$where/config.ini"
-echo "\e[0;36mBitFire $ver \e[0mconfig: $config..."
+echo "\e[0;36mBitFire $ver \e[0mconfig: $config"
+pass=$( shuf -n 3 cache/words.txt | tr '\n' '_' | sed 's/_$/\n/' )
 
 sed -i "s/secret\s*=.*/secret = '`tr -dc A-Za-z0-9 </dev/urandom | head -c 16`'/" $config
 sed -i "s/encryption_key\s*=.*/encryption_key = '`tr -dc A-Za-z0-9 </dev/urandom | head -c 24`'/" $config
 sed -i "s/browser_cookie\s*=.*/browser_cookie = '_`tr -dc a-z </dev/urandom | head -c 4`'/" $config
 sed -i "s/bitfire_param\s*=.*/bitfire_param = '_`tr -dc a-z </dev/urandom | head -c 8`'/" $config
 sed -i "s/honeypot_url\s*=.*/honeypot_url = '\/`tr -dc a-z </dev/urandom | head -c 8`\/contact'/" $config
+sed -i "s/password\s*=.*/password = '$pass'/" $config
 
 echo "encryption keys updated"
+echo "please write down the new dashboard password: \"\e[0;35m$pass\e[0m\""
 
 
 #echo "These php.ini files do not currently have auto_prepend_file"
