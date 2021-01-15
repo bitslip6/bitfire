@@ -234,7 +234,7 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
 
 // clear position flags and keep any other flags, then set the position
 // pure
-function set_flag_priority(int $flag, int $flag_priority): int {
+function set_flag_position(int $flag, int $flag_position): int {
     return ($flag & CUCKOO_PERM_MASK) | $flag_position;
 }
 
