@@ -51,10 +51,12 @@
       ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
       */
       .dropdown-menu { margin-top: -20px; }
+      .chilabel { margin-left: 1rem; }
       
       thead.details th, th { font-size: 12px; }
       
       .popover { max-width: 30rem; }
+      .underline { text-decoration: underline; margin-bottom: 1rem; }
 
     </style>
     
@@ -187,39 +189,32 @@
           <img src="https://bitslip6.com/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
         </a>
  
-        <span class="chilabel">24 Hour Totals</span>
+        <span class="chilabel underline">24 Hour Totals</span>
+
         <!-- Collapse -->
         <div class="collapse navbar-collapse" id="sidebarCollapse">
 
           <!-- Navigation -->
           <ul class="navbar-nav">
             <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
                 <span class="chilabel">
                   <svg viewBox="0 0 24 24" fill="black" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                  Alerts: </span> <span id="alerts"><?php echo $report_count; ?></span>
-              </a>
+                  Alerts: </span> <span class="lnum" id="alerts"><?php echo $report_count; ?></span>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
                 <span class="chilabel">
                   <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
-                  Blocks: </span> <span id="blocks">-</span>
-              </a>
+                  Blocks: </span> <span class="lnum" id="blocks">-</span>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
                 <span class="chilabel">
-                  <svg xmlns="http://www.w3.org/2000/svg" enable-background="new 0 0 24 24" height="24" viewBox="0 0 24 24" width="24"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M17,11c0.34,0,0.67,0.04,1,0.09V6.27L10.5,3L3,6.27v4.91c0,4.54,3.2,8.79,7.5,9.82c0.55-0.13,1.08-0.32,1.6-0.55 C11.41,19.47,11,18.28,11,17C11,13.69,13.69,11,17,11z"/><path d="M17,13c-2.21,0-4,1.79-4,4c0,2.21,1.79,4,4,4s4-1.79,4-4C21,14.79,19.21,13,17,13z M17,14.38c0.62,0,1.12,0.51,1.12,1.12 s-0.51,1.12-1.12,1.12s-1.12-0.51-1.12-1.12S16.38,14.38,17,14.38z M17,19.75c-0.93,0-1.74-0.46-2.24-1.17 c0.05-0.72,1.51-1.08,2.24-1.08s2.19,0.36,2.24,1.08C18.74,19.29,17.93,19.75,17,19.75z"/></g></g></svg>
-                  Check: </span> <span id="send"><?php echo $send; ?></span>
-              </a>
+                  <svg xmlns="http://www.w3.org/20 00/svg" enable-background="new 0 0 24 24" height="24" viewBox="0 0 24 24" width="24"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M17,11c0.34,0,0.67,0.04,1,0.09V6.27L10.5,3L3,6.27v4.91c0,4.54,3.2,8.79,7.5,9.82c0.55-0.13,1.08-0.32,1.6-0.55 C11.41,19.47,11,18.28,11,17C11,13.69,13.69,11,17,11z"/><path d="M17,13c-2.21,0-4,1.79-4,4c0,2.21,1.79,4,4,4s4-1.79,4-4C21,14.79,19.21,13,17,13z M17,14.38c0.62,0,1.12,0.51,1.12,1.12 s-0.51,1.12-1.12,1.12s-1.12-0.51-1.12-1.12S16.38,14.38,17,14.38z M17,19.75c-0.93,0-1.74-0.46-2.24-1.17 c0.05-0.72,1.51-1.08,2.24-1.08s2.19,0.36,2.24,1.08C18.74,19.29,17.93,19.75,17,19.75z"/></g></g></svg>
+                  Check: </span> <span class="lnum" id="send"><?php echo $send; ?></span>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#" aria-expanded="false">
                 <span class="chilabel">
                   <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none" fill-rule="evenodd"/><g fill-rule="evenodd"><path d="M9 17l3-2.94c-.39-.04-.68-.06-1-.06-2.67 0-8 1.34-8 4v2h9l-3-3zm2-5c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4"/><path d="M15.47 20.5L12 17l1.4-1.41 2.07 2.08 5.13-5.17 1.4 1.41z"/></g></svg>
-                  Pass: </span> <span id="send"><?php echo $good; ?></span>
-              </a>
+                  Pass: </span> <span class="lnum" id="send"><?php echo $good; ?></span>
             </li>
 
 
@@ -485,8 +480,7 @@
 
         <!-- Brand -->
         <a class="navbar-brand" href="/bitfire">
-          <img src="bitfire.png" class="navbar-brand-img 
-          mx-auto" alt="...">
+          <img src="https://bitslip6.com/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
         </a>
 
         <!-- Collapse -->
@@ -596,7 +590,9 @@
               <!-- Toggle -->
               <a href="#" id="sidebarSmallIconCopy" class="dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <div class="avatar avatar-sm avatar-online">
+                  <!--
                   <img src="avatar.jpg" class="avatar-img rounded-circle" alt="...">
+                  -->
                 </div>
               </a>
 
@@ -787,7 +783,7 @@
     //\TF\dbg($blocks);
     require_once WAF_DIR."botfilter.php";
     $idx = 0;
-    foreach ($blocks as $line) { ?>
+    if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
     <tr>
       <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
       <td><?php echo $line['ip'] . " " . $line['country']; ?></td>
@@ -809,7 +805,7 @@
       <td><?php echo htmlspecialchars($line['match'])?></td>
       <td><?php echo htmlspecialchars($line['name'])?></td>
     </tr>
-    <?php } ?>
+    <?php } } ?>
   </tbody>
 </table>
               </div>
