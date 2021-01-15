@@ -1,4 +1,5 @@
 .*.swp
+test.php
 lcov.info
 callgrind.*
 *.xhprof.json
