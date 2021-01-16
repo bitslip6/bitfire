@@ -19,7 +19,8 @@ const FAIL_RR_TOO_HIGH=26001;
 
 const FAIL_HOST_TOO_LONG=22001;
 
-const FAIL_NOT_WHITELIST=24001;
+const FAIL_FAKE_WHITELIST=24001;
+const FAIL_MISS_WHITELIST=24002;
 const FAIL_IS_BLACKLIST=25001;
 
 const BLOCK_LONG=3;
@@ -163,8 +164,9 @@ class BotFilter {
                     $request[REQUEST_IP],
                     Config::arr(CONFIG_WHITELIST));
 
+
                 // set agent whitelist status
-                $this->browser[AGENT_WHITELIST] = !$maybe_block->empty();
+                $this->browser[AGENT_WHITELIST] = ($maybe_block->empty());
 
                 // if returned a block
                 if (!$maybe_block->empty()) { return $maybe_block; }
@@ -209,8 +211,9 @@ use const BitFire\CACHE_NAME_JS_SEND;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\CONFIG_USER_TRACK_PARAM;
+use const BitFire\FAIL_FAKE_WHITELIST;
 use const BitFire\FAIL_IS_BLACKLIST;
-use const BitFire\FAIL_NOT_WHITELIST;
+use const BitFire\FAIL_MISS_WHITELIST;
 use const BitFire\FAIL_RR_TOO_HIGH;
 use const BitFire\IPDATA_RR_1M;
 use const BitFire\IPDATA_RR_5M;
@@ -279,7 +282,7 @@ function validate_host_header(array $valid_domains, array $request) : bool {
  * test if an agent is found in a list of agents
  * $botlist is format "agent match str":reverse ip network:human comment
  */
-function agent_in_list(string $a, string $ip, array $list) : bool {
+function agent_in_list(string $a, string $ip, array $list) : int {
     if (empty($a) || strlen($a) <= 1 || count($list) < 1) { return false; }
 
     foreach ($list as $k => $v) {
@@ -287,13 +290,14 @@ function agent_in_list(string $a, string $ip, array $list) : bool {
         if (strpos($a, $k) === false) { continue; }
 
         // reverse lookup, or just return found
-        return (substr($v, 0, 2) == "AS") ?
+        $r = (substr($v, 0, 2) == "AS") ?
             \BitFireBot\fast_verify_bot_as($ip, $v) :
             \BitFireBot\verify_bot_ip($ip, $v);
+        return ($r) ? 1 : 0;
     }
 
     // no match, return false
-    return false;
+    return -1;
 }
 
 /**
@@ -305,9 +309,9 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
     // handle whitelisting (the most restrictive)
     // return true(pass) if the agent is in the list of whitelist bots
     if (count($whitelist) > 0) {
-        if (!agent_in_list($agent, $ip, $whitelist)) {
-            return BitFire::new_block(FAIL_NOT_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT);
-        }
+        $r = agent_in_list($agent, $ip, $whitelist);
+        if ($r < 0) { return BitFire::new_block(FAIL_MISS_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT); }
+        if ($r == 0) { return BitFire::new_block(FAIL_FAKE_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT); }
     }
     return \TF\Maybe::of(false); 
 }
