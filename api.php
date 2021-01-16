@@ -50,6 +50,7 @@ function get_block_24groups() : Metric {
 function get_ip_24groups() : Metric {
     $metric = new Metric();
 
+    $summary = array();
     $cache = CacheStorage::get_instance();
     for($i=0; $i<25; $i++) {
         $data = $cache->load_data("metrics-$i", BITFIRE_METRICS_INIT);
@@ -57,11 +58,27 @@ function get_ip_24groups() : Metric {
         foreach ($data as $code => $cnt) {
             if ($code > 100000 && $cnt > 0) { 
                 $tmp = long2ip($code);
-                $metric->data[$tmp] = ($metric->data[$tmp] ?? 0) + $cnt;
+                $summary[$tmp] = ($summary[$tmp] ?? 0) + $cnt;
                 $metric->total += $cnt;
             }
         }
     }
+
+    
+    //$metric->data = $summary;
+    uasort($summary, function ($a, $b) {
+        if ($a == $b) { return 0; }
+        return ($a < $b) ? -1 : 1;
+    });
+
+    if (count($summary) > 10) {
+        $metric->data = array_slice($summary, 0, 10);
+        $inc = array_sum(array_values($metric->data, 10));
+        $metric->data['other'] = $inc;
+    } else {
+        $metric->data = $summary;
+    }
+
     return $metric;
 }
 
