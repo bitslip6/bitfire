@@ -12,7 +12,7 @@ const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 1
 
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 110;
+const BITFIRE_VER = 116;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_COMMAND = "BITFIRE_API";
 
@@ -50,6 +50,7 @@ const REQUEST_UA = 'USER_AGENT';
 const REQUEST_IP = 'IP';
 const REQUEST_HOST = 'HOST';
 const REQUEST_COOKIE = 'COOKIE';
+const REQUEST_ACCEPT = 'ACCEPT';
 const REQUEST_SCHEME = 'SCHEME';
 const REQUEST_PATH = 'PATH';
 const REQUEST_METHOD = 'METHOD';
@@ -538,9 +539,10 @@ function process_request(array $get, array $post, array $server, array $cookie =
     $request[REQUEST_UA] = strtolower($server['HTTP_USER_AGENT']) ?? '';
     $request[REQUEST_SCHEME] = $server['REQUEST_SCHEME'] ?? 'http';
     $request['UPGRADE_INSECURE'] = ($request[REQUEST_SCHEME] == 'http') ? $server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? null : null;
-    $request['ACCEPT'] = $server['HTTP_ACCEPT'] ?? 'text/html';
+    $request['ACCEPT'] = $server['HTTP_ACCEPT'] ?? '';
     $request['CONTENT_TYPE'] = $server['HTTP_CONTENT_TYPE'] ?? 'text/html';
     $request[REQUEST_COOKIE] = $cookie;
+    $request[REQUEST_ACCEPT] = (stripos($server['HTTP_ACCEPT_ENCODING']??'', 'gzip') === false) ? 'no_encode' : $server['HTTP_ACCEPT_ENCODING'];
 
     $request[REQUEST_IP] = getIP($server['REMOTE_ADDR'] ?? '127.0.0.1');
 
@@ -699,6 +701,7 @@ function add_country($data) {
 
 function post_request(array $request, ?Block $block, ?array $ip_data) {
     if ($block === null && http_response_code() < 300) { return; } 
+    if ($block === null) { $block = new Block(31000, "n/a", "unknown bot", $request[REQUEST_UA], 0); }
 
     // add browser data if available
     $bot = $whitelist = false;
@@ -757,7 +760,10 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 
 
     $content = json_encode($data)."\n";
-    \TF\bit_http_request("POST", "https://search-bitwaf-jadw3humgpe6ima6hbf6jpffwq.us-west-2.es.amazonaws.com/filtered2/_doc",
+    if (Config::enabled('block_file')) {
+        file_put_contents(Config::str('block_file'), $content, FILE_APPEND);
+    }
+    \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
     $content, 2, array("Content-Type" => "application/json"));
 }
 
