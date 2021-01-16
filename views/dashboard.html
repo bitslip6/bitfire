@@ -22,7 +22,10 @@
 
     <style>
       body { display: none; }
-      .chilabel { color: #333; display: block; width: 150px; float: left; margin-right: 0; padding-right: 0;}
+      .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding-right: 0;}
+      /*
+      .lnum { float: right; }
+      */
       .pr1 { margin-top: 20px; }
       .card-body { padding: 0.5rem !important; }
 
@@ -78,7 +81,6 @@
         function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
 
         function toggle(elm, type) {
-          console.log("toggle", elm, type);
           var e = GBI(elm);
           e.innerText = type;
           if (type == "block" || type == "on") {
@@ -198,7 +200,7 @@
           <!-- Navigation -->
           <ul class="navbar-nav">
             <li class="nav-item">
-                <span class="chilabel">
+                <span class="chilabel left">
                   <svg viewBox="0 0 24 24" fill="black" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
                   Alerts: </span> <span class="lnum" id="alerts"><?php echo $report_count; ?></span>
             </li>
@@ -245,21 +247,14 @@
               </a>
               <div class="collapse " id="sidebarWebFilter">
                 <ul class="nav nav-sm flex-column">
-                  <li class="nav-item" style="height:30px;">
-                    <!--
-                    <span href="#" class="nav-link chilabel" style="float: left;"> feature </span>
-                    <span type="checkbox"  style="float:right;font-size:12px;" class="pr1">alert</span>
-                    <span type="checkbox"  style="float:right;font-size:12px;" class="pr1">block</span>
-                    -->
-                  </li>
-
+                  
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
                       Security Headers
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="security_headers" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['security_headers_enabled']; ?> </button>
+                      <button id="security_headers" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['security_headers_enabled']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'block')">Block</a>
@@ -273,7 +268,7 @@
                       Force SSL
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="force_ssl" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['enforce_ssl_1year']; ?></button>
+                      <button id="force_ssl" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['enforce_ssl_1year']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'block')">Block</a>
@@ -287,7 +282,7 @@
                       Spam Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="spam_filter" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['spam_filter_enabled']; ?></button>
+                      <button id="spam_filter" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['spam_filter_enabled']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'block')">Block</a>
@@ -301,7 +296,7 @@
                       XSS Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="xss_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['xss_block']; ?></button>
+                      <button id="xss_block" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['xss_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'block')">Block</a>
@@ -315,7 +310,7 @@
                       SQL Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="sql_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['sql_block']; ?></button>
+                      <button id="sql_block" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['sql_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'block')">Block</a>
@@ -329,7 +324,7 @@
                       Web Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="web_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['web_block']; ?></button>
+                      <button id="web_block" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['web_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('web_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('web_block', 'block')">Block</a>
@@ -343,7 +338,7 @@
                       Upload Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="file_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['file_block']; ?></button>
+                      <button id="file_block" type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['file_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('file_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('file_block', 'block')">Block</a>
@@ -372,7 +367,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="allow_ip_block" disabled type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'on')">On</a>
                         <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'off')">Off</a>
@@ -398,7 +393,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="allow_ip_block" disabled type="button" disabled class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'on')">On</a>
                         <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'off')">Off</a>
@@ -412,7 +407,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="allow_ip_block" disabled type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'shmop')">Shmop</a>
                         <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'apcu')">APCu</a>
@@ -428,7 +423,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="allow_ip_block" disabled type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('response_code', 200)">200</a>
                         <a class="dropdown-item" href="#" onclick="toggle('response_code', 204)">204</a>
@@ -633,7 +628,7 @@
 
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire non-commercial: Release 1.1.3
+                  BitFire non-commercial: Release 1.1.6
                 </h6>
                 <p style="font-size:.75rem;color:#666;">BitFire non-commercial is free to use for non commercial websites. 
                 BitFirePro is licensed for commercial use and includes cash back guarantee if your site is compromised.</p>
@@ -673,7 +668,9 @@
                 <div class="chart chart-appended">
                   <canvas class="chart-canvas" id="classChart" data-toggle="legend" data-target="#classChartLegend"></canvas>
                 </div>
+                <!--
                 <div class="chart-legend" id="classChartLegend"></div>
+                -->
 
               </div>
             </div>
@@ -688,11 +685,12 @@
               </div>
               <div class="card-body">
 
-
                 <div class="chart chart-appended">
                   <canvas class="chart-canvas" id="classChart2" data-toggle="legend" data-target="#classChart2Legend"></canvas>
                 </div>
+                <!--
                 <div class="chart-legend" id="classChart2Legend"></div>
+                -->
 
               </div>
             </div>
@@ -797,9 +795,7 @@
         data-placement="top"
         data-trigger="focus"
         title="Details"
-        data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_PRETTY_PRINT))); ?>">
-        <?php echo $line['eventId']?>
-        </a>
+        data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT))); ?>"><?php echo $line['eventId'] ?? '00000'; ?></a>
         </td>
 
       <td><?php echo htmlspecialchars($line['item'])?></td>
@@ -839,19 +835,15 @@
 
     <script>
       
-      console.log("foobar!");
-
       function show_bars(chart_id, hr_set) {
-        console.log("show bars", chart_id, hr_set);
         let total = 0;
         for(var d in hr_set) {
-          console.log(hr_set[d]);
+          //console.log(hr_set[d]);
           total += hr_set[d];
         }
-        console.log("total ", total);
         GBI("block_sum_total").innerText = "(" + total + ")";
         
-        console.log(hr_set);
+        //console.log(hr_set);
         new Chart(chart_id, {
     type: 'bar',
     options: {
@@ -879,7 +871,10 @@
       
       
       function show_pie(id, data, label_fn) {
-        console.log("show pie", id, data);
+        //console.log("show pie", id, data.counts);
+        console.log(Chart.defaults.doughnut);
+        
+        //data.counts.sort((a, b) => { console.log(a, b); return 1; });
 
 
         let data_labels = [];
@@ -888,17 +883,33 @@
           data_labels.push(label_fn(key, value));
           data_per.push(value);
         }
-
-        new Chart(id, {
+        
+        var opts = {
           type: 'doughnut',
           options: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              boxWidth: 10,
+              padding: 5,
+              usePointStyle: true,
+              labels: {
+                fontSize: 9,
+                padding: 5,
+                boxWidth: 15
+              }
+            },
             tooltips: {
               callbacks: {
                 afterLabel: function() {
                   return ''
                 }
               }
-            }
+            },
+            weight: true,
+            cutoutPercentage: 80, 
+            defaultFontSize: 15,
+            defaultLineHeight: .6
           },
           data: {
             labels: data_labels,
@@ -907,15 +918,14 @@
               backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
             }]
           }
-        });
+        };
+       
+        console.log(opts);
+
+        new Chart(id, opts);
        
 
-      window.setTimeout(function() {
-        let scr = document.createElement('script');
-        scr.setAttribute('src','https://bitfire.co/dash/theme.min.js');
-        document.body.appendChild(scr);
-      }, 100);
-      }
+            }
 
 
       var codex = {
@@ -938,28 +948,29 @@
       //show_pie("classChart", {"percent": [50, 50], "counts": [100, 100]});
 
       const request = async () => {
-        console.log("a1");
         const response1 = await fetch('/bitfire?BITFIRE_API=get_block_types&_secret=<?php echo \Bitfire\Config::str("secret");?>');
-        console.log("a2");
         const response2 = await fetch('/bitfire?BITFIRE_API=get_hr_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
-        console.log("a3");
         const response3 = await fetch('/bitfire?BITFIRE_API=get_ip_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
         const data1 = await response1.json();
         const data2 = await response2.json();
         const data3 = await response3.json();
 
-        console.log("a4", data1);
         show_pie('classChart', data1, label_type);
         GBI("block_total").innerText = "(" + data1.total + ")";
         GBI("blocks").innerText = data1.total;
         show_pie('classChart2', data3, label_value);
         show_bars('hrChart', data2);
+        
+        window.setTimeout(function() {
+          let scr = document.createElement('script');
+          scr.setAttribute('src','https://bitfire.co/dash/theme.min.js');
+          document.body.appendChild(scr);
+        }, 100);
       }
       request();
 
       function toggle_features() {
         var elms = document.getElementsByClassName("feature");
-        console.log(elms);
 
         for (let element of elms) {
           if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
@@ -977,7 +988,6 @@
           }
         }
 
-        console.log(elms);
       }
       toggle_features();
 
