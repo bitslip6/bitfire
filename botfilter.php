@@ -341,7 +341,7 @@ function blacklist_inspection(array $request, ?array $blacklist) : \TF\Maybe {
 function parse_agent(string $user_agent) : array {
 
     $user_agent = strtolower($user_agent);
-    $agent = array("os" => "bot", "browser" => "bot", "ver" => "unknown", "bot" => true);
+    $agent = array("os" => "bot", "browser" => "bot", "ver" => "x", "bot" => true);
     // return robots...
     if (substr($user_agent, 0, 11) !== "mozilla/5.0") {
         return $agent;
