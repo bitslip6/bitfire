@@ -80,7 +80,7 @@ $config=array (
   ),
   'whitelist_enable' => 'report',
   'blacklist_enable' => true,
-  'require_full_browser' => 'report',
+  'require_full_browser' => false,
   'honeypot_url' => '/ztcegizz/contact',
   'check_domain' => false,
   'valid_domains' => 
