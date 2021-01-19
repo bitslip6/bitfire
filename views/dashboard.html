@@ -34,6 +34,10 @@
       svg.green { fill: #21d97e; }
       svg.yellow { fill: #f6c343; }
       svg.red { fill: #e63757; }
+
+      .oh { overflow: auto; }
+      .wrap { white-space: break-spaces; }
+      .nowrap { white-space: nowrap; }
       
       .country { float: right; display: block; }
 
@@ -73,6 +77,7 @@
       .table-sm td { padding: .25rem; }
       .tbalt {
         color: #333;
+		overflow: hidden;
         background-color: #EFEFEF;
       }
       .table-sm th { padding: .5rem .25rem; }
@@ -206,7 +211,7 @@
     ================================================== -->
     
     
-    <nav class="navbar navbar-vertical fixed-left navbar-expand-md " id="sidebar">
+    <nav class="navbar navbar-vertical fixed-left navbar-expand-md " id="sidebar" style="background-color: #FFF;">
       <div class="container-fluid">
 
         <!-- Toggler -->
@@ -605,7 +610,7 @@
               <div class="card-body">
 
        
-<table class="table table-sm table-nowrap">
+<table class="table table-sm">
   <thead class="details">
     <tr>
       <th scope="col">Time</th>
@@ -621,17 +626,17 @@
   <tbody style="font-size:10px;">
     <?php foreach ($reporting as $line) { ?>
     <tr class="inforow">
-      <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
-      <td><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
-      <td><?php echo $line['browser']['browser'] . "/". join('.', array_slice(explode('.', $line['browser']['ver']), 0, 2)) ?></td>
-      <td><?php echo $line['block']['code']?></td>
-      <td><?php echo htmlspecialchars($line['block']['parameter'])?></td>
-      <td><?php echo htmlspecialchars($line['block']['value'])?></td>
-      <td><?php echo htmlspecialchars($line['block']['pattern'])?></td>
-      <td><?php echo \BitFire\to_meta($line); ?></td>
+      <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
+      <td class="nowrap"><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
+      <td class="wrap"><?php echo $line['browser']['browser'] . "/". join('.', array_slice(explode('.', $line['browser']['ver']), 0, 2)) ?></td>
+      <td class="nowrap"><?php echo $line['block']['code']?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['block']['parameter'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['block']['value'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['block']['pattern'])?></td>
+      <td class="wrap"><?php echo \BitFire\to_meta($line); ?></td>
     </tr>
     <tr>
-      <td colspan="8" class="tbalt">
+      <td colspan="8" class="tbalt nowrap">
         <?php if ($line['browser']['valid'] >= 2) { ?>
           <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg>; 
         <?php } else if ($line['browser']['whitelist']??false) { ?>
@@ -664,7 +669,7 @@
               <div class="card-body">
 
        
-<table class="table table-sm table-nowrap">
+<table class="table table-sm">
   <thead class="details">
     <tr>
       <th scope="col">Time</th>
@@ -682,12 +687,12 @@
     $idx = 0;
     if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
     <tr>
-      <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
-      <td><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
-      <td><?php 
+      <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
+      <td class="nowrap" ><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
+      <td class="wrap"><?php 
         $tmp = BitFireBot\parse_agent($line['ua']);
         echo $tmp['browser'] . "/". join('.', array_slice(explode('.', $tmp['ver']), 0, 2)) ?></td>
-      <td>
+      <td class="nowrap">
         <a tabindex="<?php echo $idx++;?>" role="button" class="btn btn-sm btn-danger" 
         data-toggle="popover"
         data-placement="top"
@@ -696,12 +701,12 @@
         data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT))); ?>"><?php echo $line['eventId'] ?? '00000'; ?></a>
         </td>
 
-      <td><?php echo htmlspecialchars($line['item'])?></td>
-      <td><?php echo htmlspecialchars($line['match'])?></td>
-      <td><?php echo htmlspecialchars($line['name'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['item'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['match'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['name'])?></td>
     </tr>
     <tr>
-      <td colspan="8" class="tbalt">
+      <td colspan="8" class="tbalt nowrap">
         <?php if ($line['valid']??-1 >= 2) { ?>
           <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg>; 
         <?php } else if ($line['whitelist']??false) { ?>
@@ -714,7 +719,7 @@
         <span class="method"><?php
         echo htmlspecialchars($line['verb']) . '</span>' . htmlspecialchars($line['scheme']??"GET" . "://" . $line['url']);
         echo (strlen($line['params']) > 0) ? '?' . htmlspecialchars($line['params']) : "";
-        if ($line['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['ua'], 0, 64)); }
+        if ($line['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['ua'], 0, 32)); }
       ?>
       </td>
     </tr>
