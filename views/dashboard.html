@@ -31,6 +31,8 @@
 
       svg { fill: #977; }
       svg.white { fill: #1657af; }
+      
+      .country { float: right; display: block; }
 
       .btn-group-tiny>.btn {
         padding: .075rem .25rem;
@@ -71,6 +73,14 @@
     <script>
         window.ERROR = [];
 
+        function cc_to_flag(cc) {
+          if (cc.length != 2) { return ""; }
+          const OFFSET = 127397;
+          const codePoints = [...cc.toUpperCase()].map(c => c.codePointAt() + OFFSET);
+          return String.fromCodePoint(...codePoints);
+        }
+
+        
         const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
         const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
         
@@ -635,7 +645,7 @@
 
                 <!-- Title -->
                 <h1 class="header-title">
-                  Free Dashboard
+                  BitFire Dashboard
                 </h1>
 
               </div>
@@ -740,7 +750,7 @@
     <?php foreach ($reporting as $line) { ?>
     <tr>
       <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
-      <td><?php echo $line['ip'] . " " . $line['country']; ?></td>
+      <td><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
       <td><?php echo $line['browser']['browser'] . " v:". $line['browser']['ver'] ?></td>
       <td><?php echo $line['block']['code']?></td>
       <td><?php echo htmlspecialchars($line['block']['parameter'])?></td>
@@ -782,10 +792,10 @@
     //\TF\dbg($blocks);
     require_once WAF_DIR."botfilter.php";
     $idx = 0;
-    if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
+    if (isset($blocks[0])) { foreach ($blocks as $line) { $line['country'] = 'US'; ?>
     <tr>
       <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
-      <td><?php echo $line['ip'] . " " . $line['country']; ?></td>
+      <td><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
       <td><?php 
         $tmp = BitFireBot\parse_agent($line['ua']);
         echo $tmp['browser'] . " v:". $tmp['ver'] ?></td>
@@ -991,6 +1001,11 @@
       }
       toggle_features();
 
+      var elms = document.getElementsByClassName("country");
+      for (let element of elms) {
+        let t = element.innerText;
+        element.innerHTML = "["+t+"]" + cc_to_flag(t);
+      }
      
 /*
       //.then(response => response.json())
