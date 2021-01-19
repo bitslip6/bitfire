@@ -553,8 +553,6 @@ function fast_ip_lookup(string $ip, string $type = "A") : Maybe {
  * @return string the server response.
  */
 function bit_http_request(string $method, string $url, $data, int $timeout = 5, array $optional_headers = null) {
-
-    // die("url [$url]");
     // build the post content paramater
     $content = (is_array($data)) ? http_build_query($data) : $data;
     
@@ -563,7 +561,7 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
-        $optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/bitfire";
+        $optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent";
     }
 
     $params = array('http' => array(
@@ -798,4 +796,30 @@ function cookie(string $name, string $value, int $exp, bool $secure, bool $httpo
             'samesite' => 'strict'
         ]);
     }
+}
+
+function prof_sort(array $a, array $b) : int {
+    if ($a['wt'] == $b['wt']) { return 0; }
+    return ($a['wt'] < $b['wt']) ? -1 : 1;
+}
+
+
+/**
+ * load the ini file and cache the parsed code if possible
+ */
+function parse_ini(string $ini_src) {
+    $st1 = filemtime($ini_src);
+    $st2 = filemtime("$ini_src.php");
+    $config = array();
+    if ($st2 > $st1) {
+        require "$ini_src.php";
+        \BitFire\Config::set($config);
+        return;
+    }
+
+	$config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
+    if (is_writeable("$ini_src.php")) {
+        file_put_contents("$ini_src.php", "<?php\n\$config=". var_export($config, true).";\n", LOCK_EX);
+    }
+	\BitFire\Config::set($config);
 }
