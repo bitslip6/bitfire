@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 
-//\tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU); 
+//tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU); 
 
 // system root paths and timing
 $m0 = \microtime(true);
@@ -13,11 +13,10 @@ if (!file_exists(BLOCK_DIR)) { \mkdir(BLOCK_DIR, 0700, true); }
 
 include WAF_DIR."bitfire.php";
 try {
-	\BitFire\Config::set(parse_ini_file(WAF_DIR . "config.ini", false, INI_SCANNER_TYPED));
+    \TF\parse_ini(WAF_DIR."config.ini");
 
     $bitfire = \Bitfire\BitFire::get_instance(); 
     $bitfire->inspect()
-        ->then('\BitFire\Reporting')
         ->then(function ($block) use ($bitfire) {
             $ip_data = ($bitfire->bot_filter !== null) ? $bitfire->bot_filter->ip_data : array();
             \BitFire\block_ip($block, $ip_data);
@@ -26,6 +25,9 @@ try {
         })
         ->then(function($block) use ($m0) {
             include WAF_DIR."views/block.php";
+            //$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 2 || $elm['cpu'] > 2); }); 
+            //uasort($data, '\TF\prof_sort');
+            //file_put_contents("/tmp/prof.fail.json", json_encode($data, JSON_PRETTY_PRINT));
             exit();
         })
         ->doifnot(array($bitfire, 'cache_behind'));
@@ -37,4 +39,5 @@ catch (\Exception $e) {
 
 $m1 = microtime(true);
 //$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 9 || $elm['cpu'] > 9); }); 
-//file_put_contents("/tmp/pass.json", json_encode($data, JSON_PRETTY_PRINT));
+//uasort($data, '\TF\prof_sort');
+//file_put_contents("/tmp/prof.pass.json", json_encode($data, JSON_PRETTY_PRINT));
