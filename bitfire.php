@@ -12,7 +12,7 @@ const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 1
 
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 122;
+const BITFIRE_VER = 123;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_COMMAND = "BITFIRE_API";
 
@@ -412,7 +412,7 @@ class BitFire
             $x = @file(Config::str(CONFIG_REPORT_FILE));
             $report_count = (is_array($x)) ? count($x) : 0;
             $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
-            $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 500)) . ']', true));
+            $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)) . ']', true));
             $blocks = add_country(CacheStorage::get_instance()->load_data("log_data"));
             $send = CacheStorage::get_instance()->load_data("send_js", 0);
             $good = CacheStorage::get_instance()->load_data("good_js", 0);
@@ -740,7 +740,7 @@ function add_country($data) {
     $map = json_decode(file_get_contents(WAF_DIR . "cache/country.json"), true);
     $result = array();
     foreach ($data as $report) {
-        $code = \TF\ip_to_country($report['ip']);
+        $code = \TF\ip_to_country($report['ip'] ?? '');
         $report['country'] = $map[$code];
         $result[] = $report; 
     }
