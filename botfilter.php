@@ -480,7 +480,7 @@ function make_challenge_cookie(array $answer, string $ip) : string {
  * add the page that prompts the browser to add a cookie
  */
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
-    if ($cookie->extract('v')() >= 2) { return; }
+    if (intval($cookie->extract('v')()) >= 2) { return; }
 
     \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
     http_response_code(202);
