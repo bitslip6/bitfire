@@ -289,6 +289,7 @@ function agent_in_list(string $a, string $ip, array $list) : int {
     foreach ($list as $k => $v) {
 
         if (strpos($a, $k) === false) { continue; }
+        if ($v === "*") { return 1; }
 
         // reverse lookup, or just return found
         $r = (substr($v, 0, 2) == "AS") ?

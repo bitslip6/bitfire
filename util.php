@@ -462,6 +462,7 @@ function ip_to_file($ip_num) {
  * ugly AF
  */
 function ip_to_country($ip) : int {
+    if (empty($ip)) { return 0; }
 	$n = ip2long($ip);
 	$d = file_get_contents(WAF_DIR.ip_to_file($n));
 	$len = strlen($d);
