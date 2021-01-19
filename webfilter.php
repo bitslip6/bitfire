@@ -41,6 +41,7 @@ class WebFilter {
         $values = $cache->load_or_cache("webvalues2", 3600*24, '\TF\recache_file', WAF_DIR.'cache/values.raw');
         $keys = $cache->load_or_cache("webkeys2", 3600*24, '\TF\recache_file', WAF_DIR.'cache/keys.raw');
 
+        //\TF\dbg($values);
         $this->_reducer = \TF\partial('\\BitFIRE\\generic_reducer', $keys, $values);
         $this->_search_sql = \TF\partial('\\BitFIRE\\trivial_reducer', '\\BitFire\\search_sql');
     }

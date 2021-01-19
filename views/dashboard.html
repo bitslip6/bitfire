@@ -30,10 +30,17 @@
       .card-body { padding: 0.5rem !important; }
 
       svg { fill: #977; }
-      svg.white { fill: #1657af; }
+      svg.blue { fill: #30b7e5; }
+      svg.green { fill: #21d97e; }
+      svg.yellow { fill: #f6c343; }
+      svg.red { fill: #e63757; }
       
       .country { float: right; display: block; }
 
+      .btn-sm {
+        padding: 0.01rem .25rem;
+        font-size: .4rem;
+      }
       .btn-group-tiny>.btn {
         padding: .075rem .25rem;
         font-size: .4rem;
@@ -63,7 +70,17 @@
       
       .popover { max-width: 30rem; }
       .underline { text-decoration: underline; margin-bottom: 1rem; }
+      .table-sm td { padding: .25rem; }
+      .tbalt {
+        color: #333;
+        background-color: #EFEFEF;
+      }
+      .table-sm th { padding: .5rem .25rem; }
 
+      span.method { padding: .45rem .75rem; font-weight: bold; color #111; }
+      tr.inforow td {
+        background-image: linear-gradient(to bottom, rgba(240,240,240,0),95%, rgba(240,240,240,1)100%);
+      }
     </style>
     
     <!-- Title -->
@@ -475,152 +492,7 @@
     </nav>
 
     
-    
-    <nav class="navbar navbar-vertical navbar-vertical-sm fixed-left navbar-expand-md " id="sidebarSmall">
-      <div class="container-fluid">
-
-        <!-- Toggler -->
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#sidebarSmallCollapse" aria-controls="sidebarSmallCollapse" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <!-- Brand -->
-        <a class="navbar-brand" href="/bitfire">
-          <img src="https://bitslip6.com/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
-        </a>
-
-        <!-- Collapse -->
-        <div class="collapse navbar-collapse" id="sidebarSmallCollapse">
-
-          <!-- Form -->
-          <form class="mt-4 mb-3 d-md-none">
-            <div class="input-group input-group-rounded input-group-merge">
-              <input type="search" class="form-control form-control-rounded form-control-prepended" placeholder="Search" aria-label="Search">
-              <div class="input-group-prepend">
-                <div class="input-group-text">
-                  <span class="fe fe-search"></span>
-                </div>
-              </div>
-            </div>
-          </form>
-
-          <!-- Divider -->
-          <hr class="navbar-divider d-none d-md-block mt-0 mb-3">
-
-          <!-- Navigation -->
-          <ul class="navbar-nav">
-            <li class="nav-item dropright">
-              <a class="nav-link dropdown-toggle active" id="sidebarSmallDashboards" href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="X/Y Cursor Position">
-                <i class="fe fe-home"></i> <span class="d-md-none">X/Y : </span> <span id="cross"></span>
-              </a>
-            </li>
-
-            <li class="nav-item dropright">
-              <a class="nav-link dropdown-toggle active" id="sidebarSmallDashboards" href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="FPS">
-                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M15 1H9v2h6V1zm4.03 6.39l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7zm-.32-5H6.35c.57 1.62 1.82 2.92 3.41 3.56l-.11-.06 2.03-3.5zm5.97-4c-.57-1.6-1.78-2.89-3.34-3.54L12.26 11h5.39zm-7.04 7.83c.45.11.91.17 1.39.17 1.34 0 2.57-.45 3.57-1.19l-2.11-3.9-2.85 4.92zM7.55 8.99C6.59 10.05 6 11.46 6 13c0 .34.04.67.09 1h4.72L7.55 8.99zm8.79 8.14C17.37 16.06 18 14.6 18 13c0-.34-.04-.67-.09-1h-4.34l2.77 5.13zm-3.01-9.98C12.9 7.06 12.46 7 12 7c-1.4 0-2.69.49-3.71 1.29l2.32 3.56 2.72-4.7z"/></svg>
-                <span class="d-md-none">FPS3 : </span> <span id="fps"></span>
-              </a>
-            </li>
-          </ul>
-
-          <!-- Divider -->
-          <hr class="navbar-divider my-3">
-
-          <!-- Navigation -->
-          <ul class="navbar-nav mb-md-4">
-            <li class="nav-item dropright">
-              <a class="nav-link dropdown-toggle " id="sidebarSmallBasics" href="#" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" title="Basics">
-                <i class="fe fe-clipboard"></i> <span class="d-md-none">Basics</span>
-              </a>
-              <ul class="dropdown-menu" aria-labelledby="sidebarSmallBasics">
-                <li class="dropdown-header d-none d-md-block">
-                  <h6 class="text-uppercase mb-0">Basics</h6>
-                </li>
-                <li>
-                  <a href="./docs/getting-started.html" class="dropdown-item ">
-                    Getting Started
-                  </a>
-                </li>
-                <li>
-                  <a href="./docs/design-file.html" class="dropdown-item ">
-                    Design File
-                  </a>
-                </li>
-              </ul>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link " href="./docs/components.html" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Components">
-                <i class="fe fe-book-open"></i> <span class="d-md-none">Components</span>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link " href="./docs/changelog.html" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Changelog">
-                <i class="fe fe-git-branch"></i> <span class="d-md-none">Changelog</span> <span class="badge badge-primary ml-auto d-md-none">v1.6.1</span>
-              </a>
-            </li>
-          </ul>
-
-          <!-- Push content down -->
-          <div class="mt-auto"></div>
-
-          
-          <!-- Customize -->
-          <div class="mb-4" data-toggle="tooltip" data-placement="right" data-template='<div class="tooltip d-none d-md-block" role="tooltip"><div class="arrow"></div><div class="tooltip-inner"></div></div>' title="Customize">
-            <a href="#modalDemo" class="btn btn-block btn-success" data-toggle="modal">
-              <i class="fe fe-sliders"></i> <span class="d-md-none ml-2">Customize</span>
-            </a>
-          </div>
-          
-
-          
-          <!-- User (md) -->
-          <div class="navbar-user d-none d-md-flex flex-column" id="sidebarSmallUser">
-
-            <!-- Icon -->
-            <a href="#sidebarModalSearch" class="navbar-user-link mb-3" data-toggle="modal">
-              <span class="icon">
-                <i class="fe fe-search"></i>
-              </span>
-            </a>
-
-            <!-- Icon -->
-            <a href="#sidebarModalActivity" class="navbar-user-link mb-3" data-toggle="modal">
-              <span class="icon">
-                <i class="fe fe-bell"></i>
-              </span>
-            </a>
-
-            <!-- Dropup -->
-            <div class="dropright">
-
-              <!-- Toggle -->
-              <a href="#" id="sidebarSmallIconCopy" class="dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                <div class="avatar avatar-sm avatar-online">
-                  <!--
-                  <img src="avatar.jpg" class="avatar-img rounded-circle" alt="...">
-                  -->
-                </div>
-              </a>
-
-              <!-- Menu -->
-              <div class="dropdown-menu" aria-labelledby="sidebarSmallIconCopy">
-                <a href="./profile-posts.html" class="dropdown-item">Profile</a>
-                <a href="./account-general.html" class="dropdown-item">Settings</a>
-                <hr class="dropdown-divider">
-                <a href="./sign-in.html" class="dropdown-item">Logout</a>
-              </div>
-
-            </div>
-
-          </div>
-          
-
-        </div> <!-- / .navbar-collapse -->
-
-      </div>
-    </nav>
-
-    
+       
 
     <!-- MAIN CONTENT
     ================================================== -->
@@ -748,7 +620,7 @@
   </thead>
   <tbody style="font-size:10px;">
     <?php foreach ($reporting as $line) { ?>
-    <tr>
+    <tr class="inforow">
       <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
       <td><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
       <td><?php echo $line['browser']['browser'] . "/". join('.', array_slice(explode('.', $line['browser']['ver']), 0, 2)) ?></td>
@@ -757,6 +629,23 @@
       <td><?php echo htmlspecialchars($line['block']['value'])?></td>
       <td><?php echo htmlspecialchars($line['block']['pattern'])?></td>
       <td><?php echo \BitFire\to_meta($line); ?></td>
+    </tr>
+    <tr>
+      <td colspan="8" class="tbalt">
+        <?php if ($line['browser']['valid'] >= 2) { ?>
+          <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg>; 
+        <?php } else if ($line['browser']['whitelist']??false) { ?>
+          <svg class="blue" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+        <?php } else if ($line['browser']['valid']??-1 > -1){ ?>
+          <svg class="red" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M21,15v-2h-3.07c-0.05-0.39-0.12-0.77-0.22-1.14l2.58-1.49l-1-1.73L16.92,10c-0.28-0.48-0.62-0.91-0.99-1.29 C15.97,8.48,16,8.25,16,8c0-0.8-0.24-1.55-0.65-2.18L17,4.17l-1.41-1.41l-1.72,1.72c-1.68-0.89-3.1-0.33-3.73,0L8.41,2.76L7,4.17 l1.65,1.65C8.24,6.45,8,7.2,8,8c0,0.25,0.03,0.48,0.07,0.72C7.7,9.1,7.36,9.53,7.08,10L4.71,8.63l-1,1.73l2.58,1.49 c-0.1,0.37-0.17,0.75-0.22,1.14H3v2h3.07c0.05,0.39,0.12,0.77,0.22,1.14l-2.58,1.49l1,1.73L7.08,18c1.08,1.81,2.88,3,4.92,3 s3.84-1.19,4.92-3l2.37,1.37l1-1.73l-2.58-1.49c0.1-0.37,0.17-0.75,0.22-1.14H21z M13,17h-2v-6h2V17z"/></g></g></svg>
+        <?php } else { ?>
+          <svg class="yellow" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14zM12 6.72c-1.96 0-3.5 1.52-3.5 3.47h1.75c0-.93.82-1.75 1.75-1.75s1.75.82 1.75 1.75c0 1.75-2.63 1.57-2.63 4.45h1.76c0-1.96 2.62-2.19 2.62-4.45 0-1.96-1.54-3.47-3.5-3.47zm-.88 8.8h1.76v1.76h-1.76z"/></svg>
+        <?php } ?>
+        <span class="method"><?php
+        echo htmlspecialchars($line['request']['METHOD']) . '</span>' . htmlspecialchars($line['request']['SCHEME'] . "://" . $line['request']['HOST'] . $line['request']['PATH'] .
+          '?' . urldecode(http_build_query($line['request']['GET'])));
+        if ($line['browser']['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['request']['USER_AGENT'], 0, 64)); }
+      ?></td>
     </tr>
     <?php } ?>
   </tbody>
@@ -789,16 +678,15 @@
   </thead>
   <tbody style="font-size:10px;">
     <?php 
-    //\TF\dbg($blocks);
     require_once WAF_DIR."botfilter.php";
     $idx = 0;
-    if (isset($blocks[0])) { foreach ($blocks as $line) { $line['country'] = 'US'; ?>
+    if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
     <tr>
       <td scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
       <td><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
       <td><?php 
         $tmp = BitFireBot\parse_agent($line['ua']);
-        echo $tmp['browser'] . "/". join('.', array_slice(explode('.', $line['browser']['ver']), 0, 2)) ?></td>
+        echo $tmp['browser'] . "/". join('.', array_slice(explode('.', $tmp['ver']), 0, 2)) ?></td>
       <td>
         <a tabindex="<?php echo $idx++;?>" role="button" class="btn btn-sm btn-danger" 
         data-toggle="popover"
@@ -812,6 +700,25 @@
       <td><?php echo htmlspecialchars($line['match'])?></td>
       <td><?php echo htmlspecialchars($line['name'])?></td>
     </tr>
+    <tr>
+      <td colspan="8" class="tbalt">
+        <?php if ($line['valid']??-1 >= 2) { ?>
+          <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg>; 
+        <?php } else if ($line['whitelist']??false) { ?>
+          <svg class="blue" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+        <?php } else if ($line['valid']??-1 > -1){ ?>
+          <svg class="red" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M21,15v-2h-3.07c-0.05-0.39-0.12-0.77-0.22-1.14l2.58-1.49l-1-1.73L16.92,10c-0.28-0.48-0.62-0.91-0.99-1.29 C15.97,8.48,16,8.25,16,8c0-0.8-0.24-1.55-0.65-2.18L17,4.17l-1.41-1.41l-1.72,1.72c-1.68-0.89-3.1-0.33-3.73,0L8.41,2.76L7,4.17 l1.65,1.65C8.24,6.45,8,7.2,8,8c0,0.25,0.03,0.48,0.07,0.72C7.7,9.1,7.36,9.53,7.08,10L4.71,8.63l-1,1.73l2.58,1.49 c-0.1,0.37-0.17,0.75-0.22,1.14H3v2h3.07c0.05,0.39,0.12,0.77,0.22,1.14l-2.58,1.49l1,1.73L7.08,18c1.08,1.81,2.88,3,4.92,3 s3.84-1.19,4.92-3l2.37,1.37l1-1.73l-2.58-1.49c0.1-0.37,0.17-0.75,0.22-1.14H21z M13,17h-2v-6h2V17z"/></g></g></svg>
+        <?php } else { ?>
+          <svg class="yellow" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14zM12 6.72c-1.96 0-3.5 1.52-3.5 3.47h1.75c0-.93.82-1.75 1.75-1.75s1.75.82 1.75 1.75c0 1.75-2.63 1.57-2.63 4.45h1.76c0-1.96 2.62-2.19 2.62-4.45 0-1.96-1.54-3.47-3.5-3.47zm-.88 8.8h1.76v1.76h-1.76z"/></svg>
+        <?php } ?>
+        <span class="method"><?php
+        echo htmlspecialchars($line['verb']) . '</span>' . htmlspecialchars($line['scheme']??"GET" . "://" . $line['url']);
+        echo (strlen($line['params']) > 0) ? '?' . htmlspecialchars($line['params']) : "";
+        if ($line['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['ua'], 0, 64)); }
+      ?>
+      </td>
+    </tr>
+
     <?php } } ?>
   </tbody>
 </table>
@@ -939,6 +846,7 @@
 
 
       var codex = {
+        0: "wrong domain",
         10000: "XSS",
         11000: "XXE",
         12000: "RCE",
