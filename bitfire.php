@@ -230,6 +230,7 @@ class BitFire
     // request unique id
     public $uid;
     public static $_exceptions = array();
+    public static $_reporting = array();
 
     public static $_fail_reasons = array();
     protected $_ip_data = null;
@@ -269,9 +270,21 @@ class BitFire
 
             $this->api_call();
             
-            $exception_file = WAF_DIR . "cache/exceptions.json";
-            self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
+            //$exception_file = WAF_DIR . "cache/exceptions.json";
+            //self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
         }
+    }
+    
+    /**
+     * write report data after script execution 
+     */
+    public function __destruct() {
+        $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
+        $out = "";
+        foreach (self::$_reporting as $report) {
+            $out .= json_encode($report, $opts) . "\n";
+        }
+        file_put_contents(Config::str(CONFIG_REPORT_FILE), $out, FILE_APPEND);
     }
 
     protected function api_call() {
@@ -300,8 +313,27 @@ class BitFire
     public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\Maybe {
         if ($code === FAIL_NOT) { return \TF\Maybe::of(false); }
         $block = new Block($code, $parameter, $value, $pattern, $block_time);
+        if (is_report($block)) {
+            self::reporting($block, BitFire::get_instance()->_request);
+            return \TF\Maybe::of(false);
+        }
         return filter_block_exceptions($block, self::$_exceptions);
     }
+    
+    protected static function reporting(Block $block, array $request) {
+        $data = array('time' => date('r'),
+            'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+            'block' => $block,
+            'request' => $request);
+        $bf = BitFire::get_instance()->bot_filter;
+        if ($bf != null) {
+            $data['browser'] = $bf->browser;
+            $data['rate'] = $bf->ip_data;
+        }
+        
+        self::$_reporting[] = $data;
+    }
+    
 
     
     /**
@@ -311,7 +343,7 @@ class BitFire
     public static function update_cache_behind() {
         if (strlen($_SERVER['SERVER_NAME']??'') < 1) { return; }
         $secret = Config::str(CONFIG_SECRET, 'bitfiresekret');
-        $u = $_SERVER[REQUEST_SCHEME] . "://" . $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'] . "?" . BITFIRE_INPUT . "=$secret";
+        $u = $_SERVER['REQUEST_SCHEME'] . "://" . $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'] . "?" . BITFIRE_INPUT . "=$secret";
         $d = \TF\bit_http_request("GET", $u, "");
         file_put_contents(WAF_DIR . '/cache/root:'. cache_unique(), $d);
     }
@@ -368,7 +400,7 @@ class BitFire
      * return false if inspection failed...
      */
     public function inspect() : \TF\Maybe {
-        // dashboard requests
+        // dashboard requests, TODO: MOVE TO api.php
         if ($this->_request[REQUEST_PATH] === "/bitfire") {
 
             if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] !== Config::str('password', 'default_password')) {
@@ -377,15 +409,13 @@ class BitFire
                 exit;
             }
 
-            $x = @file(Config::str("report_file"));
+            $x = @file(Config::str(CONFIG_REPORT_FILE));
             $report_count = (is_array($x)) ? count($x) : 0;
             $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
-            $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str("report_file"), 20, 500)) . ']', true));
+            $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 500)) . ']', true));
             $blocks = add_country(CacheStorage::get_instance()->load_data("log_data"));
             $send = CacheStorage::get_instance()->load_data("send_js", 0);
             $good = CacheStorage::get_instance()->load_data("good_js", 0);
-            //$b2 = add_country($blocks);
-            //\TF\dbg($blocks);
             exit(require WAF_DIR . "views/dashboard.html");
         }
 
@@ -451,43 +481,39 @@ function to_meta(array $line) {
 }
 
 /**
- * filter reporting features
+ * returns true if the block should be reported and not blocked...
  */
-function reporting(Block $block) {
+function is_report(Block $block) : bool {
     $class = floor(($block->code / 1000)) * 1000;
     $feature_name =  FEATURE_CLASS[$class] ?? 'bitfire_enabled';
 
-    if (Config::str($feature_name) === "report") {
-        $data = array('time' => date('r'),
-            'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
-            'ip' => BitFire::get_instance()->_request[REQUEST_IP],
-            'block' => $block);
-        $bf = BitFire::get_instance()->bot_filter;
-        if ($bf != null) {
-            $data['browser'] = $bf->browser;
-            $data['rate'] = $bf->ip_data;
-        }
-        $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
-        file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($data, $opts) . "\n", FILE_APPEND);
-        return false;
-    }
-    return $block;
+    return (Config::str($feature_name) === "report");
 }
 
-function alert_or_block($config) : string {
-/*
-    echo "alert or block [$config]\n";
-    //var_dump();
-    var_export($config);
-    echo"\n\n";
-*/
+/**
+ * filter reporting features
+ */
+function reporting(Block $block, array $request) {
+    $data = array('time' => date('r'),
+        'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+        'ip' => BitFire::get_instance()->_request[REQUEST_IP],
+        'block' => $block,
+        'request' => $request);
+    $bf = BitFire::get_instance()->bot_filter;
+    if ($bf != null) {
+        $data['browser'] = $bf->browser;
+        $data['rate'] = $bf->ip_data;
+    }
+    $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
+    file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($data, $opts) . "\n", FILE_APPEND);
+}
 
-    if ($config === 'report' || $config === 'alert') {
-        return 'report';
-    }
-    if (!$config) {
-        return 'off';
-    }
+/**
+ * helper function for api dashboard
+ */
+function alert_or_block($config) : string {
+    if ($config === 'report' || $config === 'alert') { return 'report'; }
+    if (!$config) { return 'off'; }
     return 'block';
 }
 
@@ -543,13 +569,21 @@ function process_request(array $get, array $post, array $server, array $cookie =
     $request['CONTENT_TYPE'] = $server['HTTP_CONTENT_TYPE'] ?? 'text/html';
     $request[REQUEST_COOKIE] = $cookie;
     $request[REQUEST_ACCEPT] = (stripos($server['HTTP_ACCEPT_ENCODING']??'', 'gzip') === false) ? 'no_encode' : $server['HTTP_ACCEPT_ENCODING'];
-
-    $request[REQUEST_IP] = getIP($server['REMOTE_ADDR'] ?? '127.0.0.1');
+    $header_name = strtoupper(Config::str('ip_header', 'REMOTE_ADDR'));
+    switch ($header_name) {
+        case "X-FORWARDED-FOR":
+            $request[REQUEST_IP] = get_fwd_for($server[$header_name] ?? '127.0.0.1');
+            break;
+        case "REMOTE_ADDR":
+        case "X-FORWARDED-FOR":
+        default:
+            $request[REQUEST_IP] = getIP($server[$header_name] ?? '127.0.0.1');
+            break;
+    }
 
     // set the ajax flag
     $request['ajax'] = is_ajax($request);
 
-    //\TF\dbg($request);
     return $request;
 }
 
@@ -635,10 +669,25 @@ function is_not_ajax(array $request) {
     return !is_ajax($request);
 }
 
+/**
+ * parse out the forwarded
+ */
+function get_fwd_for(string $header) {
+    if (preg_match('/for\s*=\s*["\[]*([0-9\.\:])+/i', $header, $matches)) {
+        return $matches[1];
+    }
+    return $header;
+}
+
+// return leftmost forwarded for header
 // converts a remote_addr into an ipv4 address if at all possible
 // handles ipv6 as well 
 // PURE
 function getIP(string $remote_addr = '127.0.0.2') : string {
+    
+    $parts = explode(",", $remote_addr);
+    return trim($parts[0]??$remote_addr);
+    
     // Known prefix
     $v4mapped_prefix_bin = hex2bin('00000000000000000000ffff');
 
@@ -700,8 +749,8 @@ function add_country($data) {
 
 
 function post_request(array $request, ?Block $block, ?array $ip_data) {
-    if ($block === null && http_response_code() < 300) { return; } 
-    if ($block === null) { $block = new Block(31000, "n/a", "unknown bot", $request[REQUEST_UA], 0); }
+    $response_code = http_response_code();
+    if ($block === null && $response_code < 300) { return; } 
 
     // add browser data if available
     $bot = $whitelist = false;
@@ -712,6 +761,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     }
 
     if ($block === null && !$bot) { return; }
+    if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot", $request[REQUEST_UA], 0); }
 
 
     $class = intval($block->code / 1000) * 1000;
@@ -733,6 +783,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
         "ver" => BITFIRE_VER,
         "pass" => $block->code === 0 ? true : false,
         "bot" => $bot,
+        "response" => $response_code,
         "whitelist" => $whitelist,
         "offset" => 0
     );
