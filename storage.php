@@ -38,7 +38,7 @@ class CacheStorage implements Storage {
      * remove all created semaphores...
      */
     public function __destruct() {
-        foreach ($this->sems as $sem) { sem_remove($sem); }
+        foreach ($this->sems as $sem) { if ($sem != null) { sem_remove($sem); } }
     }
 
     protected function __construct($type = 'nop') {
@@ -86,17 +86,19 @@ class CacheStorage implements Storage {
 
     public function lock(string $key_name) {
         $sem = null;
+/*
         if (function_exists('sem_acquire')) {
             $opt = (PHP_VERSION_ID >= 80000) ? true : 1;
             $sem = sem_get(crc32($key_name), 1, 0600, $opt);
             if (!sem_acquire($sem, true)) { return null; };
             $this->sems[] = $sem;
         }
+*/
         return $sem;
     }
     
     public function unlock($sem) {
-        if (function_exists('sem_acquire')) { sem_release(($sem)); }
+        if ($sem != null && function_exists('sem_acquire')) { sem_release(($sem)); }
     }
 
     /**
