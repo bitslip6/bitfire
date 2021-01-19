@@ -106,18 +106,17 @@ You will need a webserver running PHP >= 7.1, a login, sudo access to edit php.i
    composer require bitslip6/bitfire
    ./vendor/bin/updatekeys.sh
    ```
-- or *Install by hand*
-Edit bitfire/config.ini and change: *_encryption_key_* and *_secret_*.  
-Edit your php.ini file (/etc/php/7.4/fpm/php.ini or similar) and set 
-```ini 
-auto_prepend_file ='/full/path/to/bitfire/startup.php';
-```
-
 - *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini`
    ```ini
    bitfire_enabled = true;
    ```
-- Congradulations! Time for a beer
+- Congratulations! Time for a beer
+
+- You may also install by-hand. set *_config.ini.php_* and *_cache_* to web writeable, update *_encryption_key_* and *_secret_* in config.ini then, 
+in php.ini update auto_prepend_file 
+```ini 
+auto_prepend_file ='/full/path/to/bitfire/startup.php';
+```
 
 
 
