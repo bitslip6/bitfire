@@ -73,7 +73,7 @@ function get_ip_24groups() : Metric {
 
     if (count($summary) > 10) {
         $metric->data = array_slice($summary, 0, 10);
-        $inc = array_sum(array_values($metric->data, 10));
+        $inc = array_sum(array_values(array_slice($summary, 10)));
         $metric->data['other'] = $inc;
     } else {
         $metric->data = $summary;
