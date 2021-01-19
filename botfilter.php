@@ -209,6 +209,7 @@ use const BitFire\BLOCK_MEDIUM;
 use const BitFire\BLOCK_SHORT;
 use const BitFire\CACHE_NAME_JS_SEND;
 use const BitFire\CONFIG_ENCRYPT_KEY;
+use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\CONFIG_USER_TRACK_PARAM;
 use const BitFire\FAIL_FAKE_WHITELIST;
@@ -477,13 +478,16 @@ function make_challenge_cookie(array $answer, string $ip) : string {
  * add the page that prompts the browser to add a cookie
  */
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
-    if ($cookie->extract('v')() < 2) { 
-        \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
-        http_response_code(202);
-        $block = new \BitFire\Block(1, 'n/a', 'n/a', 'check JS/Cookies', 0);
-        \BitFire\reporting($block, $request); // report on block bots
-        exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
-    }
+    if ($cookie->extract('v')() >= 2) { return; }
+
+    \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
+    http_response_code(202);
+    $block = new \BitFire\Block(1, 'n/a', 'n/a', 'check JS/Cookies', 0);
+    \BitFire\reporting($block, $request);
+    echo make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), 
+        Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
+
+    if (Config::str(CONFIG_REQUIRE_BROWSER, "report") === "block") { exit(); }
 }
 
 function strip_path_tracking_params(array $request) {
