@@ -78,9 +78,9 @@ $config=array (
     3 => 'PUT',
     4 => 'HEAD',
   ),
-  'whitelist_enable' => 'report',
+  'whitelist_enable' => 'block',
   'blacklist_enable' => true,
-  'require_full_browser' => false,
+  'require_full_browser' => 'report',
   'honeypot_url' => '/ztcegizz/contact',
   'check_domain' => false,
   'valid_domains' => 
