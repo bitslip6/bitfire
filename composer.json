@@ -1,8 +1,8 @@
 {
     "name": "bitslip6/bitfire",
     "type": "library",
-    "description": "Enterprise bot/spam firewall WAF, XSS/SQLi, HTTP headers, CSRF, SSRF/SSI, OWASP 10, grammer parsed, <2ms exec",
-    "keywords": ["firewall", "security", "headers", "xss", "sqli", "csrf", "waf"],
+    "description": "Enterprise firewall, stop all bot/spam and manual attacks. OWASP top 10, with bot whitelist in <2ms",
+    "keywords": ["firewall", "security", "spam", "bot", "headers", "xss", "sqli", "csrf", "waf"],
     "homepage": "https://github.com/bitslip6/bitfire",
     "readme": "README.md",
     "license": "APACHE-2.0",
