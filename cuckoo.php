@@ -360,10 +360,7 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
  * @param string $key = the shmem "key" = 'a'
  */
 function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 1114112, bool $force_init = false, string $key = "a"):array {
-    $size = ($items * $chunk_size);
     $entry_end = $items * CUCKOO_SLOT_SIZE_BYTES;
-    //$exp_end = ($entry_end + ($items * CUCKOO_EXP_SIZE_BYTES)); 
-    //$mem_start = $entry_end;
     $mem_end = $entry_end + $mem;
 
     $rid = cuckoo_open_mem($mem_end + 16, $key);
