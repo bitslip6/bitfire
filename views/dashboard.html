@@ -627,7 +627,7 @@
     <?php foreach ($reporting as $line) { ?>
     <tr class="inforow">
       <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
-      <td class="nowrap"><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
+      <td class="nowrap" style="min-width:125px;"><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
       <td class="wrap"><?php echo $line['browser']['browser'] . "/". join('.', array_slice(explode('.', $line['browser']['ver']), 0, 2)) ?></td>
       <td class="nowrap"><?php echo $line['block']['code']?></td>
       <td class="wrap"><?php echo htmlspecialchars($line['block']['parameter'])?></td>
@@ -688,7 +688,7 @@
     if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
     <tr>
       <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
-      <td class="nowrap" ><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
+      <td class="nowrap" style="min-width:125px;"><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
       <td class="wrap"><?php 
         $tmp = BitFireBot\parse_agent($line['ua']);
         echo $tmp['browser'] . "/". join('.', array_slice(explode('.', $tmp['ver']), 0, 2)) ?></td>
