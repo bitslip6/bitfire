@@ -769,6 +769,7 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
     $st = @stat($filename);
     if (($fh = @fopen($filename, "r")) === false) { return array(); }
     $sz = min(($lines*$line_sz), $st['size']);
+    if ($sz <= 1) { return ""; }
     fseek($fh, -$sz, SEEK_END);
     $d = fread($fh, $sz);
     $eachln = explode("\n", $d);//, -($lines+1), $lines);

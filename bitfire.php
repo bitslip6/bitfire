@@ -8,7 +8,7 @@ if (defined('BITFIRE_VER')) { return; }
  
 
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
-const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'check_domain', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 50000 => '');
+const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 50000 => '');
 
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array(10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
@@ -755,8 +755,10 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     // add browser data if available
     $bot = $whitelist = false;
     $bot_filter = BitFire::get_instance()->bot_filter;
+    $valid = -1;
     if ($bot_filter !== null) {
         $bot = $bot_filter->browser['bot'] ?? false;
+        $valid = $bot_filter->browser['valid'] ?? -1;
         $whitelist = $bot_filter->browser[AGENT_WHITELIST] ?? false;
     }
 
@@ -767,6 +769,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     $class = intval($block->code / 1000) * 1000;
     $data = array(
         "ip" => $request[REQUEST_IP],
+        "scheme" => $request[REQUEST_SCHEME],
         "ua" => $request[REQUEST_UA] ?? '',
         "url" => $request[REQUEST_HOST] . ':' . $request['PORT'] . $request[REQUEST_PATH],
         "params" => param_to_str($request['GET'], true),
@@ -785,6 +788,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
         "bot" => $bot,
         "response" => $response_code,
         "whitelist" => $whitelist,
+        "valid" => $valid,
         "offset" => 0
     );
     
@@ -805,6 +809,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     $ip = ip2long($request[REQUEST_IP]);
     $cache->update_data("metrics-".date('G'), function ($metrics) use ($class, $ip) {
         $metrics[$class]++;
+        $ip = ($ip < 100000) ? ip2long('127.0.0.1') : $ip; 
         $metrics[$ip] = ($metrics[$ip] ?? 0) + 1;
         return $metrics;
     }, BITFIRE_METRICS_INIT, 86400);
