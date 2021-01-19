@@ -349,34 +349,31 @@ function parse_agent(string $user_agent) : array {
 
     // cpu: 50, could rewrite as imperative and save here
     $os_list = array("linux", "android", "os x", "windows", "iphone", "ipad");
-    $os = array_reduce($os_list, function(string $carry, string $os) use ($user_agent) {
-        return (strpos($user_agent, $os) !== false) ?
-            $os :
-            $carry;
+    $os = array_reduce($os_list, function(string $cry, string $os) use ($user_agent) {
+        return (strpos($user_agent, $os) !== false) ? $os : $cry;
     }, "bot");
 
+
     $browser_list = array(
+        "chrome" => "(chrome)/\s*([\d+\.]+)",
+        "firefox" => "(firefox)/?\s*([\d+\.]+)",
+        "safari" => "(safari)/\s*([\d+\.]+)",
+        "android" => "(android)/?\s*([\d+\.]+)",
         "edge" => "(edge)/\s*([\d+\.]+)",
         "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
         "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
-        "opera" => "(opr)/\s*(\d+\.\d+)",
-        "vivaldi" => "(vivaldi)/\s*(\d+\.\d+)",
-        "chrome" => "(chrome)/\s*(\d+\.\d+)",
-        "firefox" => "(firefox)/?\s*(\d+\.\d+)",
-        "android" => "(android)/?\s*([\d+\.]+)",
-        "safari" => "(safari)/\s*(\d+\.\d+)",
-        "bot" => "(\w+)\s*(\d+\.\d+[\d\.]*)"
+        "opera" => "(opr)/\s*([\d+\.]+)",
+        "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
+        "bot" => "(\w+)\s*([\d+\.]+)"
     );
 
     // cpu: 50, could rewrite as imperative and save here
-    $browser = array_reduce($browser_list, function(array $carry, string $browser) use ($user_agent) {
-        if ($carry[0] === "bot") {
-            preg_match("!$browser!i", $user_agent, $matches);
-            return (isset($matches[2])) ? 
-                array_slice($matches, 1, 2) :
-                $carry;
+    $browser = array_reduce($browser_list, function(array $cry, string $browser) use ($user_agent) {
+        if ($cry[0] === "bot") {
+            preg_match("!$browser!", $user_agent, $matches);
+            return (isset($matches[2])) ? array_slice($matches, 1, 2) : $cry;
         }
-        return $carry;
+        return $cry;
     }, array("bot", "1.0"));
 
     return array("os" => $os, "browser" => $browser[0], "ver" => $browser[1], "bot" => $browser[0] === "bot");
@@ -483,8 +480,8 @@ function require_browser_or_die(array $request, \TF\Maybe $cookie) {
     if ($cookie->extract('v')() < 2) { 
         \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
         http_response_code(202);
-        \BitFire\reporting(new \BitFire\Block(1, 'n/a', 'n/a', 'check JS/Cookies', 0)); // report on block bots
-  
+        $block = new \BitFire\Block(1, 'n/a', 'n/a', 'check JS/Cookies', 0);
+        \BitFire\reporting($block, $request); // report on block bots
         exit(make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)));
     }
 }
