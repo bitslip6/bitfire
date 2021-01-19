@@ -34,3 +34,7 @@ for file in $(cat /tmp/_bitfire_ini); do
     esac
 done
 rm -f /tmp/_bitfire_ini
+
+# make directories writable
+echo "make cache web writable"
+sudo chown www-data config.ini.php cache
