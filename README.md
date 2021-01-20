@@ -106,7 +106,9 @@ You will need a webserver running PHP >= 7.1, a login, sudo access to edit php.i
    composer require bitslip6/bitfire
    ./vendor/bin/updatekeys.sh
    ```
-- *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini`
+- be sure to allow updatekeys to install in your fpm and apache php.ini files when prompted.
+
+- *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini` and see the quickstart in this readme.
    ```ini
    bitfire_enabled = true;
    ```
