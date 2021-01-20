@@ -19,7 +19,7 @@ const CSP = array('child-src', 'connect-src', 'default-src', 'font-src',
  * add the security headers from config
  */
 function send_security_headers(?array $request) : void {
-    if (!$request) { return; }
+    if (!$request || headers_sent()) { return; }
 
     header_remove('X-Powered-By');
     header_remove('Server');
