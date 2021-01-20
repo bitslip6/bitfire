@@ -1,8 +1,6 @@
 <?php
 namespace BitFire;
-
-use finfo;
-use TF\CacheStorage;
+use function TF\map_reduce;
 
 if (defined("BIT_FILTER")) { return; }
 define ("BIT_FILTER", 1);
@@ -15,6 +13,7 @@ const SQL_WORDS = array('add', 'all', 'alter', 'ascii', 'between', 'benchmark', 
 'md5', 'hex', 'like', 'true', 'false', 'function', 'or', 'and', 'left', 'join', 'group', 'having', 'right', 'substring', 'select', 'pg_sleep', 'sleep',
 'update', '(', ')', ',', '=', '!', 'insert', 'union', 'while', 'where', 'waitfor', 'is null');
 const SQL_CONTROL_CHARS = array(35 => 1, 39 => 1, 40 => 1, 41 => 1, 44 => 1, 45 => 1, 61 => 1);
+const SQL_IMPORTANT_CHARS = array("\n", "\r", "  ", "\t", '(', ')');
 
 const FAIL_SQL_LITE=14000;
 const FAIL_SQL_SELECT=14001;
@@ -30,92 +29,123 @@ const SPAM = "100%\s+free|100%\s+satisfied|50%\s+off|all\s+new|best\s+price|disc
 
 const FAIL_SPAM = 18000;
 const FAIL_FILE_UPLOAD = 21000;
+const FAIL_FILE_PHP_EXT = 21001;
+const FAIL_FILE_PHP_MIME = 21002;
+const FAIL_FILE_PHP_TAG = 21003;
+const FAIL_FILE_POLYGLOT = 21004;
+
+class StringResult {
+    public $len;
+    public $value;
+    public function __construct(string $v, int $l) {
+        $this->len = $l;
+        $this->value = $v;
+    }
+}
 
 class WebFilter {
 
-    protected $_search_sql;
     protected $_reducer;
 
     public function __construct(\TF\CacheStorage $cache) {
-        
-
-        //\TF\dbg($values);
         $this->_reducer = \TF\partial('\\BitFIRE\\generic_reducer', 
             $cache->load_or_cache("webkeys2", \TF\DAY, '\TF\recache_file', WAF_DIR.'cache/keys.raw'),
             $cache->load_or_cache("webvalues2", \TF\DAY, '\TF\recache_file', WAF_DIR.'cache/values.raw'));
-        $this->_search_sql = \TF\partial('\\BitFIRE\\trivial_reducer', '\\BitFire\\search_sql');
     }
 
     public function inspect(array $request) : \TF\Maybe {
 
-        // TODO: make some helper functions...
-        $block = \TF\Maybe::of(false);
+        $block = \TF\Maybe::$FALSE;
         if (Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            // TODO: refactor to take block as a Maybe....
             $block->doifnot('\TF\map_whilenot', $request['GET'], $this->_reducer, false);
             $block->doifnot('\TF\map_whilenot', $request['POST'], $this->_reducer, false);
             $block->doifnot('\TF\map_whilenot', $request['COOKIE'], $this->_reducer, false);
         }
 
         if (Config::enabled(CONFIG_SPAM_FILTER)) {
-            $block = $block->doifnot('BitFire\search_spam', $request['FULL']);
+            $block = $block->doifnot('\BitFire\search_spam', $request['FULL']);
         }
 
-        // no easy way to pass these three parameters, a bit ugly for now...t re
+        // no easy way to pass these three parameters, a bit ugly for now...
         if (Config::enabled(CONFIG_SQL_FILTER)) {
-            foreach ($request['GET'] as $key => $value) {
-                $block->doifnot('\BitFire\search_sql', $key, $value, $request['GETC'][$key]);
-            }
-            foreach ($request['POST'] as $key => $value) {
-                $block->doifnot('\BitFire\search_sql', $key, $value, $request['POSTC'][$key]);
-            }
+            $block = $block->doifnot('\BitFire\sql_filter', $request);
         }
 
         if (Config::enabled(CONFIG_FILE_FILTER)) {
-            if (isset($_FILES) && count($_FILES) > 0) {
-                $block->doifnot('\\BitFire\\file_filter', $_FILES);
-            }
+            $block->doifnot('\\BitFire\\file_filter', $_FILES);
         }
 
         return $block;
     }
 }
 
+/**
+ * filter for SQL injections
+ */
+function sql_filter(array $request) : \TF\Maybe {
+    foreach ($request['GET'] as $key => $value) {
+        $maybe = search_sql($key, $value, $request['GETC'][$key]);
+        if (!$maybe->empty()) { return $maybe; }
+    }
+    foreach ($request['POST'] as $key => $value) {
+        $maybe = search_sql($key, $value, $request['GETC'][$key]);
+        if (!$maybe->empty()) { return $maybe; }
+    }
+    return \TF\Maybe::$FALSE;
+}
+
 
 /**
  * check file names, extensions and content for php scripts
- * NOT PURE
  */
-function file_filter(array $files) : \TF\Maybe {
+function file_filter(array $files) : \TF\Maybe { 
+    $block = \TF\Maybe::$FALSE;
+    
     foreach ($files as $file) {
-        // check file extensions...
-        $info = pathinfo($file["tmp_name"]);
-        if (\TF\endsWith(strtolower($file["name"]), "php") ||
-            in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
-            return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_UPLOAD, "file upload", $file["name"], ".php", BLOCK_SHORT));
-        }
-            
-        // check mime types
-        $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
-        $info = finfo_file($ctx, $file["tmp_name"]);
-        if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
-            return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_UPLOAD, "file upload", $file["name"], ".php", BLOCK_SHORT));
-        }
-
-        // check for <?php tags
-        $data = file_get_contents($file["tmp_name"]);
-        if (stripos($data, "<?php") !== false) {
-            if (preg_match('/<\?php\s/i', $data)) {
-                return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_UPLOAD, "file upload", $file["name"], ".php", BLOCK_SHORT));
-            }
-        }
-        // check for phar polyglots (tar)
-        if (substr($data, -4) === "GBMB") {
-            return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_UPLOAD, "file upload", $file["name"], ".php", BLOCK_SHORT));
-        }
+        $block->do('check_ext_mime', $file);
+        $block->doifnot('check_php_tags', $file);
     }
+
+    return $block;
 }
 
+/**
+ * look for php tags in file uploads
+ */
+function check_php_tags(array $file) : \TF\Maybe {
+
+    // check for <?php tags
+    $data = file_get_contents($file["tmp_name"]);
+    if (stripos($data, "<?php") !== false) {
+        if (preg_match('/<\?php\s/i', $data)) {
+            return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_TAG, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        }
+    }
+    // check for phar polyglots (tar)
+    if (substr($data, -4) === "GBMB") {
+        return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_POLYGLOT, "file upload", $file["name"], "phar polyglot", BLOCK_SHORT));
+    }
+
+    return \TF\Maybe::$FALSE;
+}
+
+function check_ext_mime(array $file) : \TF\Maybe {
+     // check file extensions...
+    $info = pathinfo($file["tmp_name"]);
+    if (\TF\endsWith(strtolower($file["name"]), "php") ||
+        in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
+        return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
+    }
+        
+    // check mime types
+    $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
+    $info = finfo_file($ctx, $file["tmp_name"]);
+    if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
+        return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+    }
+
+    return \TF\Maybe::$FALSE;
+}
 
 
 /**
@@ -132,7 +162,7 @@ function search_short_sql(string $name, string $value) : \TF\Maybe {
         return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
 
-    return \TF\Maybe::of(false);
+    return \TF\Maybe::$FALSE;
 }
 
 
@@ -141,59 +171,64 @@ function search_short_sql(string $name, string $value) : \TF\Maybe {
  * this could be way more functional, but it would be slower, choices...
  */
 function search_sql(string $name, string $value, array $counts) : \TF\Maybe {
-    //echo "[$name] = ($value) :". var_export($counts);
 
-
-    $total_control = sum_sql_control_chars($counts);
-    if ($total_control > 0) {
-        if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
-            return BitFire::get_instance()->new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
-        }
-
-        // remove sql stuff
-        $replace_space = str_replace(array("\n", "\r", "  ", "\t", '(', ')'), " ", $value);
-        $space_corrected_len = strlen($replace_space);
-        $removed_comments_1 = preg_replace("/\/\*.*?\*\//sm", '', $replace_space, 256, $count);
-        $removed_comments_2 = preg_replace("/(#|--\s)[^\n]+/", '', $removed_comments_1, 256, $count);
-        $lower_len = strlen($removed_comments_2);
-        
-        // look for the short injection types
-        $block = search_short_sql($name, $removed_comments_2);
-        if(!$block->empty()) { return $block; }
-
-        $sql_removed = str_replace(SQL_WORDS, "", $removed_comments_2);
-        $sql_removed_len = strlen($sql_removed);
-
-        // if we have enough sql like syntax
-        if ($sql_removed_len + MIN_SQL_CHARS <= $space_corrected_len + $total_control) {
-            // ugly but fast, remove temp variables ...
-            $removed_space = preg_replace("/\s+/sm", ' ', $sql_removed);
-            $removed_leading_text = preg_replace("/^[^']+'/sm", '', $removed_space);
-            $removed_trailing_text = preg_replace("/'[^']+$/sm", '', $removed_leading_text);
-            $removed_inner_strings = preg_replace("/'[^']*'/sm", "", $removed_trailing_text);
-            $removed_table_alias = preg_replace("/as\s+\w+/sm", "", $removed_inner_strings);
-            $new_len = strlen($removed_table_alias);
-            // we removed at least half of the input, look like sql to me..
-            if ($new_len < ($space_corrected_len / 2) || $new_len < ($space_corrected_len - 20)) {
-                return BitFire::new_block(FAIL_SQL_FOUND, $name, $value, 'sql identified', 0);
-            } else if ($new_len < 15) {
-                return search_short_sql($name, $removed_table_alias);
-            }
-        }
-    }
-    else {
-        $block = search_short_sql($name, $value);
-    }
-    if(!$block->empty()) { return $block; }
-    // union select?
-
+    // block super basic
     if (preg_match("/(union|;)[\sal(]*select/sm", $value)) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
+    if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
+        return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    }
 
-    return \TF\Maybe::of(false);
+    // block short sql,
+    $total_control = sum_sql_control_chars($counts);
+    if ($total_control <= 0) { return search_short_sql($name, $value); }
+
+    $stripped_comments = strip_comments($value);
+
+        
+    // look for the short injection types
+    $block = search_short_sql($name, $stripped_comments->value);
+    if(!$block->empty()) { return $block; }
+
+    $sql_removed = str_replace(SQL_WORDS, "", $stripped_comments->value);
+    $sql_removed_len = strlen($sql_removed);
+
+    // if we have enough sql like syntax
+    if ($sql_removed_len + MIN_SQL_CHARS <= $stripped_comments->len + $total_control) {
+        // ugly but fast, remove temp variables ...
+        $result = strip_strings($sql_removed);
+
+        // we removed at least half of the input, look like sql to me..
+        if ($result->len < ($stripped_comments->len / 2) || $result->len < ($stripped_comments->len - 20)) {
+            return BitFire::new_block(FAIL_SQL_FOUND, $name, $value, 'sql identified', 0);
+        } else if ($result->len < 15) {
+            return search_short_sql($name, $result->value);
+        }
+    }
+    
+    return $block;
 }
 
+/**
+ * remove sql strings 
+ */
+function strip_strings(string $value) : StringResult {
+    $stripped = map_reduce(array("/\s+/sm" => ' ', "/^[^']+/sm" => '', "/'[^']+$/sm" => '', "/'[^']*'/sm" => '', "/as\s\w+/sm" => ''), function($key, $value, $carry) {
+        return preg_replace($key, $value, $carry);
+    });
+    return new StringResult($stripped, strlen($stripped));
+}
+
+/**
+ * remove sql comments 
+ */
+function strip_comments(string $value) {
+    $s1 = str_replace(SQL_IMPORTANT_CHARS, " ", $value);
+    $s2 = preg_replace("/\/\*.*?\*\//sm", '', $s1);
+    $s3 = preg_replace("/(#|--\s)[^\n]+/", '', $s2);
+    return new StringResult($s3, strlen($s1)); // only return len of s1
+}
 
 /**
  * search for likely spam
@@ -203,7 +238,6 @@ function search_spam(string $all_content) : \TF\Maybe {
     return BitFire::get_instance()->new_block($fail, 'GET/POST input parameters', $matches[1][0] ?? '', 'static match');
 }
 
-
 /**
  * reduce key / value with fn
  */
@@ -211,42 +245,61 @@ function trivial_reducer(callable $fn, string $key, string $value, $ignore) : \T
     if (strlen($value) > 0) {
         return $fn($key, $value);
     }
-    return \TF\Maybe::of(false);
+    return \TF\Maybe::$FALSE;
 }
 
 /**
  * reduce key / value with fn
  */
-function generic_reducer(array $keys, array $values, string $key, string $value, $ignore) : \TF\Maybe {
+function generic_reducer(array $keys, array $values, string $name, string $value, $ignore) : \TF\Maybe {
+//print_r(func_get_args());
+//die("g r");
     if (strlen($value) > 0) {
-        return \BitFire\generic($key, $value, $values, $keys);
+        return \BitFire\generic($name, $value, $values, $keys);
     }
-    return \TF\Maybe::of(false);
+    return \TF\Maybe::$FALSE;
 }
 
+/**
+ * generic search function for keys and values
+ */
 function generic(string $name, string $value, array $values, array $keys) : \TF\Maybe {
-    foreach ($values as $a => $b) {
-        if (empty($b)) { continue; }
-        if (strpos($value, $b) !== false || strpos($name, $b) !== false) {
-            $maybe_block = BitFire::get_instance()->new_block($a, $name, $value, 'static match');
-            if (!$maybe_block->empty()) {
-                return $maybe_block;
-            }
-        }
+    $block = \TF\Maybe::$FALSE;
+
+    foreach ($values as $key => $needle) {
+        $block->doifnot('\BitFire\static_match', $key, $needle, $value, $name);
     }
 
-    foreach ($keys as $a => $b) {
-        if (preg_match($b, $value) === 1) {
-            $maybe_block = BitFire::get_instance()->new_block($a, $name, $value, 'dynamic match');
-            if (!$maybe_block->empty()) {
-                return $maybe_block;
-            }
-        }
+    foreach ($keys as $key => $needle) {
+        $block->doifnot('\BitFire\dynamic_match', $key, $needle, $value, $name);
     }
     
-    return \TF\Maybe::of(false);
+    return $block;
 }
 
+/**
+ * dynamic analysis
+ */
+function dynamic_match(int $key, string $needle, string $value, string $name) : \TF\Maybe {
+    if (preg_match($needle, $value) === 1) {
+        return BitFire::new_block($key, $name, $value, 'static match');
+    }
+    return \TF\Maybe::$FALSE;
+}
+
+/**
+ * static analysis
+ */
+function static_match(int $key, string $needle, string $value, string $name) : \TF\Maybe {
+    if (empty($needle) == false && (strpos($value, $needle) !== false || strpos($name, $needle) !== false)) { 
+        return BitFire::new_block($key, $name, $value, 'static match');
+    }
+    return \TF\Maybe::$FALSE;
+}
+
+/**
+ * take character counts and return number which are sql control chars
+ */
 function sum_sql_control_chars(array $counts) : int {
     return array_sum(array_intersect_key($counts, SQL_CONTROL_CHARS));
 }
