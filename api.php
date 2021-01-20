@@ -82,12 +82,7 @@ function get_ip_24groups() : Metric {
     return $metric;
 }
 
-/**
- * 
- */
-function get_block_types(array $request) {
-    $metrics = get_block_24groups();
-    
+function send_metrics(Metric $metrics) {
     $per = array();
     if ($metrics->total > 0) {
         foreach ($metrics->data as $code => $value) { $per[$code] = (floor($value / $metrics->total) * 1000)/10; }
@@ -95,6 +90,14 @@ function get_block_types(array $request) {
         foreach ($metrics->data as $code => $value) { $per[$code] = 0; }
     }
     return json_encode(array("percent" => $per, "counts" => $metrics->data, "total" => $metrics->total));
+
+}
+
+/**
+ * 
+ */
+function get_block_types(array $request) {
+    exit(send_metrics(get_block_24groups()));
 }
 
 function get_hr_data(array $request) {
@@ -103,16 +106,7 @@ function get_hr_data(array $request) {
 }
 
 function get_ip_data(array $request) {
-    $metrics = get_ip_24groups();
-    $per = array();
-    //str_replace()
-    //htmlsp
-    if ($metrics->total > 0) {
-        foreach ($metrics->data as $code => $value) { $per[$code] = (floor($value / $metrics->total) * 1000)/10; }
-    } else {
-        foreach ($metrics->data as $code => $value) { $per[$code] = 0; }
-    }
-    return json_encode(array("percent" => $per, "counts" => $metrics->data, "total" => $metrics->total));
+    exit(send_metrics(get_ip_24groups()));
 }
 
 function make_code(array $request) {
