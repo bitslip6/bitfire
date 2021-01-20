@@ -54,7 +54,7 @@ function match_fails(int $fail_code, MatchType $type, $request) : \TF\Maybe {
         return BitFire::new_block($fail_code, $type->get_field(), $type->matched_data(), 'static match', FAIL_DURATION[$fail_code]??0);
     }
 
-    return \TF\Maybe::of(false);
+    return \TF\Maybe::$FALSE;
 }
 
 /**
@@ -193,8 +193,7 @@ class BotFilter {
             \BitFireBot\require_browser_or_die($request, $maybe_botcookie);
         }
 
-        
-        return \TF\Maybe::of(false);
+        return \TF\Maybe::$FALSE;
     }
 }
 
@@ -234,7 +233,7 @@ function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
         return BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', 
         $ip_data[IPDATA_RR_1M] . ' / ' . $ip_data[IPDATA_RR_5M], "$rr_1m / $rr_5m", BLOCK_MEDIUM);
     }
-    return \TF\Maybe::of(false);
+    return \TF\Maybe::$FALSE;
 }
 
 /**
@@ -243,6 +242,7 @@ function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
  */
 function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // check if the remote IP is in an allowed list of IPs
+    //\TF\dbg("$remote_ip / $network_regex");
     $ip_checks = (strpos($network_regex, ',') > 0) ? explode(',', $network_regex) : array($network_regex);
     $ip_matches = array_reduce($ip_checks, \TF\is_regex_reduced($remote_ip), false);
     if ($ip_matches) { return true; }
@@ -250,6 +250,7 @@ function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // fwd and reverse lookup
     $ip = \TF\reverse_ip_lookup($remote_ip)
         ->then(function($value) use ($ip_checks) {
+//\TF\dbg("v: $value, ch: $ip_checks\n");
             return array_reduce($ip_checks, \TF\find_regex_reduced($value), false);
         })->then('TF\\fast_ip_lookup');
 
@@ -285,6 +286,7 @@ function validate_host_header(array $valid_domains, array $request) : bool {
 /**
  * test if an agent is found in a list of agents
  * $botlist is format "agent match str":reverse ip network:human comment
+ * -1 - no UA match, 0 UA match net fail, 1 UA and net match
  */
 function agent_in_list(string $a, string $ip, array $list) : int {
     if (empty($a) || strlen($a) <= 1 || count($list) < 1) { return false; }
@@ -318,7 +320,7 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
         if ($r < 0) { return BitFire::new_block(FAIL_MISS_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT); }
         if ($r == 0) { return BitFire::new_block(FAIL_FAKE_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT); }
     }
-    return \TF\Maybe::of(false); 
+    return \TF\Maybe::$FALSE;
 }
 
 /**
@@ -332,7 +334,7 @@ function blacklist_inspection(array $request, ?array $blacklist) : \TF\Maybe {
         return BitFire::new_block(FAIL_IS_BLACKLIST, "user-agent", $request[REQUEST_UA], $part, BLOCK_MEDIUM);
     }
    
-    return \TF\Maybe::of(false);
+    return \TF\Maybe::$FALSE;
 }
 
 
@@ -360,14 +362,14 @@ function parse_agent(string $user_agent) : array {
 
 
     $browser_list = array(
+        "opera" => "(opr)/\s*([\d+\.]+)",
         "chrome" => "(chrome)/\s*([\d+\.]+)",
         "firefox" => "(firefox)/?\s*([\d+\.]+)",
-        "safari" => "(safari)/\s*([\d+\.]+)",
         "android" => "(android)/?\s*([\d+\.]+)",
+        "safari" => "(safari)/\s*([\d+\.]+)",
         "edge" => "(edge)/\s*([\d+\.]+)",
         "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
         "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
-        "opera" => "(opr)/\s*([\d+\.]+)",
         "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
         "bot" => "(\w+)\s*([\d+\.]+)"
     );
