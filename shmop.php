@@ -15,7 +15,7 @@ class shm {
             self::$ctx = @shm_attach($id, 4089446, 0640);
             self::$idx++;
         }
-        \TF\debug("NEW REQUEST -- shm: " . self::$idx . " ctx: " . self::$ctx);
+        \TF\debug("shm: NEW REQUEST -- shm: " . self::$idx . " ctx: " . self::$ctx);
     }
 
     public function purge() {
@@ -25,21 +25,20 @@ class shm {
     public static function read($key, int &$hash = 0) {
         $keyint = intval(hexdec(hash('crc32', $key, false)));
         $result = @shm_get_var(self::$ctx, $keyint);
-        \TF\debug("READ [$key] -- shm: $keyint\n");
-        \TF\debug(print_r($result, true));
+        \TF\debug("shm: READ [$key] -- shm: $keyint\n");
 
         if ($result !== false) {
             if (is_array($result) && count($result) === 3) {
                 if ($result[0] === $key) {
                     if ($result[1] >= time()) {
-                        \TF\debug("READ result:\n".print_r($result, true)."\n");
+                        \TF\debug("shm: READ result:\n".print_r($result, true)."\n");
                         return $result[2];
                     }
-                    \TF\debug("READ expired\n");
+                    \TF\debug("shm: READ expired\n");
                     return null;
                 }
             }
-            \TF\debug("READ removed var\n");
+            \TF\debug("shm: READ removed var\n");
             shm_remove_var(self::$ctx, $keyint);
         }
         return null;
@@ -48,7 +47,7 @@ class shm {
     public static function read_or_set(string $key, int $ttl, callable $fn) {
         $result = shm::read($key);
         if ($result === false) {
-            \TF\debug("READ or set false\n");
+            \TF\debug("shm: READ or set false\n");
             $result = $fn();
             shm::write($key, $ttl, $result);
         }
@@ -58,7 +57,7 @@ class shm {
     public static function write(string $key, int $ttl, $item, $force = true) : bool {
         $keyint = intval(hexdec(hash('crc32', $key, false)));
         $d = array($key, time() + $ttl, $item);
-        \TF\debug("WRITE $keyint\n");
+        \TF\debug("shm: WRITE $keyint\n");
         return shm_put_var(self::$ctx, $keyint, $d);
     }
 }
