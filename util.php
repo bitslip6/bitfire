@@ -124,18 +124,6 @@ function and_pipe(callable ...$fns) {
 }
 
 
-
-/**
- * hold a box of things and call functions on it
- */
-class Box {
-    protected $_x;
-    protected function __construct($x) { $this->_x = $x; }
-    public static function of($x) { return new static($x); }
-    public function __invoke() { return $this->_x; }
-    public function map(callable $fn) { return static::of($fn($this->_x)); }
-}
-
 class Reader {
     protected $_fn;
     protected $_names;
@@ -194,21 +182,17 @@ class Maybe {
         }
         return new static($x);
     }
-    public function then(callable $fn) : Maybe {
+    public function then(callable $fn, bool $spread = false) : Maybe {
         if (!empty($this->_x)) {
-            $this->assign($fn($this->_x));
+            $this->assign(
+                ($spread) ?
+                $fn(...$this->_x) :
+                $fn($this->_x)
+            );
         } else {
             $this->_errors[] = func_name($fn) . " : " . var_export($this->_x, true);
         }
 
-        return $this;
-    }
-    public function thenSpread(callable $fn) : Maybe {
-        if (!empty($this->_x)) {
-            $this->assign($fn(...$this->_x));
-        } else {
-            $this->_errors[] = func_name($fn) . " : " . var_export($this->_x, true);
-        }
         return $this;
     }
     public function map(callable $fn) : Maybe { 
@@ -354,7 +338,7 @@ function decrypt_ssl(string $password, ?string $cipher) : Maybe {
     return Maybe::of($cipher)
         ->then($exploder)
         ->if(function($x) { return is_array($x) && count($x) === 2; })
-        ->thenSpread($decryptor);
+        ->then($decryptor, true);
 }
 
 /**
@@ -579,11 +563,9 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
 
     
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
-    //$foo = (print_r($params, true));
-    //file_put_contents("/tmp/debug.log", $foo);
+
     $ctx = stream_context_create($params);
     $foo = @file_get_contents($url, false, $ctx);
-    // file_put_contents("/tmp/http2.out", "$url\n$foo\n");
     if ($foo === false) {
         $cmd = "curl -X$method --header 'content-Type: '{$optional_headers['Content-Type']}' " . escapeshellarg($url);
         if (strlen($content) > 0) {
@@ -752,7 +734,7 @@ function really_writeable(string $filename) : bool {
 }
 
 function debug(string $line) {
-    file_put_contents("/tmp/debug.log", "$line\n", FILE_APPEND);
+    file_put_contents("/tmp/bitfire.debug.log", "$line\n", FILE_APPEND);
 }
 
 /**
