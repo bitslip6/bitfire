@@ -106,10 +106,21 @@ class BotFilter {
      * CPU: 359
      */
     public function inspect(array $request) : \TF\Maybe {
-        // assert(Config::contains(CONFIG_USER_TRACK_PARAM), FATAL_MISSING_CONFIG);
-        
+
+        // request has no host header
+        if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
+            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
+                // allow valid whitelist bots to access the site
+                if (!isset($this->browser[AGENT_WHITELIST])) {
+                    $maybe = BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+                    if (!$maybe->empty()) { return $maybe; }
+                }
+            }
+        }
+
         if (strlen($request[REQUEST_HOST]) > 80) {
-            return BitFire::new_block(FAIL_HOST_TOO_LONG, "HTTP_HOST", $request[REQUEST_HOST], 'len < 80', BLOCK_SHORT);
+            $maybe = BitFire::new_block(FAIL_HOST_TOO_LONG, "HTTP_HOST", $request[REQUEST_HOST], 'len < 80', BLOCK_SHORT);
+            if (!$maybe->empty()) { return $maybe; }
         }
 
         // ugly, impure crap
@@ -182,16 +193,7 @@ class BotFilter {
             \BitFireBot\require_browser_or_die($request, $maybe_botcookie);
         }
 
-        // request has no host header
-        if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
-            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
-                // allow valid whitelist bots to access the site
-                if (!isset($this->browser[AGENT_WHITELIST])) {
-                    return BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
-                }
-            }
-        }
-
+        
         return \TF\Maybe::of(false);
     }
 }
