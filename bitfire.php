@@ -412,8 +412,8 @@ class BitFire
             $x = @file(Config::str(CONFIG_REPORT_FILE));
             $report_count = (is_array($x)) ? count($x) : 0;
             $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
-            $reporting = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)) . ']', true));
-            $blocks = add_country(CacheStorage::get_instance()->load_data("log_data"));
+            $reporting = array_reverse(add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)) . ']', true)), true);
+            $blocks = array_reverse(add_country(CacheStorage::get_instance()->load_data("log_data")), true);
             $send = CacheStorage::get_instance()->load_data("send_js", 0);
             $good = CacheStorage::get_instance()->load_data("good_js", 0);
             exit(require WAF_DIR . "views/dashboard.html");
