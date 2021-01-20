@@ -285,7 +285,7 @@ function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn) {
 }
 
 function cuckoo_read(array $ctx, string $key) {
-    if (!$ctx['rid']) { return false; }
+    if (!$ctx['rid']) { return null; }
     $header = cuckoo_find_header_for_read($ctx, $key);
 
     return ($header === null || $header['len'] < 1) ? null :
@@ -345,7 +345,7 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
         if ($id) { shmop_delete($id); }
         $id = shmop_open($token, 'c', 0600, $size_in_bytes);
         if ($id === false) {
-            debug("unable to allocate $size_in_bytes shared memory\n");
+            debug("shmop: unable to allocate $size_in_bytes shared memory\n");
         }
     }
     return $id;
