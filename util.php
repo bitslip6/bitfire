@@ -87,7 +87,7 @@ function compose(...$fns) {
  * $fn = pipe("fn1", "fn2", "fn3");
  * $fn($data);
  */
-function pipe(...$fns) {
+function pipe(callable ...$fns) {
     return function($x) use ($fns) {
         return array_reduce($fns, function($acc, $fn) {
             return $fn($acc);
@@ -173,9 +173,12 @@ class Reader {
 class Maybe {
     protected $_x;
     protected $_errors;
+    /** @var Maybe */
+    public static $FALSE;
     protected function assign ($x) { $this->_x = ($x instanceOf Maybe) ? $x->value() : $x; }
-    protected function __construct($x) { $this->_x = $x; $this->_errors = array(); }
+    public function __construct($x) { $this->_x = $x; $this->_errors = array(); }
     public static function of($x) : Maybe { 
+        //if ($x === false) { return MaybeFalse; } // shorthand for negative maybe
         if ($x instanceof Maybe) {
             $x->_x = $x->value();
             return $x;
@@ -232,6 +235,8 @@ class Maybe {
     public function __invoke(string $type = null) { return $this->value($type); }
     public function __toString() : string { return "Maybe of: " . (string)$this->_x; }
 }
+Maybe::$FALSE = Maybe::of(false);
+
 
 function func_name(callable $fn) : string {
     if (is_string($fn)) {
@@ -394,7 +399,7 @@ function map_reduce(array $map, callable $fn, $carry = "") {
  * more of a map_whilenot
  */
 function map_whilenot(array $map, callable $fn, $input) {
-    $maybe = \TF\Maybe::of(false);
+    $maybe = \TF\Maybe::$FALSE;
     foreach($map as $key => $value) { 
         $maybe = $maybe->doifnot($fn($key, $value, $input));
     }
@@ -402,7 +407,7 @@ function map_whilenot(array $map, callable $fn, $input) {
 }
 
 function map_if(array $map, callable $fn, $input) {
-    $maybe = \TF\Maybe::of(true);
+    $maybe = \TF\Maybe::$FALSE;
     foreach($map as $key => $value) { 
         $maybe->do($fn($key, $value, $input));
     }
@@ -417,7 +422,10 @@ function map_if(array $map, callable $fn, $input) {
 function map_mapvalue(array $map = null, callable $fn) : array {
     $result = array();
     foreach($map as $key => $value) {
-        $result[$key] = $fn($value);
+        $tmp = $fn($value);
+        if ($tmp !== null) {
+            $result[$key] = $fn($value);
+        }
     }
     return $result;
 }
@@ -734,7 +742,9 @@ function really_writeable(string $filename) : bool {
 }
 
 function debug(string $line) {
-    file_put_contents("/tmp/bitfire.debug.log", "$line\n", FILE_APPEND);
+    if (\BitFire\Config::enabled("debug")) {
+        file_put_contents("/tmp/bitfire.debug.log", "$line\n", FILE_APPEND);
+    }
 }
 
 /**
