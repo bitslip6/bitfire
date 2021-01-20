@@ -311,11 +311,11 @@ class BitFire
      * create a new block, returns a maybe of a block, empty if there is an exception for it
      */
     public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\Maybe {
-        if ($code === FAIL_NOT) { return \TF\Maybe::of(false); }
+        if ($code === FAIL_NOT) { return \TF\Maybe::$FALSE; }
         $block = new Block($code, $parameter, $value, $pattern, $block_time);
         if (is_report($block)) {
             self::reporting($block, BitFire::get_instance()->_request);
-            return \TF\Maybe::of(false);
+            return \TF\Maybe::$FALSE;
         }
         return filter_block_exceptions($block, self::$_exceptions);
     }
@@ -421,20 +421,20 @@ class BitFire
 
 
 
-        $block = \TF\Maybe::of(false);
+        $block = \TF\Maybe::$FALSE;
         if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
 
         // don't inspect local commands
         if (!isset($_SERVER['REQUEST_URI'])) { return $block; }
 
 		if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
-            include WAF_DIR."headers.php";
+            require_once WAF_DIR."headers.php";
 			\BitFireHeader\send_security_headers($this->_request);
 		}
         
         // bot filtering
         if ($this->bot_filter_enabled()) {
-            require WAF_DIR . 'botfilter.php';
+            require_once WAF_DIR . 'botfilter.php';
             $this->bot_filter = new BotFilter($this->cache);
             $block = $this->bot_filter->inspect($this->_request);
         }
@@ -450,7 +450,7 @@ class BitFire
 
         // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            require WAF_DIR . 'webfilter.php';
+            require_once WAF_DIR . 'webfilter.php';
             $this->_web_filter = new \BitFire\WebFilter($this->cache);
             $block = $this->_web_filter->inspect($this->_request);
         }
@@ -543,7 +543,7 @@ function process_request(array $get, array $post, array $server, array $cookie =
         
     $get_counts = array();
     // count character frequencies
-    foreach($get as $key => $value) {
+    foreach($request['GET'] as $key => $value) {
         $get_counts[$key] = (is_array($value)) ? 
             array_reduce($value, '\\BitFire\\get_counts_reduce', array()) :
             get_counts($value);
@@ -552,7 +552,7 @@ function process_request(array $get, array $post, array $server, array $cookie =
     
     $post_counts = array();
     // count character frequencies
-    foreach($post as $key => $value) {
+    foreach($request['POST'] as $key => $value) {
         $post_counts[$key] = (is_array($value)) ? 
             array_reduce($value, 'BitFire\\get_counts_reduce', array()) :
             get_counts($value);
@@ -562,7 +562,7 @@ function process_request(array $get, array $post, array $server, array $cookie =
     // add canonical header values
     $request['REQUESTED_WITH'] = $server['HTTP_X_REQUESTED_WITH'] ?? null;
     $request['FETCH_MODE'] = $server['HTTP_SEC_FETCH_MODE'] ?? null;
-    $request[REQUEST_UA] = strtolower($server['HTTP_USER_AGENT']) ?? '';
+    $request[REQUEST_UA] = strtolower($server['HTTP_USER_AGENT'] ?? '');
     $request[REQUEST_SCHEME] = $server['REQUEST_SCHEME'] ?? 'http';
     $request['UPGRADE_INSECURE'] = ($request[REQUEST_SCHEME] == 'http') ? $server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? null : null;
     $request['ACCEPT'] = $server['HTTP_ACCEPT'] ?? '';
@@ -587,10 +587,12 @@ function process_request(array $get, array $post, array $server, array $cookie =
     return $request;
 }
 
-function each_input_param($in) : string {
+function each_input_param($in) {
     if (is_array($in)) {
         $in = implode("^", $in);
     }
+    // we don't inspect numeric values because they would pass all tests
+    else if (is_numeric($in)) { return null; }
     if (strlen($in) > 0) {
         $value = strtolower(urldecode($in));
         if (Config::enabled("block_profanity")) {
