@@ -359,11 +359,11 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
  * @param bool $force_init = false
  * @param string $key = the shmem "key" = 'a'
  */
-function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 1114112, bool $force_init = false, string $key = "a"):array {
+function cuckoo_connect(int $items = 4096, int $chunk_size = 1024, int $mem = 1114112, bool $force_init = false):array {
     $entry_end = $items * CUCKOO_SLOT_SIZE_BYTES;
     $mem_end = $entry_end + $mem;
 
-    $rid = cuckoo_open_mem($mem_end + 16, $key);
+    $rid = cuckoo_open_mem($mem_end + 16, 'a');
     $ctx = Array(
         'rid' => $rid, 
         'txid' => mt_rand(1, 2147483647),

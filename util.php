@@ -504,7 +504,7 @@ function ip_lookup(string $ip, string $type = "A") : Maybe {
     assert(in_array($type, array("A", "AAAA", "CNAME", "MX", "NS", "PTR", "SRV", "TXT", "SOA")), "invalid dns query type [$type]");
     try {
         //$url = "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json";
-        $raw = bit_http_request("GET", "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json", '', 3);
+        $raw = bit_http_request("GET", "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json", '');
         //echo "[$url]\n($raw)\n";
         //die();
         if ($raw !== false) {
@@ -545,7 +545,7 @@ function fast_ip_lookup(string $ip, string $type = "A") : Maybe {
  * @throws HttpTimeoutException if the connection times out
  * @return string the server response.
  */
-function bit_http_request(string $method, string $url, $data, int $timeout = 5, array $optional_headers = null) {
+function bit_http_request(string $method, string $url, $data, array $optional_headers = null) {
     // build the post content paramater
     $content = (is_array($data)) ? http_build_query($data) : $data;
     
@@ -557,7 +557,7 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
         $optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent";
     }
 
-    $params = http_ctx($method, $timeout);
+    $params = http_ctx($method, 2);
     $params['http']['content'] = $content;
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
