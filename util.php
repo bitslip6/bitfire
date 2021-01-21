@@ -779,17 +779,17 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
  * sets a cookie in a browser in various versions of PHP
  * not pure
  */
-function cookie(string $name, string $value, int $exp, bool $secure, bool $httponly) {
+function cookie(string $name, string $value, int $exp) {
 
     if (PHP_VERSION_ID < 70300) { 
-        setcookie($name, $value, $exp, '/; samesite=strict', '', $secure, $httponly);
+        setcookie($name, $value, $exp, '/; samesite=strict', '', false, true);
     } else {
         setcookie($name, $value, [
             'expires' => $exp,
             'path' => '/',
             'domain' => '',
-            'secure' => $secure,
-            'httponly' => $httponly,
+            'secure' => false,
+            'httponly' => true,
             'samesite' => 'strict'
         ]);
     }
