@@ -5,7 +5,7 @@
     "keywords": ["firewall", "security", "spam", "bot", "headers", "xss", "sqli", "csrf", "waf"],
     "homepage": "https://github.com/bitslip6/bitfire",
     "readme": "README.md",
-    "license": "APACHE-2.0",
+    "license": "AGPL-3.0",
     "authors": [
         {
             "name": "Cory Marsh",
@@ -21,7 +21,7 @@
         "wiki": "https://github.com/bitslip6/bitfire/wiki"
     },
     "require": {
-        "php": ">=7.1.0"
+        "php": "^7.0.33"
     },
     "scripts": {
         "post-install-cmd": "updatekeys.sh"
