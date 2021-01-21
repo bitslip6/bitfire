@@ -363,6 +363,7 @@ function throttle_lockfile() {
 /**
  * recursively perform a function over directory traversal.
  */
+/*
 function file_recurse(string $dirname, callable $fn) :void {
     $maxfiles = 1000;
     if ($dh = \opendir($dirname)) {
@@ -380,6 +381,7 @@ function file_recurse(string $dirname, callable $fn) :void {
         \closedir($dh);
     }
 }
+*/
 
 /**
  * get a list from the remote api server, cache it in shmop cache
