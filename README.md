@@ -6,7 +6,6 @@
 [![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire) 
 [![Maintainability](https://api.codeclimate.com/v1/badges/0a9a35bf6e0378820811/maintainability)](https://codeclimate.com/github/bitslip6/bitfire/maintainability)
 [![PHP Ver](https://img.shields.io/badge/php->=7.1-blue)](https://php)
-
 [![Slack Chat](https://img.shields.io/badge/slack-3%20online-blue)](https://join.slack.com/t/bitslip6/shared_invite/zt-l7gxmgc3-9T0QFNP6GN4IFPOVtZGJrQ)
 
 
