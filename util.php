@@ -558,7 +558,7 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
     }
 
     $params = http_ctx($method, $timeout);
-    $params['content'] = $content;
+    $params['http']['content'] = $content;
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
     $ctx = stream_context_create($params);
@@ -580,11 +580,12 @@ function http_ctx(string $method, int $timeout) : array {
         'timeout' => $timeout,
         'max_redirects' => 4,
         'header' => ''
-    ),
+        ),
         'ssl' => array(
             'verify_peer' => false,
             'allow_self_signed' => true,
-    ) );
+        )
+    );
 }
 
 

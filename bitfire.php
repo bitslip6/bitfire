@@ -373,29 +373,9 @@ class BitFire
      */
     public function inspect() : \TF\Maybe {
         // dashboard requests, TODO: MOVE TO api.php
-        if ($this->_request[REQUEST_PATH] === "/bitfire") {
-
-            if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] !== Config::str('password', 'default_password')) {
-                header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
-                header('HTTP/1.0 401 Unauthorized');
-                exit;
-            }
-
-            $x = @file(Config::str(CONFIG_REPORT_FILE));
-            $report_count = (is_array($x)) ? count($x) : 0;
-            $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
-            $tmp = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)) . ']', true));
-            $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
-            
-            $tmp = add_country(CacheStorage::get_instance()->load_data("log_data"));
-            $blocks = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
-
-            $send = CacheStorage::get_instance()->load_data("send_js", 0);
-            $good = CacheStorage::get_instance()->load_data("good_js", 0);
-            exit(require WAF_DIR . "views/dashboard.html");
-        }
-
-
+        require_once WAF_DIR."dashboard.php";
+        serve_dashboard($this->_request[REQUEST_PATH]);
+        
 
         $block = \TF\Maybe::$FALSE;
         if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
@@ -415,14 +395,6 @@ class BitFire
             $block = $this->bot_filter->inspect($this->_request);
         }
 
-        $block->doifnot(array($this, "cache_behind"));
-        
-        // perform cache behind after bot filtering (don't want to cache bot requests)
-        /*
-        if ($block->empty()) {
-            $this->cache_behind();
-        }
-        */
 
         // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
@@ -430,6 +402,8 @@ class BitFire
             $this->_web_filter = new \BitFire\WebFilter($this->cache);
             $block = $this->_web_filter->inspect($this->_request);
         }
+
+        $block->doifnot(array($this, "cache_behind"));
 
         return $block;
     }

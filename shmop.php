@@ -27,20 +27,16 @@ class shm {
         $result = @shm_get_var(self::$ctx, $keyint);
         \TF\debug("shm: READ [$key] -- shm: $keyint\n");
 
-        if ($result !== false) {
-            if (is_array($result) && count($result) === 3) {
-                if ($result[0] === $key) {
-                    if ($result[1] >= time()) {
-                        \TF\debug("shm: READ result:\n".print_r($result, true)."\n");
-                        return $result[2];
-                    }
-                    \TF\debug("shm: READ expired\n");
-                    return null;
-                }
+        if (isset($result[2]) && $result[0] === $key) {
+            if ($result[1] >= time()) {
+                \TF\debug("shm: READ result:\n".print_r($result, true)."\n");
+                return $result[2];
             }
-            \TF\debug("shm: READ removed var\n");
-            shm_remove_var(self::$ctx, $keyint);
+            \TF\debug("shm: READ expired\n");
+            return null;
         }
+        \TF\debug("shm: READ removed var\n");
+        shm_remove_var(self::$ctx, $keyint);
         return null;
     }
 
