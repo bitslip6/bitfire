@@ -638,20 +638,24 @@ class txt {
     }
 
     protected static function msg_type(string $type) {
+        $r = "comment";
         switch($type) {
             case "msgid":
-                return "msgid";
+                $r = "msgid";
+                break;
             case "msgid_plural":
-                return "msgid_plural";
+                $r = "msgid_plural";
+                break;
             case "msgstr":
-                return "msgstr";
+                $r = "msgstr";
             case "msgstr[0]":
-                return "msgstr";
+                $r = "msgstr";
             case "msgstr[1]":
-                return "msgstr_plural";
+                $r = "msgstr_plural";
             default:
-                return "comment";
+                $r ="comment";
         }
+        return $r; 
     }
 
     /**
