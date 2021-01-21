@@ -180,23 +180,24 @@ function is_ajax(array $request) : bool {
     if (isset($request['ajax'])) { return $request['ajax']; }
     
     $ajax = false;
-    if ($request[REQUEST_METHOD] !== 'GET') { return true; }
+    if ($request[REQUEST_METHOD] !== 'GET') { $ajax = true; }
     // path is a  wordpress ajax request
-    if (\stripos($request['PATH'], "ajax.php") !== false) { return true; }
+    else if (\stripos($request['PATH'], "ajax.php") !== false) { $ajax = true; }
     
     // accept || content type is requested as javascript
     // if the client is looking for something other than html, it's ajax
-    if (\stripos($request['ACCEPT'], 'text/html') === false &&
-        \stripos($request['CONTENT_TYPE'], 'text/html') === false) { return true; }
+    else if (\stripos($request['ACCEPT'], 'text/html') === false &&
+        \stripos($request['CONTENT_TYPE'], 'text/html') === false) { $ajax = true; }
 
     // often these are set on fetch or xmlhttp requests
-    if ($request['REQUESTED_WITH'] || $request['FETCH_MODE'] === 'cors' ||  $request['FETCH_MODE'] === 'websocket') {
-        return true;
-    }
+    else if ($request['REQUESTED_WITH'] || $request['FETCH_MODE'] === 'cors' ||
+        $request['FETCH_MODE'] === 'websocket') { $ajax = true; }
 
     // fall back to using upgrade insecure (should only come on main http requests), this should work for all major browsers
-    $upgrade_insecure = ($request[REQUEST_SCHEME] == "http" && ($request['UPGRADE_INSECURE'] === null || \strlen($request['UPGRADE_INSECURE']) < 1)) ? true : false;
-    return $upgrade_insecure;
+    else {
+        $ajax = ($request[REQUEST_SCHEME] == "http" && ($request['UPGRADE_INSECURE'] === null || \strlen($request['UPGRADE_INSECURE']) < 1)) ? true : false;
+    }
+    return $ajax;
 }
 
 // opposite of is_ajax
