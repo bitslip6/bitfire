@@ -189,8 +189,16 @@ function search_sql(string $name, string $value, array $counts) : \TF\Maybe {
         
     // look for the short injection types
     $block = search_short_sql($name, $stripped_comments->value);
-    if(!$block->empty()) { return $block; }
+    $block->doifnot('\BitFire\check_removed_sql', $stripped_comments, $total_control, $name, $value);
 
+    return $block;
+}
+
+/**
+ * check if removed sql was found
+ */
+function check_removed_sql(StringResult $stripped_comments, int $total_control, string $name, string $value) : \TF\Maybe {
+ 
     $sql_removed = str_replace(SQL_WORDS, "", $stripped_comments->value);
     $sql_removed_len = strlen($sql_removed);
 
@@ -207,7 +215,7 @@ function search_sql(string $name, string $value, array $counts) : \TF\Maybe {
         }
     }
     
-    return $block;
+    return \TF\Maybe::$FALSE;
 }
 
 /**
