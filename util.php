@@ -216,16 +216,21 @@ class Maybe {
     public function errors() : array { return $this->_errors; }
     public function value(string $type = null) { 
         if (empty($this->_x)) { return false; }
+        $result = $this->_x;
+
         switch($type) {
             case 'str':
             case 'string':
-                return strval($this->_x);
+                $result = strval($this->_x);
+                break;
             case 'int':
-                return intval($this->_x);
+                $result = intval($this->_x);
+                break;
             case 'array':
-                return is_array($this->_x) ? $this->_x : array($this->_x);
+                $result = is_array($this->_x) ? $this->_x : array($this->_x);
+                break;
         }
-        return $this->_x;
+        return $result;
     }
     public function append($value) : Maybe { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
     public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
