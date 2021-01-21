@@ -54,7 +54,7 @@ function process_server(array $server) : array {
     $url = parse_url($server['REQUEST_URI'] ?? '//localhost/');
     return array(
         REQUEST_HOST => parse_host_header($server['HTTP_HOST'] ?? ''),
-        "PATH" => $url['path'],
+        "PATH" => $url['path'] ?? '/',
         REQUEST_IP => process_ip($server),
         REQUEST_METHOD => ($server['REQUEST_METHOD'] ?? 'GET'),
         "PORT" => $server['SERVER_PORT'] ?? 8080,
@@ -64,7 +64,7 @@ function process_server(array $server) : array {
         REQUEST_SCHEME => ($server['REQUEST_SCHEME'] ?? 'http'),
         REQUEST_ACCEPT => ($server['HTTP_ACCEPT_ENCODING']??'') . ' . ' . ($server['HTTP_ACCEPT_ENCODING']??''),
         'ACCEPT' => ($server['HTTP_ACCEPT'] ?? ''),
-        'UPGRADE_INSECURE' => ($server['REQUEST_SCHEME'] == 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? '') : '',
+        'UPGRADE_INSECURE' => (($server['REQUEST_SCHEME']??'http') == 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? '') : '',
         'CONTENT_TYPE' => ($server['HTTP_CONTENT_TYPE'] ?? 'text/html')
     );
 }
