@@ -1,7 +1,9 @@
 
 <!-- SHIELDS -->
 [![License](https://img.shields.io/badge/license-AGPL%203.0-blue)](https://www.gnu.org/licenses/agpl-3.0.en.html)
-[![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) [![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
+[![Issues](https://img.shields.io/github/issues/bitslip6/bitfire)](https://github.com/bitslip6/bitfire) [![Discord Chat](https://img.shields.io/discord/793172132191928341)](https://discord.gg/VZ3C3bFK) 
+[![Maintainability](https://api.codeclimate.com/v1/badges/0a9a35bf6e0378820811/maintainability)](https://codeclimate.com/github/bitslip6/bitfire/maintainability)
+[![PHP Ver](https://img.shields.io/badge/php->7.1-blue)](https://php)
 
 
 
