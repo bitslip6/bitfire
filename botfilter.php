@@ -185,7 +185,7 @@ class BotFilter {
         if ($this->browser[AGENT_BOT]) {
             $this->browser[AGENT_WHITELIST] = false;
             if (Config::enabled(CONFIG_WHITELIST_ENABLE)) {
-                $maybe_block = \BitFireBot\whitelist_inspection(
+                $maybe_block->doifnot('\BitFireBot\whitelist_inspection',
                     $request[REQUEST_UA],
                     $request[REQUEST_IP],
                     Config::arr(CONFIG_WHITELIST));
@@ -193,13 +193,9 @@ class BotFilter {
 
                 // set agent whitelist status
                 $this->browser[AGENT_WHITELIST] = ($maybe_block->empty());
-
-                // if returned a block
-                if (!$maybe_block->empty()) { return $maybe_block; }
             } 
             else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
-                $maybe_block = \BitFireBot\blacklist_inspection($request, file(WAF_DIR.'bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
-                if (!$maybe_block->empty()) { return $maybe_block; }
+                $maybe_block->doifnot('\BitFireBot\blacklist_inspection', $request, file(WAF_DIR.'bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
             }
         }
         // handle humans
@@ -207,7 +203,7 @@ class BotFilter {
             \BitFireBot\require_browser_or_die($request, $maybe_botcookie);
         }
 
-        return \TF\Maybe::$FALSE;
+        return $maybe_block;
     }
 }
 
