@@ -153,10 +153,10 @@ function cuckoo_mem_defrag($ctx): void {
  * write $item to $key and expires in ttl_sec
  * will overwrite existing keys with a lower priority
  */
-function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priority = 0 | CUCKOO_LOW ): bool {
+function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item): bool {
     if (!$ctx['rid']) { return false; }
     
-    $header = cuckoo_find_header_for_write($ctx, $key, $priority);
+    $header = cuckoo_find_header_for_write($ctx, $key, CUCKOO_LOW);
     if ($header === null) { return false; }
 
     // we have a header we can write cache data to...
@@ -167,11 +167,11 @@ function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priori
     // we can't store this much data in the cache...
     if ($size > CUCKOO_MAX_SIZE) { return false; }
 
-    $mem = ($header['len'] < $size) ? cuckoo_find_free_mem($ctx, $size, $priority) : [$header['offset'], $header['len']];
+    $mem = ($header['len'] < $size) ? cuckoo_find_free_mem($ctx, $size, CUCKOO_LOW) : [$header['offset'], $header['len']];
     if ($mem[0] === null) { return false; }
 
     // clear permissions...
-    $header['flags'] = set_flag_priority($header['flags'], $priority) | CUCKOO_FULL;
+    $header['flags'] = set_flag_priority($header['flags'], CUCKOO_LOW) | CUCKOO_FULL;
     $header['offset'] = $mem[0];
     $header['len'] = $size;
     $header['expires'] = $ctx['now'] + $ttl_sec;
@@ -406,7 +406,7 @@ class cuckoo {
         return cuckoo_read_or_set(self::$ctx, $key, $ttl, $fn);
     }
 
-    public static function write(string $key, int $ttl, $item, int $priority = 0 | CUCKOO_LOW ) {
-        return cuckoo_write(self::$ctx, $key, $ttl, $item, $priority);
+    public static function write(string $key, int $ttl, $item) { 
+        return cuckoo_write(self::$ctx, $key, $ttl, $item);
     }
 }

@@ -104,31 +104,33 @@ class MatchType
         $this->_block_time = $block_time;
     }
 
-    public function match(array $request) {
+    public function match(array $request) : bool {
         $this->_matched = $request[$this->_key] ?? '';
+        $result = false;
         switch ($this->_type) {
             case MatchType::EXACT: 
-                return $this->_matched === $this->_value;
+                $result = ($this->_matched === $this->_value);
+                break;
             case MatchType::CONTAINS: 
                 if (is_array($this->_value)) {
                     foreach ($this->_value as $v) {
                         $m = strstr($this->_matched, $v);
-                        if ($m !== false) { 
-                            return $m;
-                        }
+                        if ($m !== false) { $result = true; }
                     }
-                    return false;
-                }
-                return strpos($this->_matched, $this->_value) !== false;
+                } else { $result = strpos($this->_matched, $this->_value) !== false; }
+                break;
             case MatchType::IN: 
-                return in_array($this->_matched, $this->_value);
+                $result = in_array($this->_matched, $this->_value);
+                break;
             case MatchType::NOTIN: 
-                return !in_array($this->_matched, $this->_value);
+                $result = !in_array($this->_matched, $this->_value);
+                break;
             case MatchType::REGEX:
-                return preg_match($this->_value, $this->_matched) > 0;
-            break;
+                $result = preg_match($this->_value, $this->_matched) > 0;
+                break;
+            default:
         }
-        return false;
+        return $result;
     }
 
     public function matched_data() : string {
