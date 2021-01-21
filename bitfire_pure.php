@@ -123,19 +123,17 @@ function process_request(array $get, array $post, array $server, array $cookie =
 }
 
 function each_input_param($in) {
-    if (is_array($in)) {
-        $in = implode("^", $in);
-    }
     // we don't inspect numeric values because they would pass all tests
-    else if (is_numeric($in)) { return null; }
-    if (strlen($in) > 0) {
-        $value = strtolower(urldecode($in));
-        if (Config::enabled("block_profanity")) {
-            $value = \BitFire\replace_profanity($value);
-        }
-        return (Config::enabled('decode_html')) ? html_entity_decode($value) : $value;
+    if (is_numeric($in)) { return null; }
+
+    // flatten arrays
+    if (is_array($in)) { $in = implode("^", $in); }
+
+    $value = strtolower(urldecode($in));
+    if (Config::enabled("block_profanity")) {
+        $value = \BitFire\replace_profanity($value);
     }
-    return strval($in);
+    return (Config::enabled('decode_html')) ? html_entity_decode($value) : strval($value);
 }
 
 
@@ -317,7 +315,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
         file_put_contents(Config::str('block_file'), $content, FILE_APPEND);
     }
     \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
-    $content, 2, array("Content-Type" => "application/json"));
+    $content, array("Content-Type" => "application/json"));
 }
 
 function make_post_data(array $request, Block $block, ?array $ip_data) {

@@ -259,9 +259,7 @@ function trivial_reducer(callable $fn, string $key, string $value, $ignore) : \T
 /**
  * reduce key / value with fn
  */
-function generic_reducer(array $keys, array $values, string $name, string $value, $ignore) : \TF\Maybe {
-//print_r(func_get_args());
-//die("g r");
+function generic_reducer(array $keys, array $values, string $name, string $value) : \TF\Maybe {
     if (strlen($value) > 0) {
         return \BitFire\generic($name, $value, $values, $keys);
     }
