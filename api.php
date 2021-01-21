@@ -48,8 +48,8 @@ function get_block_24groups() : Metric {
 }
 
 function get_ip_24groups() : Metric {
-    $metric = new Metric();
 
+    $total = 0;
     $summary = array();
     $cache = CacheStorage::get_instance();
     for($i=0; $i<25; $i++) {
@@ -59,13 +59,19 @@ function get_ip_24groups() : Metric {
             if ($code > 100000 && $cnt > 0) { 
                 $tmp = long2ip($code);
                 $summary[$tmp] = ($summary[$tmp] ?? 0) + $cnt;
-                $metric->total += $cnt;
+                $total += $cnt;
             }
         }
     }
 
+    return parse_24_groups($summary, $total);
+}
+
+function parse_24_groups(array $summary, int $total) {
     
-    //$metric->data = $summary;
+    $metric = new Metric();
+    $metric->total = $total;
+
     uasort($summary, function ($a, $b) {
         if ($a == $b) { return 0; }
         return ($a < $b) ? -1 : 1;
