@@ -48,6 +48,20 @@ const AGENT_BLACKLIST = 'blacklist';
 
 const FAIL_DURATION = array(FAIL_HONEYPOT => BLOCK_LONG, FAIL_METHOD => BLOCK_SHORT);
 
+const AGENT_MATCH = array(
+        "opera" => "(opr)/\s*([\d+\.]+)",
+        "chrome" => "(chrome)/\s*([\d+\.]+)",
+        "firefox" => "(firefox)/?\s*([\d+\.]+)",
+        "android" => "(android)/?\s*([\d+\.]+)",
+        "safari" => "(safari)/\s*([\d+\.]+)",
+        "edge" => "(edge)/\s*([\d+\.]+)",
+        "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
+        "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
+        "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
+        "bot" => "(\w+)\s*([\d+\.]+)"
+    );
+
+
 // 2 calls = 29: cpu
 function match_fails(int $fail_code, MatchType $type, $request) : \TF\Maybe {
     if ($type->match($request)) {
@@ -207,6 +221,7 @@ use TF\CacheStorage;
 
 use function BitFire\reporting;
 
+use const BitFire\AGENT_MATCH;
 use const BitFire\BLOCK_MEDIUM;
 use const BitFire\BLOCK_SHORT;
 use const BitFire\CACHE_NAME_JS_SEND;
@@ -361,21 +376,8 @@ function parse_agent(string $user_agent) : array {
     }, "bot");
 
 
-    $browser_list = array(
-        "opera" => "(opr)/\s*([\d+\.]+)",
-        "chrome" => "(chrome)/\s*([\d+\.]+)",
-        "firefox" => "(firefox)/?\s*([\d+\.]+)",
-        "android" => "(android)/?\s*([\d+\.]+)",
-        "safari" => "(safari)/\s*([\d+\.]+)",
-        "edge" => "(edge)/\s*([\d+\.]+)",
-        "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
-        "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
-        "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
-        "bot" => "(\w+)\s*([\d+\.]+)"
-    );
-
     // cpu: 50, could rewrite as imperative and save here
-    $browser = array_reduce($browser_list, function(array $cry, string $browser) use ($user_agent) {
+    $browser = array_reduce(AGENT_MATCH, function(array $cry, string $browser) use ($user_agent) {
         if ($cry[0] === "bot") {
             preg_match("!$browser!", $user_agent, $matches);
             return (isset($matches[2])) ? array_slice($matches, 1, 2) : $cry;
