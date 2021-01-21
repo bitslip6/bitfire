@@ -557,19 +557,8 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
         $optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent";
     }
 
-    $params = array('http' => array(
-        'method' => $method,
-        'content' => $content,
-        'timeout' => $timeout,
-        'max_redirects' => 4,
-        'header' => ''
-    ),
-        'ssl' => array(
-            'verify_peer' => false,
-            'allow_self_signed' => true,
-    ) );
-
-    
+    $params = http_ctx($method, $timeout);
+    $params['content'] = $content;
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
     $ctx = stream_context_create($params);
@@ -583,6 +572,19 @@ function bit_http_request(string $method, string $url, $data, int $timeout = 5, 
     }
 
     return $foo;
+}
+
+function http_ctx(string $method, int $timeout) : array {
+    return array('http' => array(
+        'method' => $method,
+        'timeout' => $timeout,
+        'max_redirects' => 4,
+        'header' => ''
+    ),
+        'ssl' => array(
+            'verify_peer' => false,
+            'allow_self_signed' => true,
+    ) );
 }
 
 
