@@ -50,21 +50,52 @@ function filter_block_exceptions(Block $block, array $exceptions) : Maybe {
     return Maybe::of(array_reduce($exceptions, '\BitFire\match_block_exception', $block));
 }
 
+function process_server(array $server) : array {
+    $url = parse_url($server['REQUEST_URI'] ?? '//localhost/');
+    return array(
+        REQUEST_HOST => parse_host_header($server['HTTP_HOST'] ?? ''),
+        "PATH" => $url['path'],
+        REQUEST_IP => process_ip($server),
+        REQUEST_METHOD => ($server['REQUEST_METHOD'] ?? 'GET'),
+        "PORT" => $server['SERVER_PORT'] ?? 8080,
+        'REQUESTED_WITH' => ($server['HTTP_X_REQUESTED_WITH'] ?? null),
+        'FETCH_MODE' => ($server['HTTP_SEC_FETCH_MODE'] ?? null),
+        REQUEST_UA => strtolower($server['HTTP_USER_AGENT'] ?? ''),
+        REQUEST_SCHEME => ($server['REQUEST_SCHEME'] ?? 'http'),
+        REQUEST_ACCEPT => ($server['HTTP_ACCEPT_ENCODING']??'') . ' . ' . ($server['HTTP_ACCEPT_ENCODING']??''),
+        'ACCEPT' => ($server['HTTP_ACCEPT'] ?? ''),
+        'UPGRADE_INSECURE' => ($server['REQUEST_SCHEME'] == 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? '') : '',
+        'CONTENT_TYPE' => ($server['HTTP_CONTENT_TYPE'] ?? 'text/html')
+    );
+}
+
+function process_ip(array $server) : string {
+    $header_name = strtoupper(Config::str('ip_header', 'REMOTE_ADDR'));
+    $ip = "n/a";
+    switch ($header_name) {
+        case "X-FORWARDED-FOR":
+            $ip = get_fwd_for($server[$header_name] ?? '127.0.0.1');
+            break;
+        case "REMOTE_ADDR":
+        case "X-FORWARDED-FOR":
+        default:
+            $ip = getIP($server[$header_name] ?? '127.0.0.1');
+            break;
+    }
+
+    return $ip;
+}
+
+
 // parse the request into a single passable object
 // PURE
 function process_request(array $get, array $post, array $server, array $cookie = array()) : array {
 
-    $url = parse_url($server['REQUEST_URI'] ?? '//localhost/');
-    $request = array(
-        REQUEST_HOST => parse_host_header($server['HTTP_HOST'] ?? ''),
-        "PATH" => $url['path'] ?? '/',
-        "PORT" => $server['SERVER_PORT'] ?? 8080,
-        "GET" => \TF\map_mapvalue($get, '\\BitFire\\each_input_param'),
-        "POST" => \TF\map_mapvalue($post, '\\BitFire\\each_input_param'),
-        REQUEST_METHOD => $server['REQUEST_METHOD'] ?? 'GET');
-
-    $request['FULL']  = http_build_query($request['GET']);
-    $request['FULL'] .= " POST " .http_build_query($request['POST']);
+    $request = process_server($server);
+    $request["GET"] = \TF\map_mapvalue($get, '\\BitFire\\each_input_param');
+    $request["POST"] = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
+    $request['FULL'] = http_build_query($request['GET']) . " POST " .http_build_query($request['POST']);
+    $request[REQUEST_COOKIE] = $cookie;
 
         
     $get_counts = array();
@@ -84,28 +115,6 @@ function process_request(array $get, array $post, array $server, array $cookie =
             get_counts($value);
     }
     $request['POSTC'] = $post_counts;
-
-    // add canonical header values
-    $request['REQUESTED_WITH'] = $server['HTTP_X_REQUESTED_WITH'] ?? null;
-    $request['FETCH_MODE'] = $server['HTTP_SEC_FETCH_MODE'] ?? null;
-    $request[REQUEST_UA] = strtolower($server['HTTP_USER_AGENT'] ?? '');
-    $request[REQUEST_SCHEME] = $server['REQUEST_SCHEME'] ?? 'http';
-    $request['UPGRADE_INSECURE'] = ($request[REQUEST_SCHEME] == 'http') ? $server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? null : null;
-    $request['ACCEPT'] = $server['HTTP_ACCEPT'] ?? '';
-    $request['CONTENT_TYPE'] = $server['HTTP_CONTENT_TYPE'] ?? 'text/html';
-    $request[REQUEST_COOKIE] = $cookie;
-    $request[REQUEST_ACCEPT] = (stripos($server['HTTP_ACCEPT_ENCODING']??'', 'gzip') === false) ? 'no_encode' : $server['HTTP_ACCEPT_ENCODING'];
-    $header_name = strtoupper(Config::str('ip_header', 'REMOTE_ADDR'));
-    switch ($header_name) {
-        case "X-FORWARDED-FOR":
-            $request[REQUEST_IP] = get_fwd_for($server[$header_name] ?? '127.0.0.1');
-            break;
-        case "REMOTE_ADDR":
-        case "X-FORWARDED-FOR":
-        default:
-            $request[REQUEST_IP] = getIP($server[$header_name] ?? '127.0.0.1');
-            break;
-    }
 
     // set the ajax flag
     $request['ajax'] = is_ajax($request);
@@ -263,17 +272,6 @@ function replace_profanity(string $data) : string {
     return preg_replace('/('.PROFANITY.')/', '@#$!%', $data);
 }
 
-function add_country($data) {
-    if (!is_array($data) || count($data) < 1) { return $data; }
-    $map = json_decode(file_get_contents(WAF_DIR . "cache/country.json"), true);
-    $result = array();
-    foreach ($data as $report) {
-        $code = \TF\ip_to_country($report['ip'] ?? '');
-        $report['country'] = $map[$code];
-        $result[] = $report; 
-    }
-    return $result;
-}
 
 
 function post_request(array $request, ?Block $block, ?array $ip_data) {
@@ -295,44 +293,15 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 
 
     $class = intval($block->code / 1000) * 1000;
-    $data = array(
-        "ip" => $request[REQUEST_IP],
-        "scheme" => $request[REQUEST_SCHEME],
-        "ua" => $request[REQUEST_UA] ?? '',
-        "url" => $request[REQUEST_HOST] . ':' . $request['PORT'] . $request[REQUEST_PATH],
-        "params" => param_to_str($request['GET'], true),
-        "post" => param_to_str($request['POST'], true),
-        "verb" => $request[REQUEST_METHOD],
-        "ts" => microtime(true),
-        "tv" => date("D H:i:s ") . date('P'),
-        "referer" => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
-        "eventId" => $block->code,
-        "classId" => $class,
-        "item" => $block->parameter,
-        "name" => $block->pattern,
-        "match" => $block->value,
-        "ver" => BITFIRE_VER,
-        "pass" => $block->code === 0 ? true : false,
-        "bot" => $bot,
-        "response" => $response_code,
-        "whitelist" => $whitelist,
-        "valid" => $valid,
-        "offset" => 0
-    );
-    
-    // add ip data to the log
-    if (isset($ip_data['rr1m'])) {
-        $data['rr1m'] = $ip_data['rr_1m'];
-        $data['rr5m'] = $ip_data['rr_5m'];
-        $data['ref'] = $ip_data['ref'];
-        $data['404'] = $ip_data['404'];
-        $data['500'] = $ip_data['500'];
-    }
-
-
+    $data = make_post_data($request, $block, $ip_data);
+    $data["bot"] = $bot;
+    $data["response"] = $response_code;
+    $data["whitelist"] = $whitelist;
+    $data["valid"] = $valid;
+    $data["classId"] = $class;
     
     // cache the last 15 blocks
-    $cache = CacheStorage::get_instance();
+    $cache = \TF\CacheStorage::get_instance();
     $cache->rotate_data("log_data", $data, 15);
     $ip = ip2long($request[REQUEST_IP]);
     $cache->update_data("metrics-".date('G'), function ($metrics) use ($class, $ip) {
@@ -349,6 +318,40 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     }
     \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
     $content, 2, array("Content-Type" => "application/json"));
+}
+
+function make_post_data(array $request, Block $block, ?array $ip_data) {
+
+    $data = array(
+        "ip" => $request[REQUEST_IP],
+        "scheme" => $request[REQUEST_SCHEME],
+        "ua" => $request[REQUEST_UA] ?? '',
+        "url" => $request[REQUEST_HOST] . ':' . $request['PORT'] . $request[REQUEST_PATH],
+        "params" => param_to_str($request['GET'], true),
+        "post" => param_to_str($request['POST'], true),
+        "verb" => $request[REQUEST_METHOD],
+        "ts" => microtime(true),
+        "tv" => date("D H:i:s ") . date('P'),
+        "referer" => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
+        "eventId" => $block->code,
+        "item" => $block->parameter,
+        "name" => $block->pattern,
+        "match" => $block->value,
+        "ver" => BITFIRE_VER,
+        "pass" => $block->code === 0 ? true : false,
+        "offset" => 0
+    );
+    
+    // add ip data to the log
+    if (isset($ip_data['rr1m'])) {
+        $data['rr1m'] = $ip_data['rr_1m'];
+        $data['rr5m'] = $ip_data['rr_5m'];
+        $data['ref'] = $ip_data['ref'];
+        $data['404'] = $ip_data['404'];
+        $data['500'] = $ip_data['500'];
+    }
+
+    return $data;
 }
 
 /**
@@ -370,21 +373,14 @@ function param_to_str(array $params, $filter = false) {
 
 
 
+const BLOCK_MAP = array(1 => 'short_block_time', 2 => 'medium_block_time', 3 => 'long_block_time');
 function block_ip($block, array $ip_data) : void {
-    if (!Config::enabled('allow_ip_block') || !$block) { return; }
-    $exp = time();
-    if ($block->block_time == 1) {
-        $exp += Config::int('short_block_time', 600);
-    } else if ($block->block_time == 2) {
-        $exp += Config::int('medium_block_time', 3600);
-    } else if ($block->block_time >= 3) {
-        $exp += Config::int('long_block_time', 86400);
-    } else {
-        return;
-    }
-
+    if (!Config::enabled('allow_ip_block') || !$block || $block->block_time < 1) { return; }
+   
     $blockfile = BLOCK_DIR . $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
     @file_put_contents($blockfile, $ip_data['ref'] ?? \substr(\uniqid(), 5, 8));
+
+    $exp = time() + Config::int(BLOCK_MAP[$block->block_time]);
     \touch($blockfile, $exp);
     
     \http_response_code(Config::int('response_code', 500));
