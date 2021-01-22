@@ -169,7 +169,7 @@ class BotFilter {
             $url = \BitFireBot\strip_path_tracking_params($request);
             // response answer matches cookie
             if (intval($maybe_botcookie->extract('a')()) === intval($_GET['_bfa'])) {
-                \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_GOOD, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
+                \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['valid'] = ($data['valid']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
                 $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
                     \TF\en_json( array('ip' => $request[REQUEST_IP], 'v' => 2, 'et' => time() + 60*60)));
                 \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
@@ -218,6 +218,7 @@ use TF\CacheStorage;
 use function BitFire\reporting;
 
 use const BitFire\AGENT_MATCH;
+use const BitFire\BITFIRE_METRICS_INIT;
 use const BitFire\BLOCK_MEDIUM;
 use const BitFire\BLOCK_SHORT;
 use const BitFire\CACHE_NAME_JS_SEND;
@@ -484,7 +485,8 @@ function make_challenge_cookie(array $answer, string $ip) : string {
 function require_browser_or_die(array $request, \TF\Maybe $cookie) {
     if (intval($cookie->extract('v')()) >= 2) { return; }
 
-    \TF\CacheStorage::get_instance()->update_data(CACHE_NAME_JS_SEND, function($ctr) { return $ctr + 1; }, 0, \TF\DAY * 30);
+
+    $data = \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
     http_response_code(202);
     $block = BitFire::new_block(20000, 'n/a', 'n/a', 'check JS/Cookies', 0);
     echo make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), 
