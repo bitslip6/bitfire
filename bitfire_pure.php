@@ -304,11 +304,11 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     $cache->rotate_data("log_data", $data, 15);
     $ip = ip2long($request[REQUEST_IP]);
     $cache->update_data("metrics-".date('G'), function ($metrics) use ($class, $ip) {
-        $metrics[$class]++;
+        $metrics[$class] = ($metrics[$class]??0) + 1;
         $ip = ($ip < 100000) ? ip2long('127.0.0.1') : $ip; 
-        $metrics[$ip] = ($metrics[$ip] ?? 0) + 1;
+        $metrics[$ip] = ($metrics[$ip]??0) + 1;
         return $metrics;
-    }, BITFIRE_METRICS_INIT, 86400);
+    }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
 
 
     $content = json_encode($data)."\n";
