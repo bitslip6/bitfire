@@ -149,7 +149,7 @@ class CacheStorage implements Storage {
         }
 
         // force failure to return null
-        return ($success !== false) ? $value : $init;
+        return ($success) ? $value : $init;
     }
 
     /**
