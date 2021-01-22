@@ -112,6 +112,13 @@
         function max(numbers) { return numbers.reduce(max_reducer); }
         function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
 
+
+        function update_challenge(data) {
+          console.log(data);
+          GBI("check").innerText = data.challenge;
+          GBI("pass").innerText = data.valid;
+        }
+
         function toggle(elm, type) {
           var e = GBI(elm);
           e.innerText = type;
@@ -244,12 +251,12 @@
             <li class="nav-item">
                 <span class="chilabel">
                   <svg xmlns="http://www.w3.org/20 00/svg" enable-background="new 0 0 24 24" height="24" viewBox="0 0 24 24" width="24"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M17,11c0.34,0,0.67,0.04,1,0.09V6.27L10.5,3L3,6.27v4.91c0,4.54,3.2,8.79,7.5,9.82c0.55-0.13,1.08-0.32,1.6-0.55 C11.41,19.47,11,18.28,11,17C11,13.69,13.69,11,17,11z"/><path d="M17,13c-2.21,0-4,1.79-4,4c0,2.21,1.79,4,4,4s4-1.79,4-4C21,14.79,19.21,13,17,13z M17,14.38c0.62,0,1.12,0.51,1.12,1.12 s-0.51,1.12-1.12,1.12s-1.12-0.51-1.12-1.12S16.38,14.38,17,14.38z M17,19.75c-0.93,0-1.74-0.46-2.24-1.17 c0.05-0.72,1.51-1.08,2.24-1.08s2.19,0.36,2.24,1.08C18.74,19.29,17.93,19.75,17,19.75z"/></g></g></svg>
-                  Check: </span> <span class="lnum" id="send"><?php echo $send; ?></span>
+                  Check: </span> <span class="lnum" id="check"></span>
             </li>
             <li class="nav-item">
                 <span class="chilabel">
                   <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none" fill-rule="evenodd"/><g fill-rule="evenodd"><path d="M9 17l3-2.94c-.39-.04-.68-.06-1-.06-2.67 0-8 1.34-8 4v2h9l-3-3zm2-5c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4"/><path d="M15.47 20.5L12 17l1.4-1.41 2.07 2.08 5.13-5.17 1.4 1.41z"/></g></svg>
-                  Pass: </span> <span class="lnum" id="send"><?php echo $good; ?></span>
+                  Pass: </span> <span class="lnum" id="pass"></span>
             </li>
 
 
@@ -710,7 +717,7 @@
         <?php if ($line['valid']??-1 >= 2) { ?>
           <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg> 
         <?php } else if ($line['whitelist']??false) { ?>
-          <svg class="blue" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+          <svg height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
         <?php } else if ($line['valid']??-1 > -1){ ?>
           <svg class="red" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M21,15v-2h-3.07c-0.05-0.39-0.12-0.77-0.22-1.14l2.58-1.49l-1-1.73L16.92,10c-0.28-0.48-0.62-0.91-0.99-1.29 C15.97,8.48,16,8.25,16,8c0-0.8-0.24-1.55-0.65-2.18L17,4.17l-1.41-1.41l-1.72,1.72c-1.68-0.89-3.1-0.33-3.73,0L8.41,2.76L7,4.17 l1.65,1.65C8.24,6.45,8,7.2,8,8c0,0.25,0.03,0.48,0.07,0.72C7.7,9.1,7.36,9.53,7.08,10L4.71,8.63l-1,1.73l2.58,1.49 c-0.1,0.37-0.17,0.75-0.22,1.14H3v2h3.07c0.05,0.39,0.12,0.77,0.22,1.14l-2.58,1.49l1,1.73L7.08,18c1.08,1.81,2.88,3,4.92,3 s3.84-1.19,4.92-3l2.37,1.37l1-1.73l-2.58-1.49c0.1-0.37,0.17-0.75,0.22-1.14H21z M13,17h-2v-6h2V17z"/></g></g></svg>
         <?php } else { ?>
@@ -883,9 +890,15 @@
         const response1 = await fetch('/bitfire?BITFIRE_API=get_block_types&_secret=<?php echo \Bitfire\Config::str("secret");?>');
         const response2 = await fetch('/bitfire?BITFIRE_API=get_hr_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
         const response3 = await fetch('/bitfire?BITFIRE_API=get_ip_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
+        const response4 = await fetch('/bitfire?BITFIRE_API=get_valid_data&_secret=<?php echo \Bitfire\Config::str("secret");?>');
         const data1 = await response1.json();
         const data2 = await response2.json();
         const data3 = await response3.json();
+        const data4 = await response4.json();
+        
+        update_challenge(data4);
+        
+        console.log("data4", data4);
 
         show_pie('classChart', data1, label_type);
         GBI("block_total").innerText = "(" + data1.total + ")";
