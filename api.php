@@ -15,8 +15,8 @@ function get_block_24sum() : array {
     $result = array();
     $cache = CacheStorage::get_instance();
     for($i=0; $i<25; $i++) {
-        $data = $cache->load_data("metrics-$i", BITFIRE_METRICS_INIT);
-        if (!is_array($data)) { $data = BITFIRE_METRICS_INIT; }
+        $data = $cache->load_data("metrics-$i", null);
+        if ($data == null) { continue; }
         $sum = 0;
         foreach ($data as $code => $value) {
             if($code < 100000) { $sum += $value; }
@@ -34,9 +34,10 @@ function get_block_24groups() : Metric {
     $metric = new Metric();
     $cache = CacheStorage::get_instance();
     for($i=0; $i<25; $i++) {
-        $data = $cache->load_data("metrics-$i", BITFIRE_METRICS_INIT);
-        if (!is_array($data)) { $data = BITFIRE_METRICS_INIT; }
+        $data = $cache->load_data("metrics-$i", null);
+        if ($data === null) { continue; }
         foreach ($data as $code => $cnt) {
+            if ($code === "challenge" || $code === "valid") { continue; }
             if ($code < 100000 && $cnt > 0) { 
                 $tmp = $metric->data[$code] ?? 0;
                 $metric->data[$code] = $tmp + $cnt;
@@ -53,9 +54,10 @@ function get_ip_24groups() : Metric {
     $summary = array();
     $cache = CacheStorage::get_instance();
     for($i=0; $i<25; $i++) {
-        $data = $cache->load_data("metrics-$i", BITFIRE_METRICS_INIT);
-        if (!is_array($data)) { $data = array(); }
+        $data = $cache->load_data("metrics-$i", null);
+        if ($data == null) { continue; }
         foreach ($data as $code => $cnt) {
+            if ($code === "challenge" || $code === "valid") { continue; }
             if ($code > 100000 && $cnt > 0) { 
                 $tmp = long2ip($code);
                 $summary[$tmp] = ($summary[$tmp] ?? 0) + $cnt;
@@ -113,6 +115,21 @@ function get_hr_data(array $request) {
 
 function get_ip_data(array $request) {
     exit(send_metrics(get_ip_24groups()));
+}
+
+function get_valid_data(array $request) {
+    $cache = CacheStorage::get_instance();
+    $response = array('challenge' => 0, 'valid' => 0);
+    for($i=0; $i<25; $i++) {
+        $data = $cache->load_data("metrics-$i", null);
+        if ($data === null) { continue; }
+        foreach ($data as $code => $cnt) {
+            if ($code === "challenge") { $response['challenge'] += $cnt; }
+            if ($code === "valid") { $response['valid'] += $cnt; }
+        }
+    }
+
+    exit(json_encode($response));
 }
 
 function make_code(array $request) {
