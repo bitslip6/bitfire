@@ -3,9 +3,6 @@ namespace BitFire;
 
 use TF\Maybe;
 
-const CACHE_NAME_JS_SEND="send_js";
-const CACHE_NAME_JS_GOOD="good_js";
-
 const BOT_ANS_CODE_POS=2;
 const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
