@@ -31,7 +31,7 @@ function endsWith(string $haystack, string $needle) { return strrpos($haystack, 
 function say($color = '\033[39m', $prefix = "") : callable { return function($line) use ($color, $prefix) : string { return (strlen($line) > 0) ? "{$color}{$prefix}{$line}\033[32m\n" : ""; }; } 
 function last_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, -1, 1)[0] : $default; }
 function first_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, 0, 1)[0] : $default; }
-function random_str(int $len) : string { return substr(base64_encode(openssl_random_pseudo_bytes($len)), 0, $len); }
+function random_str(int $len) : string { return substr(base64_encode(random_bytes($len)), 0, $len); }
 function un_json(string $data) { return json_decode($data, true, 6); }
 function en_json($data) : string { return json_encode($data); }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (endsWith($key, $item)) { return true; } } return false; }
@@ -325,7 +325,7 @@ function apidata($method, $params) {
  */
 function encrypt_ssl(string $password, string $text) : string {
     assert(between(strlen($password), 20, 32), "cipher password length is out of bounds: [$password]");
-    $iv = substr(base64_encode(openssl_random_pseudo_bytes(16)), 0, 16);
+    $iv = random_str(16);
     return openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
 }
 
@@ -447,9 +447,9 @@ function param_glue(string $key, string $value, string $carry = "") : string {
     return "$carry$key=".urlencode($value);
 }
 
-// return true if an string is an ipv6 address
+// return true if a string is an ipv6 address
 function is_ipv6(string $addr) : bool {
-    return substr_count($addr, ':') === 5;
+    return substr_count($addr, ':') >= 3;
 }
 
 function ip_to_file($ip_num) {
