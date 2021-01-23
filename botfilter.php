@@ -251,7 +251,6 @@ function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
  */
 function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // check if the remote IP is in an allowed list of IPs
-    //\TF\dbg("$remote_ip / $network_regex");
     $ip_checks = (strpos($network_regex, ',') > 0) ? explode(',', $network_regex) : array($network_regex);
     $ip_matches = array_reduce($ip_checks, \TF\is_regex_reduced($remote_ip), false);
     if ($ip_matches) { return true; }
@@ -259,7 +258,6 @@ function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     // fwd and reverse lookup
     $ip = \TF\reverse_ip_lookup($remote_ip)
         ->then(function($value) use ($ip_checks) {
-//\TF\dbg("v: $value, ch: $ip_checks\n");
             return array_reduce($ip_checks, \TF\find_regex_reduced($value), false);
         })->then('TF\\fast_ip_lookup');
 
@@ -277,10 +275,54 @@ function verify_bot_as(string $remote_ip, string $network) : bool {
     $network = escapeshellarg("-i origin " . substr($network, 0, 8));
     $match = (\TF\is_ipv6($remote_ip)) ?
         array_slice(explode(":", $remote_ip), 0, 2) :
-        array_slice(explode(".", $remote_ip), 0, 3);
+        array_slice(explode(".", $remote_ip), 0, 2);
     $cmd = "whois -h whois.radb.net -- $network | grep " . escapeshellarg(join('.', $match));
-    $result = exec($cmd);
-    return stristr($result, "route") !== false;
+    $routes = parse_whois_route(exec($cmd));
+    return is_ip_in_cidr_list($remote_ip, $routes);
+}
+
+function is_ip_in_cidr_list(string $remote_ip, array $routes) : bool {
+
+    if (\TF\is_ipv6($remote_ip)) {
+        $ip_bytes = unpack('n*', inet_pton($remote_ip));
+        return array_reduce($routes, function($carry, string $route) use ($ip_bytes, $remote_ip) {
+            [$route_ip, $netmask] = explode('/', $route, 2);
+            $netmask = intval($netmask);
+            $route_bytes = unpack('n*', @inet_pton($route_ip));
+
+            for ($i = 1, $ceil = ceil($netmask / 16); $i <= $ceil; ++$i) {
+                $left = $netmask - 16 * ($i - 1);
+                $left = ($left <= 16) ? $left : 16;
+                $mask = ~(0xffff >> $left) & 0xffff;
+                if (($ip_bytes[$i] & $mask) != ($route_bytes[$i] & $mask)) {
+                    return false;
+                }
+            }
+            return true;
+        }, false);
+    } else {
+        $s1 = sprintf('%032b', ip2long($remote_ip));
+        return array_reduce($routes, function($carry, string $route) use ($s1) {
+            if ($carry === 0) { return $carry; }
+            [$ip, $netmask] = explode('/', $route, 2);
+            return substr_compare($s1, sprintf('%032b', ip2long($ip)), 0, intval($netmask));
+        }, 1) === 0;
+    }
+}
+
+/**
+ * parse all lines of whois route lookup 
+ */
+function parse_whois_route(string $output) : ?array {
+    return array_map('\BitFireBot\parse_whois_line', explode("\n", $output));
+}
+
+/**
+ * parse 'route    : 1.2.3.4/24' into '1.2.3.4/24'
+ */
+function parse_whois_line(string $line) : string {
+    $parts = explode(": ", $line);
+    return trim($parts[1]??'');
 }
 
 // return false if valid_domains has entries and request['host'] is not in it
