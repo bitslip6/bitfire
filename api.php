@@ -134,7 +134,7 @@ function get_valid_data(array $request) {
 
 function make_code(array $request) {
     $s = Config::str(CONFIG_SECRET, 'bitfiresekret');
-    $iv = substr(base64_encode(openssl_random_pseudo_bytes(16)), 0, 12);
+    $iv = \TF\random_str(12);
     $hash = base64_encode(hash_hmac("sha1", $iv, $s, true));
     unset($request['GET'][BITFIRE_COMMAND]);
     unset($request['GET']['_secret']);
