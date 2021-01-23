@@ -19,7 +19,6 @@ class CacheStorage implements Storage {
     protected static $_instance = null;
     protected $_shmop = null;
     protected $_shm = null;
-    protected $sems = array();
 
     // a string of, apcu, opcache, shmop, shmem
     public static function set_type(string $cache_type) {
@@ -37,9 +36,8 @@ class CacheStorage implements Storage {
     /**
      * remove all created semaphores...
      */
-    public function __destruct() {
-        foreach ($this->sems as $sem) { if ($sem != null) { sem_remove($sem); } }
-    }
+    //public function __destruct() {
+    //}
 
     protected function __construct($type = 'nop') {
         if ($type !== '') { self::$_type = $type; }
@@ -84,16 +82,15 @@ class CacheStorage implements Storage {
         }
     }
 
+    // only lock metrics updates
     public function lock(string $key_name) {
         $sem = null;
-/*
-        if (function_exists('sem_acquire')) {
+
+        if (strpos($key_name, 'metrics') !== false && function_exists('sem_acquire')) {
             $opt = (PHP_VERSION_ID >= 80000) ? true : 1;
-            $sem = sem_get(crc32($key_name), 1, 0600, $opt);
+            $sem = sem_get(0x228AAAE7, 1, 0660, $opt);
             if (!sem_acquire($sem, true)) { return null; };
-            $this->sems[] = $sem;
         }
-*/
         return $sem;
     }
     
