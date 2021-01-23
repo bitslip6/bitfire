@@ -31,8 +31,6 @@ function serve_dashboard(string $path) {
         $tmp = add_country(\TF\CacheStorage::get_instance()->load_data("log_data"));
         $blocks = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
 
-        //$send = \TF\CacheStorage::get_instance()->load_data("send_js", 0);
-        //$good = \TF\CacheStorage::get_instance()->load_data("good_js", 0);
         exit(require WAF_DIR . "views/dashboard.html");
     }
 }
