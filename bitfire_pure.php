@@ -260,7 +260,7 @@ function match_block_exception(Block $block, array $exception) : Block {
 function cache_unique() {
     $lang = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ',';
     $parts = explode(',', $lang);
-    return $parts[0];
+    return $parts[0] ?? '';
 }
 
 /**
@@ -289,6 +289,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 
     if ($block === null && !$bot) { return; }
     if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot", $request[REQUEST_UA], 0); }
+    else if ($block === null) { $block = new Block(31002, "return code", strval($response_code), $request[REQUEST_UA], 0); }
 
 
     $class = intval($block->code / 1000) * 1000;
@@ -312,7 +313,9 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 
 
     $content = json_encode($data)."\n";
-    if (Config::enabled('block_file')) {
+    if (Config::enabled('report_file') && $block->code === 31002) {
+        file_put_contents(Config::str('report_file'), $content, FILE_APPEND);
+    }  else if (Config::enabled('block_file')) {
         file_put_contents(Config::str('block_file'), $content, FILE_APPEND);
     }
     \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
@@ -320,7 +323,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 }
 
 function make_post_data(array $request, Block $block, ?array $ip_data) {
-
+    
     $data = array(
         "ip" => $request[REQUEST_IP],
         "scheme" => $request[REQUEST_SCHEME],
