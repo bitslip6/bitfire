@@ -336,14 +336,14 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
  */
 function cuckoo_open_mem(int $size_in_bytes, string $key) {
     $token = ftok(__FILE__, $key);
-    $id = @shmop_open($token, 'c', 0600, $size_in_bytes);
+    $id = @shmop_open($token, 'c', 0660, $size_in_bytes);
 
     // unable to attach created memory segment, recreate it...
     if ($id === false) {
         // connect failed, we probably have an old mem segment that is not large enough
         $id = @shmop_open($token, 'w', 0, 0);
         if ($id) { shmop_delete($id); }
-        $id = shmop_open($token, 'c', 0600, $size_in_bytes);
+        $id = shmop_open($token, 'c', 0660, $size_in_bytes);
         if ($id === false) {
             debug("shmop: unable to allocate $size_in_bytes shared memory\n");
         }
@@ -395,7 +395,7 @@ class cuckoo {
     private static $ctx;
 
     public function __construct() {
-        self::$ctx = cuckoo_connect(29000, 128, 29000*128);
+        self::$ctx = cuckoo_connect(29000, 128, 29000*128, false);
     }
 
     public static function read($key) {
