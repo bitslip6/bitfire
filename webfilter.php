@@ -88,7 +88,7 @@ function sql_filter(array $request) : \TF\Maybe {
         if (!$maybe->empty()) { return $maybe; }
     }
     foreach ($request['POST'] as $key => $value) {
-        $maybe = search_sql($key, $value, $request['GETC'][$key]);
+        $maybe = search_sql($key, $value, $request['POSTC'][$key]);
         if (!$maybe->empty()) { return $maybe; }
     }
     return \TF\Maybe::$FALSE;
@@ -173,7 +173,7 @@ function search_short_sql(string $name, string $value) : \TF\Maybe {
 function search_sql(string $name, string $value, array $counts) : \TF\Maybe {
 
     // block super basic
-    if (preg_match("/(union|;)[\sal(]*select/sm", $value)) {
+    if (strpos($value, "from", strpos($value, "select", strpos($value, "union")))) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
     if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
@@ -185,7 +185,6 @@ function search_sql(string $name, string $value, array $counts) : \TF\Maybe {
     if ($total_control <= 0) { return search_short_sql($name, $value); }
 
     $stripped_comments = strip_comments($value);
-
         
     // look for the short injection types
     $block = search_short_sql($name, $stripped_comments->value);
