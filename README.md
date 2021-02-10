@@ -96,7 +96,7 @@ Security from F to A in 5 minutes https://www.youtube.com/watch?v=DHhEW2otdng
 
 ### Prerequisites
 
-You will need a webserver running PHP >= 7.1, a login, sudo access to edit php.ini and a text editor.
+You will need: a webserver (apache, nginx), PHP >= 7.1, a login, text editor, sudo access to edit php.ini.
 
 
 ### Installation
@@ -125,12 +125,13 @@ in php.ini update auto_prepend_file
 auto_prepend_file ='/full/path/to/bitfire/startup.php';
 ```
 
+Detailed configuration is available on our [Wiki](https://github.com/bitslip6/bitfire/wiki)
 
 
 <!-- SETUP -->
 ## Setup / Configuration Quickstart
 
-The default config is very conservative and will only block
+The default configuration is very conservative and will only block
 bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire
 home directory (your github checkout location, or for composer vendor/bitslip6/bitfire/config.ini)
 
