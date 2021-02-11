@@ -15,7 +15,7 @@ function add_country($data) {
     return $result;
 }
 
-function is_dis() {
+function isdis() {
     $result = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR."config.ini.php");
     return ($result) ? " disabled " : "";
 }
