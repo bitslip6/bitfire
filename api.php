@@ -146,23 +146,36 @@ function make_code(\BitFire\Request $request) {
 }
 
 function is_quoted(string $data) : bool {
-    return ($data === "true" || $data === "false" || ctype_digit($data)) ? false : true;
+    return ($data === "true" || $data === "false" || ctype_digit($data)) ? true : false;
 }
 
 function toggle_config_value(\BitFire\Request $request) {
     if (!is_writable(WAF_DIR."config.ini")) {
-        exit("failure");
+        exit("fail");
     }
 
     $input = file_get_contents(WAF_DIR."config.ini");
-    $param = $request->get['param'];
-    $value = $request->get['value'];
+    $param = htmlentities($_GET['param']);
+    $value = htmlentities($_GET['value']);
+    if ($value === "off" || $value === "false") {
+        $value = "false";
+    } else if ($value === "alert" || $value === "report") {
+        $value = "report";
+    } else if ($value === "true" || $value === "block") {
+        $value = "true";
+    }
 
     $value = (is_quoted(strtolower($value))) ? $value : "\"$value\"";
-    $output = preg_replace("/^\s*$param\s*=.*$", "$param = $value\n", $input);
-    file_put_contents(WAF_DIR."config.ini", $output);
+    $patterns = "/\s*$param\s*=.*/";
+    $output = preg_replace($patterns, "\n$param = $value", $input);
 
-    exit("success");
+    // don't accidently 0 the config
+    if (strlen($output) + 20 > strlen($input)) {
+        file_put_contents(WAF_DIR."config.ini", $output);
+        exit("success");
+    } else {
+        exit("fail");
+    }
 }
 
 
