@@ -272,7 +272,7 @@
           <h6 class="navbar-heading">
             Settings
           </h6>
-          <?php if (!$config_writeable || !$config_cache_writeable) { ?>
+          <?php if (!$config_writeable) { ?>
           <h6 class="navbar-heading btn-warning">
             config.ini not writeable
           </h6>
@@ -704,7 +704,7 @@
     </tr>
   </thead>
   <tbody style="font-size:10px;">
-    <?php foreach ($reporting as $line) { if (!isset($line['time'])) { echo "<!-- " . print_r($line); . " -->\n"; continue; } ?>
+    <?php foreach ($reporting as $line) { if (!isset($line['time'])) { echo "<!-- "; print_r($line); echo " -->\n"; continue; } ?>
     <tr class="inforow">
       <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
       <td class="nowrap" style="min-width:125px;"><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
