@@ -3,82 +3,45 @@ namespace BitFire;
 use TF\CacheStorage;
 require WAF_DIR . "bitfire_pure.php";
 
-if (defined('BITFIRE_VER')) { return; }
- 
 
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
-const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 50000 => '');
-
-const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
-const BITFIRE_METRICS_INIT = array('challenge' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 123;
-const BITFIRE_DOMAIN = "http://api.bitslip6.com";
-const BITFIRE_COMMAND = "BITFIRE_API";
-
-const BITFIRE_MAX_HASH_COUNT = 20;
-const BITFIRE_MAX_AUDIT = 20;
-const BITFIRE_MAX_PAGES = 200;
-const WAF_MIN_HIT = 25;
-const WAF_MIN_PERCENT = 10;
-
-const CONFIG_REPORT_FILE='report_file';
-const CONFIG_WHITELIST_ENABLE='whitelist_enable';
-const CONFIG_BLACKLIST_ENABLE='blacklist_enable';
-const CONFIG_REQUIRE_BROWSER = 'require_full_browser';
-const CONFIG_USER_TRACK_COOKIE = 'browser_cookie';
-const CONFIG_MAX_CACHE_AGE = 'max_cache_age';
-const CONFIG_USER_TRACK_PARAM = 'bitfire_param';
-const CONFIG_ENCRYPT_KEY = 'encryption_key';
-const CONFIG_SECRET = 'secret';
-const CONFIG_VALID_DOMAIN_LIST = 'valid_domains';
-const CONFIG_ENABLED = 'bitfire_enabled';
-const CONFIG_WEB_FILTER_ENABLED = 'web_filter_enabled';
-const CONFIG_SECURITY_HEADERS = 'security_headers_enabled';
-const CONFIG_XSS_FILTER="xss_block";
-const CONFIG_SQL_FILTER="sql_block";
-const CONFIG_FILE_FILTER="file_block";
-const CONFIG_SPAM_FILTER="spam_filter_enabled";
-const CONFIG_CACHE_TYPE = 'cache_type';
-const CONFIG_LOG_FILE = 'log_file';
-const CONFIG_RR_1M = 'rr_1m';
-const CONFIG_RR_5M = 'rr_5m';
-const CONFIG_PROFANITY = 'profanity_filter';
-const CONFIG_CHECK_DOMAIN = 'check_domain';
-
-const REQUEST_UA = 'USER_AGENT';
-const REQUEST_IP = 'IP';
-const REQUEST_HOST = 'HOST';
-const REQUEST_COOKIE = 'COOKIE';
-const REQUEST_ACCEPT = 'ACCEPT';
-const REQUEST_SCHEME = 'SCHEME';
-const REQUEST_PATH = 'PATH';
-const REQUEST_METHOD = 'METHOD';
-
-const BITFIRE_INPUT = '_bitfire';
-
-const THROTTLE_LOCK_TIME = 600;
-const THROTTLE_LOCK_FILE = ".bitfire.lock";
-
-const FAIL_NOT = 0;
-
-const PROFANITY = "anal|anus|arse|ass|asss|bastard|bitch|cock|cocksuck|coon|crap|cunt|cyberfuck|damn|dick|douche|fag|faggot|fuck|fuck\s+you|fuckhole|god damn|gook|homoerotic|hore|lesbian|mother|fucker|motherfuck|motherfucker|negro|nigger|penis|penisfucker|piss|porn|pussy|retard|sex|shit|slut|son\s+of\s+a\s+bitch|tits|viagra|whore";
-
+require_once WAF_DIR."const.php";
 require_once WAF_DIR."storage.php";
 require_once WAF_DIR."util.php";
 require_once WAF_DIR."english.php";
 
 
+class Headers
+{
+    public $requested_with = '';
+    public $fetch_mode = '';
+    public $accept;
+    public $content;
+    public $encoding;
+    public $dnt;
+    public $upgrade_insecure;
+}
+
 class Request
 {
-    public $get;
-    public $post;
-    public $full;
+    public $headers;
+    public $host;
+    public $path;
     public $ip;
+    public $method;
+    public $port;
+    public $scheme;
+
+
+    public $get;
+    public $get_freq = array();
+    public $post;
+    public $post_freq = array();
+    public $cookies;
+
     public $agent;
     public $referer;
-    public $cookies;
-    public $host;
-    public $method;
+    public $ajax = false;
 }
 
 
@@ -104,8 +67,9 @@ class MatchType
         $this->_block_time = $block_time;
     }
 
-    public function match(array $request) : bool {
-        $this->_matched = $request[$this->_key] ?? '';
+    public function match(\BitFire\Request $request) : bool {
+        $key = $this->_key;
+        $this->_matched = $request->$key ?? '';
         $result = false;
         switch ($this->_type) {
             case MatchType::EXACT: 
@@ -162,7 +126,7 @@ class Block {
 class Config {
     public static $_options = null;
 
-    public static function set(array $options) {
+    public static function set(array $options) : void {
         Config::$_options = $options;
     }
 
@@ -235,9 +199,7 @@ class BitFire
 
         if (Config::enabled(CONFIG_ENABLED)) {
             $this->uid = substr(\uniqid(), 5, 8);
-
-            // process _SERVER _GET _POST variables into this->_request
-            $this->_request = process_request($_GET, $_POST, $_SERVER, $_COOKIE);
+            $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
             
             // we will need cache storage and secure cookies
             $this->cache = \TF\CacheStorage::get_instance();
@@ -262,16 +224,18 @@ class BitFire
     }
 
     protected function api_call() {
-        if ($this->_request['GET']['_secret']??'no' === Config::str(CONFIG_SECRET)) {
-            require WAF_DIR."api.php";
+        if ($this->_request->get[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET)) {
+            require_once WAF_DIR."api.php";
 
-            $fn = '\\BitFire\\' . $this->_request['GET'][BITFIRE_COMMAND];
+            $fn = '\\BitFire\\' . $this->_request->get[BITFIRE_COMMAND]??'nop';
             
             if (!in_array($fn, BITFIRE_API_FN)) { exit("unknown function [$fn]"); }
             $result = $fn($this->_request);
             exit ($result);
+        } else if ($this->_request->get[BITFIRE_INTERNAL_PARAM]??'' === 'report') {
+            require_once WAF_DIR."headers.php";
+            exit (\BitFireHeader\header_report($this->_request));
         }
-        
     }
 
     /**
@@ -294,7 +258,10 @@ class BitFire
         return filter_block_exceptions($block, self::$_exceptions);
     }
     
-    protected static function reporting(Block $block, array $request) {
+    /**
+     * TODO: format blocks the same way as reports
+     */
+    protected static function reporting(Block $block, \BitFire\Request $request) {
         $data = array('time' => date('r'),
             'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
             'block' => $block,
@@ -330,13 +297,13 @@ class BitFire
         // don't cache internal requests... (infinate loop)
         if (isset($_GET[BITFIRE_INPUT])) { return; }
 
-        // if the request is to the homepage with no parameters, its possible to cache
+        // if the request is to the homepage with no parameters, it is possible to cache
         $tracking_cookie = Config::str(CONFIG_USER_TRACK_COOKIE, '_bitf');
         $site_cookies = array_filter(array_keys($_COOKIE), function($name) use ($tracking_cookie) { return stripos($name, $tracking_cookie) === false; });
 
         if (Config::int(CONFIG_MAX_CACHE_AGE, 0) > 0 &&
-            $this->_request[REQUEST_PATH] === '/' && 
-            $this->_request[REQUEST_METHOD] === "GET" &&
+            $this->_request->path === '/' && 
+            $this->_request->method === "GET" &&
             count($_GET) === 0 && 
             count($site_cookies) === 0) {
                 // update the cache after this request
@@ -347,7 +314,7 @@ class BitFire
                     // add a js challenge if the request is not to a bot
                     if ($this->bot_filter != null && $this->bot_filter->browser['bot'] == false) {
                         echo \BitFireBot\make_js_challenge(
-                            $this->_request[REQUEST_IP],
+                            $this->_request->ip,
                             Config::str(CONFIG_USER_TRACK_PARAM),
                             Config::str(CONFIG_ENCRYPT_KEY),
                             Config::str(CONFIG_USER_TRACK_COOKIE));
@@ -375,8 +342,10 @@ class BitFire
      */
     public function inspect() : \TF\Maybe {
         // dashboard requests, TODO: MOVE TO api.php
-        require_once WAF_DIR."dashboard.php";
-        serve_dashboard($this->_request[REQUEST_PATH]);
+        if ($this->_request->path === Config::str(CONFIG_DASHBOARD_PATH)) {
+            require_once WAF_DIR."dashboard.php";
+            serve_dashboard($this->_request->path);
+        }
         
 
         $block = \TF\Maybe::$FALSE;

@@ -1,20 +1,28 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 
+use function TF\really_writeable;
+
 function add_country($data) {
     if (!is_array($data) || count($data) < 1) { return $data; }
-    $map = json_decode(file_get_contents(WAF_DIR . "cache/country.json"), true);
+    $map = \TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"));
     $result = array();
     foreach ($data as $report) {
         $code = \TF\ip_to_country($report['ip'] ?? '');
+//print_r($report);
         $report['country'] = $map[$code];
         $result[] = $report; 
     }
     return $result;
 }
 
+function is_dis() {
+    $result = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR."config.ini.php");
+    return ($result) ? " disabled " : "";
+}
+
 function serve_dashboard(string $path) {
-    if ($path === "/bitfire") {
+    if ($path === Config::str(CONFIG_DASHBOARD_PATH)) {
 
         if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] !== Config::str('password', 'default_password')) {
             header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
@@ -22,14 +30,19 @@ function serve_dashboard(string $path) {
             exit;
         }
 
+        $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR."config.ini.php");
+
         $x = @file(Config::str(CONFIG_REPORT_FILE));
         $report_count = (is_array($x)) ? count($x) : 0;
         $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
-        $tmp = add_country(json_decode('['. join(",", \TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)) . ']', true));
+        $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)));
+//\TF\dbg($tmp);
         $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
         
-        $tmp = add_country(\TF\CacheStorage::get_instance()->load_data("log_data"));
-        $blocks = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
+        $src = (Config::enabled('block_file')) ?
+            \TF\read_last_lines(Config::str(CONFIG_BLOCK_FILE), 20, 2500) :
+            \TF\CacheStorage::get_instance()->load_data("log_data");
+        $blocks = (isset($tmp[0])) ? array_reverse(add_country(\TF\un_json_array($src)), true) : array();
 
         exit(require WAF_DIR . "views/dashboard.html");
     }

@@ -1,5 +1,5 @@
 #!/bin/sh
-ver=1.0.4
+ver=1.0.5
 where=$( dirname $(realpath "$0") )
 config="$where/config.ini"
 echo "\e[0;36mBitFire $ver \e[0mconfig: $config"
@@ -16,7 +16,7 @@ echo "encryption keys updated"
 echo "please write down the new dashboard password: \"\e[0;35m$pass\e[0m\""
 
 
-#echo "These php.ini files do not currently have auto_prepend_file"
+# echo "These php.ini files do not currently have auto_prepend_file"
 rm -f /tmp/_bitfire_ini
 find $(dirname $(dirname `php -i | grep '(php.ini)' | cut -d '>' -f 2`)) -name php.ini | xargs egrep -l -e '\s*[^;\s]\s*auto_prepend_file' > /tmp/_bitfire_ini
 find $(dirname $(dirname `php -i | grep '(php.ini)' | cut -d '>' -f 2`)) -name php.ini | xargs egrep -l -e 'auto_prepend_file\s*=\s*""' >> /tmp/_bitfire_ini
@@ -27,10 +27,10 @@ mv /tmp/_bitfire_ini2 /tmp/_bitfire_ini
 for file in $(cat /tmp/_bitfire_ini); do
     echo 
     echo "\e[0;34m$file \e[0;90m"
-    echo "sudo sed -i 's/^.*auto_prepend_file.*$/auto_prepend_file = "startup.php"/' $file\e[m";
+    echo "sudo sed -i 's/^.*auto_prepend_file.*$/auto_prepend_file = "$where/startup.php"/' $file\e[m";
     read -p "add BitFire support to $file (y/n)? " ans 
     case $ans in
-        [yY]* ) sudo sed -i 's/^.*auto_prepend_file.*$/auto_prepend_file = "startup.php"/' $file;;
+        [yY]* ) sudo sed -i "s/^.*auto_prepend_file.*$/auto_prepend_file = \"$where/startup.php\"/" $file;;
     esac
 done
 rm -f /tmp/_bitfire_ini

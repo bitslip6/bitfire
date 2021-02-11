@@ -2,10 +2,6 @@
 namespace BitFire;
 use function TF\map_reduce;
 
-if (defined("BIT_FILTER")) { return; }
-define ("BIT_FILTER", 1);
-
-include_once("english.php");
 const MIN_SQL_CHARS=8;
 
 const SQL_WORDS = array('add', 'all', 'alter', 'ascii', 'between', 'benchmark', 'case', 'contains', 'concat',
@@ -53,17 +49,17 @@ class WebFilter {
             $cache->load_or_cache("webvalues2", \TF\DAY, '\TF\recache_file', WAF_DIR.'cache/values.raw'));
     }
 
-    public function inspect(array $request) : \TF\Maybe {
+    public function inspect(\BitFire\Request $request) : \TF\Maybe {
 
         $block = \TF\Maybe::$FALSE;
         if (Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            $block->doifnot('\TF\map_whilenot', $request['GET'], $this->_reducer, false);
-            $block->doifnot('\TF\map_whilenot', $request['POST'], $this->_reducer, false);
-            $block->doifnot('\TF\map_whilenot', $request['COOKIE'], $this->_reducer, false);
+            $block->doifnot('\TF\map_whilenot', $request->get, $this->_reducer, false);
+            $block->doifnot('\TF\map_whilenot', $request->post, $this->_reducer, false);
+            $block->doifnot('\TF\map_whilenot', $request->cookies, $this->_reducer, false);
         }
 
         if (Config::enabled(CONFIG_SPAM_FILTER)) {
-            $block = $block->doifnot('\BitFire\search_spam', $request['FULL']);
+            $block = $block->doifnot('\BitFire\search_spam', http_build_query($request->get) . http_build_query($request->post));
         }
 
         // no easy way to pass these three parameters, a bit ugly for now...
@@ -82,13 +78,13 @@ class WebFilter {
 /**
  * filter for SQL injections
  */
-function sql_filter(array $request) : \TF\Maybe {
-    foreach ($request['GET'] as $key => $value) {
-        $maybe = search_sql($key, $value, $request['GETC'][$key]);
+function sql_filter(\BitFire\Request $request) : \TF\Maybe {
+    foreach ($request->get as $key => $value) {
+        $maybe = search_sql($key, $value, $request->get_freq[$key]);
         if (!$maybe->empty()) { return $maybe; }
     }
-    foreach ($request['POST'] as $key => $value) {
-        $maybe = search_sql($key, $value, $request['POSTC'][$key]);
+    foreach ($request->post as $key => $value) {
+        $maybe = search_sql($key, $value, $request->post_freq[$key]);
         if (!$maybe->empty()) { return $maybe; }
     }
     return \TF\Maybe::$FALSE;
@@ -132,7 +128,7 @@ function check_php_tags(array $file) : \TF\Maybe {
 function check_ext_mime(array $file) : \TF\Maybe {
      // check file extensions...
     $info = pathinfo($file["tmp_name"]);
-    if (\TF\endsWith(strtolower($file["name"]), "php") ||
+    if (\TF\ends_with(strtolower($file["name"]), "php") ||
         in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
         return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
     }
@@ -221,9 +217,9 @@ function check_removed_sql(StringResult $stripped_comments, int $total_control, 
  * remove sql strings 
  */
 function strip_strings(string $value) : StringResult {
-    $stripped = map_reduce(array("/\s+/sm" => ' ', "/^[^']+/sm" => '', "/'[^']+$/sm" => '', "/'[^']*'/sm" => '', "/as\s\w+/sm" => ''), function($key, $value, $carry) {
-        return preg_replace($key, $value, $carry);
-    });
+    $stripped = map_reduce(array("/\s+/sm" => ' ', "/^[^']+/sm" => '', "/'[^']+$/sm" => '', "/'[^']*'/sm" => '', "/as\s\w+/sm" => ''), function($search, $replace, $carry) {
+        return preg_replace($search, $replace, $carry);
+    }, $value);
     return new StringResult($stripped, strlen($stripped));
 }
 
