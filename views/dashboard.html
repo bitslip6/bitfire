@@ -778,7 +778,7 @@
         data-placement="top"
         data-trigger="focus"
         title="Details"
-        data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT))); ?>"><?php echo $line['eventId'] ?? '00000'; ?></a>
+        data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT))); ?>"><?php echo $line['eventid'] ?? '00000'; ?></a>
         </td>
 
       <td class="wrap"><?php echo htmlspecialchars($line['item'])?></td>
