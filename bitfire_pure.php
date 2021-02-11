@@ -16,23 +16,6 @@ function is_report(Block $block) : bool {
     return (Config::str($feature_name) === "report");
 }
 
-/**
- * filter reporting features
- */
-function reporting(Block $block, array $request) {
-    $data = array('time' => date('r'),
-        'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
-        'ip' => BitFire::get_instance()->_request[REQUEST_IP],
-        'block' => $block,
-        'request' => $request);
-    $bf = BitFire::get_instance()->bot_filter;
-    if ($bf != null) {
-        $data['browser'] = $bf->browser;
-        $data['rate'] = $bf->ip_data;
-    }
-    $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
-    file_put_contents(Config::str(CONFIG_REPORT_FILE), json_encode($data, $opts) . "\n", FILE_APPEND);
-}
 
 /**
  * helper function for api dashboard
@@ -50,24 +33,31 @@ function filter_block_exceptions(Block $block, array $exceptions) : Maybe {
     return Maybe::of(array_reduce($exceptions, '\BitFire\match_block_exception', $block));
 }
 
-function process_server(array $server) : array {
+function process_server2(array $server) : Request {
     $url = parse_url($server['REQUEST_URI'] ?? '//localhost/');
-    return array(
-        REQUEST_HOST => parse_host_header($server['HTTP_HOST'] ?? ''),
-        "PATH" => $url['path'] ?? '/',
-        REQUEST_IP => process_ip($server),
-        REQUEST_METHOD => ($server['REQUEST_METHOD'] ?? 'GET'),
-        "PORT" => $server['SERVER_PORT'] ?? 8080,
-        'REQUESTED_WITH' => ($server['HTTP_X_REQUESTED_WITH'] ?? null),
-        'FETCH_MODE' => ($server['HTTP_SEC_FETCH_MODE'] ?? null),
-        REQUEST_UA => strtolower($server['HTTP_USER_AGENT'] ?? ''),
-        REQUEST_SCHEME => ($server['REQUEST_SCHEME'] ?? 'http'),
-        REQUEST_ACCEPT => ($server['HTTP_ACCEPT_ENCODING']??'') . ' . ' . ($server['HTTP_ACCEPT_ENCODING']??''),
-        'ACCEPT' => ($server['HTTP_ACCEPT'] ?? ''),
-        'UPGRADE_INSECURE' => (($server['REQUEST_SCHEME']??'http') == 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? '') : '',
-        'CONTENT_TYPE' => ($server['HTTP_CONTENT_TYPE'] ?? 'text/html')
-    );
+    $request = new Request();
+    $request->ip = process_ip($server);
+    $request->host = parse_host_header($server['HTTP_HOST'] ?? '');
+    $request->agent = strtolower($server['HTTP_USER_AGENT'] ?? '');
+    $request->path = ($url['path'] ?? '/');
+    $request->method = ($server['REQUEST_METHOD'] ?? 'GET');
+    $request->port = ($server['SERVER_PORT'] ?? 8080);
+    $request->scheme = ($server['REQUEST_SCHEME'] ?? 'http');
+
+    $headers = new Headers();
+    $headers->requested_with = ($server['HTTP_X_REQUESTED_WITH'] ?? '');
+    $headers->fetch_mode = ($server['HTTP_SEC_FETCH_MODE'] ?? '');
+    $headers->encoding = ($server['HTTP_ACCEPT_ENCODING'] ?? '');
+    $headers->accept = ($server['HTTP_ACCEPT'] ?? '');
+    $headers->content = ($server['HTTP_CONTENT_TYPE'] ?? '');
+    $headers->dnt = ($server['HTTP_DNT'] ?? '');
+    $headers->upgrade_insecure = ($request->scheme === 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? null) : null;
+    $headers->content_type = ($server['HTTP_CONTENT_TYPE'] ?? 'text/html');
+
+    $request->headers = $headers;
+    return $request;
 }
+
 
 function process_ip(array $server) : string {
     $header_name = strtoupper(Config::str('ip_header', 'REMOTE_ADDR'));
@@ -87,40 +77,28 @@ function process_ip(array $server) : string {
 }
 
 
-// parse the request into a single passable object
-// PURE
-function process_request(array $get, array $post, array $server, array $cookie = array()) : array {
-
-    $request = process_server($server);
-    $request["GET"] = \TF\map_mapvalue($get, '\\BitFire\\each_input_param');
-    $request["POST"] = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
-    $request['FULL'] = http_build_query($request['GET']) . " POST " .http_build_query($request['POST']);
-    $request[REQUEST_COOKIE] = $cookie;
-
-        
-    $get_counts = array();
-    // count character frequencies
-    foreach($request['GET'] as $key => $value) {
-        $get_counts[$key] = (is_array($value)) ? 
+function freq_map(array $inputs) : array {
+    $r = array();
+    foreach($inputs as $key => $value) {
+        $r[$key] = (is_array($value)) ? 
             array_reduce($value, '\\BitFire\\get_counts_reduce', array()) :
             get_counts($value);
     }
-    $request['GETC'] = $get_counts;
-    
-    $post_counts = array();
-    // count character frequencies
-    foreach($request['POST'] as $key => $value) {
-        $post_counts[$key] = (is_array($value)) ? 
-            array_reduce($value, 'BitFire\\get_counts_reduce', array()) :
-            get_counts($value);
-    }
-    $request['POSTC'] = $post_counts;
+    return $r;
+}
 
-    // set the ajax flag
-    $request['ajax'] = is_ajax($request);
+function process_request2(array $get, array $post, array $server, array $cookie = array()) : Request {
+    $request = process_server2($server);
+    $request->get = \TF\map_mapvalue($get, '\\BitFire\\each_input_param');
+    $request->post = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
+    $request->cookies = $cookie;
+    $request->get_freq = freq_map($request->get);
+    $request->get_post = freq_map($request->post);
+    $request->ajax = is_ajax($request);
 
     return $request;
 }
+
 
 function each_input_param($in) {
     // we don't inspect numeric values because they would pass all tests
@@ -176,32 +154,32 @@ function get_counts_reduce(array $carry, string $input) : array {
  * TODO: add testing for some file download types? (*cough WF *cough)
  * PURE
  */
-function is_ajax(array $request) : bool {
-    if (isset($request['ajax'])) { return $request['ajax']; }
+function is_ajax(\BitFire\Request $request) : bool {
+    if ($request->ajax) { return $request->ajax; }
     
     $ajax = false;
-    if ($request[REQUEST_METHOD] !== 'GET') { $ajax = true; }
+    if ($request->method !== 'GET') { $ajax = true; }
     // path is a  wordpress ajax request
-    else if (\stripos($request['PATH'], "ajax.php") !== false) { $ajax = true; }
+    else if (\stripos($request->path, "ajax") !== false) { $ajax = true; }
     
     // accept || content type is requested as javascript
     // if the client is looking for something other than html, it's ajax
-    else if (\stripos($request['ACCEPT'], 'text/html') === false &&
-        \stripos($request['CONTENT_TYPE'], 'text/html') === false) { $ajax = true; }
+    else if (\stripos($request->headers->accept, 'text/html') === false &&
+        \stripos($request->headers->content, 'text/html') === false) { $ajax = true; }
 
     // often these are set on fetch or xmlhttp requests
-    else if ($request['REQUESTED_WITH'] || $request['FETCH_MODE'] === 'cors' ||
-        $request['FETCH_MODE'] === 'websocket') { $ajax = true; }
+    else if ($request->headers->requested_with !== '' || $request->headers->fetch_mode === 'cors' ||
+        $request->headers->fetch_mode === 'websocket') { $ajax = true; }
 
     // fall back to using upgrade insecure (should only come on main http requests), this should work for all major browsers
     else {
-        $ajax = ($request[REQUEST_SCHEME] == "http" && ($request['UPGRADE_INSECURE'] === null || \strlen($request['UPGRADE_INSECURE']) < 1)) ? true : false;
+        $ajax = ($request->scheme == "http" && ($request->headers->upgrade_insecure === null || \strlen($request->headers->upgrade_insecure) < 1)) ? true : false;
     }
     return $ajax;
 }
 
 // opposite of is_ajax
-function is_not_ajax(array $request) {
+function is_not_ajax(Request $request) : bool {
     return !is_ajax($request);
 }
 
@@ -244,8 +222,8 @@ function getIP(string $remote_addr = '127.0.0.2') : string {
 }
 
 // return true if  request[path] contains url_match
-function url_contains(array $request, string $url_match) : bool {
-    return stristr($request['PATH'], $url_match) !== false;
+function url_contains(\BitFire\Request $request, string $url_match) : bool {
+    return stristr($request->path, $url_match) !== false;
 }
 
 
@@ -273,7 +251,7 @@ function replace_profanity(string $data) : string {
 
 
 
-function post_request(array $request, ?Block $block, ?array $ip_data) {
+function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data) {
     $response_code = http_response_code();
     if ($block === null && $response_code < 300) { return; } 
 
@@ -288,8 +266,8 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     }
 
     if ($block === null && !$bot) { return; }
-    if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot", $request[REQUEST_UA], 0); }
-    else if ($block === null) { $block = new Block(31002, "return code", strval($response_code), $request[REQUEST_UA], 0); }
+    if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot", $request->agent, 0); }
+    else if ($block === null) { $block = new Block(31002, "return code", strval($response_code), $request->agent, 0); }
 
 
     $class = intval($block->code / 1000) * 1000;
@@ -299,11 +277,12 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     $data["whitelist"] = $whitelist;
     $data["valid"] = $valid;
     $data["classId"] = $class;
+    $data["headers"] = headers_list();
     
     // cache the last 15 blocks
     $cache = \TF\CacheStorage::get_instance();
     $cache->rotate_data("log_data", $data, 15);
-    $ip = ip2long($request[REQUEST_IP]);
+    $ip = ip2long($request->ip);
     $cache->update_data("metrics-".date('G'), function ($metrics) use ($class, $ip) {
         $metrics[$class] = ($metrics[$class]??0) + 1;
         $ip = ($ip < 100000) ? ip2long('127.0.0.1') : $ip; 
@@ -313,7 +292,7 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
 
 
     $content = json_encode($data)."\n";
-    if (Config::enabled('report_file') && $block->code === 31002) {
+    if (Config::enabled('report_file') && $data["pass"] === true) {
         file_put_contents(Config::str('report_file'), $content, FILE_APPEND);
     }  else if (Config::enabled('block_file')) {
         file_put_contents(Config::str('block_file'), $content, FILE_APPEND);
@@ -322,16 +301,16 @@ function post_request(array $request, ?Block $block, ?array $ip_data) {
     $content, array("Content-Type" => "application/json"));
 }
 
-function make_post_data(array $request, Block $block, ?array $ip_data) {
+function make_post_data(\BitFire\Request $request, Block $block, ?array $ip_data) {
     
     $data = array(
-        "ip" => $request[REQUEST_IP],
-        "scheme" => $request[REQUEST_SCHEME],
-        "ua" => $request[REQUEST_UA] ?? '',
-        "url" => $request[REQUEST_HOST] . ':' . $request['PORT'] . $request[REQUEST_PATH],
-        "params" => param_to_str($request['GET'], true),
-        "post" => param_to_str($request['POST'], true),
-        "verb" => $request[REQUEST_METHOD],
+        "ip" => $request->ip,
+        "scheme" => $request->scheme,
+        "ua" => $request->agent ?? '',
+        "url" => $request->host . ':' . $request->port . $request->path,
+        "params" => param_to_str($request->get, true),
+        "post" => param_to_str($request->post, true),
+        "verb" => $request->method,
         "ts" => microtime(true),
         "tv" => date("D H:i:s ") . date('P'),
         "referer" => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',

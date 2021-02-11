@@ -3,6 +3,8 @@ namespace TF;
 
 if (defined("_TF_UTIL")) { return; }
 
+
+const DS = DIRECTORY_SEPARATOR;
 const _TF_UTIL=true;
 const WEEK=86400*7;
 const DAY=86400;
@@ -26,19 +28,18 @@ function is_regex_reduced($value) : callable { return function($initial, $argume
 function find_regex_reduced($value) : callable { return function($initial, $argument) use ($value) { return (preg_match("/$argument/", $value) <= 0 ? $initial : $value); }; }
 function is_contain($value) : callable { return function($argument) use ($value) { return (strpos($argument, $value) !== false); }; }
 function is_not_contain($value) : callable { return function($argument) use ($value) { return (strpos($argument, $value) === false); }; }
-function startsWith(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
-function endsWith(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
+function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
+function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
 function say($color = '\033[39m', $prefix = "") : callable { return function($line) use ($color, $prefix) : string { return (strlen($line) > 0) ? "{$color}{$prefix}{$line}\033[32m\n" : ""; }; } 
 function last_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, -1, 1)[0] : $default; }
 function first_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, 0, 1)[0] : $default; }
 function random_str(int $len) : string { return substr(base64_encode(random_bytes($len)), 0, $len); }
 function un_json(string $data) { return json_decode($data, true, 6); }
 function en_json($data) : string { return json_encode($data); }
-function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (endsWith($key, $item)) { return true; } } return false; }
-// dechex: hexdec, 15, cpu: 12, pack: 2/2, 
+function un_json_array(array $data) { return \TF\un_json('['. join(",", $data) . ']'); }
+function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
-function keep_only_size(Maybe $data, int $size) : Maybe { while ($data->size() > $size) { $data = \TF\Maybe::of(array_shift($data())); } return $data; }
 
 
 /**
@@ -70,103 +71,6 @@ function partial_right(callable $fn, ...$args) : callable {
     return function(...$x) use ($fn, $args) {
         return $fn(...array_merge($x, $args));
     };
-}
-
-/**
- * create a new function composed of $fns()
- */
-function compose(...$fns) {
-    return \array_reduce(
-        $fns, function ($carry, $item) {
-            return function ($x) use ($carry, $item) { return $item($carry($x)); };
-        });
-}
-
-/**
- * functional helper for chaining function output *YAY MONOIDS!*
- * $fn = pipe("fn1", "fn2", "fn3");
- * $fn($data);
- */
-function pipe(callable ...$fns) {
-    return function($x) use ($fns) {
-        return array_reduce($fns, function($acc, $fn) {
-            return $fn($acc);
-        }, $x);
-    };
-}
-
-/**
- * functional helper for calling methods on an input and returning all values ORed together
- * $fn = or_pipe("test1", "test2");
- * $any_true = $fn($data);
- */
-function or_pipe(callable ...$fns) {
-    return function($x, bool $initial = false) use ($fns) {
-        foreach ($fns as $fn) {
-            $initial |= $fn($x);
-        }
-        return $initial;
-    };
-}
-
-/**
- * functional helper for calling methods on an input and returning all values ORed together
- * $fn = and_pipe("test1", "test2");
- * $all_true = $fn($data, false);
- */
-function and_pipe(callable ...$fns) {
-    return function($x, bool $initial = true) use ($fns) {
-        foreach ($fns as $fn) {
-            $initial &= $fn($x);
-        }
-        return $initial;
-    };
-}
-
-
-class Reader {
-    protected $_fn;
-    protected $_names;
-    protected function __construct(callable $fn) { $this->_fn = $fn; }
-    public static function of(callable $fn) { 
-        return new static($fn);
-    }
-    // binds all parameters IN ORDER at the end of the function
-    // eg: bind('p1', 'p2') = call(x,x,p1,p2);
-    public function bind(...$param_names) {
-        $this->_names = $param_names;
-        return $this;
-    }
-    // binds all parameters IN REVERSEORDER at the end of the function
-    // eg: bind('p1', 'p2') = call(x,x,p2,p1);
-    public function bind_l(...$param_names) {
-        $this->_names = array_reverse($param_names);
-        return $this;
-    }
-    // runs the function with arguments IN ORDER at the BEGINNING of the function
-    // eg: bind('p1','p2')->run(a1, a2) = call(a1,a2,p1,p2);
-    public function run(array $ctx, ...$args) {
-        $fn = $this->_fn;
-        return $fn(...array_merge($args, $this->bind_args($ctx)));
-    }
-    // runs the function with arguments IN ORDER at the END of the function
-    // eg: bind('p1','p2')->run(a1, a2) = call(p1,p2,a1,a2);
-    public function run_l(array $ctx, ...$args) {
-        $fn = $this->_fn;
-        return $fn(...array_merge($this->bind_args($ctx), $args));
-    }
-    protected function bind_args(array $ctx) : array {
-        $bind_args = array();
-        for($i=0,$m=count($this->_names);$i<$m;$i++) {
-            $bind_args[] = $ctx[$this->_names[$i]];
-        }
-        return $bind_args;
-    }
-    // helper method to invoke ->run, eg:
-    // ->bind(foo)->run(arg1) = ->bind(foo)(arg1);
-    public function __invoke(array $ctx, ...$args) {
-        return $this->run($ctx, ...$args);
-    }
 }
 
 
@@ -271,17 +175,8 @@ if (!function_exists('getallheaders')) {
 
 
 /**
- * load raw files (ct: 228)
- * trim: cpu: 37
- * substr: 17
- * strlen: 1
- * lookahead: 121
- * substr: 228/99
- * hexdec: 102
- * between 106
- * uudecode: 71
- * lookbehind: 254
- * total: ct:2 cpu: 1299, wt: 1298
+ * double time
+ * PURE
  */
 function recache(array $lines) : array {
     $z = lookahead(trim($lines[0]), '');
@@ -299,8 +194,12 @@ function recache(array $lines) : array {
     return $a;
 }
 
+/**
+ * recache file
+ * NOT PURE
+ */
 function recache_file(string $filename) {
-    return recache(file($filename, FILE_IGNORE_NEW_LINES | FILE_IGNORE_NEW_LINES));
+    return recache(file($filename, FILE_IGNORE_NEW_LINES));
 }
 
 /**
@@ -310,10 +209,10 @@ function apidata($method, $params) {
 
     $url = array_reduce(array_keys($params), function($c, $key) use ($params) {
         return $c . "&$key=" . $params[$key];
-    }, "http://dev.bitslip6.com:9090/waf/$method?apikey=__KEY__");
+    }, "http://www.bitslip6.com:9090/waf/$method?apikey=__KEY__");
 
     $data = @\file_get_contents($url, false, stream_context_create(array('http'=> array('timeout' => 3))));
-    return ($data !== false) ? json_decode($data, true) : array("status" => 0);
+    return ($data !== false) ? \TF\un_json($data) : array("status" => 0);
 }
 
 
@@ -329,7 +228,10 @@ function encrypt_ssl(string $password, string $text) : string {
     return openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
 }
 
-// aes-128-cbc decryption of data, return raw value
+/**
+ * aes-128-cbc decryption of data, return raw value
+ * PURE
+ */ 
 function raw_decrypt(string $cipher, string $iv, string $password) {
     return openssl_decrypt($cipher, "AES-128-CBC", $password, 0, $iv);
 }
@@ -339,6 +241,7 @@ function raw_decrypt(string $cipher, string $iv, string $password) {
  * @param string $password the password to decrypt with
  * @param string $cipher the message encrypted with encrypt_ssl
  * @return Maybe with the original string data 
+ * PURE
  */
 function decrypt_ssl(string $password, ?string $cipher) : Maybe {
 
@@ -351,40 +254,10 @@ function decrypt_ssl(string $password, ?string $cipher) : Maybe {
         ->then($decryptor, true);
 }
 
-/**
- * get the path to the system lock file
- */
-function throttle_lockfile() {
-    $dir = \sys_get_temp_dir(); 
-    assert(\file_exists($dir), TDNE . ": [$dir]");
-    return "$dir/bitfire-error.lock";
-}
 
 /**
- * recursively perform a function over directory traversal.
- */
-/*
-function file_recurse(string $dirname, callable $fn) :void {
-    $maxfiles = 1000;
-    if ($dh = \opendir($dirname)) {
-        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0) {
-            $path = $dirname . '/' . $file;
-            if (!$file || $file === '.' || $file === '..' || is_link($file)) {
-                continue;
-            } if (is_dir($path)) {
-                file_recurse($path, $fn);
-            }
-            else {
-                \call_user_func($fn, $path);
-            }
-        }
-        \closedir($dh);
-    }
-}
-*/
-
-/**
- * get a list from the remote api server, cache it in shmop cache
+ * update blocking lists
+ * NOT PURE
  */
 function get_remote_list(string $type, \TF\Storage $cache) {
     return $cache->load_or_cache("remote-{$type}", WEEK, function($type) {
@@ -396,6 +269,7 @@ function get_remote_list(string $type, \TF\Storage $cache) {
 /**
  * calls $carry $fn($key, $value, $carry) for each element in $map
  * allows passing optional initial $carry, defaults to empty string
+ * PURE as $fn
  */
 function map_reduce(array $map, callable $fn, $carry = "") {
     foreach($map as $key => $value) { $carry = $fn($key, $value, $carry); }
@@ -404,6 +278,7 @@ function map_reduce(array $map, callable $fn, $carry = "") {
 
 /**
  * more of a map_whilenot
+ * PURE as $fn
  */
 function map_whilenot(array $map, callable $fn, $input) {
     $maybe = \TF\Maybe::$FALSE;
@@ -413,20 +288,13 @@ function map_whilenot(array $map, callable $fn, $input) {
     return $maybe;
 }
 
-function map_if(array $map, callable $fn, $input) {
-    $maybe = \TF\Maybe::$FALSE;
-    foreach($map as $key => $value) { 
-        $maybe->do($fn($key, $value, $input));
-    }
-    return $maybe;
-}
-
 
 /**
  * calls $carry $fn($key, $value, $carry) for each element in $map
  * allows passing optional initial $carry, defaults to empty string
+ * PURE as $fn
  */
-function map_mapvalue(array $map = null, callable $fn) : array {
+function map_mapvalue(?array $map = null, callable $fn) : array {
     $result = array();
     foreach($map as $key => $value) {
         $tmp = $fn($value);
@@ -438,31 +306,34 @@ function map_mapvalue(array $map = null, callable $fn) : array {
 }
 
 
-
 /**
- * glues a key and value together in url format (urlencodes $value also!)
+ * counts number of : >= 3
+ * PURE
  */
-function param_glue(string $key, string $value, string $carry = "") : string {
-    $carry = ($carry === "") ? "" : "$carry&";
-    return "$carry$key=".urlencode($value);
-}
-
-// return true if a string is an ipv6 address
 function is_ipv6(string $addr) : bool {
     return substr_count($addr, ':') >= 3;
 }
 
-function ip_to_file($ip_num) {
-	$n = floor($ip_num/100000000);
-	return "cache/ip.$n.bin";
+/**
+ * find the IP DB for a given IP
+ * TODO: split into more files, improve distribution
+ */
+function ip_to_file(int $ip_num) {
+    $n = floor($ip_num/100000000);
+	$file = "cache/ip.$n.bin";
+    debug("ip [%d] -> [%s]", $ip_num, $file);
+    return $file;
 }
 
 /**
- * ugly AF
+ * ugly AF returns the country number
+ * depends on IP DB
+ * NOT PURE
  */
 function ip_to_country($ip) : int {
     if (empty($ip)) { return 0; }
 	$n = ip2long($ip);
+    if ($n === false) { return 0; }
 	$d = file_get_contents(WAF_DIR.ip_to_file($n));
 	$len = strlen($d);
 	$off = 0;
@@ -475,8 +346,11 @@ function ip_to_country($ip) : int {
 }
 
 
-// reduce a string to a value by iterating over each character
-function str_reduce(string $string, callable $fn, string $prefix = "", string $suffix = "") {
+/**
+ * reduce a string to a value by iterating over each character
+ * PURE
+ */ 
+function str_reduce(string $string, callable $fn, string $prefix = "", string $suffix = "") : string {
     for ($i=0,$m=strlen($string); $i<$m; $i++) {
         $prefix .= $fn($string[$i]);
     }
@@ -487,6 +361,11 @@ function str_reduce(string $string, callable $fn, string $prefix = "", string $s
  * reverse ip lookup, takes ipv4 and ipv6 addresses, 
  */
 function reverse_ip_lookup(string $ip) : Maybe {
+    if (\BitFire\Config::str('dns_service', 'localhost')) {
+        debug("gethostbyaddr %s", $ip);
+        return Maybe::of(gethostbyaddr($ip));
+    }
+
     $lookup_addr = ""; 
     if (is_ipv6($ip)) {
         // remove : and reverse the address
@@ -503,19 +382,21 @@ function reverse_ip_lookup(string $ip) : Maybe {
 }
 
 /**
- * queries quad 1 for dns data, no SSL
- * @returns array("name", "data")
+ * queries quad 1 for dns data, no SSL or uses local DNS services
+ * @returns Maybe of the result
  */
 function ip_lookup(string $ip, string $type = "A") : Maybe {
-    $dns = null;
     assert(in_array($type, array("A", "AAAA", "CNAME", "MX", "NS", "PTR", "SRV", "TXT", "SOA")), "invalid dns query type [$type]");
+    debug("ip_lookup %s / %s", $ip, $type);
+    $dns = null;
+    if (\BitFire\Config::str('dns_service') === 'localhost') {
+        return Maybe::of(($type === "PTR") ?
+            gethostbyaddr($ip) : gethostbyname($ip));
+    }
     try {
-        //$url = "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json";
         $raw = bit_http_request("GET", "http://1.1.1.1/dns-query?name=$ip&type=$type&ct=application/dns-json", '');
-        //echo "[$url]\n($raw)\n";
-        //die();
         if ($raw !== false) {
-            $formatted = json_decode($raw, true);
+            $formatted = \TF\un_json($raw);
             if (isset($formatted['Authority'])) {
                 $dns = end($formatted['Authority'])['data'] ?? '';
             } else if (isset($formatted['Answer'])) {
@@ -526,11 +407,13 @@ function ip_lookup(string $ip, string $type = "A") : Maybe {
         // silently swallow http errors.
     }
 
-    //assert($dns !== null, "unable to query quad 1, $ip, $type");
     return Maybe::of($dns);
 }
 
-// memoized version of ip_lookup
+/**
+ * memoized version of ip_lookup (1 hour)
+ * NOT PURE
+ */
 function fast_ip_lookup(string $ip, string $type = "A") : Maybe {
     return \TF\memoize('TF\ip_lookup', "_bf_dns_{$type}_{$ip}", 3600)($ip, $type);
 }
@@ -569,6 +452,7 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
     $ctx = stream_context_create($params);
+    debug("bit_http [%s]", $url);
     $foo = @file_get_contents($url, false, $ctx);
     if ($foo === false) {
         $cmd = "curl -X$method --header 'content-Type: '{$optional_headers['Content-Type']}' " . escapeshellarg($url);
@@ -581,6 +465,10 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
     return $foo;
 }
 
+/**
+ * create HTTP context for HTTP request
+ * PURE
+ */
 function http_ctx(string $method, int $timeout) : array {
     return array('http' => array(
         'method' => $method,
@@ -597,7 +485,11 @@ function http_ctx(string $method, int $timeout) : array {
 
 
 /**
- * international text 
+ * international text, pulls language from $_SEVER['HTTP_ACCEPT_LANG']
+ * NOT PURE
+ * example:
+ * txt::set_section('dashboard');
+ * txt::_s('msg_name', 'cap');
  */
 class txt {
     // crappy state variables...
@@ -607,7 +499,7 @@ class txt {
 
 
     // required to be set at least 1x
-    public static function set_section(string $section) {
+    public static function set_section(string $section) : void {
         if (txt::$_lang === "") {
             txt::$_lang = txt::lang_from_http($_SERVER['HTTP_ACCEPT_LANG'] ?? "*");
         }
@@ -615,7 +507,7 @@ class txt {
     }
 
     // process accept lang into a path
-    protected static function lang_from_http(string $accept) {
+    protected static function lang_from_http(string $accept) : string {
 
         $default_lang = "en";
         // split language on , iterate over each, code is last match wins, we reverse because higher priority are first
@@ -625,26 +517,27 @@ class txt {
             // if language accepts anything, use default
             $lang = $lang == "*" ? $default_lang : $lang;
 
-            return (is_dir(WAF_DIR . "lang" . \BitFire\DS . $lang[0])) ? $lang[0] : $current;
+            return (is_dir(WAF_DIR . "lang" . DS . $lang[0])) ? $lang[0] : $current;
         }, $default_lang);
 
     }
 
-    protected static function section_loaded(string $section) {
+    protected static function section_loaded(string $section) : bool {
         return isset(txt::$_data[$section]);
     }
 
-    protected static function find_pot_file(string $section) {
-         $file = WAF_DIR . "lang" . \BitFire\DS . txt::$_lang . \BitFire\DS . $section . ".po";
+    protected static function find_pot_file(string $section) : string {
+         $file = WAF_DIR . "lang" . DS . txt::$_lang . DS . $section . ".po";
          assert(file_exists($file), "no language PO file for [".txt::$_lang."] [$section]");
          return $file;
     }
 
-    protected static function load_lines(string $section) {
-        return file(txt::find_pot_file($section));
+    protected static function load_lines(string $section) : array {
+        $data = file(txt::find_pot_file($section));
+        return ($data) ? $data : array();
     }
 
-    protected static function msg_type(string $type) {
+    protected static function msg_type(string $type) : string {
         $r = "comment";
         switch($type) {
             case "msgid":
@@ -700,7 +593,7 @@ class txt {
     /**
      * get translated singular text from POT file named $section with $msgid
      */
-    public static function _s(string $msgid, string $mods = "") {
+    public static function _s(string $msgid, string $mods = "") : string {
         assert(txt::$_section != "", "must set a text section first");
         txt::load_section(txt::$_section);
         $r = txt::mod(txt::$_data[txt::$_section][$msgid] ?? "ID:$msgid", $mods);
@@ -710,7 +603,7 @@ class txt {
     /**
      * get translated plural text from POT file named $section with $msgid
      */
-    public static function _p(string $msgid, string $mods = "") {
+    public static function _p(string $msgid, string $mods = "") : string {
         assert(txt::$_section != "", "must set a text section first");
         txt::load_section(txt::$_section);
         $r = txt::mod(txt::$_data[txt::$_section]["{$msgid}_plural"] ?? $msgid, $mods);
@@ -720,7 +613,7 @@ class txt {
     /**
      * | separated list of modifiers to apply
      **/  
-    public static function mod(string $input, string $mods) {
+    public static function mod(string $input, string $mods) : string {
         if ($mods === "") { return $input; }
         return array_reduce(explode("|", $mods), function($carry, $mod) use($input) {
             switch($mod) {
@@ -740,45 +633,45 @@ class txt {
     }
 }
 
-// create the JS to send an xml http request
-function xml_request_to_url(string $url, array $data, string $callback = 'console.log') {
-    return 'c=new XMLHttpRequest();c.open("POST","'.$url.'",true);c.setRequestHeader("Content-type","application/x-www-form-urlencoded");'.
-    'c.onreadystatechange=function(){if(c.readyState==4&&c.status==200){'.$callback.'(c.responseText);}};c.send("'. 
-    http_build_query($data) . '");';
-}
 
-// test if the web user can write to a file (checks ownership and permission 6xx or 7xx)
+/**
+ * test if the web user can write to a file (checks ownership and permission 6xx or 7xx)
+ * NOT PURE
+ */ 
 function really_writeable(string $filename) : bool {
     $st = stat($filename);
     $mode = intval(substr(decoct($st['mode']), -3, 1));
-    return ($st['uid'] === \Bitfire\Config::int('web_uid')) &&
+    $writeable = ($st['uid'] === \Bitfire\Config::int('web_uid')) &&
         (($mode === 6) || ($mode === 7));
+    if (!$writeable) { debug("%s is not writeable", $filename); }
+    return $writeable;
 }
 
-function debug(string $line) {
-    if (\BitFire\Config::enabled("debug")) {
-        file_put_contents("/tmp/bitfire.debug.log", "$line\n", FILE_APPEND);
+/**
+ * add a line to the debug file (SLOW, does not wait until processing is complete)
+ * NOT PURE
+ */
+function debug(string $fmt, ...$args) {
+    if (\BitFire\Config::enabled("debug_file")) {
+        file_put_contents(\BitFire\Config::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt\n", ...$args), FILE_APPEND);
     }
 }
 
-/**
- * concatenate all values of $input
- */
-function concat(array $input) {
-     return array_reduce($input, function($carry, $x) { return $carry.$x; });
-}
 
 /**
  * read x lines from end of file (line_sz should be > avg length of line)
+ * ugly af
+ * NOT PURE
  */
 function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
     $st = @stat($filename);
     if (($fh = @fopen($filename, "r")) === false) { return array(); }
     $sz = min(($lines*$line_sz), $st['size']);
-    if ($sz <= 1) { return ""; }
+    debug("read %d trailing lines [%s], bytes: %d", $lines, $filename, $sz);
+    if ($sz <= 1) { return array(); }
     fseek($fh, -$sz, SEEK_END);
     $d = fread($fh, $sz);
-    $eachln = explode("\n", $d);//, -($lines+1), $lines);
+    $eachln = explode("\n", $d);
     $lines = min(count($eachln), $lines)-1;
     if ($lines <= 0) { return array(); }
     $s = array_splice($eachln, -($lines+1), $lines);
@@ -788,10 +681,9 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
 
 /**
  * sets a cookie in a browser in various versions of PHP
- * not pure
+ * NOT PURE 
  */
-function cookie(string $name, string $value, int $exp) {
-
+function cookie(string $name, string $value, int $exp) : void {
     if (PHP_VERSION_ID < 70300) { 
         setcookie($name, $value, $exp, '/; samesite=strict', '', false, true);
     } else {
@@ -806,6 +698,10 @@ function cookie(string $name, string $value, int $exp) {
     }
 }
 
+/**
+ * sort profiling data by wall time
+ * PURE
+ */
 function prof_sort(array $a, array $b) : int {
     if ($a['wt'] == $b['wt']) { return 0; }
     return ($a['wt'] < $b['wt']) ? -1 : 1;
@@ -814,20 +710,19 @@ function prof_sort(array $a, array $b) : int {
 
 /**
  * load the ini file and cache the parsed code if possible
+ * NOT PURE
  */
-function parse_ini(string $ini_src) {
-    $st1 = filemtime($ini_src);
-    $st2 = filemtime("$ini_src.php");
+function parse_ini(string $ini_src) : void {
     $config = array();
-    if ($st2 > $st1) {
+    $parsed_file = "$ini_src.php";
+    if (filemtime($parsed_file) > filemtime($ini_src)) {
         require "$ini_src.php";
-        \BitFire\Config::set($config);
-        return;
+    } else {
+        $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
+        debug("parsed ini file");
+        if (is_writable($parsed_file)) {
+            file_put_contents($parsed_file, "<?php\n\$config=". var_export($config, true).";\n", LOCK_EX);
+        }
     }
-
-	$config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
-    if (is_writeable("$ini_src.php")) {
-        file_put_contents("$ini_src.php", "<?php\n\$config=". var_export($config, true).";\n", LOCK_EX);
-    }
-	\BitFire\Config::set($config);
+    \BitFire\Config::set($config);
 }

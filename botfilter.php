@@ -1,49 +1,10 @@
 <?php
 namespace BitFire;
 
-use TF\Maybe;
-
 const BOT_ANS_CODE_POS=2;
 const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
 
-const FAIL_HONEYPOT=50001;
-const FAIL_PHPUNIT=50004;
-const FAIL_WP_ENUM=50003;
-const FAIL_METHOD=50002;
-const FAIL_INVALID_DOMAIN=23001;
-const FAIL_RR_TOO_HIGH=26001;
-
-const FAIL_HOST_TOO_LONG=22001;
-
-const FAIL_FAKE_WHITELIST=24001;
-const FAIL_MISS_WHITELIST=24002;
-const FAIL_IS_BLACKLIST=25001;
-
-const BLOCK_LONG=3;
-const BLOCK_MEDIUM=2;
-const BLOCK_SHORT=1;
-const BLOCK_NONE=0;
-const BLOCK_WARN=-1;
-
-const IPDATA_RR_1M='rr_1m';
-const IPDATA_RR_5M='rr_5m';
-
-const CONFIG_HONEYPOT='honeypot_url';
-const CONFIG_METHODS='allowed_methods';
-const CONFIG_WHITELIST='botwhitelist';
-const CONFIG_RATE_LIMIT_ACTION='rate_limit_action';
-const CONFIG_MFA_PAGES='mfa_pages';
-const CONFIG_BLACKLIST='blacklist';
-
-
-const AGENT_OS = 'os';
-const AGENT_BROWSER = 'browser';
-const AGENT_BOT = 'bot';
-const AGENT_WHITELIST = 'whitelist';
-const AGENT_BLACKLIST = 'blacklist';
-
-const FAIL_DURATION = array(FAIL_HONEYPOT => BLOCK_LONG, FAIL_METHOD => BLOCK_SHORT);
 
 const AGENT_MATCH = array(
         "opera" => "(opr)/\s*([\d+\.]+)",
@@ -60,7 +21,7 @@ const AGENT_MATCH = array(
 
 
 // 2 calls = 29: cpu
-function match_fails(int $fail_code, MatchType $type, $request) : \TF\Maybe {
+function match_fails(int $fail_code, MatchType $type, \BitFire\Request $request) : \TF\Maybe {
     if ($type->match($request)) {
         return BitFire::new_block($fail_code, $type->get_field(), $type->matched_data(), 'static match', FAIL_DURATION[$fail_code]??0);
     }
@@ -84,10 +45,10 @@ class BotFilter {
     public function __construct(\TF\CacheStorage $cache) {
         $this->cache = $cache;
         $this->_constraints = array(
-            FAIL_PHPUNIT => new MatchType(MatchType::CONTAINS, REQUEST_PATH, '/phpunit', BLOCK_SHORT),
-            FAIL_WP_ENUM => new MatchType(MatchType::CONTAINS, REQUEST_PATH, '/wp-json/wp/v2/users', BLOCK_SHORT),
-            FAIL_HONEYPOT => new MatchType(MatchType::EXACT, REQUEST_PATH, Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
-            FAIL_METHOD => new MatchType(MatchType::NOTIN, REQUEST_METHOD, Config::arr(CONFIG_METHODS), BLOCK_SHORT)
+            FAIL_PHPUNIT => new MatchType(MatchType::CONTAINS, "path", '/phpunit', BLOCK_SHORT),
+            FAIL_WP_ENUM => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', BLOCK_SHORT),
+            FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
+            FAIL_METHOD => new MatchType(MatchType::NOTIN, "method", Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );
     }
 
@@ -116,37 +77,37 @@ class BotFilter {
      * returns true if all tests pass
      * CPU: 359
      */
-    public function inspect(array $request) : \TF\Maybe {
+    public function inspect(\BitFire\Request $request) : \TF\Maybe {
 
         // request has no host header
         if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
-            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request)) {
+            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request->host)) {
                 // allow valid whitelist bots to access the site
                 if (!isset($this->browser[AGENT_WHITELIST])) {
-                    $maybe = BitFire::new_block(FAIL_INVALID_DOMAIN, REQUEST_HOST, $request[REQUEST_HOST], \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+                    $maybe = BitFire::new_block(FAIL_INVALID_DOMAIN, "host", $request->host, \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
                     if (!$maybe->empty()) { return $maybe; }
                 }
             }
         }
 
-        if (strlen($request[REQUEST_HOST]) > 80) {
-            $maybe = BitFire::new_block(FAIL_HOST_TOO_LONG, "HTTP_HOST", $request[REQUEST_HOST], 'len < 80', BLOCK_SHORT);
+        if (strlen($request->host) > 80) {
+            $maybe = BitFire::new_block(FAIL_HOST_TOO_LONG, "HTTP_HOST", $request->host, 'len < 80', BLOCK_SHORT);
             if (!$maybe->empty()) { return $maybe; }
         }
 
         // ugly, impure crap
-        $this->get_ip_data($request[REQUEST_IP]);
+        $this->get_ip_data($request->ip);
     
 
         // bot tracking cookie
         $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
-            $request[REQUEST_COOKIE][Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
+            $request->cookies[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
             Config::str(CONFIG_ENCRYPT_KEY),
-            $request[REQUEST_IP]);
+            $request->ip);
 
 
         // get details about the agent
-        $this->browser = \BitFireBot\parse_agent($request[REQUEST_UA]);
+        $this->browser = \BitFireBot\parse_agent($request->agent);
         $this->browser['valid'] = $maybe_botcookie->extract('v', 0)();
 
         // match constraints
@@ -159,7 +120,7 @@ class BotFilter {
 
         // check the browser cookie answer matches the request
         // TODO: move to a function
-        if ($request[REQUEST_PATH] === "/bitfire_browser_required") {
+        if ($request->path === "/bitfire_browser_required") {
             exit(include WAF_DIR . "views/browser_required.phtml");
         }
         if (isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
@@ -168,12 +129,12 @@ class BotFilter {
             if (intval($maybe_botcookie->extract('a')()) === intval($_GET['_bfa'])) {
                 \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['valid'] = ($data['valid']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
                 $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
-                    \TF\en_json( array('ip' => $request[REQUEST_IP], 'v' => 2, 'et' => time() + 60*60)));
+                    \TF\en_json( array('ip' => $request->ip, 'v' => 2, 'et' => time() + 60*60)));
                 \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
             } else {
                 $url = "/bitfire_browser_required";
             }
-            $foo = "Location: " . $request['SCHEME'] . '://' . $request['HOST'] . ":" . $request['PORT'] . "$url";
+            $foo = "Location: " . $request->scheme . '://' . $request->host . ":" . $request->port . "$url";
             header($foo);
             exit();
         }
@@ -183,8 +144,8 @@ class BotFilter {
             $this->browser[AGENT_WHITELIST] = false;
             if (Config::enabled(CONFIG_WHITELIST_ENABLE)) {
                 $maybe_block->doifnot('\BitFireBot\whitelist_inspection',
-                    $request[REQUEST_UA],
-                    $request[REQUEST_IP],
+                    $request->agent,
+                    $request->ip,
                     Config::arr(CONFIG_WHITELIST));
 
 
@@ -192,7 +153,7 @@ class BotFilter {
                 $this->browser[AGENT_WHITELIST] = ($maybe_block->empty());
             } 
             else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
-                $maybe_block->doifnot('\BitFireBot\blacklist_inspection', $request, file(WAF_DIR.'bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
+                $maybe_block->doifnot('\BitFireBot\blacklist_inspection', $request, file(WAF_DIR.'cache/bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
             }
         }
         // handle humans
@@ -210,6 +171,7 @@ namespace BitFireBot;
 use BitFire\BitFire;
 use BitFire\Block;
 use BitFire\Config;
+use BitFire\Request;
 use TF\CacheStorage;
 
 use function BitFire\reporting;
@@ -229,9 +191,6 @@ use const BitFire\FAIL_MISS_WHITELIST;
 use const BitFire\FAIL_RR_TOO_HIGH;
 use const BitFire\IPDATA_RR_1M;
 use const BitFire\IPDATA_RR_5M;
-use const BitFire\REQUEST_HOST;
-use const BitFire\REQUEST_IP;
-use const BitFire\REQUEST_UA;
 
 /**
  * test if the ipdata exceeds request rate
@@ -328,9 +287,9 @@ function parse_whois_line(string $line) : string {
 // return false if valid_domains has entries and request['host'] is not in it
 // true otherwise
 // PURE
-function validate_host_header(array $valid_domains, array $request) : bool {
+function validate_host_header(array $valid_domains, string $host) : bool {
     return (!empty($valid_domains)) ?
-        \TF\in_array_ending($valid_domains, $request[REQUEST_HOST]??'') :
+        \TF\in_array_ending($valid_domains, $host) :
         true;
 }
 
@@ -368,8 +327,8 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
     // return true(pass) if the agent is in the list of whitelist bots
     if (count($whitelist) > 0) {
         $r = agent_in_list($agent, $ip, $whitelist);
-        if ($r < 0) { return BitFire::new_block(FAIL_MISS_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT); }
-        if ($r == 0) { return BitFire::new_block(FAIL_FAKE_WHITELIST, REQUEST_UA, $agent, "user agent whitelist", BLOCK_SHORT); }
+        if ($r < 0) { return BitFire::new_block(FAIL_MISS_WHITELIST, "user_agent", $agent, "user agent whitelist", BLOCK_SHORT); }
+        if ($r == 0) { return BitFire::new_block(FAIL_FAKE_WHITELIST, "user_agent", $agent, "user agent whitelist", BLOCK_SHORT); }
     }
     return \TF\Maybe::$FALSE;
 }
@@ -378,11 +337,11 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
  * returns true if the useragent / ip is not blacklisted, false otherwise
  * PURE
  */
-function blacklist_inspection(array $request, ?array $blacklist) : \TF\Maybe {
-    $match = new \BitFire\MatchType(\BitFire\MatchType::CONTAINS, REQUEST_UA, $blacklist, BLOCK_MEDIUM);
+function blacklist_inspection(\BitFire\Request $request, ?array $blacklist) : \TF\Maybe {
+    $match = new \BitFire\MatchType(\BitFire\MatchType::CONTAINS, "agent", $blacklist, BLOCK_MEDIUM);
     $part = $match->match($request);
     if ($part !== false) {
-        return BitFire::new_block(FAIL_IS_BLACKLIST, "user-agent", $request[REQUEST_UA], $part, BLOCK_MEDIUM);
+        return BitFire::new_block(FAIL_IS_BLACKLIST, "user_agent", $request->agent, $part, BLOCK_MEDIUM);
     }
    
     return \TF\Maybe::$FALSE;
@@ -521,24 +480,24 @@ function make_challenge_cookie(array $answer, string $ip) : string {
 /**
  * add the page that prompts the browser to add a cookie
  */
-function require_browser_or_die(array $request, \TF\Maybe $cookie) {
+function require_browser_or_die(\BitFire\Request $request, \TF\Maybe $cookie) {
     if (intval($cookie->extract('v')()) >= 2) { return; }
 
 
     $data = \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
     http_response_code(202);
     $block = BitFire::new_block(20000, 'n/a', 'n/a', 'check JS/Cookies', 0);
-    echo make_js_challenge($request[REQUEST_IP], Config::str(CONFIG_USER_TRACK_PARAM), 
+    echo make_js_challenge($request->ip, Config::str(CONFIG_USER_TRACK_PARAM), 
         Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
 
     if (Config::str(CONFIG_REQUIRE_BROWSER, "report") === "block") { exit(); }
 }
 
-function strip_path_tracking_params(array $request) {
-    unset($request['GET']['_bfa']) ;
-    unset($request['GET']['_bfx']) ;
-    unset($request['GET']['_bfz']) ;
-    unset($request['GET'][Config::str(CONFIG_USER_TRACK_PARAM)]) ;
-    return($request['PATH'] . '?' . http_build_query($request['GET']));
+function strip_path_tracking_params(\BitFire\Request $request) {
+    unset($request->get['_bfa']) ;
+    unset($request->get['_bfx']) ;
+    unset($request->get['_bfz']) ;
+    unset($request->get[Config::str(CONFIG_USER_TRACK_PARAM)]) ;
+    return($request->path . '?' . http_build_query($request->get));
 }
 

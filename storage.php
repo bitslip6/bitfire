@@ -187,7 +187,7 @@ class FileStorage implements Storage {
      */
     public function load_data(string $key_name) {
         $contents = file_get_contents($this->_write_path . "{$key_name}.profile");
-        return ($contents !== false) ? json_decode($contents, true) : null;
+        return ($contents !== false) ? \TF\un_json($contents) : null;
     }
 
     public function update_data(string $key_name, callable $fn, $init, int $ttl) {
@@ -252,19 +252,17 @@ class BitInspectFileStore implements BitInspectStore {
     }
 
     public function load_page(string $name) {
-        //$path = $this->_path . DIRECTORY_SEPARATOR . $this->request_to_name($page);
-        //debug("load page [$name]");
         $path = $this->_path . $name . ".json";
         if (!is_file($path)) { return null; }
         $data = file_get_contents($path);
-        return ($data !== false) ? json_decode($data, true) : null;
+        return ($data !== false) ? \TF\un_json($data) : null;
     }
 
     public function load_page_list() {
         $path = $this->_path . 'bitfire_pagelist.json';
         if (!is_file($path)) { return null; }
         $data = file_get_contents($path);
-        return ($data !== false) ? json_decode($data, true) : null;
+        return ($data !== false) ? \TF\un_json($data) : null;
     }
 
     public function save_page_list($list) {

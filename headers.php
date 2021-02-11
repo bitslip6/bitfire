@@ -1,9 +1,6 @@
 <?php declare(strict_types=1);
 namespace BitFireHeader;
 
-use const BitFire\REQUEST_HOST;
-use const BitFire\REQUEST_PATH;
-
 const CONFIG_ENFORCE_SSL = "enforce_ssl_1year";
 
 const FEATURE_POLICY = array('accelerometer' => 'self', 'ambient-light-sensor' => 'self', 'autoplay' => 'self', 'camera' => 'self', 'geolocation' => '*', 'midi' => 'self', 'notifications' => 'self', 'push' => 'self', 'sync-xhr' => 'self', 'microphone' => 'self', 'gyroscope' => 'self', 'speaker' => 'self', 'vibrate' => 'self', 'fullscreen' => 'self', 'payment' => '*');
@@ -16,12 +13,19 @@ const CSP = array('child-src', 'connect-src', 'default-src', 'font-src',
             'form-action', 'frame-ancestors', 'upgrade-insecure-requests');
 
 /**
+ * log CSP report failures
+ */
+function header_report(\BitFire\Request $request) : void {
+    file_put_contents("/tmp/bitfire.report.json", \TF\en_json($request), FILE_APPEND);
+}
+
+/**
  * add the security headers from config
  */
-function send_security_headers(?array $request) : void {
+function send_security_headers(\BitFire\Request $request) : void {
     if (!$request || headers_sent()) { return; }
 
-    $path = $request[REQUEST_HOST].$request[REQUEST_PATH]."?_bitfire=report";
+    $path = $request->host . $request->path . "?" . \BitFire\BITFIRE_INTERNAL_PARAM . "=report";
     core_headers($path);
 
     // set strict transport security (HSTS)

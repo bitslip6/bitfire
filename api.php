@@ -104,20 +104,20 @@ function send_metrics(Metric $metrics) {
 /**
  * 
  */
-function get_block_types(array $request) {
+function get_block_types(\BitFire\Request $request) {
     exit(send_metrics(get_block_24groups()));
 }
 
-function get_hr_data(array $request) {
+function get_hr_data(\BitFire\Request $request) {
     $metrics = get_block_24sum();
     return json_encode($metrics);
 }
 
-function get_ip_data(array $request) {
+function get_ip_data(\BitFire\Request $request) {
     exit(send_metrics(get_ip_24groups()));
 }
 
-function get_valid_data(array $request) {
+function get_valid_data(\BitFire\Request $request) {
     $cache = CacheStorage::get_instance();
     $response = array('challenge' => 0, 'valid' => 0);
     for($i=0; $i<25; $i++) {
@@ -132,17 +132,37 @@ function get_valid_data(array $request) {
     exit(json_encode($response));
 }
 
-function make_code(array $request) {
+function make_code(\BitFire\Request $request) {
     $s = Config::str(CONFIG_SECRET, 'bitfiresekret');
     $iv = \TF\random_str(12);
     $hash = base64_encode(hash_hmac("sha1", $iv, $s, true));
-    unset($request['GET'][BITFIRE_COMMAND]);
-    unset($request['GET']['_secret']);
-    $request['GET'][BITFIRE_COMMAND] = 'once';
-    $request['GET']['_iv'] = $iv;
-    $request['GET']['_enc'] = $hash;
-    $url = $request[REQUEST_SCHEME] . '://' . $request[REQUEST_HOST] . ':' . $request['PORT'] . $request[REQUEST_PATH] . '?' . http_build_query($request['GET']);
+    unset($request->get[BITFIRE_COMMAND]);
+    unset($request->get[BITFIRE_INTERNAL_PARAM]);
+    $request->get[BITFIRE_COMMAND] = 'once';
+    $request->get['_iv'] = $iv;
+    $request->get['_enc'] = $hash;
+    $url = $request->scheme . '://' . $request->host . ':' . $request->port . $request->path . '?' . http_build_query($request->get);
     return $url;
+}
+
+function is_quoted(string $data) : bool {
+    return ($data === "true" || $data === "false" || ctype_digit($data)) ? false : true;
+}
+
+function toggle_config_value(\BitFire\Request $request) {
+    if (!is_writable(WAF_DIR."config.ini")) {
+        exit("failure");
+    }
+
+    $input = file_get_contents(WAF_DIR."config.ini");
+    $param = $request->get['param'];
+    $value = $request->get['value'];
+
+    $value = (is_quoted(strtolower($value))) ? $value : "\"$value\"";
+    $output = preg_replace("/^\s*$param\s*=.*$", "$param = $value\n", $input);
+    file_put_contents(WAF_DIR."config.ini", $output);
+
+    exit("success");
 }
 
 
