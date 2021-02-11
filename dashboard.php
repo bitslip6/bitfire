@@ -9,7 +9,6 @@ function add_country($data) {
     $result = array();
     foreach ($data as $report) {
         $code = \TF\ip_to_country($report['ip'] ?? '');
-//print_r($report);
         $report['country'] = $map[$code];
         $result[] = $report; 
     }
@@ -36,7 +35,6 @@ function serve_dashboard(string $path) {
         $report_count = (is_array($x)) ? count($x) : 0;
         $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
         $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::str(CONFIG_REPORT_FILE), 20, 2500)));
-//\TF\dbg($tmp);
         $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
         
         $src = (Config::enabled('block_file')) ?
