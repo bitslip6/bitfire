@@ -17,12 +17,11 @@ function add_country($data) {
 
 function isdis() {
     $result = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR."config.ini.php");
-    return ($result) ? " disabled " : "";
+    return ($result) ? " " : "disabled ";
 }
 
 function serve_dashboard(string $path) {
     if ($path === Config::str(CONFIG_DASHBOARD_PATH)) {
-
         if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] !== Config::str('password', 'default_password')) {
             header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
             header('HTTP/1.0 401 Unauthorized');
