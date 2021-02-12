@@ -5,7 +5,7 @@ const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 1
 
 const BITFIRE_API_FN = array('\\BitFire\\get_block_types', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array('challenge' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 126;
+const BITFIRE_VER = 127;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_INTERNAL_PARAM = '_bitfire_p';
 const BITFIRE_COMMAND = "BITFIRE_API";
