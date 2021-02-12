@@ -204,17 +204,18 @@ class BitFire
             // we will need cache storage and secure cookies
             $this->cache = \TF\CacheStorage::get_instance();
 
-            $this->api_call();
             
             //$exception_file = WAF_DIR . "cache/exceptions.json";
             //self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
         }
+        $this->api_call();
     }
     
     /**
      * write report data after script execution 
      */
     public function __destruct() {
+        if (!Config::enabled(CONFIG_REPORT_FILE) || count(self::$_reporting) < 1) { return; }
         $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
         $out = "";
         foreach (self::$_reporting as $report) {
@@ -224,15 +225,15 @@ class BitFire
     }
 
     protected function api_call() {
-        if ($this->_request->get[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET)) {
+        if ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET)) {
             require_once WAF_DIR."api.php";
 
-            $fn = '\\BitFire\\' . $this->_request->get[BITFIRE_COMMAND]??'nop';
-            
+            $fn = '\\BitFire\\' . htmlentities($_GET[BITFIRE_COMMAND]??'nop');
             if (!in_array($fn, BITFIRE_API_FN)) { exit("unknown function [$fn]"); }
+
             $result = $fn($this->_request);
             exit ($result);
-        } else if ($this->_request->get[BITFIRE_INTERNAL_PARAM]??'' === 'report') {
+        } else if ($_GET[BITFIRE_INTERNAL_PARAM]??'' === 'report') {
             require_once WAF_DIR."headers.php";
             exit (\BitFireHeader\header_report($this->_request));
         }
