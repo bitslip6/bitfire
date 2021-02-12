@@ -982,25 +982,23 @@ fetch("https://bitfire.co/ver.php")
         }
       }
     }
-
+    
     if (behind == 0) {
-      GBI("upgrade_link").innerText = "Up To Date";
+      GBI("upgrade_link").innerText = "Software Up To Date";
       GBI("upgrade_link").setAttribute("disabled", "disabled");
       GBI("upgrade_link").classList.remove("lift");
     } else {
       GBI("upgrade_link").innerText = "Upgrade to " + latest_str;
       GBI("upgrade_link").classList.remove("btn-secondary");
       GBI("upgrade_link").classList.add("btn-warning");
-      //GBI("upgrade_link").setAttribute("disabled", "disabled");
-      //GBI("upgrade_link").classList.remove("lift");
     }
   });
 
       const request = async () => {
-        const response1 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response2 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response3 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response4 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response1 = await fetch('/?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response2 = await fetch('/?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response3 = await fetch('/?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response4 = await fetch('/?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
         const data1 = await response1.json();
         const data2 = await response2.json();
         const data3 = await response3.json();
