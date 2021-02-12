@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -22,7 +21,7 @@
 
     <style>
       body { display: none; }
-      .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding-right: 0;}
+      .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding: .4rem 0 0 0!important; }
       /*
       .lnum { float: right; }
       */
@@ -42,8 +41,9 @@
       .country { float: right; display: block; }
 
       .btn-sm {
-        padding: 0.01rem .25rem;
-        font-size: .4rem;
+        padding: 0.1rem .5rem !important;
+        font-size: .4rem !important;
+        font-weight: bold;
       }
       .btn-group-tiny>.btn {
         padding: .075rem .25rem;
@@ -52,7 +52,7 @@
         border-radius: .25rem;
       }
       .dropdown-toggle {
-        width: 70px;
+        width: 50px;
       }
       
       .nav-sm .nav-link {
@@ -67,7 +67,9 @@
       /*
       ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
       */
+      /*
       .dropdown-menu { margin-top: -20px; }
+      */
       .chilabel { margin-left: 1rem; }
       
       thead.details th, th { font-size: 12px; }
@@ -104,6 +106,8 @@
         }
 
         
+        const VERSION = 126;
+        const VERSION_STR = "1.2.6";
         const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
         const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
         
@@ -123,7 +127,7 @@
         function toggle(elm, type) {
           var e = GBI(elm);
           e.innerText = type;
-          fetch('<?php echo \Bitfire\Config::str("dashboard_url")?>?BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+          fetch('<?php echo \Bitfire\Config::str("dashboard_url")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>').then(data => { console.log(data); });
           if (type == "block" || type == "on") {
             e.classList.remove("btn-warning");
             e.classList.remove("btn-secondary");
@@ -300,11 +304,11 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="security_headers" type="button" <?php echo \BtiFire\isdis(); ?> class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['security_headers_enabled']; ?> </button>
+                      <button id="security_headers_enabled" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['security_headers_enabled']; ?> </button>
                       <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'alert')">Alert</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'block')">Block</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('security_headers', 'off')">Off</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('security_headers_enabled', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('security_headers_enabled', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('security_headers_enabled', 'off')">Off</a>
                       </div>
                     </div>
                   </li>
@@ -314,11 +318,11 @@
                       Force SSL
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="force_ssl" type="button"  <?php echo \BitFire\isdis(); ?> class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['enforce_ssl_1year']; ?></button>
+                      <button id="enforce_ssl_1year" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['enforce_ssl_1year']; ?></button>
                       <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'alert')">Alert</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'block')">Block</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('force_ssl', 'off')">Off</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('enforce_ssl_1year', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('enforce_ssl_1year', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('enforce_ssl_1year', 'off')">Off</a>
                       </div>
                     </div>
                   </li>
@@ -328,49 +332,49 @@
                       Spam Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="spam_filter" type="button" <?php echo \BitFire\isdis(); ?> class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['spam_filter_enabled']; ?></button>
+                      <button id="spam_filter_enabled" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['spam_filter_enabled']; ?></button>
                       <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'alert')">Alert</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'block')">Block</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter', 'off')">Off</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter_enabled', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter_enabled', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('spam_filter_enabled', 'off')">Off</a>
                       </div>
                     </div>
-
                   </li>
+
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
                       XSS Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="xss_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['xss_block']; ?></button>
+                      <button id="xss_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['xss_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'block')">Block</a>
                         <a class="dropdown-item" href="#" onclick="toggle('xss_block', 'off')">Off</a>
                       </div>
                     </div>
-
                   </li>
+
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
                       SQL Filter
                     </span>
-                    <div class="btn-group-sm" role="group"></div>
-                      <button id="sql_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['sql_block']; ?></button>
+                    <div class="btn-group-sm" role="group">
+                      <button id="sql_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['sql_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'block')">Block</a>
                         <a class="dropdown-item" href="#" onclick="toggle('sql_block', 'off')">Off</a>
                       </div>
                     </div>
-
                   </li>
+
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
                       Web Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="web_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['web_block']; ?></button>
+                      <button id="web_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['web_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('web_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('web_block', 'block')">Block</a>
@@ -384,7 +388,7 @@
                       Upload Filter
                     </span>
                     <div class="btn-group-sm" role="group">
-                      <button id="file_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['file_block']; ?></button>
+                      <button id="file_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['file_block']; ?></button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('file_block', 'alert')">Alert</a>
                         <a class="dropdown-item" href="#" onclick="toggle('file_block', 'block')">Block</a>
@@ -403,20 +407,21 @@
               <a class="nav-link" href="#sidebarBots" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarBots">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17 15.18 9l1.41 1.41L10 17z"/></svg>
                 &nbsp;Bots
-                &nbsp;<span style="color:#999;font-size:12px;"> ( 2 ) </span>
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 3 ) </span>
               </a>
               <div class="collapse " id="sidebarBots">
                 <ul class="nav nav-sm flex-column">
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
-                      Allow IP Block
+                      Require Browser
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?>type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="require_full_browser" <?php echo \BitFire\isdis(); ?>type="button" class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['require_full_browser']; ?> </button>
+
                       <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'on')">On</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'off')">Off</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('require_full_browser', 'on')">On</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('require_full_browser', 'off')">Off</a>
                       </div>
                     </div>
                   </li>
@@ -427,11 +432,11 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="file_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['whitelist_enable']; ?></button>
+                      <button id="whitelist_enable" type="button" <?php echo \BitFire\isdis(); ?>class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['whitelist_enable']; ?></button>
                       <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#" onclick="toggle('botwhitelist', 'alert')">Alert</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('botwhitelist', 'block')">Block</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('botwhitelist', 'off')">Off</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('whitelist_enable', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('whitelist_enable', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('whitelist_enable', 'off')">Off</a>
                       </div>
                     </div>
                   </li>
@@ -442,11 +447,11 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="file_block" type="button" <?php echo \BitFire\isdis(); ?>class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['blacklist_enable']; ?></button>
+                      <button id="blacklist_enable" type="button" <?php echo \BitFire\isdis(); ?>class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><?php echo $config['blacklist_enable']; ?></button>
                       <div class="dropdown-menu">
-                        <a class="dropdown-item" href="#" onclick="toggle('botblacklist', 'alert')">Alert</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('botblacklist', 'block')">Block</a>
-                        <a class="dropdown-item" href="#" onclick="toggle('botblacklist', 'off')">Off</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('blacklist_enable', 'alert')">Alert</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('blacklist_enable', 'block')">Block</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('blacklist_enable', 'off')">Off</a>
                       </div>
                     </div>
                   </li>
@@ -454,8 +459,6 @@
                 </ul>
               </div>
 
-              </ul>
-            </div>
 
 
 
@@ -463,7 +466,7 @@
               <a class="nav-link" href="#sidebarSettings" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-7H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-1.75 9c0 .23-.02.46-.05.68l1.48 1.16c.13.11.17.3.08.45l-1.4 2.42c-.09.15-.27.21-.43.15l-1.74-.7c-.36.28-.76.51-1.18.69l-.26 1.85c-.03.17-.18.3-.35.3h-2.8c-.17 0-.32-.13-.35-.29l-.26-1.85c-.43-.18-.82-.41-1.18-.69l-1.74.7c-.16.06-.34 0-.43-.15l-1.4-2.42c-.09-.15-.05-.34.08-.45l1.48-1.16c-.03-.23-.05-.46-.05-.69 0-.23.02-.46.05-.68l-1.48-1.16c-.13-.11-.17-.3-.08-.45l1.4-2.42c.09-.15.27-.21.43-.15l1.74.7c.36-.28.76-.51 1.18-.69l.26-1.85c.03-.17.18-.3.35-.3h2.8c.17 0 .32.13.35.29l.26 1.85c.43.18.82.41 1.18.69l1.74-.7c.16-.06.34 0 .43.15l1.4 2.42c.09.15.05.34-.08.45l-1.48 1.16c.03.23.05.46.05.69z"/></svg>
                 &nbsp;Settings
-                &nbsp;<span style="color:#999;font-size:12px;"> ( 2 ) </span>
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 5 ) </span>
               </a>
               <div class="collapse " id="sidebarSettings">
                 <ul class="nav nav-sm flex-column">
@@ -473,7 +476,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?>type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?>type="button" class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'on')">On</a>
                         <a class="dropdown-item" href="#" onclick="toggle('allow_ip_block', 'off')">Off</a>
@@ -487,7 +490,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?> type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="cache_type" <?php echo \BitFire\isdis(); ?> type="button" class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['cache_type']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'shmop')">Shmop</a>
                         <a class="dropdown-item" href="#" onclick="toggle('cache_type', 'apcu')">APCu</a>
@@ -503,7 +506,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?> type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['dns_service']; ?> </button>
+                      <button id="dns_service" <?php echo \BitFire\isdis(); ?> type="button" class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['dns_service']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" title="local system DNS" href="#" onclick="toggle('dns_service', 'localhost')">localhost</a>
                         <a class="dropdown-item" title="cloudflair DNS over HTTPS 1.1.1.1 " href="#" onclick="toggle('dns_service', 'cloudflair')">cloudflair</a>
@@ -517,7 +520,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?> type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['ip_header']; ?> </button>
+                      <button id="ip_header" <?php echo \BitFire\isdis(); ?> type="button" class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['ip_header']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" title="Use remote IP address" href="#" onclick="toggle('ip_header', 'REMOTE_ADDR')">Remote IP</a>
                         <a class="dropdown-item" title="Use depricated X-FORWARDED-FOR header " href="#" onclick="toggle('ip_header', 'X-FORWARDED-FOR')">x-forwarded-for</a>
@@ -535,7 +538,7 @@
                     </span>
 
                     <div class="btn-group-sm" role="group">
-                      <button id="allow_ip_block" <?php echo \BitFire\isdis(); ?> type="button" class="btn feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      <button id="response_code" <?php echo \BitFire\isdis(); ?> type="button" class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['response_code']; ?> </button>
                       <div class="dropdown-menu">
                         <a class="dropdown-item" href="#" onclick="toggle('response_code', 200)">200</a>
                         <a class="dropdown-item" href="#" onclick="toggle('response_code', 204)">204</a>
@@ -595,7 +598,7 @@
 
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire non-commercial: Release 1.2.4
+                  BitFire non-commercial: Release 1.2.6
                 </h6>
                 <p style="font-size:.75rem;color:#666;">BitFire non-commercial is free to use for non commercial websites. 
                 BitFirePro is licensed for commercial use and includes cash back guarantee if your site is compromised.</p>
@@ -608,8 +611,8 @@
               </div>
               <div class="col-auto">
 
+                <a href="#!" class="btn btn-secondary lift" id="upgrade_link">Upgrade</a>
                 <!-- Button -->
-
                 <a href="#!" class="btn btn-success lift" id="dwn_link">Go Pro</a>
 
               </div>
@@ -960,16 +963,47 @@
 
       //show_pie("classChart", {"percent": [50, 50], "counts": [100, 100]});
 
+fetch("https://bitfire.co/ver.php")
+  .then(response => response.json())
+  .then(response => {
+    console.log(response);
+    var behind = 0;
+    var latest_str = VERSION_STR;
+    var latest = VERSION;
+    for (const r in response) {
+      //console.log("version!", r);
+      if(response[r][0] > VERSION) { 
+        if (response[r][0] > latest) {
+          latest = response[r][0];
+          latest_str = r;
+          behind++;
+        }
+      }
+    }
+
+    if (behind == 0) {
+      GBI("upgrade_link").innerText = "Up To Date";
+      GBI("upgrade_link").setAttribute("disabled", "disabled");
+      GBI("upgrade_link").classList.remove("lift");
+    } else {
+      GBI("upgrade_link").innerText = "Upgrade to " + latest_str;
+      GBI("upgrade_link").classList.remove("btn-secondary");
+      GBI("upgrade_link").classList.add("btn-warning");
+      //GBI("upgrade_link").setAttribute("disabled", "disabled");
+      //GBI("upgrade_link").classList.remove("lift");
+    }
+  });
+
       const request = async () => {
-        const response1 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response2 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response3 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response4 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response1 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response2 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response3 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response4 = await fetch(':/<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
         const data1 = await response1.json();
         const data2 = await response2.json();
         const data3 = await response3.json();
         const data4 = await response4.json();
-        
+
         update_challenge(data4);
         
         console.log("data4", data4);
