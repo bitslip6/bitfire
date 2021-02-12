@@ -314,7 +314,7 @@ function make_post_data(\BitFire\Request $request, Block $block, ?array $ip_data
         "ts" => microtime(true),
         "tv" => date("D H:i:s ") . date('P'),
         "referer" => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
-        "eventId" => $block->code,
+        "eventid" => $block->code,
         "item" => $block->parameter,
         "name" => $block->pattern,
         "match" => $block->value,
