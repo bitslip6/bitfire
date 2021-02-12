@@ -21,6 +21,7 @@
 
     <style>
       body { display: none; }
+      .right { float: right; }
       .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding: .4rem 0 0 0!important; }
       /*
       .lnum { float: right; }
@@ -732,7 +733,8 @@
         <span class="method"><?php
         echo htmlspecialchars($line['request']['method']) . '</span>' . htmlspecialchars($line['request']['scheme'] . "://" . $line['request']['host'] . $line['request']['path'] .
           '?' . urldecode(http_build_query($line['request']['get'])));
-        if ($line['browser']['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)); }
+        // if ($line['browser']['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)); }
+        echo "<div  class='right'>&nbsp;&nbsp;<b>AGENT:</b>&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)) . "</div>";
       ?></td>
     </tr>
     <?php } ?>
