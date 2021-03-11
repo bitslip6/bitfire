@@ -1,9 +1,9 @@
 <?php
 $config=array (
   'bitfire_enabled' => true,
-  'allow_ip_block' => false,
-  'security_headers_enabled' => true,
-  'enforce_ssl_1year' => false,
+  'allow_ip_block' => 'on',
+  'security_headers_enabled' => 'report',
+  'enforce_ssl_1year' => 'report',
   'feature_policy' => false,
   'allowed_features' => 
   array (
@@ -14,10 +14,10 @@ $config=array (
   'max_cache_age' => 0,
   'web_filter_enabled' => true,
   'decode_html' => true,
-  'spam_filter_enabled' => false,
+  'spam_filter_enabled' => 'report',
   'xss_block' => true,
   'sql_block' => 'block',
-  'web_block' => 'report',
+  'web_block' => true,
   'file_block' => true,
   'block_profanity' => false,
   'filtered_logging' => 
@@ -79,9 +79,9 @@ $config=array (
     3 => 'PUT',
     4 => 'HEAD',
   ),
-  'whitelist_enable' => 'report',
+  'whitelist_enable' => true,
   'blacklist_enable' => true,
-  'require_full_browser' => 'report',
+  'require_full_browser' => 'on',
   'honeypot_url' => '/ztcegizz/contact',
   'check_domain' => false,
   'valid_domains' => 

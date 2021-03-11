@@ -109,6 +109,7 @@ class BotFilter {
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
         $this->browser['valid'] = $maybe_botcookie->extract('v', 0)();
+        $this->browser[AGENT_WHITELIST] = false;
 
         // match constraints
         // TODO: better naming
@@ -372,15 +373,16 @@ function parse_agent(string $user_agent) : array {
 
 
     // cpu: 50, could rewrite as imperative and save here
-    $browser = array_reduce(AGENT_MATCH, function(array $cry, string $browser) use ($user_agent) {
+    $browser = array_reduce(array_keys(AGENT_MATCH), function(array $cry, string $match_key) use ($user_agent) {
         if ($cry[0] === "bot") {
-            preg_match("!$browser!", $user_agent, $matches);
-            return (isset($matches[2])) ? array_slice($matches, 1, 2) : $cry;
+            $pattern = AGENT_MATCH[$match_key];
+            preg_match("!$pattern!", $user_agent, $matches);
+            return (isset($matches[2])) ? [$match_key, $matches[1], $matches[2]] : $cry;
         }
         return $cry;
-    }, array("bot", "1.0"));
+    }, array("bot", "bot", "1.0"));
 
-    return array("os" => $os, "browser" => $browser[0], "ver" => $browser[1], "bot" => $browser[0] === "bot");
+    return array("os" => $os, "whitelist" => false, "browser" => $browser[1], "ver" => $browser[2], "bot" => $browser[0] === "bot");
 }
 
 /**

@@ -74,6 +74,8 @@ function partial_right(callable $fn, ...$args) : callable {
 }
 
 
+//$m = \TF\Maybe(false);
+
 class Maybe {
     protected $_x;
     protected $_errors;
@@ -113,7 +115,7 @@ class Maybe {
     public function if(callable $fn) : Maybe { if ($fn($this->_x) === false) { $this->_x = false; } return $this; }
     public function ifnot(callable $fn) : Maybe { if ($fn($this->_x) !== false) { $this->_x = false; } return $this; }
     /** execute $fn runs if maybe is not empty */
-    public function do(callable $fn, ...$args) : Maybe { if ($this->_x !== false) { $this->assign($fn(...$args)); } return $this; }
+    public function do(callable $fn, ...$args) : Maybe { if (!empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     /** execute $fn runs if maybe is empty */
     public function doifnot(callable $fn, ...$args) : Maybe { if (empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     public function empty() : bool { return empty($this->_x); } // false = true

@@ -123,6 +123,21 @@ class Block {
     }
 }
 
+class Exception {
+    public $code;
+    public $parameter;
+    public $url;
+    public $host;
+
+    public function __construct(int $code = 0, ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
+        $this->code = $code;
+        $this->parameter = $parameter;
+        $this->url = $url;
+        $this->host = $host;
+    }
+}
+
+
 class Config {
     public static $_options = null;
 
@@ -242,7 +257,7 @@ class BitFire
     /**
      * append an exception to the list of exceptions
      */
-    public function add_exception(array $exception) {
+    public function add_exception(Exception $exception) {
         self::$_exceptions[] = $exception;
     }
 
@@ -252,11 +267,12 @@ class BitFire
     public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\Maybe {
         if ($code === FAIL_NOT) { return \TF\Maybe::$FALSE; }
         $block = new Block($code, $parameter, $value, $pattern, $block_time);
+        $req = BitFire::get_instance()->_request;
         if (is_report($block)) {
-            self::reporting($block, BitFire::get_instance()->_request);
+            self::reporting($block, $req);
             return \TF\Maybe::$FALSE;
         }
-        return filter_block_exceptions($block, self::$_exceptions);
+        return filter_block_exceptions($block, self::$_exceptions, $req->host . ':' . $req->path);
     }
     
     /**

@@ -1,0 +1,142 @@
+{
+  "ci_service": {
+    "branch": "master",
+    "build_identifier": "",
+    "build_url": "",
+    "commit_sha": "ca05e9c2e0757eb8a73f25eb96616a231ebfa00b",
+    "committed_at": 1611201955,
+    "name": ""
+  },
+  "environment": {
+    "gem_version": "2.7.6",
+    "package_version": "",
+    "pwd": "/home/cory/tools/bitfire-release",
+    "prefix": "/home/cory/tools/bitfire-release",
+    "rails_root": "",
+    "reporter_version": "0.9.0",
+    "simplecov_root": ""
+  },
+  "git": {
+    "branch": "master",
+    "head": "ca05e9c2e0757eb8a73f25eb96616a231ebfa00b",
+    "committed_at": 1611201955
+  },
+  "covered_percent": 33.64650616559013,
+  "covered_strength": 0,
+  "line_counts": {
+    "missed": 1130,
+    "covered": 573,
+    "total": 1703
+  },
+  "source_files": [
+    {
+      "blob_id": "79e5b0b924b562332beb147282076826101c073d",
+      "coverage": "[0,0,null,null,null,null,0,0,0,0,0,null,null,null,null,null,0,0,0,0,0,0,null,null,1,8,2,null,null,0,42,6,null,42,null,null,null,null,null,0,0,null,null,0,3,2,3,3,null,2,0,0,null,null,null,null,0,0,null,null,null,null,null,null,48,96,32,0,0,0,0,96,16,0,0,0,0,0,0,0,0,0,0,null,null,null,4,4,null,null,null,null,null,null,null,null,4,null,null,0,12,null,null,null,null,null,0,0,0,0,0,0,0,null,null,16,16,16,8,16,20,12,4,null,null,32,96,null,16,16,32,0,0,0,0,0,80,32,null,16,0,0,0,0,0,0,0,0,null,null,null,48,null,null,null,null,null,48,72,60,48,60,null,12,null,null,null,null,null,null,0,null,0,null,null,null,0,0,null,null,null,null,null,0,0,null,null,null,null,null,0,0,0,null,null,0,0,0,0,null,null,null,null,null,0,0,0,0,null,0,null,null,null,null,null,null,0,0,0,0,0,null,null,0,0,null,0,null,0,0,0,null,0,0,null,0,null,null,0,null,null,null,0,0,0,null,null,0,0,0,0,0,0,0,null,null,0,null,null,0,0,0,0,null,null,0,0,0,0,0,null,null,0,0,0]",
+      "covered_percent": 27.741935483870968,
+      "covered_strength": 7.754838709677419,
+      "line_counts": {
+        "missed": 112,
+        "covered": 43,
+        "total": 155
+      },
+      "name": "storage.php"
+    },
+    {
+      "blob_id": "5d9953dc368ed47a30274103044bc8faf048ff7b",
+      "coverage": "[0,0,0,0,0,null,0,0,0,0,0,0,0,0,0,null,0,0,0,null,null,0,0,0,null,0,null,null,null,0,0,0,0,null,0,null,null,null,0,0,0,0,0,null,null,0,null,null,0,null,null,0,0,0,0,0,null,0,null,null,null,null,null,0,0,null,null,null,null,null,null,null,0,null,0,0,null,null,null,0,null,null,null,0,null,0,null,null,0,0,0,null,null,null,0,null,null,0,null,null,0,null,null,0,0,0,null,null,0,0,0,null,null,0,0,null,0,null,0,0,null,0,0,null,null,0,0,null,null,null,0,0,null,0,0,0,null,0,0,0,0,0,null,0,null,null,0,0,null,null,null,null,null,null,null,64,64,null,0,0,null,null,0,0,null,null,null,0,null,0,0,null,null,0,0,0,0,0,null,null,0,0,null,null,0,null,null,null,null,null,null,null,null,0,0,0,null,null,0,0,null,null,0,null,null,null,null,null,null,null,null,0,0,0,0,null,null,null,null,null,null,null,0,0,null,0,0,null,0,0,null,null,null,null,null,null,0,0,null,null,null,0,0,null,null,null,null,null,null,0,0,null,0,0,null,0,0,null,0,0,0,null,0,null,null,null,null,null,null,null,0,0,0,null,0,0,0,0,0,0,0,0,null,null,null,null,32,64,0,null,0,0,0,0,0,null,null,null,null,null,null,null,null,null,null,0,null,0,0,0,null,null,null,null,null,null,null,null,null,0,null,null,0,0,0,0,0,0,null,null,0,null,null,null,null,null,2,5,9,null,null,1,null,9,1,7,1,6,null,null,1,null,null,null,null,null,null,null,null,null,null,1,3,2,null,6,0,1,5,1,2,1,3,2,null,null,1,null,0,null,null,0,0,0,0,0,0,null,null,null,1,null,null,0,0,null,0,7,null,null,0,96,null,null,0,0,null,null,48,0]",
+      "covered_percent": 15,
+      "covered_strength": 2.23,
+      "line_counts": {
+        "missed": 170,
+        "covered": 30,
+        "total": 200
+      },
+      "name": "cuckoo.php"
+    },
+    {
+      "blob_id": "5ede0c36a02c6de74fe72b6ede1416ea53a37220",
+      "coverage": "[null,0,null,0,null,0,0,null,0,0,0,null,0,0,0,0,0,0,null,0,null,0,0,0,null,0,0,0,0,0,null,0,0,null,0,0,0,0,0,0,null,null,0,0,0,0,0,null,0,null,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,24,32,0,null,null,16,null,null,null,null,null,0,null,0,0,null,0,0,null,0,null,9,9,9,99,99,144,135,null,null,null,2,4,6,null,16,null,4,4,4,4,null,2,36,4,null,null,null,null,null,null,null,null,null,null,null,2,null,null,10,0,null,0,0,0,null,null,null,null,12,0,0,null,null,null,10,null,null,null,2,20,10,10,null,null,null,12,16,null,null,null,null,14,4,26,null,null,null,null,6,0,null,12,0,null,0,0,0,0,0,0,0,null,0,0,0,null,null,null,8,0,0,0,0,0,0,null,null,null,0,null,0,0,null,null,null,10,8,null,null,2,null,null,null,null,0,null,0,0,0,0,null,0,null,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,null,null,null,null,null,6,18,0,0,null,4,null,null,null,null,null,null,12,null,null,57,54,6,null,null,18,24,null,54,36,null,24,null,null,2,14,null,null,null,null,null,2,10,4,0,11,12,4,6,null,null,null,null,null,12,18,54,null,null,null,null,null,null,null,null,24,85,null,21,null,39,3,null,null,18,6,13,10,null,null,null,2,null,null,null,null,null,null,12,null,null,null,16,24,15,36,null,0,null,null,null,null,null,null,6,30,12,3,24,null,null,2,null,null,null,null,null,null,null,null,null,null,13,null,52,13,null,78,1,null,null,null,12,264,521,null,null,null,null,420,240,376,213,null,73,48,null,108,null,null,null,null,null,null,null,null,null,6,2,4,0,2,0,0,0,2,3,7,1,2,0,0,0,0,3,7,1,null,2,null,null,null,null,null,null,null,null,null,6,8,6,8,12,null,null,null,null,null,null,null,null,8,22,22,20,null,12,0,null,null,null,null,null,null,null,6,null,null,null,null,null,null,18,null,null,20,8,null,null,null,null,4,18,null,2,0,8,2,6,8,null,null,null,null,null,null,null,4,18,null,28,6,16,18,26,null,12,null,null,1,2,2,2,6,0]",
+      "covered_percent": 57.421875,
+      "covered_strength": 17.8046875,
+      "line_counts": {
+        "missed": 109,
+        "covered": 147,
+        "total": 256
+      },
+      "name": "botfilter.php"
+    },
+    {
+      "blob_id": "8a61931295cc3813fc8508e96bf7c3340128225a",
+      "coverage": "[null,0,0,null,0,0,null,0,0,null,0,null,null,null,0,0,null,0,0,0,0,0,0,0,null,null,null,0,null,0,0,0,0,0,0,null,0,0,0,0,0,0,null,null,null,0,null,0,null,1,3,10,11,null,null,1,null,2,5,8,8,8,null,null,5,0,null,null,null,5,5,null,null,5,5,null,null,1,null,null,null,null,null,null,1,3,0,0,null,3,0,0,null,2,null,null,null,null,null,null,1,2,null,2,0,0,null,null,1,null,null,null,null,null,0,null,null,0,0,0,0,null,null,null,0,0,null,null,0,null,null,0,null,0,0,0,0,null,null,null,0,0,0,0,null,null,0,null,null,null,null,null,null,0,0,0,null,0,0,null,0,0,null,null,0,null,null,null,null,null,null,null,0,null,null,0,0,null,0,0,null,null,null,0,0,null,0,null,null,null,0,0,null,0,null,null,null,null,null,0,null,0,0,null,null,0,null,0,null,null,0,0,0,0,null,null,null,0,null,null,null,null,null,0,0,0,null,0,null,null,null,null,null,0,0,0,0,0,null,null,null,null,null,0,0,0,null,null,null,null,null,0,0,0,null,0,null,null,null,null,null,0,0,0,null,0,null,null,null,null,null,0,0,null,0,0,null,null,0,0,null,null,0,null,null,null,null,null,0,0,0,null,0,null,null,null,null,null,0,0,0,null,0,null,null,null,null,null,0,0]",
+      "covered_percent": 16.43835616438356,
+      "covered_strength": 0.6712328767123288,
+      "line_counts": {
+        "missed": 122,
+        "covered": 24,
+        "total": 146
+      },
+      "name": "webfilter.php"
+    },
+    {
+      "blob_id": "3fd58f11e2111cdf9616e675b6279c51c1982cbd",
+      "coverage": "[0,0,null,0,null,0,0,0,0,0,null,null,null,null,0,0,0,0,0,0,957,0,0,0,114,113,0,0,0,99,0,0,0,0,7,4,66,null,526,1344,0,null,null,null,null,null,30,80,90,10,null,null,null,null,null,null,null,null,null,12,27,24,null,null,null,null,null,null,8,18,16,null,null,null,null,null,null,0,0,0,0,null,null,null,null,null,null,null,null,0,0,0,0,0,null,null,null,null,null,null,null,null,0,0,0,0,null,0,null,null,null,null,null,null,null,null,0,0,0,0,null,0,null,null,null,null,0,0,0,3,1,4,null,null,null,1,1,2,null,null,null,0,0,0,null,null,null,2,2,11,null,null,null,0,0,0,null,1,1,12,8,null,1,null,null,null,0,0,null,null,null,null,0,0,0,null,0,148,75,0,null,21,0,0,null,84,null,52,78,15,15,12,110,null,0,132,null,null,52,null,0,0,0,0,0,null,0,null,52,0,null,0,null,176,22,0,31,55,14,null,7,14,14,0,0,14,0,0,21,0,0,null,7,null,0,0,44,0,0,115,0,null,0,null,null,11,44,28,null,16,0,null,16,null,null,null,null,null,null,0,null,0,0,0,0,null,null,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,2,18,2,2,514,2500,1500,328,164,0,1008,null,null,2,null,null,2,22,null,null,null,null,null,0,null,16,14,14,null,22,6,null,null,null,null,null,null,null,null,null,10,75,60,50,null,null,null,6,16,null,null,null,null,null,null,null,null,8,null,20,20,null,12,12,46,20,null,null,null,null,null,null,3,12,2,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,0,0,0,0,null,null,null,null,null,null,null,30,290,10,null,null,null,null,null,15,10,34,72,null,5,null,null,0,0,0,0,null,0,null,null,null,null,null,null,null,60,30,60,0,0,0,null,null,30,null,null,null,null,null,null,null,9,12,24,null,null,null,14,84,null,null,0,0,0,null,null,null,null,null,0,0,0,0,0,0,0,0,0,0,null,0,null,null,null,null,3,45,95,null,2,null,null,null,null,null,8,8,32,null,9,null,47,0,35,77,91,null,null,40,null,null,null,null,null,null,18,9,99,0,null,99,null,null,9,45,9,0,9,65,null,null,0,null,null,null,null,36,null,null,null,18,126,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,36,null,54,null,36,27,9,null,27,9,null,null,45,18,234,null,36,72,9,11,4,0,null,4,null,null,9,null,null,18,18,9,9,9,null,null,0,null,null,null,null,null,null,null,null,null,null,0,null,0,0,0,null,null,null,0,0,0,null,0,null,null,null,0,null,0,null,0,null,0,null,0,null,0,0,null,null,null,0,0,null,null,0,0,0,0,null,null,0,0,null,null,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,null,0,null,null,null,null,null,0,null,0,null,0,0,0,0,0,null,0,0,0,0,0,0,0,0,null,null,null,null,null,0,0,0,0,null,null,null,null,null,0,0,0,0,0,null,null,null,null,null,0,0,0,0,0,null,null,null,null,null,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,null,0,null,null,null,null,0,0,0,0,null,null,null,0,0,0,0,0,null,null,1,4,7,null,null,null,null,null,null,0,0,null,null,null,null,null,0,0,0,0,0,0,0,0,0,0,0,0,null,null,null,null,null,null,null,6,null,4,20,0,0,0,null,null,null,null,null,null,null,null,null,0,0,0,null,null,null,null,null,null,0,0,0,0,0,0,0,0,null,null,0,0,0,null,0]",
+      "covered_percent": 40,
+      "covered_strength": 33.72857142857143,
+      "line_counts": {
+        "missed": 252,
+        "covered": 168,
+        "total": 420
+      },
+      "name": "util.php"
+    },
+    {
+      "blob_id": "560bdea36d69f775c2825f4124a7e0f2e48b0715",
+      "coverage": "[0,0,0,0,null,0,null,null,0,0,null,0,0,0,0,0,null,0,0,0,0,0,null,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,null,0,0,0,0,0,0,0,0,null,0,null,0,0,null,0,null,0,null,0,0,0,null,null,0,null,0,0,0,0,0,0,0,0,0,null,null,null,0,null,0,0,0,0,0,null,0,0,0,0,0,null,156,39,39,39,39,39,null,null,11,44,11,22,0,8,2,0,35,498,1458,245,null,32,7,0,0,0,0,16,2,0,0,0,0,null,11,null,null,0,0,null,null,0,0,null,null,null,0,null,0,0,0,0,0,null,40,8,8,8,8,8,null,null,null,0,0,null,0,0,null,null,2,2,null,null,102,204,null,null,10,35,null,null,18,36,null,null,30,60,134,48,null,null,null,null,null,null,null,0,null,0,null,null,0,null,0,null,0,0,0,null,0,0,null,0,null,null,0,null,null,0,null,null,null,null,null,0,15,4,null,10,null,null,null,null,null,0,null,5,8,null,null,11,null,null,3,null,2,null,null,null,null,null,null,null,null,null,0,0,0,0,0,null,0,null,null,0,11,0,null,0,null,0,0,0,null,null,null,null,null,null,null,0,0,null,null,null,null,null,40,16,64,32,16,4,null,36,null,null,4,8,24,2,4,8,4,2,2,null,null,4,null,null,null,null,null,null,null,null,0,0,0,0,0,0,null,null,null,null,null,null,0,null,3,null,null,6,11,null,7,1,1,1,1,null,0,0,null,0,null,0,0,0,0,0,0,null,null,0,0,0,null,null,null,null,null,null,null,0,0,0,null,null,null,null,null,null,null,0,null,3,6,null,null,2,6,null,null,4,null,5,3,4,null,null,null,3,3,5,6,null,null,null,null,9,3,5,6,null,null,6,null,1,null,null,null,null,null,0,null,6,9,null,0,5,6,1,1,1,0]",
+      "covered_percent": 38.73517786561265,
+      "covered_strength": 15.782608695652174,
+      "line_counts": {
+        "missed": 155,
+        "covered": 98,
+        "total": 253
+      },
+      "name": "bitfire.php"
+    },
+    {
+      "blob_id": "526d25126c71f1ef40c30ef7ea678399afba269f",
+      "coverage": "[0,0,0,null,0,0,null,null,null,null,null,8,56,32,null,40,null,null,null,null,null,0,0,0,0,0,0,0,0,0,0,null,0,0,null,null,null,null,null,0,0,0,0,null,null,null,null,null,12,54,null,null,15,91,0,144,57,75,63,60,30,30,105,60,150,60,124,75,null,null,null,15,120,15,15,0,0,0,0,0,0,93,15,null,null,15,null,null,null,null,null,60,null,60,75,75,165,30,null,null,15,null,45,0,0,0,null,15,null,15,null,45,0,0,0,null,15,null,null,60,null,15,null,null,0,null,0,null,null,0,null,0,0,0,null,0,null,null,null,null,null,15,null,15,195,null,null,null,null,0,null,null,0,0,0,0,null,null,0,null,null,0,0,0,0,0,null,0,null,null,null,null,null,null,null,null,null,null,27,51,null,15,45,null,90,null,null,null,105,120,null,null,72,56,null,null,0,125,null,15,null,null,null,0,0,null,null,null,null,null,0,0,0,null,0,null,null,null,null,null,null,15,null,75,90,null,null,0,null,null,0,0,0,null,null,null,0,0,null,null,null,0,0,null,null,null,0,0,null,null,null,null,null,null,0,0,null,null,null,null,0,0,0,null,null,null,null,null,null,0,0,null,null,null,null,0,0,0,null,null,0,0,0,0,0,0,0,null,null,0,0,null,null,0,0,0,0,0,0,0,null,null,0,0,0,0,0,0,0,0,0,null,null,0,0,0,null,0,0,null,null,0,null,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,null,0,0,null,null,null,0,0,0,0,0,0,null,null,0,null,null,null,null,null,0,0,0,0,0,0,0,0,null,0,null,0,null,null,null,null,0,0,0,null,0,0,null,0,0,null,0,0]",
+      "covered_percent": 27.699530516431924,
+      "covered_strength": 16.173708920187792,
+      "line_counts": {
+        "missed": 154,
+        "covered": 59,
+        "total": 213
+      },
+      "name": "bitfire_pure.php"
+    },
+    {
+      "blob_id": "250aab144e95c6a2143c2ad2725251f8189e9a63",
+      "coverage": "[0,0,null,0,0,0,0,0,0,0,0,null,0,null,null,1,1,null,0,0,0,0,null,null,0,0,0,0,0,null,0,0,null,0,0,0]",
+      "covered_percent": 7.4074074074074066,
+      "covered_strength": 0.07407407407407407,
+      "line_counts": {
+        "missed": 25,
+        "covered": 2,
+        "total": 27
+      },
+      "name": "dashboard.php"
+    },
+    {
+      "blob_id": "ea983334553436a2fb0b9293805e699f032364c6",
+      "coverage": "[0,0,null,0,0,null,0,null,0,null,0,null,0,null,null,null,null,null,null,null,1,7,null,0,0,null,null,0,null,null,null,null,0,null,0,0,0,null,0,0,null,null,null,0,0,null,null,null,0,0,0,null,0,0,0,0,0,null,null,null,0,0,0,0]",
+      "covered_percent": 6.0606060606060606,
+      "covered_strength": 0.24242424242424243,
+      "line_counts": {
+        "missed": 31,
+        "covered": 2,
+        "total": 33
+      },
+      "name": "headers.php"
+    }
+  ],
+  "repo_token": ""
+}
