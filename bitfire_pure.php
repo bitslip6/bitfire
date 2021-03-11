@@ -172,9 +172,11 @@ function is_ajax(\BitFire\Request $request) : bool {
         $request->headers->fetch_mode === 'websocket') { $ajax = true; }
 
     // fall back to using upgrade insecure (should only come on main http requests), this should work for all major browsers
+    /*
     else {
         $ajax = ($request->scheme == "http" && ($request->headers->upgrade_insecure === null || \strlen($request->headers->upgrade_insecure) < 1)) ? true : false;
     }
+    */
     return $ajax;
 }
 
@@ -230,9 +232,15 @@ function url_contains(\BitFire\Request $request, string $url_match) : bool {
 /**
  * returns $block if it doesn't match the block exception
  */
-function match_block_exception(Block $block, array $exception) : Block {
-    return $block;
+function match_block_exception(?Block $block, Exception $exception, string $host, string $url) : ?Block {
+     // make sure that every non default paramater matches
+     if ($exception->host !== NULL && $host !== $exception->host) { return $block; }
+     if ($exception->url !== NULL && $url !== $exception->url) { return $block; }
+     if ($exception->parameter !== NULL && $block->parameter !== $exception->url) { return $block; }
+     if ($exception->code !== 0 && $block->code !== $exception->code) { return $block; }
+     return NULL;
 }
+
 
 // TODO: add override for additional uniqueness 
 function cache_unique() {
@@ -278,6 +286,7 @@ function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data)
     $data["valid"] = $valid;
     $data["classId"] = $class;
     $data["headers"] = headers_list();
+    $data["rhead"] = getallheaders();
     
     // cache the last 15 blocks
     $cache = \TF\CacheStorage::get_instance();
