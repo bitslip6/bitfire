@@ -158,7 +158,7 @@ class BotFilter {
             }
         }
         // handle humans
-        else if (Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+        else if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $request->ajax === false) {
             \BitFireBot\require_browser_or_die($request, $maybe_botcookie);
         }
 
@@ -485,16 +485,17 @@ function make_challenge_cookie(array $answer, string $ip) : string {
 function require_browser_or_die(\BitFire\Request $request, \TF\Maybe $cookie) {
     if (intval($cookie->extract('v')()) >= 2) { return; }
 
-
-    $data = \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
+    \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
     http_response_code(202);
-    $block = BitFire::new_block(20000, 'n/a', 'n/a', 'check JS/Cookies', 0);
     echo make_js_challenge($request->ip, Config::str(CONFIG_USER_TRACK_PARAM), 
         Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
 
     if (Config::str(CONFIG_REQUIRE_BROWSER, "report") === "block") { exit(); }
 }
 
+/**
+ * strip off all internal parameters from request and return a url without any internal parameters
+ */
 function strip_path_tracking_params(\BitFire\Request $request) {
     unset($request->get['_bfa']) ;
     unset($request->get['_bfx']) ;
