@@ -27,6 +27,40 @@ function alert_or_block($config) : string {
 }
 
 /**
+ * load exceptions from disk
+ */
+function load_exceptions() : array {
+    $exceptions = array();
+    if (file_exists(WAF_DIR."cache/exceptions.json")) {
+        $exceptions = json_decode(file_get_contents("cache/exceptions.json"), true);
+    }
+    return $exceptions;
+}
+
+function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) {
+    if ($ex1->code != $ex2->code) { return false; }
+    if ($ex1->host != $ex2->host) { return false; }
+    if ($ex1->parameter != $ex2->parameter) { return false; }
+    if ($ex1->url != $ex2->url) { return false; }
+    return true;
+}
+
+/**
+ * remove an exception from the list
+ */
+function remove_exception(\BitFire\Exception $ex) {
+    $exceptions = array_filter(load_exceptions(), function(\BitFire\Exception $test) use ($ex) { return ($ex->uuid === $test->uuid) ? false : true; }); 
+    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($exceptions), LOCK_EX);
+}
+
+function add_exception(\BitFire\Exception $ex) {
+    $exceptions = load_exceptions();
+    $exceptions[] = $ex;
+    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($exceptions), LOCK_EX);
+}
+
+
+/**
  * returns a maybe of the block if no exception exists
  */
 function filter_block_exceptions(Block $block, array $exceptions) : Maybe {
