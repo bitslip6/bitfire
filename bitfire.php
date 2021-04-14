@@ -129,7 +129,7 @@ class Exception {
     public $url;
     public $host;
 
-    public function __construct(int $code = 0, ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
+    public function __construct(int $code = 0, ?string $uuid = NULL, ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
         $this->code = $code;
         $this->parameter = $parameter;
         $this->url = $url;
@@ -182,7 +182,7 @@ class BitFire
     public $cache;
     // request unique id
     public $uid;
-    public static $_exceptions = array();
+    public static $_exceptions = NULL;
     public static $_reporting = array();
 
     public static $_fail_reasons = array();
@@ -272,6 +272,7 @@ class BitFire
             self::reporting($block, $req);
             return \TF\Maybe::$FALSE;
         }
+        self::$_exceptions = (self::$_exceptions === NULL) ? load_exceptions() : self::$_exceptions;
         return filter_block_exceptions($block, self::$_exceptions, $req->host . ':' . $req->path);
     }
     
@@ -365,7 +366,10 @@ class BitFire
         }
         
 
-        $block = \TF\Maybe::$FALSE;
+        // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
+        \TF\Maybe::$FALSE = \TF\Maybe::of(false);
+        $block = \TF\Maybe::of(false);
+
         if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
 
         // don't inspect local commands
