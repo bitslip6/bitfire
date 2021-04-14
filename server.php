@@ -65,29 +65,6 @@ function get_server_config_file_list() :array {
     );
 }
 
-function pattern_to_list_1(array $patterns) :array {
-
-    $all_files = array();
-    foreach ($patterns as $pattern) {
-        $pattern_files = glob($pattern);
-        foreach ($pattern_files as $file) {
-            $all_files[] = $file;
-        }
-    }
-    return $all_files;
-}
-
-
-function pattern_to_list_2(array $patterns) :array {
-    $result = array_reduce($patterns, function ($carry, $x)  {
-        return array_reduce(glob($x), function ($carry, $x) {
-            $carry[] = $x;
-            return $carry;
-        }, $carry);
-    }, array());
-
-    return $result;
-}
 
 function pattern_to_list_3(array $patterns) :array {
     return append_reduce('glob', $patterns);
@@ -98,7 +75,7 @@ function pattern_to_list_3(array $patterns) :array {
  * get a list of all http configuration files on the target system 
  */
 function get_all_http_confs() : array {
-    return \BitFireSvr\pattern_to_list(\BitFireSvr\get_server_config_file_list());
+    return \BitFireSvr\pattern_to_list_3(\BitFireSvr\get_server_config_file_list());
 }
 
 /**
@@ -155,7 +132,6 @@ function split_request_url(array $access_line) : array {
     $access_line[ACCESS_HOST] = $url['host'] ?? 'localhost';
     $access_line[ACCESS_QUERY] = $url['query'] ?? '';
 
-    // print_r($access_line);
     return $access_line;
 }
 
@@ -192,22 +168,18 @@ function process_access_line(string $line) : ?\BitFire\Request {
         return \BitFire\process_request2($get, array(), $server, array());
     });
 
-/*
-    if ($data->empty()) {
-        print_r($data->errors());
-    }
-*/
 
     return $data->empty() ? NULL : $data->value();
 }
 
 
-function block_to_exception(\BitFire\Block $block) : ?\BitFire\Exception {
+function block_to_exception(?\BitFire\Block $block) : ?\BitFire\Exception {
+    if (!$block) { return NULL; }
     $exception = new \BitFire\Exception();
     $exception->code = $block->code;
     $exception->url = \BitFire\Bitfire::get_instance()->_request->path;
     $exception->parameter = $block->parameter;
-    $exception->ip = \BitFire\BitFire::get_instance()->_request->ip;
+    //$exception->ip = \BitFire\BitFire::get_instance()->_request->ip;
 
     return $exception;
 }
@@ -234,17 +206,17 @@ function process_access_file(string $file_name) : array {
 
     $batch_size = 0;
     $batch = array();
-    foreach(line_at_a_time($file_name) as $line) {
+    $exceptions = array();
+    foreach (line_at_a_time($file_name) as $line) {
         if ($batch_size++ >= 500) {
-            process_batch($batch);
+            $exceptions = array_merge($exceptions, process_batch($batch));
             $batch_size = 0;
+            $batch = array();
         }
         $batch[] = $line;
     }
 
-    process_batch($batch);
-
-    return $batch;
+    return array_merge($exceptions, process_batch($batch));
 }
 
 function process_batch(array $lines) {
@@ -263,54 +235,12 @@ function process_batch(array $lines) {
     $bitfire = \BitFire\BitFire::get_instance();
     $exceptions = array_reduce($batch_req, function ($carry, $request) use ($bitfire) {
         $bitfire->_request = $request;
-        print_r($request);
         $maybe_block = $bitfire->inspect();
-        $carry[] = $maybe_block->if('block_to_exception')();
+        $maybe_block->then('\BitFireSvr\block_to_exception');
+        $maybe_block->then(function($x) use (&$carry) { $carry[] = $x; });
         return $carry;
     }, array());
-print_r($exceptions);
-    //$maybe_block = $bitfire->inspect();
 
-    
-
-    //print_r($batch_req);
-    /*
-    foreach ($browser_requests as $b) {
-        echo "ip : " . $b->ip . "\n";
-    }
-
-    echo "count - " . count($browser_requests) . "\n";
-    echo "count - " . count($batch_req) . "\n";
-    echo "count - " . count($requests) . "\n";
-*/
-
-    
-/*
-    foreach ($requests as $r) {
-        echo "path: " . $r->path . "\n";
-    }
-*/
-
-    //print_r($browser_requests);
-    die("HERE\n");
-//echo "======\n";
-//    print_r($browser_requests);
-    die("find out\n");
+    return $exceptions;
 }
 
-/*
-    $bitfire = \BitFire\BitFire::get_instance();
-    $exceptions = array();
-    $good_browsers = array();
-    foreach(line_at_a_time($file_name) as $line) {
-        $bitfire->_request = process_access_line($line);
-        $maybe_block = $bitfire->inspect();
-        $exceptions[] = $maybe_block->if('block_to_exception')();
-        if (is_browser_request($bitfire->_request)) {
-            $good_browsers[$bitfire->_request->ip] = true;
-        }
-    }
-
-    return array_filter($exceptions, function($item) { return ($item == false) ? false : true; } );
-}
-*/
