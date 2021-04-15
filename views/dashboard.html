@@ -128,7 +128,7 @@
         function toggle(elm, type) {
           var e = GBI(elm);
           e.innerText = type;
-          fetch('<?php echo \Bitfire\Config::str("dashboard_url")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>').then(data => { console.log(data); });
+          fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>').then(data => { console.log(data); });
           if (type == "block" || type == "on") {
             e.classList.remove("btn-warning");
             e.classList.remove("btn-secondary");
@@ -169,15 +169,7 @@
         }
 
 
-        function software_change() {
-          var ver = GBI("software_ver").value;
-          fetch("/upgrade/software/"+ver)
-              .then(response => response.json())
-              .then(data => { 
-                add_info("primary", "software upgrade: " + data.status);
-              }).catch((error) => { console.log("software change error!", error); });
-        }
-        
+               
        
         /**
          * @param string type  primary, secondary, success, danger, warning, info
@@ -195,21 +187,6 @@
           accumulator + "<div class='alert alert-"+value.type+"' role='alert'>" + value.message + "</div>", '');
         }
 
-        
-
-        function load_temp() {
-            fetch("/temp/setting")
-                .then(response => response.json())
-                .then(data => {
-                    GBI("cputemp").innerHTML = data.cputemp.toFixed(1) + "&#176;";
-                    GBI("vixeltemp").innerHTML = (Math.round(data.vixeltemp*10)/10) + "&#176;";
-                }).catch((error) => {
-                  add_info("danger", "error reading temperature data");
-                });
-
-            window.setTimeout(load_temp, 4000);
-        }
-        
         function GBI(name) { return document.getElementById(name); }
         function avg_click(e) {
             window.CHITON_AVG = !window.CHITON_AVG;
@@ -995,10 +972,10 @@ fetch("https://bitfire.co/ver.php")
   });
 
       const request = async () => {
-        const response1 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response2 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response3 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response4 = await fetch('//<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response1 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response2 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response3 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response4 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
 
         
         const data1 = await response1.json();
