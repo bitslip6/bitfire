@@ -230,7 +230,7 @@ Distributed under the Apache 2.0 License. See `LICENSE` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Your Name - [@bitslip6](https://twitter.com/bitslip6) - info@bitslip6.com
+Cory - [@bitslip6](https://twitter.com/bitslip6) - info@bitslip6.com
 
 Project Link: [https://github.com/bitslip6/bitfire](https://github.com/bitslip6/bitfire)
 
