@@ -144,7 +144,7 @@ class Maybe {
     public function index(int $index) : Maybe { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? false); } return new static(false); }
     public function isa(string $type) { return $this->_x instanceof $type; }
     public function __invoke(string $type = null) { return $this->value($type); }
-    public function __toString() : string { return "Maybe of: " . (string)$this->_x; }
+    public function __toString() : string { return (string)$this->_x; }
 }
 Maybe::$FALSE = Maybe::of(false);
 
@@ -185,7 +185,7 @@ function recache(array $lines) : array {
     $a = array();
     $block="";
     for ($i=1,$m=count($lines);$i<$m;$i++) {
-        $id = hexdec(substr($lines[$i], 0, 4));
+        $id = @hexdec(substr($lines[$i], 0, 4));
         if (between($id, 10000, 90000)) {
             $a[$id]=trim($block);
             $block="";
@@ -225,7 +225,7 @@ function apidata($method, $params) {
  * @return string message.iv
  */
 function encrypt_ssl(string $password, string $text) : string {
-    assert(between(strlen($password), 20, 32), "cipher password length is out of bounds: [$password]");
+    assert(between(strlen($password), 12, 32), "cipher password length is out of bounds: [$password]");
     $iv = random_str(16);
     return openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
 }
@@ -248,12 +248,12 @@ function raw_decrypt(string $cipher, string $iv, string $password) {
 function decrypt_ssl(string $password, ?string $cipher) : Maybe {
 
     $exploder = partial("explode", ".");
-    $decryptor = partial_right("TF\\raw_decrypt", $password);
+    $decrypt = partial_right("TF\\raw_decrypt", $password);
 
     return Maybe::of($cipher)
         ->then($exploder)
         ->if(function($x) { return is_array($x) && count($x) === 2; })
-        ->then($decryptor, true);
+        ->then($decrypt, true);
 }
 
 
@@ -690,7 +690,7 @@ function cookie(string $name, string $value, int $exp) : void {
         setcookie($name, $value, $exp, '/; samesite=strict', '', false, true);
     } else {
         setcookie($name, $value, [
-            'expires' => $exp,
+            'expires' => time() + $exp,
             'path' => '/',
             'domain' => '',
             'secure' => false,
@@ -717,14 +717,15 @@ function prof_sort(array $a, array $b) : int {
 function parse_ini(string $ini_src) : void {
     $config = array();
     $parsed_file = "$ini_src.php";
-    if (filemtime($parsed_file) > filemtime($ini_src)) {
+    if (file_exists($parsed_file) && filemtime($parsed_file) > filemtime($ini_src)) {
         require "$ini_src.php";
     } else {
         $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
         debug("parsed ini file");
-        if (is_writable($parsed_file)) {
+        if ((file_exists($parsed_file) && is_writable($parsed_file)) || is_writable(dirname($parsed_file))) {
             file_put_contents($parsed_file, "<?php\n\$config=". var_export($config, true).";\n", LOCK_EX);
         }
     }
     \BitFire\Config::set($config);
 }
+

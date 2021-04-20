@@ -15,7 +15,7 @@ interface Storage {
  * trivial cache abstraction with support for apcu, shared memory and zend opcache 
  */
 class CacheStorage implements Storage {
-    protected static $_type = 'shmop';
+    protected static $_type = 'nop';
     protected static $_instance = null;
     protected $_shmop = null;
     protected $_shm = null;
@@ -28,7 +28,7 @@ class CacheStorage implements Storage {
 
     public static function get_instance() : CacheStorage {
         if (self::$_instance === null) {
-            self::$_instance = new CacheStorage(self::$_type);
+            self::$_instance = new CacheStorage(\Bitfire\Config::str('cache_type', 'nop'));
         }
         return self::$_instance;
     }
