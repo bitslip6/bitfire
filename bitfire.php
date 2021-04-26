@@ -232,7 +232,7 @@ class BitFire
         $this->api_call();
 
         if (function_exists('\BitFirePRO\send_pro_headers')) {
-            \BitFirePRO\send_pro_mfa();
+            \BitFirePRO\send_pro_mfa($this->_request);
         }
     }
     
@@ -274,7 +274,7 @@ class BitFire
     /**
      * create a new block, returns a maybe of a block, empty if there is an exception for it
      */
-    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\Maybe {
+    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\MaybeBlock {
         if ($code === FAIL_NOT) { return \TF\Maybe::$FALSE; }
         $block = new Block($code, $parameter, $value, $pattern, $block_time);
         $req = BitFire::get_instance()->_request;
@@ -376,7 +376,7 @@ class BitFire
      * inspect a request and block failed requests
      * return false if inspection failed...
      */
-    public function inspect() : \TF\Maybe {
+    public function inspect() : \TF\MaybeBlock {
         // dashboard requests, TODO: MOVE TO api.php
         if ($this->_request->path === Config::str(CONFIG_DASHBOARD_PATH)) {
             require_once WAF_DIR."dashboard.php";
@@ -385,8 +385,8 @@ class BitFire
         
 
         // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
-        \TF\Maybe::$FALSE = \TF\Maybe::of(false);
-        $block = \TF\Maybe::of(false);
+        \TF\Maybe::$FALSE = \TF\MaybeBlock::of(NULL);
+        $block = \TF\MaybeBlock::of(NULL);
 
         if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
 

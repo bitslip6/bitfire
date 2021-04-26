@@ -275,7 +275,7 @@ function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn) {
     return if_else($header !== null, 
         function() use ($ctx, $header) {
             return unserialize(shmop_read($ctx['rid'], 
-                $header['offset'], $header['len']), array("allowed_classes" => array('TF\Maybe'))); },
+                $header['offset'], $header['len']), array("allowed_classes" => array('TF\MaybeI'))); },
         function() use ($ctx, $key, $ttl, $fn) {
             $data = $fn();
             cuckoo_write($ctx, $key, $ttl, $data);
@@ -292,7 +292,7 @@ function cuckoo_read(array $ctx, string $key) {
         unserialize(
             shmop_read($ctx['rid'], 
             $header['offset'],
-            $header['len']), array("allowed_classes" => array('TF\Maybe')));
+            $header['len']), array("allowed_classes" => array('TF\MaybeI')));
 }
 
 

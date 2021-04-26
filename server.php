@@ -28,6 +28,21 @@ function line_at_a_time(string $filename) : iterable {
 }
 
 /**
+ * convert string version number to unsigned 32bit int
+ */
+function text_to_int(string $ver) {
+    $result = 0;
+    $ctr = 1;
+    $parts = array_reverse(explode(".", $ver));
+    foreach ($parts as $part) {
+        $p2 = intval($part) * ($ctr);
+        $result += $p2;
+        $ctr*=100;
+    }
+    return $result;
+}
+
+/**
  * recursively reduce list by fn, result is an array of output of fn for each list item
  * fn should output an array list for each list item, the result will be all items appended
  */
@@ -40,10 +55,42 @@ function append_reduce(callable $fn, array $list) : array {
     }, array());
 }
 
+// strip the wordpress or plugin root from the filename
+function strip_root(string $file) : string {
+    return str_replace(trim($_SERVER['DOCUMENT_ROOT'], '/'), 'src', trim($file, '/'));
+}
+
+
+// run the hash functions on a file
+function hash_file(string $filename, string $sym_ver) : ?array {
+    $filename = str_replace("//", "/", $filename);
+    $i = pathinfo($filename);
+    if ($i['extension'] !== "php") { return null; }
+    $result = array();
+    $shortname  = strip_root($filename);
+
+    $result['e'] = $i['extension'];
+    $t = "/{$sym_ver}/{$shortname}";
+    $c = file_get_contents($filename);
+    $result['c'] = crc32($c);
+    $result['p'] = crc32($t);
+    //$result['v'] = $sym_ver;
+    $result['f'] = $t;
+
+    return $result;
+}
+
+
+function hash_wp_root(string $root) : array {
+    $hashes = \TF\file_recurse($_SERVER['DOCUMENT_ROOT'] . "/$root", '\BitFireSvr\hash_file');
+    return $hashes;
+}
+
+
 /**
  * returns output of $fn if $fn output evaluates to true
  */
-function if_it(callable $fn, $item) : mixed {
+function if_it(callable $fn, $item) {
     $r = $fn($item);
     return ($r) ? $r : NULL;
 }

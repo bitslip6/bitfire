@@ -30,15 +30,18 @@ function is_locked() {
 
 function serve_dashboard(string $path) {
     if ($path === Config::str(CONFIG_DASHBOARD_PATH)) {
+        /*
         if (!isset($_SERVER['PHP_AUTH_PW']) || $_SERVER['PHP_AUTH_PW'] !== Config::str('password', 'default_password')) {
             header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
             header('HTTP/1.0 401 Unauthorized');
             exit;
         }
+        */
 
         $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR."config.ini.php");
 
         $report_count = system("wc -l " . Config::file(CONFIG_REPORT_FILE) . "| wc -f 1 -d ' '"); //(is_array($x)) ? count($x) : 0;
+        $config_orig = Config::$_options;
         $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
         $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500)));
         $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
