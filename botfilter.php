@@ -1,6 +1,8 @@
 <?php
 namespace BitFire;
 
+use function TF\parse_ini;
+
 const BOT_ANS_CODE_POS=2;
 const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
@@ -21,7 +23,7 @@ const AGENT_MATCH = array(
 
 
 // 2 calls = 29: cpu
-function match_fails(int $fail_code, MatchType $type, \BitFire\Request $request) : \TF\Maybe {
+function match_fails(int $fail_code, MatchType $type, \BitFire\Request $request) : \TF\MaybeBlock {
     if ($type->match($request)) {
         return BitFire::new_block($fail_code, $type->get_field(), $type->matched_data(), 'static match', FAIL_DURATION[$fail_code]??0);
     }
@@ -38,7 +40,7 @@ class BotFilter {
     public $cache;
 
     protected $_ip_key;
-    public $ip_data;
+    public $ip_data = array();
 
     protected $_constraints;
 
@@ -73,11 +75,9 @@ class BotFilter {
      * inspect the UA, determine human or bot
      * perform human validation, bot white/black listing
      * 
-     * TODO: simplify with Maybe
-     * returns true if all tests pass
      * CPU: 359
      */
-    public function inspect(\BitFire\Request $request) : \TF\Maybe {
+    public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
 
         // handle wp-cron and other self requested pages
         if (($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']) ||
@@ -119,7 +119,7 @@ class BotFilter {
 
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
-        $this->browser['valid'] = $maybe_botcookie->extract('v', 0)();
+        $this->browser['valid'] = intval($maybe_botcookie->extract('v', 0)();
         $this->browser[AGENT_WHITELIST] = false;
 
         // match constraints
@@ -156,16 +156,16 @@ class BotFilter {
         // handle robots
         if ($this->browser[AGENT_BOT]) {
             $this->browser[AGENT_WHITELIST] = false;
-            if (Config::enabled(CONFIG_WHITELIST_ENABLE)) {
+            if (Config::enabled(CONFIG_WHITELIST_ENABLE) && $maybe_block->empty()) {
+                $agents = \parse_ini_file(WAF_DIR."whitelist_agents.ini");
                 $maybe_block->doifnot('\BitFireBot\whitelist_inspection',
                     $request->agent,
                     $request->ip,
-                    Config::arr(CONFIG_WHITELIST));
-
+                    $agents['botwhitelist']);
 
                 // set agent whitelist status
                 $this->browser[AGENT_WHITELIST] = ($maybe_block->empty());
-            } 
+            }
             else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
                 $maybe_block->doifnot('\BitFireBot\blacklist_inspection', $request, file(WAF_DIR.'cache/bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
             }
@@ -210,7 +210,7 @@ use const BitFire\IPDATA_RR_5M;
  * test if the ipdata exceeds request rate
  * PURE
  */
-function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\Maybe {
+function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\MaybeBlock {
     if ($ip_data[IPDATA_RR_1M] > $rr_1m || $ip_data[IPDATA_RR_5M] > $rr_5m) {
         return BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', 
         $ip_data[IPDATA_RR_1M] . ' / ' . $ip_data[IPDATA_RR_5M], "$rr_1m / $rr_5m", BLOCK_MEDIUM);
@@ -335,7 +335,7 @@ function agent_in_list(string $a, string $ip, array $list) : int {
  * check if agent is in whitelist, true if we have whitelist and no match, false if no whitelist, bock if 
  * NOT PURE: depends on external dns and whois
  */
-function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF\Maybe {
+function whitelist_inspection(string $agent, string $ip, ?array $whitelist) : \TF\MaybeBlock {
     // configured to only allow whitelisted bots, so we can block here 
     // handle whitelisting (the most restrictive)
     // return true(pass) if the agent is in the list of whitelist bots
@@ -351,7 +351,7 @@ function whitelist_inspection(string $agent, string $ip, array $whitelist) : \TF
  * returns true if the useragent / ip is not blacklisted, false otherwise
  * PURE
  */
-function blacklist_inspection(\BitFire\Request $request, ?array $blacklist) : \TF\Maybe {
+function blacklist_inspection(\BitFire\Request $request, ?array $blacklist) : \TF\MaybeBlock {
     $match = new \BitFire\MatchType(\BitFire\MatchType::CONTAINS, "agent", $blacklist, BLOCK_MEDIUM);
     $part = $match->match($request);
     if ($part !== false) {
@@ -436,7 +436,7 @@ function bot_calc_answer(int $n1, int $n2, int $op) : array {
  * returns a maybe with tracking data or an empty monad...
  * PURE!
  */
-function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip) : \TF\Maybe {
+function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip) : \TF\MaybeStr {
     return \TF\decrypt_ssl($encrypt_key, $cookie_data)
         ->then("TF\un_json")
         ->if(function($cookie) use ($src_ip) { 
@@ -496,7 +496,7 @@ function make_challenge_cookie(array $answer, string $ip) : string {
 /**
  * add the page that prompts the browser to add a cookie
  */
-function require_browser_or_die(\BitFire\Request $request, \TF\Maybe $cookie) {
+function require_browser_or_die(\BitFire\Request $request, \TF\MaybeStr $cookie) {
     if (intval($cookie->extract('v')()) >= 2) { 
         header("x-challenge: valid");
         return;

@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 namespace BitFire;
-use TF\Maybe;
+use TF\MaybeBlock;
 
 function to_meta(array $line) {
     return "5m:".$line['rate']['rr_5m'].", 1m:".$line['rate']['rr_1m']." ,v:".$line['browser']['valid'].", ref:".$line['rate']['ref'];
@@ -64,8 +64,8 @@ function add_exception(\BitFire\Exception $ex) {
 /**
  * returns a maybe of the block if no exception exists
  */
-function filter_block_exceptions(Block $block, array $exceptions) : Maybe {
-    return Maybe::of(array_reduce($exceptions, '\BitFire\match_block_exception', $block));
+function filter_block_exceptions(Block $block, array $exceptions) : MaybeBlock {
+    return MaybeBlock::of(array_reduce($exceptions, '\BitFire\match_block_exception', $block));
 }
 
 function process_server2(array $server) : Request {
@@ -128,7 +128,7 @@ function process_request2(array $get, array $post, array $server, array $cookie 
     $request->post = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
     $request->cookies = $cookie;
     $request->get_freq = freq_map($request->get);
-    $request->get_post = freq_map($request->post);
+    $request->post_freq = freq_map($request->post);
     $request->ajax = is_ajax($request);
 
     return $request;
@@ -333,7 +333,9 @@ function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data)
     $data["valid"] = $valid;
     $data["classId"] = $class;
     $data["headers"] = remove_bulky_headers(headers_list());
-    $data["rhead"] = getallheaders();
+    if (function_exists('getallheaders')) {
+        $data["rhead"] = \getallheaders();
+    }
     
     // cache the last 15 blocks
     $cache = \TF\CacheStorage::get_instance();
@@ -349,11 +351,10 @@ function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data)
 
     $content = json_encode($data)."\n";
     if (Config::enabled('report_file') && $data["pass"] === true) {
-        $file = Config::str('report_file');
-        $file = ($file[0] === '/') ? $file : WAF_DIR . $file;
+        $file = Config::file('report_file');
         file_put_contents($file, $content, FILE_APPEND);
-    }  else if (Config::enabled(BLOCK_FILE)) {
-        file_put_contents(Config::file(BLOCK_FILE), $content, FILE_APPEND);
+    }  else if (Config::enabled(CONFIG_BLOCK_FILE)) {
+        file_put_contents(Config::file(CONFIG_BLOCK_FILE), $content, FILE_APPEND);
     }
     \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
     $content, array("Content-Type" => "application/json"));

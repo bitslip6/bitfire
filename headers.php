@@ -29,7 +29,7 @@ function send_security_headers(\BitFire\Request $request) : void {
     core_headers($path);
 
     // set strict transport security (HSTS)
-    if (\Bitfire\Config::enabled("enforce_ssl_1year")) {
+    if (\Bitfire\Config::str("enforce_ssl_1year") == "block" || \Bitfire\Config::str("enforce_ssl_1year") === true) {
         force_ssl_with_sts();
     }
 

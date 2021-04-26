@@ -19,7 +19,7 @@ function do_for_all(array $data, callable $fn) { foreach ($data as $item) { $fn(
 function do_for_all_key_names(array $data, array $keynames, callable $fn) { foreach ($keynames as $item) { $fn($data[$item], $item); } }
 function do_for_all_key(array $data, callable $fn) { foreach ($data as $key => $item) { $fn($key); } }
 function do_for_all_key_value(array $data, callable $fn) { foreach ($data as $key => $item) { $fn($key, $item); } }
-function do_for_all_key_value_recursive(array $data, callable $fn) { foreach ($data as $key => $items) { foreach ($items as $item) { $fn($key, $item); } } }
+function do_for_all_key_value_recursive(array $data, callable $fn) { foreach ($data as $key => $item) { if (is_array($item)) { do_for_all_key_value_recursive($item, $fn); } else { $fn($key, $item); } } }
 function between($data, $min, $max) { return $data >= $min && $data <= $max; }
 function keep_if_key(array $data, callable $fn) { $result = $data; foreach ($data as $key => $item) { if (!$fn($key)) { unset($result[$key]); } return $result; }}
 function if_then_do(callable $test_fn, callable $action, $optionals = null) : callable { return function($argument) use ($test_fn, $action, $optionals) { if ($argument && $test_fn($argument, $optionals)) { $action($argument); }}; }
@@ -42,6 +42,56 @@ function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)
 function lookbehind(string $s, string $r) : string { return @$r($s); }
 // return the $index element of $input split by $separator or '' on any failure
 function take_nth(?string $input, string $separator, int $index) : string { if (empty($input)) { return ''; } $parts = explode($separator, $input); return (isset($parts[$index])) ? $parts[$index] : ''; }
+
+function flatten(array $array) : array {
+    $return = array();
+    array_walk_recursive($array, function($a) use (&$return) { $return[] = $a; });
+    return $return;
+}
+
+function array_flatten($array) {
+    $return = array();
+    foreach ($array as $key => $value) {
+        if (is_array($value)){
+            $return = array_merge($return, array_flatten($value));
+        } else {
+            $return[$key] = $value;
+        }
+    }
+
+    return $return;
+}
+
+
+/**
+ * recursively perform a function over directory traversal.
+ */
+function file_recurse(string $dirname, callable $fn) : array {
+    $maxfiles = 1000;
+    $result = array();
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0) {
+            $path = $dirname . '/' . $file;
+            if (!$file || $file === '.' || $file === '..' || is_link($file)) {
+                continue;
+            } if (is_dir($path)) {
+                $r = file_recurse($path, $fn);
+                if (!empty($r)) {
+                    if (is_array($r)) {
+                        foreach($r as $i) { $result[] = $i; }
+                    }
+                }
+            }
+            else {
+                $r = \call_user_func($fn, $path);
+                if (!empty($r)) { $result[] = $r; }
+            }
+        }
+        \closedir($dh);
+    }   
+
+    return $result;
+}
 
 
 /**
@@ -76,16 +126,36 @@ function partial_right(callable $fn, ...$args) : callable {
 }
 
 
-//$m = \TF\Maybe(false);
+interface MaybeI {
+    public static function of($x) : MaybeI;
+    public function then(callable $fn, bool $spread = false) : MaybeI;
+    public function map(callable $fn) : MaybeI;
+    public function if(callable $fn) : MaybeI;
+    public function ifnot(callable $fn) : MaybeI;
+    /** execute $fn runs if maybe is not empty */
+    public function do(callable $fn, ...$args) : MaybeI;
+    /** execute $fn runs if maybe is empty */
+    public function doifnot(callable $fn, ...$args) : MaybeI;
+    public function empty() : bool;
+    public function errors() : array;
+    public function value(string $type = null);
+    public function append($value) : MaybeI;
+    public function size() : int;
+    public function extract(string $key, $default = false) : MaybeI;
+    public function index(int $index) : MaybeI;
+    public function isa(string $type) : bool;
+    public function __toString() : string;
+}
 
-class Maybe {
+
+class MaybeA implements MaybeI {
     protected $_x;
     protected $_errors;
-    /** @var Maybe */
+    /** @var MaybeA */
     public static $FALSE;
-    protected function assign ($x) { $this->_x = ($x instanceOf Maybe) ? $x->value() : $x; }
+    protected function assign ($x) { $this->_x = ($x instanceOf MaybeI) ? $x->value() : $x; }
     public function __construct($x) { $this->_x = $x; $this->_errors = array(); }
-    public static function of($x) : Maybe { 
+    public static function of($x) : MaybeI { 
         //if ($x === false) { return MaybeFalse; } // shorthand for negative maybe
         if ($x instanceof Maybe) {
             $x->_x = $x->value();
@@ -93,7 +163,7 @@ class Maybe {
         }
         return new static($x);
     }
-    public function then(callable $fn, bool $spread = false) : Maybe {
+    public function then(callable $fn, bool $spread = false) : MaybeI {
         if (!empty($this->_x)) {
             $this->assign(
                 ($spread) ?
@@ -106,7 +176,7 @@ class Maybe {
 
         return $this;
     }
-    public function map(callable $fn) : Maybe { 
+    public function map(callable $fn) : MaybeI { 
         if (is_array($this->_x) && !empty($this->_x)) {
             $this->_x = array_map($fn, $this->_x);
         } else {
@@ -114,16 +184,16 @@ class Maybe {
         }
         return $this;
     }
-    public function if(callable $fn) : Maybe { if ($fn($this->_x) === false) { $this->_x = false; } return $this; }
-    public function ifnot(callable $fn) : Maybe { if ($fn($this->_x) !== false) { $this->_x = false; } return $this; }
+    public function if(callable $fn) : MaybeI { if ($fn($this->_x) === false) { $this->_x = NULL; } return $this; }
+    public function ifnot(callable $fn) : MaybeI { if ($fn($this->_x) !== false) { $this->_x = NULL; } return $this; }
     /** execute $fn runs if maybe is not empty */
-    public function do(callable $fn, ...$args) : Maybe { if (!empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
+    public function do(callable $fn, ...$args) : MaybeI { if (!empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     /** execute $fn runs if maybe is empty */
-    public function doifnot(callable $fn, ...$args) : Maybe { if (empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
+    public function doifnot(callable $fn, ...$args) : MaybeI { if (empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     public function empty() : bool { return empty($this->_x); } // false = true
     public function errors() : array { return $this->_errors; }
     public function value(string $type = null) { 
-        if (empty($this->_x)) { return false; }
+        if (empty($this->_x)) { return null; }
         $result = $this->_x;
 
         switch($type) {
@@ -140,15 +210,23 @@ class Maybe {
         }
         return $result;
     }
-    public function append($value) : Maybe { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
+    public function append($value) : MaybeI { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
     public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
-    public function extract(string $key, $default = false) : Maybe { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } return new static($default); }
-    public function index(int $index) : Maybe { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? false); } return new static(false); }
-    public function isa(string $type) { return $this->_x instanceof $type; }
-    public function __invoke(string $type = null) { return $this->value($type); }
+    public function extract(string $key, $default = NULL) : MaybeI { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } return new static($default); }
+    public function index(int $index) : MaybeI { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? NULL); } return new static(NULL); }
+    public function isa(string $type) : bool { return $this->_x instanceof $type; }
     public function __toString() : string { return (string)$this->_x; }
 }
-Maybe::$FALSE = Maybe::of(false);
+class Maybe extends MaybeA {
+    public function __invoke(string $type = null) { return $this->value($type); }
+}
+class MaybeBlock extends MaybeA {
+    public function __invoke() : ?\BitFire\Block { return $this->_x; }
+}
+class MaybeStr extends MaybeA {
+    public function __invoke() : ?string { return (string)$this->_x; }
+}
+Maybe::$FALSE = MaybeBlock::of(NULL);
 
 
 function func_name(callable $fn) : string {
@@ -244,15 +322,15 @@ function raw_decrypt(string $cipher, string $iv, string $password) {
  * Decrypt string using openSSL module
  * @param string $password the password to decrypt with
  * @param string $cipher the message encrypted with encrypt_ssl
- * @return Maybe with the original string data 
+ * @return MaybeI with the original string data 
  * PURE
  */
-function decrypt_ssl(string $password, ?string $cipher) : Maybe {
+function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
 
     $exploder = partial("explode", ".");
     $decrypt = partial_right("TF\\raw_decrypt", $password);
 
-    return Maybe::of($cipher)
+    return MaybeStr::of($cipher)
         ->then($exploder)
         ->if(function($x) { return is_array($x) && count($x) === 2; })
         ->then($decrypt, true);
@@ -286,7 +364,7 @@ function map_reduce(array $map, callable $fn, $carry = "") {
  */
 function map_whilenot(array $map, callable $fn, $input) {
     $maybe = \TF\Maybe::$FALSE;
-    foreach($map as $key => $value) { 
+    foreach ($map as $key => $value) {
         $maybe = $maybe->doifnot($fn($key, $value, $input));
     }
     return $maybe;
@@ -364,10 +442,10 @@ function str_reduce(string $string, callable $fn, string $prefix = "", string $s
 /**
  * reverse ip lookup, takes ipv4 and ipv6 addresses, 
  */
-function reverse_ip_lookup(string $ip) : Maybe {
+function reverse_ip_lookup(string $ip) : MaybeStr {
     if (\BitFire\Config::str('dns_service', 'localhost')) {
         debug("gethostbyaddr %s", $ip);
-        return Maybe::of(gethostbyaddr($ip));
+        return MaybeStr::of(gethostbyaddr($ip));
     }
 
     $lookup_addr = ""; 
@@ -389,12 +467,12 @@ function reverse_ip_lookup(string $ip) : Maybe {
  * queries quad 1 for dns data, no SSL or uses local DNS services
  * @returns Maybe of the result
  */
-function ip_lookup(string $ip, string $type = "A") : Maybe {
+function ip_lookup(string $ip, string $type = "A") : MaybeStr {
     assert(in_array($type, array("A", "AAAA", "CNAME", "MX", "NS", "PTR", "SRV", "TXT", "SOA")), "invalid dns query type [$type]");
     debug("ip_lookup %s / %s", $ip, $type);
     $dns = null;
     if (\BitFire\Config::str('dns_service') === 'localhost') {
-        return Maybe::of(($type === "PTR") ?
+        return MaybeStr::of(($type === "PTR") ?
             gethostbyaddr($ip) : gethostbyname($ip));
     }
     try {
@@ -411,14 +489,14 @@ function ip_lookup(string $ip, string $type = "A") : Maybe {
         // silently swallow http errors.
     }
 
-    return Maybe::of($dns);
+    return MaybeStr::of($dns);
 }
 
 /**
  * memoized version of ip_lookup (1 hour)
  * NOT PURE
  */
-function fast_ip_lookup(string $ip, string $type = "A") : Maybe {
+function fast_ip_lookup(string $ip, string $type = "A") : MaybeStr {
     return \TF\memoize('TF\ip_lookup', "_bf_dns_{$type}_{$ip}", 3600)($ip, $type);
 }
 

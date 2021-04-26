@@ -2,6 +2,7 @@
 namespace BitFire;
 use TF\CacheStorage;
 use function TF\ends_with;
+use function TF\file_recurse;
 
 class Metric {
     public $data = array();
@@ -156,8 +157,8 @@ function toggle_config_value(\BitFire\Request $request) {
     }
 
     $input = file_get_contents(WAF_DIR."config.ini");
-    $param = htmlentities($_GET['param']);
-    $value = htmlentities($_GET['value']);
+    $param = htmlentities(strtolower($_GET['param']));
+    $value = htmlentities(strtolower($_GET['value']));
     if ($value === "off" || $value === "false") {
         $value = "false";
     } else if ($value === "alert" || $value === "report") {
@@ -181,9 +182,32 @@ function toggle_config_value(\BitFire\Request $request) {
 
 
 function dump_hashes(\BitFire\Request $request) {
+    require_once WAF_DIR . "/server.php";
     $root = $_SERVER['DOCUMENT_ROOT'];
-    $cmd = "find $root -type f -name '*.php' | xargs crc32";
-    exec($cmd, $out);
+    $cmd = "find $root -name 'wp-settings.php'";
+    exec($cmd, $r);
+    //echo "[$root] [$cmd\n";
+    //echo "\n----\n";
+    $json = array();
+    foreach ($r as $path) {
+        $d = dirname($path);
+        $full_path = "$d/wp-includes/version.php";
+        $wp_version = "0";
+        include_once $full_path;
+        if ($wp_version === "0") { die("WTF?\n"); }
+        $import = \TF\partial_right('\BitFireSvr\hash_file', $wp_version);
+        
+        //echo "1: recursing: [$d]\n";
+        $json[$d] = file_recurse($d, $import);
+        //print_r($result);
+    }
+    echo json_encode($json, JSON_PRETTY_PRINT);
+    //print_r($r);
+//echo "\n----\n";
+    //die("($d) fin\n");
+    //json_encode(\BitFireSvr\hash_wp_root($_SERVER['DOCUMENT_ROOT']));
+    //$cmd = "find $root -type f -name '*.php' | xargs crc32";
+    //exec($cmd, $out);
 }
 
 if (file_exists(WAF_DIR . "proapi.php")) {

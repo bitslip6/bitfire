@@ -19,7 +19,7 @@ class shm {
     }
 
     public function purge() {
-        shm_remove(self::$ctx);
+        @shm_remove(self::$ctx);
     }
 
     public static function read($key, int &$hash = 0) {
@@ -36,7 +36,7 @@ class shm {
             return null;
         }
         \TF\debug("shm: READ removed var\n");
-        shm_remove_var(self::$ctx, $keyint);
+        @shm_remove_var(self::$ctx, $keyint);
         return null;
     }
 
@@ -54,6 +54,6 @@ class shm {
         $keyint = intval(hexdec(hash('crc32', $key, false)));
         $d = array($key, time() + $ttl, $item);
         \TF\debug("shm: WRITE $keyint\n");
-        return shm_put_var(self::$ctx, $keyint, $d);
+        return @shm_put_var(self::$ctx, $keyint, $d);
     }
 }

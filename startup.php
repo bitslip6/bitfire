@@ -15,12 +15,13 @@ include WAF_DIR."bitfire.php";
 try {
     \TF\parse_ini(WAF_DIR."config.ini");
 
+    if (Config::str('pro_key')) { include WAF_DIR . "pro.php"; }
     $bitfire = \Bitfire\BitFire::get_instance(); 
     $bitfire->inspect()
-        ->then(function ($block) use ($bitfire) {
+        ->then(function (\BitFire\Block $block) use ($bitfire) {
             $ip_data = ($bitfire->bot_filter !== null) ? $bitfire->bot_filter->ip_data : array();
             \BitFire\block_ip($block, $ip_data);
-            register_shutdown_function('\\BitFire\\post_request', $bitfire->_request, $block, $ip_data);
+            //register_shutdown_function('\\BitFire\\post_request', $bitfire->_request, $block, $ip_data);
             return $block;
         })
         ->then(function($block) use ($m0) {
@@ -31,7 +32,7 @@ try {
         })
         ->doifnot(array($bitfire, 'cache_behind'));
 
-    register_shutdown_function('\BitFire\post_request', $bitfire->_request, null, null);
+    //register_shutdown_function('\BitFire\post_request', $bitfire->_request, null, null);
 }
 catch (\Exception $e) {
 }
