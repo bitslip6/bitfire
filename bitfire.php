@@ -149,22 +149,28 @@ class Config {
         Config::$_options[$option_name] = $value;
     }
 
-    public static function str(string $name, string $default = '') {
-        return Config::$_options[$name] ?? $default;
+    public static function str(string $name, string $default = '') : string {
+        return (string) Config::$_options[$name] ?? $default;
     }
 
-    public static function int(string $name, int $default = 0) {
+    public static function int(string $name, int $default = 0) : int {
         return intval(Config::$_options[$name] ?? $default);
     }
 
     public static function arr(string $name, array $default = array()) : array {
-        return Config::$_options[$name] ?? $default;
+        return (is_array(Config::$_options[$name])) ? Config::$_options[$name] : $default;
     }
 
     public static function enabled(string $name, bool $default = false) : bool {
         if (!isset(Config::$_options[$name])) { return $default; }
-        if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report") { return true; }
+        if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report" || Config::$_options[$name] == true) { return true; }
         return (bool)Config::$_options[$name];
+    }
+
+    public static function file(string $name) : string {
+        if (!isset(Config::$_options[$name])) { return ''; }
+        if (Config::$_options[$name][0] === '/') { return (string)Config::$_options[$name]; }
+        return WAF_DIR . (string)Config::$_options[$name];
     }
 }
 
@@ -219,11 +225,15 @@ class BitFire
             // we will need cache storage and secure cookies
             $this->cache = \TF\CacheStorage::get_instance();
 
-            
-            //$exception_file = WAF_DIR . "cache/exceptions.json";
-            //self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
+            $exception_file = WAF_DIR . "cache/exceptions.json";
+            self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
         }
+
         $this->api_call();
+
+        if (function_exists('\BitFirePRO\send_pro_headers')) {
+            \BitFirePRO\send_pro_mfa();
+        }
     }
     
     /**
@@ -236,7 +246,7 @@ class BitFire
         foreach (self::$_reporting as $report) {
             $out .= json_encode($report, $opts) . "\n";
         }
-        file_put_contents(Config::str(CONFIG_REPORT_FILE), $out, FILE_APPEND);
+        file_put_contents(Config::file(CONFIG_REPORT_FILE), $out, FILE_APPEND);
     }
 
     protected function api_call() {
@@ -326,11 +336,12 @@ class BitFire
             count($site_cookies) === 0) {
                 // update the cache after this request
                 register_shutdown_function([$this, 'update_cache_behind']);
-                $page = 'root:' . cache_unique();
+                $page = WAF_DIR . 'cache/root:' . cache_unique();
                 // we have a cached page that is not too old
-                if ($this->cached_page_is_valid()) {
+                if ($this->cached_page_is_valid($page)) {
+                    header("x-cached: 1");
                     // add a js challenge if the request is not to a bot
-                    if ($this->bot_filter != null && $this->bot_filter->browser['bot'] == false) {
+                    if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser['bot'] == false) {
                         echo \BitFireBot\make_js_challenge(
                             $this->_request->ip,
                             Config::str(CONFIG_USER_TRACK_PARAM),
@@ -338,7 +349,7 @@ class BitFire
                             Config::str(CONFIG_USER_TRACK_COOKIE));
                     }
                     // serve the static page!
-                    echo file_get_contents(WAF_DIR . "cache/$page");
+                    echo file_get_contents($page);
                     echo "<!-- cache -->\n";
                     exit();
                 }
@@ -348,9 +359,16 @@ class BitFire
     /**
      * test if BitFire::CACHE_PAGE is a valid cached page (exists and is not stale)
      */
-    public function cached_page_is_valid() {
-        $stat_data = @stat(BitFire::CACHE_PAGE);
-        return ($stat_data != false && ($stat_data['ctime'] + $this->_config[CONFIG_MAX_CACHE_AGE]) > time());
+    public function cached_page_is_valid(string $page) {
+        $stat_data = @stat($page);
+        $exp_time = $stat_data['ctime'] + Config::int(CONFIG_MAX_CACHE_AGE);
+        //echo "<!-- [$page]\n" . time() . "\n$exp_time\n"; print_r($stat_data); echo "-->\n";
+        $cache_valid = ($stat_data != false && $exp_time > time());
+        $h = "x-cache-valid: false";
+        if ($cache_valid) { $h = "x-cache-valid: true"; }
+        header($h);
+        //return false;
+        return $cache_valid;
     }
 
 
@@ -394,8 +412,6 @@ class BitFire
             $this->_web_filter = new \BitFire\WebFilter($this->cache);
             $block = $this->_web_filter->inspect($this->_request);
         }
-
-        $block->doifnot(array($this, "cache_behind"));
 
         return $block;
     }

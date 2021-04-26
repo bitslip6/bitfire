@@ -24,11 +24,10 @@ try {
             return $block;
         })
         ->then(function($block) use ($m0) {
-            include WAF_DIR."views/block.php";
-            //$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 2 || $elm['cpu'] > 2); }); 
-            //uasort($data, '\TF\prof_sort');
-            //file_put_contents("/tmp/prof.fail.json", json_encode($data, JSON_PRETTY_PRINT));
-            exit();
+            if ($block->code > 0) {
+                include WAF_DIR."views/block.php";
+                exit();
+            }
         })
         ->doifnot(array($bitfire, 'cache_behind'));
 

@@ -40,6 +40,8 @@ function un_json_array(array $data) { return \TF\un_json('['. join(",", $data) .
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
+// return the $index element of $input split by $separator or '' on any failure
+function take_nth(?string $input, string $separator, int $index) : string { if (empty($input)) { return ''; } $parts = explode($separator, $input); return (isset($parts[$index])) ? $parts[$index] : ''; }
 
 
 /**

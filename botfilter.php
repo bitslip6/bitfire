@@ -79,6 +79,17 @@ class BotFilter {
      */
     public function inspect(\BitFire\Request $request) : \TF\Maybe {
 
+        // handle wp-cron and other self requested pages
+        if (($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']) ||
+        ($request->path == '/wp-cron.php' && strstr($request->agent, 'wordpress/'))) {
+            return \TF\Maybe::$FALSE;
+        }
+
+        // ignore urls that receive consistant bot access that may be difficult to identify
+        if (in_array($request->path, Config::arr("ignore_bot_urls"))) {
+            return \TF\Maybe::$FALSE;
+        }
+
         // request has no host header
         if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
             if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request->host)) {
@@ -124,18 +135,20 @@ class BotFilter {
         if ($request->path === "/bitfire_browser_required") {
             exit(include WAF_DIR . "views/browser_required.phtml");
         }
-        if (isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
+        if (Config::enabled(CONFIG_REQUIRE_BROWSER) & isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
             $url = \BitFireBot\strip_path_tracking_params($request);
             // response answer matches cookie
             if (intval($maybe_botcookie->extract('a')()) === intval($_GET['_bfa'])) {
+                header("x-challenge: pass");
                 \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['valid'] = ($data['valid']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
                 $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
                     \TF\en_json( array('ip' => $request->ip, 'v' => 2, 'et' => time() + 60*60)));
                 \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
             } else {
+                header("x-challenge: fail");
                 $url = "/bitfire_browser_required";
             }
-            $foo = "Location: " . $request->scheme . '://' . $request->host . ":" . $request->port . "$url";
+            $foo = "Location: " . $request->scheme . '://' . $request->host . ":" . $request->port . trim($url, '?');
             header($foo);
             exit();
         }
@@ -437,6 +450,7 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
  * NOT PURE, SETS CLIENT COOKIE!
  */
 function make_js_challenge(string $ip, string $tracking_param, string $encrypt_key, string $utc_name) : string {
+    header("x-challenge: sent");
     $n1 = intval(decoct(rand(1000,500000)));
     $n2 = intval(decoct(rand(12,2000)));
     $answer = \BitFireBot\bot_calc_answer($n1, $n2, rand(1,4));
@@ -483,14 +497,18 @@ function make_challenge_cookie(array $answer, string $ip) : string {
  * add the page that prompts the browser to add a cookie
  */
 function require_browser_or_die(\BitFire\Request $request, \TF\Maybe $cookie) {
-    if (intval($cookie->extract('v')()) >= 2) { return; }
+    if (intval($cookie->extract('v')()) >= 2) { 
+        header("x-challenge: valid");
+        return;
+    }
 
     \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
     http_response_code(202);
     echo make_js_challenge($request->ip, Config::str(CONFIG_USER_TRACK_PARAM), 
         Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
 
-    if (Config::str(CONFIG_REQUIRE_BROWSER, "report") === "block") { exit(); }
+    exit();
+    //if (Config::str(CONFIG_REQUIRE_BROWSER, "report") === "block") { exit(); }
 }
 
 /**
