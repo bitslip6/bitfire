@@ -11,9 +11,10 @@ function to_meta(array $line) {
  */
 function is_report(Block $block) : bool {
     $class = floor(($block->code / 1000)) * 1000;
-    $feature_name =  FEATURE_CLASS[$class] ?? 'bitfire_enabled';
+    if (!isset(FEATURE_CLASS[$class])) { return true; } // unknown class, set to report mode. PROGRAMMING ERROR
 
-    return (Config::str($feature_name) === "report");
+    $value = Config::str(FEATURE_CLASS[$class]);
+    return (substr($value, 0, 6) === "report" || substr($value, 0, 5) === "alert");
 }
 
 
@@ -198,8 +199,8 @@ function is_ajax(\BitFire\Request $request) : bool {
     
     // accept || content type is requested as javascript
     // if the client is looking for something other than html, it's ajax
-    else if (\stripos($request->headers->accept, 'text/html') === false &&
-        \stripos($request->headers->content, 'text/html') === false) { $ajax = true; }
+    else if (($request->headers->accept != '' && \stripos($request->headers->accept, 'text/html') === false) &&
+        ($request->headers->content != '' && \stripos($request->headers->content, 'text/html') === false)) { $ajax = true; }
 
     // often these are set on fetch or xmlhttp requests
     else if ($request->headers->requested_with !== '' || $request->headers->fetch_mode === 'cors' ||
@@ -211,6 +212,9 @@ function is_ajax(\BitFire\Request $request) : bool {
         $ajax = ($request->scheme == "http" && ($request->headers->upgrade_insecure === null || \strlen($request->headers->upgrade_insecure) < 1)) ? true : false;
     }
     */
+    if ($ajax) {
+        header("x-bf-ajax: true");
+    }
     return $ajax;
 }
 
@@ -278,9 +282,7 @@ function match_block_exception(?Block $block, Exception $exception, string $host
 
 // TODO: add override for additional uniqueness 
 function cache_unique() {
-    $lang = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? ',';
-    $parts = explode(',', $lang);
-    return $parts[0] ?? '';
+    return \TF\take_nth($_SERVER['HTTP_ACCEPT_LANGUAGE']??'', ',', 0) . '-' . $_SERVER['SERVER_NAME'];
 }
 
 /**
@@ -291,6 +293,17 @@ function replace_profanity(string $data) : string {
     return preg_replace('/('.PROFANITY.')/', '@#$!%', $data);
 }
 
+function header_match(string $header) {
+    return !(
+            (stristr($header, "content-security-policy") != false) ||
+            (stristr($header, "report-to") != false) ||
+            (stristr($header, "referer-policy") != false)
+        );
+}
+
+function remove_bulky_headers(array $headers) : array{
+    return array_filter($headers, '\BitFire\header_match');
+}
 
 
 function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data) {
@@ -319,7 +332,7 @@ function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data)
     $data["whitelist"] = $whitelist;
     $data["valid"] = $valid;
     $data["classId"] = $class;
-    $data["headers"] = headers_list();
+    $data["headers"] = remove_bulky_headers(headers_list());
     $data["rhead"] = getallheaders();
     
     // cache the last 15 blocks
@@ -336,9 +349,11 @@ function post_request(\BitFire\Request $request, ?Block $block, ?array $ip_data)
 
     $content = json_encode($data)."\n";
     if (Config::enabled('report_file') && $data["pass"] === true) {
-        file_put_contents(Config::str('report_file'), $content, FILE_APPEND);
-    }  else if (Config::enabled('block_file')) {
-        file_put_contents(Config::str('block_file'), $content, FILE_APPEND);
+        $file = Config::str('report_file');
+        $file = ($file[0] === '/') ? $file : WAF_DIR . $file;
+        file_put_contents($file, $content, FILE_APPEND);
+    }  else if (Config::enabled(BLOCK_FILE)) {
+        file_put_contents(Config::file(BLOCK_FILE), $content, FILE_APPEND);
     }
     \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
     $content, array("Content-Type" => "application/json"));

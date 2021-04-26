@@ -1,6 +1,7 @@
 <?php
 namespace BitFire;
 use TF\CacheStorage;
+use function TF\ends_with;
 
 class Metric {
     public $data = array();
@@ -179,4 +180,12 @@ function toggle_config_value(\BitFire\Request $request) {
 }
 
 
-?>
+function dump_hashes(\BitFire\Request $request) {
+    $root = $_SERVER['DOCUMENT_ROOT'];
+    $cmd = "find $root -type f -name '*.php' | xargs crc32";
+    exec($cmd, $out);
+}
+
+if (file_exists(WAF_DIR . "proapi.php")) {
+    require WAF_DIR . "proapi.php";
+}
