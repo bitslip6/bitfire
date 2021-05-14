@@ -52,8 +52,6 @@ function core_headers(string $path) : void {
     header("X-Content-Type-Options: nosniff");
     header("X-XSS-Protection: 1; mode=block");
     header("Referrer-Policy: strict-origin-when-cross-origin");
-    header('Report-To: {"group":"bitfire","max_age":2592000,"endpoints":[{"url":"https://www.bitslip6.com/csp/_doc"}],"include_subdomains":true}');
-
 }
 
 function force_ssl_with_sts() : void {

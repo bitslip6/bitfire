@@ -45,8 +45,8 @@ class WebFilter {
 
     public function __construct(\TF\CacheStorage $cache) {
         $this->_reducer = \TF\partial('\\BitFIRE\\generic_reducer', 
-            $cache->load_or_cache("webkeys2", \TF\DAY, '\TF\recache_file', WAF_DIR.'cache/keys.raw'),
-            $cache->load_or_cache("webvalues2", \TF\DAY, '\TF\recache_file', WAF_DIR.'cache/values.raw'));
+            $cache->load_or_cache("webkeys2", \TF\DAY, \TF\partial('\TF\recache_file', WAF_DIR.'cache/keys.raw')),
+            $cache->load_or_cache("webvalues2", \TF\DAY, \TF\partial('\TF\recache_file', WAF_DIR.'cache/values.raw')));
     }
 
     public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
@@ -257,9 +257,9 @@ function trivial_reducer(callable $fn, string $key, string $value, $ignore) : \T
 /**
  * reduce key / value with fn
  */
-function generic_reducer(array $keys, array $values, string $name, string $value) : \TF\MaybeBlock {
+function generic_reducer(array $keys, array $values, $name, ?string $value) : \TF\MaybeBlock {
     if (strlen($value) > 0) {
-        return \BitFire\generic($name, $value, $values, $keys);
+        return \BitFire\generic((string)$name, $value, $values, $keys);
     }
     return \TF\Maybe::$FALSE;
 }

@@ -128,43 +128,71 @@ class Exception {
     public $parameter;
     public $url;
     public $host;
+    public $uuid;
 
-    public function __construct(int $code = 0, ?string $uuid = NULL, ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
+    public function __construct(int $code = 0, string $uuid = 'x', ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
         $this->code = $code;
         $this->parameter = $parameter;
         $this->url = $url;
         $this->host = $host;
+        $this->uuid = $uuid;
     }
 }
 
 
 class Config {
     public static $_options = null;
+    private static $_nonce = null;
 
+    public static function nonce() : string {
+        if (self::$_nonce == null) {
+            self::$_nonce = str_replace(array('-','+','/'), "", \TF\random_str(10));
+        }
+        return self::$_nonce;
+    }
+
+    // set the full list of configuration options
     public static function set(array $options) : void {
         Config::$_options = $options;
     }
 
+    // execute $fn if option enabled
+    public static function if_en(string $option_name, $fn) {
+        if (Config::$_options[$option_name]) { $fn(); }
+    }
+
+    // set a single value
     public static function set_value(string $option_name, $value) {
         Config::$_options[$option_name] = $value;
     }
 
+    // return true if value is set to true or "block"
+    public static function is_block(string $name) : bool {
+        return (Config::$_options[$name]??'' == 'block' || Config::$_options[$name]??'' == true) ? true : false;
+    }
+
+    // get a string value with a default
     public static function str(string $name, string $default = '') : string {
         return (string) Config::$_options[$name] ?? $default;
     }
 
+    // get an integer value with a default
     public static function int(string $name, int $default = 0) : int {
         return intval(Config::$_options[$name] ?? $default);
     }
 
     public static function arr(string $name, array $default = array()) : array {
-        return (is_array(Config::$_options[$name])) ? Config::$_options[$name] : $default;
+        return (isset(Config::$_options[$name]) && is_array(Config::$_options[$name])) ? Config::$_options[$name] : $default;
     }
 
     public static function enabled(string $name, bool $default = false) : bool {
         if (!isset(Config::$_options[$name])) { return $default; }
         if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report" || Config::$_options[$name] == true) { return true; }
         return (bool)Config::$_options[$name];
+    }
+
+    public static function disabled(string $name, bool $default = true) : bool {
+        return !Config::enabled($name, $default);
     }
 
     public static function file(string $name) : string {
@@ -226,14 +254,12 @@ class BitFire
             $this->cache = \TF\CacheStorage::get_instance();
 
             $exception_file = WAF_DIR . "cache/exceptions.json";
-            self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
-        }
 
+            if (function_exists('\BitFirePRO\send_pro_headers')) {
+                \BitFirePRO\send_pro_mfa($this->_request);
+            }
+        }
         $this->api_call();
-
-        if (function_exists('\BitFirePRO\send_pro_headers')) {
-            \BitFirePRO\send_pro_mfa($this->_request);
-        }
     }
     
     /**
@@ -241,12 +267,15 @@ class BitFire
      */
     public function __destruct() {
         if (!Config::enabled(CONFIG_REPORT_FILE) || count(self::$_reporting) < 1) { return; }
-        $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
+        // encoder is json_encode with pretty printing if file has word "pretty" in it
+        $encoder = \TF\partial_right('json_encode', (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0);
+        @file_put_contents(Config::file(CONFIG_REPORT_FILE), join(",", array_map($encoder, self::$_reporting)) . "\n", FILE_APPEND);
+/*
         $out = "";
         foreach (self::$_reporting as $report) {
             $out .= json_encode($report, $opts) . "\n";
         }
-        file_put_contents(Config::file(CONFIG_REPORT_FILE), $out, FILE_APPEND);
+*/
     }
 
     protected function api_call() {
@@ -283,14 +312,14 @@ class BitFire
             return \TF\Maybe::$FALSE;
         }
         self::$_exceptions = (self::$_exceptions === NULL) ? load_exceptions() : self::$_exceptions;
-        return filter_block_exceptions($block, self::$_exceptions, $req->host . ':' . $req->path);
+        return filter_block_exceptions($block, self::$_exceptions, $req);
     }
     
     /**
      * TODO: format blocks the same way as reports
      */
     protected static function reporting(Block $block, \BitFire\Request $request) {
-        $data = array('time' => date('r'),
+        $data = array('time' => \TF\utc_date('r'), 'tv' => \TF\utc_time(),
             'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
             'block' => $block,
             'request' => $request);
@@ -377,6 +406,17 @@ class BitFire
      * return false if inspection failed...
      */
     public function inspect() : \TF\MaybeBlock {
+
+        // block from the htaccess file
+        if (isset($this->_request->get['_block'])) {
+            return BitFire::new_block(28001, "_block", "url", $this->_request->get['_block'], 0);
+        }
+
+        // if we are disabled, just return
+        if ($this->_request === NULL || Config::disabled(CONFIG_ENABLED)) {
+            return \TF\MaybeBlock::of(NULL);
+        }
+
         // dashboard requests, TODO: MOVE TO api.php
         if ($this->_request->path === Config::str(CONFIG_DASHBOARD_PATH)) {
             require_once WAF_DIR."dashboard.php";
@@ -393,17 +433,17 @@ class BitFire
         // don't inspect local commands
         if (!isset($_SERVER['REQUEST_URI'])) { return $block; }
 
-		if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
-            require_once WAF_DIR."headers.php";
-			\BitFireHeader\send_security_headers($this->_request);
-		}
-        
         // bot filtering
         if ($this->bot_filter_enabled()) {
             require_once WAF_DIR . 'botfilter.php';
             $this->bot_filter = new BotFilter($this->cache);
             $block = $this->bot_filter->inspect($this->_request);
         }
+
+        if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
+            require_once WAF_DIR."headers.php";
+			\BitFireHeader\send_security_headers($this->_request);
+		}
 
 
         // generic filtering
