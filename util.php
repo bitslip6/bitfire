@@ -42,6 +42,7 @@ function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)
 function lookbehind(string $s, string $r) : string { return @$r($s); }
 // return the $index element of $input split by $separator or '' on any failure
 function take_nth(?string $input, string $separator, int $index) : string { if (empty($input)) { return ''; } $parts = explode($separator, $input); return (isset($parts[$index])) ? $parts[$index] : ''; }
+function read_stream($stream) { $data = ""; if($stream) { while (!feof($stream)) { $data .= fread($stream , 2048); } } return $data; }
 
 function flatten(array $array) : array {
     $return = array();
@@ -99,7 +100,7 @@ function file_recurse(string $dirname, callable $fn) : array {
  */
 function memoize(callable $fn, string $key, int $ttl) {
     return function(...$args) use ($fn, $key, $ttl) {
-        $result = \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, $fn, ...$args);
+        $result = \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, \TF\partial($fn, ...$args));
         return $result;
     };
 }
@@ -184,6 +185,7 @@ class MaybeA implements MaybeI {
         }
         return $this;
     }
+    public function effect(callable $fn) : MaybeI { if (!empty($this->_x)) { $fn($this->_x); } return $this; }
     public function if(callable $fn) : MaybeI { if ($fn($this->_x) === false) { $this->_x = NULL; } return $this; }
     public function ifnot(callable $fn) : MaybeI { if ($fn($this->_x) !== false) { $this->_x = NULL; } return $this; }
     /** execute $fn runs if maybe is not empty */
@@ -327,6 +329,8 @@ function raw_decrypt(string $cipher, string $iv, string $password) {
  */
 function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
 
+    if (!$cipher || strlen($cipher) < 20) { return MaybeStr::of(false); }
+
     $exploder = partial("explode", ".");
     $decrypt = partial_right("TF\\raw_decrypt", $password);
 
@@ -336,16 +340,6 @@ function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
         ->then($decrypt, true);
 }
 
-
-/**
- * update blocking lists
- * NOT PURE
- */
-function get_remote_list(string $type, \TF\Storage $cache) {
-    return $cache->load_or_cache("remote-{$type}", WEEK, function($type) {
-        return apidata("getlist", ["type" => $type]);
-    }, array($type));
-}
 
 
 /**
@@ -380,8 +374,8 @@ function map_mapvalue(?array $map = null, callable $fn) : array {
     $result = array();
     foreach($map as $key => $value) {
         $tmp = $fn($value);
-        if ($tmp !== null) {
-            $result[$key] = $fn($value);
+        if ($tmp !== NULL) {
+            $result[(string)$key] = $fn($value);
         }
     }
     return $result;
@@ -734,9 +728,13 @@ function really_writeable(string $filename) : bool {
  * NOT PURE
  */
 function debug(string $fmt, ...$args) {
+    static $idx = 0;
     if (\BitFire\Config::enabled("debug_file")) {
-        file_put_contents(\BitFire\Config::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt\n", ...$args), FILE_APPEND);
+        file_put_contents(\BitFire\Config::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
+    } else if (\BitFire\Config::enabled("debug_header")) {
+        header("x-bitfire-$idx: " . sprintf("$fmt", ...$args));
     }
+    $idx++;
 }
 
 
@@ -747,15 +745,16 @@ function debug(string $fmt, ...$args) {
  */
 function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
     $st = @stat($filename);
-    if (($fh = @fopen($filename, "r")) === false) { return array(); }
+    if (($fh = @fopen($filename, "r")) === false) { return array('empty'); }
     $sz = min(($lines*$line_sz), $st['size']);
-    debug("read %d trailing lines [%s], bytes: %d", $lines, $filename, $sz);
-    if ($sz <= 1) { return array(); }
+    // debug("read %d trailing lines [%s], bytes: %d", $lines, $filename, $sz);
+    if ($sz <= 1) { return array("no size"); }
     fseek($fh, -$sz, SEEK_END);
     $d = fread($fh, $sz);
     $eachln = explode("\n", $d);
+    // \TF\dbg("each: " . count($eachln) . " d : " . strlen($d) . " sz: $sz\n");
     $lines = min(count($eachln), $lines)-1;
-    if ($lines <= 0) { return array(); }
+    if ($lines <= 0) { return array("no lines"); }
     $s = array_splice($eachln, -($lines+1), $lines);
     return $s;
 }
@@ -766,6 +765,7 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
  * NOT PURE 
  */
 function cookie(string $name, string $value, int $exp) : void {
+    if (!\BitFire\Config::enabled("cookies_enabled")) { return; }
     if (PHP_VERSION_ID < 70300) { 
         setcookie($name, $value, $exp, '/; samesite=strict', '', false, true);
     } else {
@@ -791,6 +791,18 @@ function prof_sort(array $a, array $b) : int {
 
 
 /**
+ * replace file contents inline
+ */
+function file_replace(string $filename, string $find, string $replace) : bool {
+    $in = file_get_contents($filename);
+    return file_write($filename, str_replace($find, $replace, $in));
+}
+
+function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
+    return (@file_put_contents($filename, $content, $opts) == strlen($content));
+}
+
+/**
  * load the ini file and cache the parsed code if possible
  * NOT PURE
  */
@@ -799,13 +811,49 @@ function parse_ini(string $ini_src) : void {
     $parsed_file = "$ini_src.php";
     if (file_exists($parsed_file) && filemtime($parsed_file) > filemtime($ini_src)) {
         require "$ini_src.php";
+        \BitFire\Config::set($config);
     } else {
         $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
-        debug("parsed ini file");
-        if ((file_exists($parsed_file) && is_writable($parsed_file)) || is_writable(dirname($parsed_file))) {
-            file_put_contents($parsed_file, "<?php\n\$config=". var_export($config, true).";\n", LOCK_EX);
-        }
+        \BitFire\Config::set($config);
+        if (\BitFire\Config::enabled("cache_ini_files")) {
+            if (!file_write($parsed_file, "<?php\n\$config=". var_export($config, true).";\n")) {
+                file_replace($ini_src, "cache_ini_files = true", "cache_ini_files = false");
+            }
+        };
     }
-    \BitFire\Config::set($config);
+}
+
+// generate a random parameter value
+function get_random_param(?string $name) : string {
+    if (!$name) {
+        return mt_rand(1000,9999) . "=" . \TF\random_str(6);
+    }
+    return "$name=" . \TF\random_str(6);
+}
+
+
+// return a cache busted url.  sets header Cache-Control: no-store
+function cache_bust(?string $url="") : string {
+    header("Cache-Control: no-store, private, no-cache, max-age=0");
+    header('Expires: '.gmdate('D, d M Y H:i:s \G\M\T', 100000));
+
+    if (\BitFire\Config::enabled('cache_bust_parameter')) {
+        $url = trim($url, " \t&?");
+        return $url . ((strpos($url, '?') != false) ? "&" : '?') . get_random_param(\BitFire\Config::str('cache_bust_parameter'));
+    }
+    return $url;
+}
+
+// return date in GMT time
+function utc_date(string $format) : string {
+    return date($format, utc_time());
+}
+
+function utc_time() : int {
+    return time() + date('z');
+}
+
+function utc_microtime() : float {
+    return microtime(true) + date('z');
 }
 

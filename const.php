@@ -2,10 +2,11 @@
 namespace BitFire;
 
 const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 50000 => '');
+const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg', 16000 => 'php.svg', 17000 => 'fire.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg', 26000 => 'speed.svg');
 
 const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code');
 const BITFIRE_METRICS_INIT = array('challenge' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 132;
+const BITFIRE_VER = 135;
 const BITFIRE_DOMAIN = "http://api.bitslip6.com";
 const BITFIRE_INTERNAL_PARAM = '_bitfire_p';
 const BITFIRE_COMMAND = "BITFIRE_API";
@@ -16,6 +17,7 @@ const BITFIRE_MAX_PAGES = 200;
 const WAF_MIN_HIT = 25;
 const WAF_MIN_PERCENT = 10;
 
+const CONFIG_COOKIES='cookies_enabled';
 const CONFIG_REPORT_FILE='report_file';
 const CONFIG_BLOCK_FILE='block_file';
 const CONFIG_DASHBOARD_PATH='dashboard_path';
@@ -92,3 +94,4 @@ const AGENT_WHITELIST = 'whitelist';
 const AGENT_BLACKLIST = 'blacklist';
 
 const FAIL_DURATION = array(FAIL_HONEYPOT => BLOCK_LONG, FAIL_METHOD => BLOCK_SHORT);
+

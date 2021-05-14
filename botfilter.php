@@ -1,14 +1,20 @@
 <?php
 namespace BitFire;
 
+use function BitFireBot\bot_calc_answer;
 use function TF\parse_ini;
 
+/*
+const BOT_ANS_OP2=4;
+const BOT_ANS_OP1=3;
 const BOT_ANS_CODE_POS=2;
 const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
+*/
 
 
 const AGENT_MATCH = array(
+        "brave" => "(brave)/\s*([\d+\.]+)",
         "opera" => "(opr)/\s*([\d+\.]+)",
         "chrome" => "(chrome)/\s*([\d+\.]+)",
         "firefox" => "(firefox)/?\s*([\d+\.]+)",
@@ -21,6 +27,124 @@ const AGENT_MATCH = array(
         "bot" => "(\w+)\s*([\d+\.]+)"
     );
 
+class IPData {
+    public $rr;
+    public $rr_time;
+    public $ref;
+    public $ip_crc;
+    public $ua_crc;
+    public $ctr_404 = 0;
+    public $ctr_500 = 0;
+    public $valid = 0;
+    public $op1 = 0;
+    public $op2 = 0;
+    public $oper = 0;
+    public $ans = '';
+
+    public function __construct(int $ip_crc, int $ua_crc) {
+        $this->ip_crc = $ip_crc;
+        $this->ua_crc = $ua_crc;
+    }
+
+    public function make_new(string $ip, string $ua) : IPData {
+        $data = new IPData(\BitFireBot\ip_to_int($ip), crc32($ua));
+        $data->rr = 0;
+        $data->rr_time = time() + 5*60;
+        $data->ref = mt_rand(0, mt_getrandmax());
+        return $data;
+    }
+}
+
+/*
+$data = IPData::make_new("127.0.0.1", "Mozilla/5.0 chrome 125");
+print_r($data);
+echo "\n";
+die("hit\n");
+$j = json_encode($data);
+print_r($j);
+echo "\n" . strlen($j) . " \n";
+$s = serialize($data);
+print_r($s);
+echo "\n" . strlen($s) . " \n";
+//4 4 2 2 1 2 4
+//$p = pack("iiSSCSI", $data->ip_crc, $data->ua_crc, $data->ctr_404, $data->ctr_500, $data->valid, $data->rr, $data->rr_time);
+var_dump($data->ip_crc);
+//$p = pack("L", $data->ip_crc);
+$q = 50821;
+$t1 = pack("NN", $data->ip_crc, $data->ua_crc);
+$a1 = unpack("Nip/Nua", $t1);
+echo "($q) ANS: [" . $a1['ip'] . "] ( " . $a1['ua'] . ") \n";
+die();
+
+$p = pack("N", $data->ip_crc);
+//printf("%d %d %d %d\n", $p[0], $p[1], $p[2], $p[3]);
+printf("%d\n", $p);
+echo "\n[$p] (" . strlen($p) . ")\n";
+$a = unpack("Nip", $p) . "\n\n";
+echo "IP: " . $a['ip'] . "\n";
+/*
+print_r($a['ip']);
+var_dump($a);
+var_dump($a[0]);
+var_dump($a[1]);
+var_dump($a[2]);
+var_dump($a[3]);
+die("hit\n");
+*/
+
+class Answer {
+    public $op1;
+    public $op2;
+    public $oper;
+    public $ans;
+    public $code;
+    
+    public function __construct(int $op1, int $op2, int $oper) {
+        $this->op1 = $op1;
+        $this->op2 = $op2;
+        $this->oper = $oper;
+        switch($oper) {
+            case 1:
+                $this->ans = $op1 * $op2;
+                $this->code = "($op1*$op2)";
+                break;
+            case 2:
+                $this->ans = $op1 / $op2;
+                $this->code = "($op1/$op2)";
+                break;
+            case 3:
+                $this->ans = $op1 + $op2;
+                $this->code = "($op1+$op2)";
+                break;
+            default:
+                $this->ans = $op1 - $op2;
+                $this->code = "($op1-$op2)";
+                break;
+        }
+    }
+}
+
+class Challenge {
+    public $expire_time;
+    public $valid;
+    public $answer;
+    public $ip;
+    public $ua_crc;
+
+    //public function __construct(string $ip, int $valid, int $exp_time, string $ua, $answer) {
+    protected function __construct(int $ip_int, int $valid, int $ua_crc, int $exp_time, $answer) {
+        $this->ip = $ip_int;
+        $this->valid = $valid;
+        $this->answer = $answer;
+        $this->expire_time = time() + $exp_time;
+        $this->ua_crc = $ua_crc;
+    }
+
+    public static function new(string $ip_str, int $valid, string $ua_str, int $exp_time, $answer) {
+        return new Challenge(\BitFireBot\ip_to_int($ip_str), $valid, crc32($ua_str), $exp_time, $answer);
+    }
+}
+
 
 // 2 calls = 29: cpu
 function match_fails(int $fail_code, MatchType $type, \BitFire\Request $request) : \TF\MaybeBlock {
@@ -31,6 +155,67 @@ function match_fails(int $fail_code, MatchType $type, \BitFire\Request $request)
     return \TF\Maybe::$FALSE;
 }
 
+// create a new ip_data local cache entry
+function new_ip_data($remote_addr, $agent) : string { 
+    $answer = new Answer(mt_rand(1000,500000), mt_rand(12,4000), mt_rand(1,4));
+    $data = array('ip' => \BitFireBot\ip_to_int($remote_addr), 'ua' => crc32($agent), 'ctr_404' => 0, 'valid' => 0, 
+        'ctr_500' => 0, 'rr' => 0, 'rrtime' => 0, 'op1' => $answer->op1, 'op2' => $answer->op2, 'oper' => $answer->oper);
+    return pack_ip_data($data);
+}
+
+/**
+ * map a locally stored data array into an IPData object
+ */
+function map_ip_data(string $ip_data) : IPData {
+    $data = unpack_ip_data($ip_data);
+    $ip = new IPData($data['ip']??0, $data['ua']??0);
+    $ip->ctr_404 = $data['ctr_404']??0;
+    $ip->ctr_500 = $data['ctr_500']??0;
+    $ip->rr = $data['rr']??0;
+    $ip->rr_time = $data['rrtime']??0;
+    $ip->valid = $data['valid']??0;
+    $ip->ans = $data['ans']??0;
+    $ip->op1 = $data['op1']??0;
+    $ip->op2 = $data['op2']??0;
+    $ip->oper = $data['oper']??0;
+    return $ip;
+}
+
+function unpack_ip_data(string $data) : array {
+    $d = unpack("Nip/Nua/Sctr_404/Sctr_500/Srr/Nrrtime/Cvalid/Nop1/Nop2/Coper", $data);
+    \TF\debug("x-read-ans: " . $d['op1'] . " . " . $d['op2'] . " . " . $d['oper']);
+    return $d;
+}
+
+function pack_ip_data(array $ip_data) : string {
+    $t1 = pack("NNSSSNCNNC*", $ip_data['ip'], $ip_data['ua'], $ip_data['ctr_404'], $ip_data['ctr_500'], $ip_data['rr'], $ip_data['rrtime'], $ip_data['valid'], $ip_data['op1'], $ip_data['op2'], $ip_data['oper']);
+    return $t1;
+}
+
+/**
+ * load the local data for the remote IP
+ */
+function get_ip_data(string $remote_addr, string $agent) : IPData {
+
+    $ip_key = "BITFIRE_IP_$remote_addr";
+    \TF\debug("x-cache-key: [$ip_key]");
+    $data = \TF\CacheStorage::get_instance()->update_data($ip_key, function ($data) {
+
+        $t = time();
+        $ip_data = unpack_ip_data($data);
+
+        // update request rate counter
+        if ($ip_data['rrtime'] < $t) { $ip_data['rr'] = 0; $ip_data['rrtime'] = $t+(60*5); }
+        $ip_data['rr']++;
+
+        return pack_ip_data($ip_data);
+    }, function() use ($remote_addr, $agent) { return \BitFire\new_ip_data($remote_addr, $agent); },
+    60*10);
+
+    return map_ip_data($data);
+}
+
+
 /**
  * TODO: add blocking for amazon, digital ocean, ms azure, google cloud 
  */
@@ -39,7 +224,6 @@ class BotFilter {
     public $browser;
     public $cache;
 
-    protected $_ip_key;
     public $ip_data = array();
 
     protected $_constraints;
@@ -52,24 +236,10 @@ class BotFilter {
             FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
             FAIL_METHOD => new MatchType(MatchType::NOTIN, "method", Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );
+
     }
 
-    protected function get_ip_data(string $remote_addr) {
-        $this->_ip_key = "BITFIRE_IP_$remote_addr";
-        $t = time();
-        // todo: move ip data to bot filter
-        $this->ip_data = $this->cache->update_data($this->_ip_key, function ($data) use ($t){
-
-            if ($data['rr_1t'] < $t) { $data['rr_1m'] = 0; $data['rr_1t'] = $t+60; }
-            if ($data['rr_5t'] < $t) { $data['rr_5m'] = 0; $data['rr_5t'] = $t+(60*5); }
-            $data['rr_1m']++;
-            $data['rr_5m']++;
-
-            return $data;
-        }, array('rr_5t' => $t+60*5, 'rr_5m' => 0, 'rr_1m' => 0, 'rr_1t' => $t+60, 'ref' => \substr(\uniqid(), 5, 8), '404' => 0, '500' => 0),
-        60*6);
-    }
-
+    
 
     /**
      * inspect the UA, determine human or bot
@@ -80,8 +250,8 @@ class BotFilter {
     public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
 
         // handle wp-cron and other self requested pages
-        if (($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']) ||
-        ($request->path == '/wp-cron.php' && strstr($request->agent, 'wordpress/'))) {
+        if (Config::enabled("skip_local_bots") &&
+            (\BitFireBot\is_local_request($request) || \BitFireBot\is_local_wordpress($request))) {
             return \TF\Maybe::$FALSE;
         }
 
@@ -107,48 +277,73 @@ class BotFilter {
         }
 
         // ugly, impure crap
-        $this->get_ip_data($request->ip);
+        $this->ip_data = get_ip_data($request->ip, $request->agent);
     
-
-        // bot tracking cookie
-        $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
-            $request->cookies[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
-            Config::str(CONFIG_ENCRYPT_KEY),
-            $request->ip);
-
+        //echo Config::str(CONFIG_USER_TRACK_COOKIE) . "\n";
+        //echo Config::str(CONFIG_ENCRYPT_KEY) . "\n";
+        //print_r($request->ip);
 
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
-        $this->browser['valid'] = intval($maybe_botcookie->extract('v', 0)();
         $this->browser[AGENT_WHITELIST] = false;
 
         // match constraints
         // TODO: better naming
         // cpu: 52
         $maybe_block = \TF\map_whilenot($this->_constraints, "\BitFire\match_fails", $request);
-        $maybe_block->doifnot('\BitFireBot\validate_rr',
-            Config::int(CONFIG_RR_1M), Config::int(CONFIG_RR_5M), $this->ip_data);
+        $maybe_block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
 
+        // bot tracking cookie
+        $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
+            $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
+            Config::str(CONFIG_ENCRYPT_KEY),
+            $request->ip);
+
+        // set browser validity to cookie value or server ip data
+        $this->browser['valid'] = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
+        \TF\debug("x-valid: ". $this->browser['valid'] . " ip_data: " . $this->ip_data->valid);
 
         // check the browser cookie answer matches the request
         // TODO: move to a function
         if ($request->path === "/bitfire_browser_required") {
             exit(include WAF_DIR . "views/browser_required.phtml");
         }
-        if (Config::enabled(CONFIG_REQUIRE_BROWSER) & isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
+        if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->browser['valid'] < 2 && isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
+            
+            \TF\debug("x-valid-check: ". $_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)]);
             $url = \BitFireBot\strip_path_tracking_params($request);
+
+            $answer = new Answer($this->ip_data->op1, $this->ip_data->op2, $this->ip_data->oper);
+            $response = ($answer->ans != 0) ? $answer->ans : $maybe_botcookie->extract('a')->value('int');
+            \TF\debug("x-valid-ans: ($response) - ({$answer->ans})");
+
             // response answer matches cookie
-            if (intval($maybe_botcookie->extract('a')()) === intval($_GET['_bfa'])) {
-                header("x-challenge: pass");
-                \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['valid'] = ($data['valid']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
-                $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY),
-                    \TF\en_json( array('ip' => $request->ip, 'v' => 2, 'et' => time() + 60*60)));
-                \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
+            if (intval($response) === intval($_GET['_bfa'])) {
+                \TF\debug("x-challenge: pass");
+                \TF\CacheStorage::get_instance()->update_data('metrics-'.\TF\utc_date('G'), function($data) { $data['valid'] = ($data['valid']??0) + 1; return $data; }, function() { return BITFIRE_METRICS_INIT; }, \TF\DAY);
+                if (Config::enabled(CONFIG_COOKIES)) {
+                    \TF\debug("x-challenge-type: config_cookie");
+                    $valid_cookie = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY), 
+                        \TF\en_json( array('ip' => $request->ip, 'v' => 2, 'et' => time() + 60*60)));
+                    \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $valid_cookie, time() + \TF\DAY*30, false, true);
+                } else {
+                    \TF\debug("x-challenge-type: shmop");
+                    $ip_key = "BITFIRE_IP_{$request->ip}";
+                    $this->cache->update_data($ip_key, function ($data) {
+                        $ip_data = unpack_ip_data($data);
+                        \TF\debug("x-challenge-type-valid: [{$ip_data['valid']}]");
+                        $ip_data['valid'] = 2;
+                        return pack_ip_data($ip_data);
+                    }, function() use ($remote_addr, $agent) { return \BitFire\new_ip_data($remote_addr, $agent); },
+                    60*10);
+                }
             } else {
-                header("x-challenge: fail");
+                \TF\debug("x-challenge: fail [$response] - [{$_GET['_bfa']}]");
                 $url = "/bitfire_browser_required";
             }
-            $foo = "Location: " . $request->scheme . '://' . $request->host . ":" . $request->port . trim($url, '?');
+            $request->scheme = \BitFireBot\force_ssl_scheme($request);
+            $port = ($request->port == 80 && $request->scheme != 'http') ? '' : ":{$request->port}";
+            $foo = "Location: " . $request->scheme . '://' . $request->host . $port . \TF\cache_bust($url);
             header($foo);
             exit();
         }
@@ -157,7 +352,7 @@ class BotFilter {
         if ($this->browser[AGENT_BOT]) {
             $this->browser[AGENT_WHITELIST] = false;
             if (Config::enabled(CONFIG_WHITELIST_ENABLE) && $maybe_block->empty()) {
-                $agents = \parse_ini_file(WAF_DIR."whitelist_agents.ini");
+                $agents = \parse_ini_file(WAF_DIR."cache/whitelist_agents.ini");
                 $maybe_block->doifnot('\BitFireBot\whitelist_inspection',
                     $request->agent,
                     $request->ip,
@@ -171,8 +366,12 @@ class BotFilter {
             }
         }
         // handle humans
-        else if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $request->ajax === false) {
-            \BitFireBot\require_browser_or_die($request, $maybe_botcookie);
+        else if (Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+            if ($request->ajax === false && $this->browser['valid'] < 2) {
+                \BitFireBot\require_browser_or_die($request, $maybe_botcookie, $this->ip_data);
+            } else {
+                \TF\debug("x-bitfire-req: [" . $request->ajax . " - " . $this->browser['valid'] . "]");
+            }
         }
 
         return $maybe_block;
@@ -182,8 +381,10 @@ class BotFilter {
 
 namespace BitFireBot;
 
+use BitFire\Answer;
 use BitFire\BitFire;
 use BitFire\Block;
+use BitFire\Challenge;
 use BitFire\Config;
 use BitFire\Request;
 use TF\CacheStorage;
@@ -194,7 +395,6 @@ use const BitFire\AGENT_MATCH;
 use const BitFire\BITFIRE_METRICS_INIT;
 use const BitFire\BLOCK_MEDIUM;
 use const BitFire\BLOCK_SHORT;
-use const BitFire\CACHE_NAME_JS_SEND;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
@@ -203,17 +403,46 @@ use const BitFire\FAIL_FAKE_WHITELIST;
 use const BitFire\FAIL_IS_BLACKLIST;
 use const BitFire\FAIL_MISS_WHITELIST;
 use const BitFire\FAIL_RR_TOO_HIGH;
-use const BitFire\IPDATA_RR_1M;
-use const BitFire\IPDATA_RR_5M;
+
+
+
+/**
+ * convert an IP to a 32bit int.  possible collisions for ipv6 addrs.  unlikely to be significant
+ */
+function ip_to_int(string $ip) : int {
+    if (strchr($ip, ":") !== false) { return ip2long($ip); }
+    else { return crc32($ip); }
+}
+
+/**
+ * return true for local wordpress requests (ie: wp-cron, etc)
+ */
+function is_local_wordpress(\BitFire\Request $request) : bool {
+    return (\TF\ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false);
+}
+
+/**
+ * return true if the request is from the local server
+ */
+function is_local_request(\BitFire\Request $request) {
+    return ($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']);
+}
+/**
+ * force ssl scheme if host is unwrapping SSL for us, could be faked, but then
+ */
+function force_ssl_scheme(\BitFire\Request $request) : string {
+    // only allow http or https for forwarded_proto
+    $r = (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) ? $_SERVER['HTTP_X_FORWARDED_PROTO'] : $request->scheme;
+    return (in_array($r, array('http', 'https'))) ? $r : $request->scheme;
+}
 
 /**
  * test if the ipdata exceeds request rate
  * PURE
  */
-function validate_rr(int $rr_1m, int $rr_5m, array $ip_data) : \TF\MaybeBlock {
-    if ($ip_data[IPDATA_RR_1M] > $rr_1m || $ip_data[IPDATA_RR_5M] > $rr_5m) {
-        return BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', 
-        $ip_data[IPDATA_RR_1M] . ' / ' . $ip_data[IPDATA_RR_5M], "$rr_1m / $rr_5m", BLOCK_MEDIUM);
+function validate_rr(int $rr_5m, \BitFire\IPData $ip_data) : \TF\MaybeBlock {
+    if ($ip_data->rr > $rr_5m) {
+        return BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', $ip_data->rr, "$rr_5m", BLOCK_MEDIUM);
     }
     return \TF\Maybe::$FALSE;
 }
@@ -242,16 +471,12 @@ function fast_verify_bot_as(string $remote_ip, string $network) : bool {
 }
 
 // verify that $remote ip is part of the AS network number $network
-// depends on whois in system path
-// EXEC CALL
 function verify_bot_as(string $remote_ip, string $network) : bool {
-    $network = escapeshellarg("-i origin " . substr($network, 0, 8));
-    $match = (\TF\is_ipv6($remote_ip)) ?
-        array_slice(explode(":", $remote_ip), 0, 2) :
-        array_slice(explode(".", $remote_ip), 0, 2);
-    $cmd = "whois -h whois.radb.net -- $network | grep " . escapeshellarg(join('.', $match));
-    $routes = parse_whois_route(exec($cmd));
-    return is_ip_in_cidr_list($remote_ip, $routes);
+    $x = \TF\MaybeA::of(fsockopen("whois.radb.net", 43, $no, $str, 1))
+        ->effect(\TF\partial_right('\fputs', "$remote_ip\r\n"))
+        ->then('\TF\read_stream')
+        ->if(\TF\partial_right('stristr', $network));
+        return $x->empty() ? false : true;
 }
 
 function is_ip_in_cidr_list(string $remote_ip, array $routes) : bool {
@@ -398,36 +623,6 @@ function parse_agent(string $user_agent) : array {
     return array("os" => $os, "whitelist" => false, "browser" => $browser[1], "ver" => $browser[2], "bot" => $browser[0] === "bot");
 }
 
-/**
- * Calculate a javascript bot response answer
- * returns the result of a random operation 
- * of n1 and n2 with JS code to perform the operation
- * TODO: unit tests
- * PURE
- */
-function bot_calc_answer(int $n1, int $n2, int $op) : array {
-    $ans = array(0, 0, 0);
-    $ans[\BitFire\BOT_ANS_OP_POS] = $op;
-    switch($op) {
-        case 1:
-            $ans[\BitFire\BOT_ANS_ANS_POS] = $n1 * $n2;
-            $ans[\BitFire\BOT_ANS_CODE_POS] = "($n1*$n2)";
-            break;
-        case 2:
-            $ans[\BitFire\BOT_ANS_ANS_POS] = $n1 / $n2;
-            $ans[\BitFire\BOT_ANS_CODE_POS] = "($n1/$n2)";
-            break;
-        case 3:
-            $ans[\BitFire\BOT_ANS_ANS_POS] = $n1 + $n2;
-            $ans[\BitFire\BOT_ANS_CODE_POS] = "($n1+$n2)";
-            break;
-        default:
-            $ans[\BitFire\BOT_ANS_ANS_POS] = $n1 - $n2;
-            $ans[\BitFire\BOT_ANS_CODE_POS] = "($n1-$n2)";
-            break;
-    }
-    return $ans;
-}
 
 //TODO: make encrypt cookie fun and compose then replace with upper call
 // also extract js answer code
@@ -437,11 +632,12 @@ function bot_calc_answer(int $n1, int $n2, int $op) : array {
  * PURE!
  */
 function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip) : \TF\MaybeStr {
-    return \TF\decrypt_ssl($encrypt_key, $cookie_data)
-        ->then("TF\un_json")
-        ->if(function($cookie) use ($src_ip) { 
+    $f = \TF\decrypt_ssl($encrypt_key, $cookie_data)
+        ->then("TF\\un_json")
+        ->if(function($cookie) use ($src_ip) {
             return ((($cookie['ip'] ?? '') === $src_ip) && (($cookie['et'] ?? 0) > time()));
         });
+    return $f;
 }
 
 
@@ -449,13 +645,19 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
  * make a new js challenge script and set a cookie
  * NOT PURE, SETS CLIENT COOKIE!
  */
-function make_js_challenge(string $ip, string $tracking_param, string $encrypt_key, string $utc_name) : string {
-    header("x-challenge: sent");
-    $n1 = intval(decoct(rand(1000,500000)));
-    $n2 = intval(decoct(rand(12,2000)));
-    $answer = \BitFireBot\bot_calc_answer($n1, $n2, rand(1,4));
+function make_js_challenge(\BitFire\IPData $ip) : string { // }, string $tracking_param, string $encrypt_key, string $utc_name) : string {
+    \TF\debug("x-challenge: sent " . $ip->op1 . " [{$ip->oper}] " . $ip->op2);
+    //$n1 = intval(decoct(rand(1000,500000)));
+    //$n2 = intval(decoct(rand(12,2000)));
+    $answer = new Answer($ip->op1, $ip->op2, $ip->oper);
+    //echo make_js_challenge($request->ip, Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
+    \TF\debug("x-bitfire-code: [" . $answer->code . "]");
 
-    $js  = "function _0x8bab5c(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$answer[\BitFire\BOT_ANS_CODE_POS]};}";
+    for($i=0,$m=strlen((string)$ip->op1);$i<$m;$i++) {
+
+    }
+
+    $js  = "function _0x8bab5c(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$answer->code};}";
     $js .= '
     function BITB() { var u=new URL(window.location.href); 
 var e=document; 
@@ -464,51 +666,54 @@ e._bitfire=1;
 t=screen.width+"_"+screen.height;
 n=(new Date).getTimezoneOffset(); 
 var p=u.searchParams;
-p.append("'.$tracking_param.'", 1);
+p.append("'.Config::str(CONFIG_USER_TRACK_PARAM).'", 1);
 p.append("_bfa",_0x8bab5c());
 p.append("_bfx",t);
 p.append("_bfz",n);
 window.location.replace(u);
-} } BITB(); ';
+} } document.addEventListener("DOMContentLoaded", BITB);';
 
-    $crypt = \TF\encrypt_ssl($encrypt_key, make_challenge_cookie($answer, $ip));
+    $challenge = make_challenge_cookie($answer, $ip->ip_crc);
+    $crypt = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY), json_encode($challenge));
 
+    // ensure csp_policy retains unsafe-eval
+    if (Config::enabled("csp_policy_enabled")) {
+        $policy = Config::arr("csp_policy");
+        $policy['script-src'] = "'unsafe-eval' " . $policy['script-src']??'';
+        Config::set_value("csp_policy", $policy);
+    }
 
-    \TF\cookie($utc_name, $crypt, time() + 60*10, false, true);
-    return "<script>{$js}</script>";
+    \TF\cookie(Config::str(CONFIG_USER_TRACK_COOKIE), $crypt, time() + 60*10, false, true);
+    return "<html><head><script nonce=\"".Config::nonce()."\">{$js}</script></head><body id='body'></body></html>";
 }
 
 
+// TODO: CONTINUE HERE, MUST RETURN CHALLENGE
 // make a json encoded challenge cookie that expires in 1 minute
-function make_challenge_cookie(array $answer, string $ip) : string {
-    assert(count($answer) >= \BitFire\BOT_ANS_ANS_POS, "unable to make challenge cookie with bad answer value");
-
-    return json_encode(
-        array(
+function make_challenge_cookie(Answer $answer, string $ip) {
+    //public static function new(string $ip_str, int $valid, string $ua_str, int $exp_time, $answer) {
+    //return Challenge::new($ip, 0, )
+    $d = array(
             'et' => time() + 60*10,
             'v' => 1,
-            'a' => $answer[\BitFire\BOT_ANS_ANS_POS],
+            'a' => $answer->ans,
             'ip' => $ip
-        )
     );
+    return $d;
 }
 
 /**
  * add the page that prompts the browser to add a cookie
  */
-function require_browser_or_die(\BitFire\Request $request, \TF\MaybeStr $cookie) {
-    if (intval($cookie->extract('v')()) >= 2) { 
-        header("x-challenge: valid");
-        return;
-    }
+function require_browser_or_die(\BitFire\Request $request, \TF\MaybeStr $cookie, \BitFire\IPData $ip_data) {
 
-    \TF\CacheStorage::get_instance()->update_data('metrics-'.date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, \BitFire\BITFIRE_METRICS_INIT, \TF\DAY);
+    // update challenge counter
+    $updated = \TF\CacheStorage::get_instance()->update_data('metrics-'.\TF\utc_date('G'), function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; }, function() { return BITFIRE_METRICS_INIT; }, \TF\DAY);
     http_response_code(202);
-    echo make_js_challenge($request->ip, Config::str(CONFIG_USER_TRACK_PARAM), 
-        Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
+    \TF\cache_bust();
 
-    exit();
-    //if (Config::str(CONFIG_REQUIRE_BROWSER, "report") === "block") { exit(); }
+    echo make_js_challenge($ip_data, Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
+    if (Config::is_block(CONFIG_REQUIRE_BROWSER)) { exit(); }
 }
 
 /**
@@ -519,6 +724,10 @@ function strip_path_tracking_params(\BitFire\Request $request) {
     unset($request->get['_bfx']) ;
     unset($request->get['_bfz']) ;
     unset($request->get[Config::str(CONFIG_USER_TRACK_PARAM)]) ;
+    unset($request->get[Config::str('cache_bust_parameter')]) ;
+    unset($_GET[Config::str('cache_bust_parameter')]) ;
+    unset($_REQUEST[Config::str('cache_bust_parameter')]) ;
+
     return($request->path . '?' . http_build_query($request->get));
 }
 
