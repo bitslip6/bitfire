@@ -33,7 +33,7 @@ function ends_with(string $haystack, string $needle) { return strrpos($haystack,
 function say($color = '\033[39m', $prefix = "") : callable { return function($line) use ($color, $prefix) : string { return (strlen($line) > 0) ? "{$color}{$prefix}{$line}\033[32m\n" : ""; }; } 
 function last_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, -1, 1)[0] : $default; }
 function first_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, 0, 1)[0] : $default; }
-function random_str(int $len) : string { return substr(base64_encode(random_bytes($len)), 0, $len); }
+function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', ''), 0, $len); }
 function un_json(string $data) { return json_decode($data, true, 6); }
 function en_json($data) : string { return json_encode($data); }
 function un_json_array(array $data) { return \TF\un_json('['. join(",", $data) . ']'); }
@@ -43,7 +43,10 @@ function lookbehind(string $s, string $r) : string { return @$r($s); }
 // return the $index element of $input split by $separator or '' on any failure
 function take_nth(?string $input, string $separator, int $index) : string { if (empty($input)) { return ''; } $parts = explode($separator, $input); return (isset($parts[$index])) ? $parts[$index] : ''; }
 function read_stream($stream) { $data = ""; if($stream) { while (!feof($stream)) { $data .= fread($stream , 2048); } } return $data; }
+// $fn = $result .= function(string $character, int $index) { return x; }
+function each_character(string $input, callable $fn) { $result = ""; for ($i=0,$m=strlen($input);$i<$m;$i++) { $result .= $fn($input[$i], $i); } return $result; }
 
+/* // flatten multi-depth array
 function flatten(array $array) : array {
     $return = array();
     array_walk_recursive($array, function($a) use (&$return) { $return[] = $a; });
@@ -59,9 +62,9 @@ function array_flatten($array) {
             $return[$key] = $value;
         }
     }
-
     return $return;
 }
+*/
 
 
 /**
@@ -855,5 +858,14 @@ function utc_time() : int {
 
 function utc_microtime() : float {
     return microtime(true) + date('z');
+}
+
+function array_shuffle(array $in) : array {
+    $out = array();
+    while(($m = count($in))>0) {
+        $t = array_splice($in, mt_rand(0, $m), 1);
+        $out[] = $t[0]??0;
+    }
+    return $out;
 }
 

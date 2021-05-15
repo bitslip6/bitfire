@@ -320,7 +320,7 @@ class BitFire
      */
     protected static function reporting(Block $block, \BitFire\Request $request) {
         $data = array('time' => \TF\utc_date('r'), 'tv' => \TF\utc_time(),
-            'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+            'exec' => number_format(microtime(true) - $GLOBALS['start_time'], 6). ' sec',
             'block' => $block,
             'request' => $request);
         $bf = BitFire::get_instance()->bot_filter;
