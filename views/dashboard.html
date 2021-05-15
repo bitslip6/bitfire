@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://bitfire.co/dash/quill.core.css" />
     -->
 
-	<link rel="shortcut icon" href="//www.bitslip6.com/img/shield64.png">
+	<link rel="shortcut icon" href="https://www.bitslip6.com/img/shield64.png">
     <link rel="stylesheet" href="https://bitfire.co/dash/vs2015.css" />
 
     <!-- Theme CSS -->
@@ -101,6 +101,10 @@
     <script>
         window.ERROR = [];
 
+        function add_exception(ex) {
+          console.log(ex);
+        }
+
         function cc_to_flag(cc) {
           if (cc.length != 2) { return ""; }
           const OFFSET = 127397;
@@ -110,7 +114,7 @@
 
         
         const VERSION = 127;
-        const VERSION_STR = "1.3.2";
+        const VERSION_STR = "1.3.7";
         const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
         const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
         const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -221,11 +225,11 @@
  
         <h6 class="navbar-heading"> Site Lock </h6>
         <span class="left">
-          <div id="unlock_div" <?php if ($locked) { echo 'class="hidden"'; }?>>
+          <div id="unlock_div" <?php if (!$locked) { echo 'class="hidden"'; }?>>
           <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
           <button id="unlock" type="button" class="btn btn-danger lift">UNLOCK SITE</button>
           </div>
-          <div id="lock_div" <?php if (!$locked) { echo 'class="hidden"'; }?>>
+          <div id="lock_div" <?php if ($locked) { echo 'class="hidden"'; }?>>
           <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg>
           <button id="lock" type="button" class="btn btn-success lift">LOCK SITE</button>
           </div>
@@ -644,7 +648,7 @@
               <div class="col">
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire PRO: Release 1.3.2
+                  BitFire PRO: Release 1.3.7
                 </h6>
                 <p style="font-size:.75rem;color:#666;">
                 BitFire PRO is licensed for commercial use and includes cash back guarantee if your site is compromised. email: info@bitslip6.com for details</p>
@@ -739,49 +743,55 @@
               <div class="card-body">
 
        
-<table class="table table-sm">
+<table class="table table-sm" style="width:100%">
   <thead class="details">
     <tr>
+      <th scope="col"></th>
       <th scope="col">Time</th>
       <th scope="col">IP</th>
-      <th scope="col">Browser</th>
-      <th scope="col">Code</th>
-      <th scope="col">Param</th>
-      <th scope="col">Value</th>
-      <th scope="col">Pattern</th>
-      <th scope="col">Meta</th>
+      <th scope="col">URL / Agent</th>
     </tr>
   </thead>
-  <tbody style="font-size:10px;">
-    <?php foreach ($reporting as $line) { if (!isset($line['time'])) { echo "<!-- "; print_r($line); echo " -->\n"; continue; } ?>
-    <tr class="inforow">
+  <tbody style="font-size:10px;width:100%">
+    <?php if (isset($reporting[0])) { foreach ($reporting as $line) { if (!isset($line['time'])) { echo "<!-- "; print_r($line); echo " -->\n"; continue; } ?>
+    <?php //echo "<pre>"; print_r($line['request']); echo "</pre>\n"; ?>
+    <tr class="inforow" width="100%">
       <td class="nowrap" scope="row">
       <div class="avatar-group">
-        <div class="avatar">
-          <img src="https://bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" />
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/fix.svg" alt="exception" width="24" 
+          title="add exception for <?php echo MESSAGE_CLASS[\BitFire\code_class($line['block']['code'])] . ' parameter: ' . $line['block']['parameter']?>"
+          class="avatag-img rounded-circle" style="cursor:pointer;" onclick="add_exception()" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
         </div>
-        <div class="avatar">
-          <img src="https://bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" />
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle" />
         </div>
-        <div class="avatar">
-          <img src="https://bitfire.co/assets/<?php echo $line['country_img'];?>" alt="country" />
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
         </div>
       </div>
+      </td>
+      <td class="nowrap"><?php $t=time(); echo date('M d, H:i:s', strtotime($line['tv']??$t));?></td>
+      <td class="nowrap" style="min-width:100px;"><?php echo "<strong>" . $line['request']['ip'] . '</strong>'?></td>
+      <td class="nowrap">
+        <div style="float:left"><?php echo "<strong>" . $line['request']['method'] . "&nbsp;&nbsp;&nbsp;" . $line['request']['scheme'] . "://" . $line['request']['host'] . $line['request']['path']?></strong></div>
+        <div style="float:right"><?php echo $line['request']['agent']?></div>
       </td>
     </tr>
 
 
-    <tr class="inforow">
-      <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['time']))?></td>
-      <td class="nowrap" style="min-width:125px;"><?php echo ($line['ip'] ?? '-') . " <span class=\"country\">" . $line['country']; ?></span></td>
-      <td class="wrap"><?php echo $line['browser']['browser'] . "/". join('.', array_slice(explode('.', $line['browser']['ver']), 0, 2)) ?></td>
-      <td class="nowrap"><?php echo $line['block']['code']?></td>
+    <tr class="tbalt inforow">
+      <td class="nowrap"><?php $code = $line['block']['code']; $cl = intval($code/1000)*1000; echo $code . ':' . MESSAGE_CLASS[$cl]; ?></td>
       <td class="wrap"><?php echo htmlspecialchars($line['block']['parameter'])?></td>
-      <td class="wrap"><?php echo htmlspecialchars($line['block']['value'])?></td>
-      <td class="wrap"><?php echo htmlspecialchars($line['block']['pattern'])?></td>
-      <td class="wrap"><?php echo \BitFire\to_meta($line); ?></td>
+      <td class="wrap"><?php echo htmlspecialchars(substr($line['block']['value'], 0, 80))?></td>
+      <td class="nowrap">
+        <?php echo htmlspecialchars(substr($line['block']['pattern'], 0, 50))?>
+        <?php echo \BitFire\to_meta($line); ?></td>
     </tr>
-    <tr>
+    <!--tr>
       <td colspan="8" class="tbalt nowrap">
         <?php if ($line['browser']['valid'] >= 2) { ?>
           <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg> 
@@ -798,8 +808,8 @@
         // if ($line['browser']['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)); }
         echo "<div  class='right'>&nbsp;&nbsp;<b>AGENT:</b>&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)) . "</div>";
       ?></td>
-    </tr>
-    <?php } ?>
+    </tr-->
+    <?php } } ?>
   </tbody>
 </table>
               </div>
@@ -815,7 +825,60 @@
               </div>
               <div class="card-body">
 
+<table class="table table-sm" style="width:100%">
+  <thead class="details">
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Time</th>
+      <th scope="col">IP</th>
+      <th scope="col">URL / Agent</th>
+    </tr>
+  </thead>
+  <tbody style="font-size:10px;width:100%">
+
+    <?php if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
+    <tr class="inforow" width="100%">
+      <td class="nowrap" scope="row">
+      <div class="avatar-group">
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/fix.svg" alt="exception" width="24" 
+          title="add exception for <?php echo MESSAGE_CLASS[$line['classId']] . ' parameter: ' . $line['item']?>"
+          class="avatag-img rounded-circle" style="cursor:pointer;" onclick="add_exception()" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+        </div>
+      </div>
+      </td>
+      <td class="nowrap"><?php $t=time(); echo date('M d, H:i:s', strtotime($line['ts']??$t));?></td>
+      <td class="nowrap" style="min-width:100px;"><?php echo "<strong>" . $line['ip'] . '</strong>'?></td>
+      <td class="nowrap">
+        <div style="float:left"><?php echo "<strong>" . $line['verb'] . "&nbsp;&nbsp;&nbsp;" . $line['scheme'] . "://" . $line['url']?></strong></div>
+        <div style="float:right"><?php echo $line['ua']?></div>
+      </td>
+    </tr>
+
+
+    <tr class="tbalt inforow">
+      <td class="nowrap"><?php echo $line['eventid'] . ':' . MESSAGE_CLASS[$line['classId']]; ?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['params'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars(substr($line['match'], 0, 80))?></td>
+      <td class="nowrap">
+        <?php echo htmlspecialchars(substr($line['name'], 0, 50))?>
+    </tr>
+  <?php } } ?>
+  </tbody>
+</table>
+ 
+
        
+<!--
 <table class="table table-sm">
   <thead class="details">
     <tr>
@@ -875,6 +938,7 @@
     <?php } } ?>
   </tbody>
 </table>
+-->
               </div>
             </div>
           </div>
@@ -907,10 +971,12 @@
       
       function show_bars(chart_id, hr_set) {
         let total = 0;
+        //console.log("chart id", chart_id);
         for(var d in hr_set) {
-          //console.log(hr_set[d]);
+          console.log(d, hr_set[d]);
           total += hr_set[d];
         }
+        console.log("total: ", total);
         GBI("block_sum_total").innerText = "(" + total + ")";
         
         //console.log(hr_set);
@@ -1062,15 +1128,18 @@ fetch("https://bitfire.co/ver.php")
         const response3 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
         const response4 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
 
+        //console.log("fetched");
         
         const data1 = await response1.json();
         const data2 = await response2.json();
         const data3 = await response3.json();
+        console.log("await 3", data3);
         const data4 = await response4.json();
+
 
         update_challenge(data4);
         
-        console.log("data4", data4);
+        //console.log("data4", data4);
 
         show_pie('classChart', data1, label_type);
         GBI("block_total").innerText = "(" + data1.total + ")";
@@ -1117,7 +1186,7 @@ fetch("https://bitfire.co/ver.php")
 
       GBI("lock").addEventListener("click", function() {
         GBI("lock").innerText = "unlocking...";
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>')
+        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>')
         .then(response => {
           console.log(response); 
           GBI("lock").innerText = "LOCK SITE";

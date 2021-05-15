@@ -12,6 +12,15 @@ const BOT_ANS_OP_POS=1;
 const BOT_ANS_ANS_POS=0;
 */
 
+class JS_Fn {
+    public $js_code;
+    public $fn_name;
+    public function __construct($code, $name) {
+        $this->js_code = $code;
+        $this->fn_name = $name;
+    }
+}
+
 
 const AGENT_MATCH = array(
         "brave" => "(brave)/\s*([\d+\.]+)",
@@ -386,6 +395,7 @@ use BitFire\BitFire;
 use BitFire\Block;
 use BitFire\Challenge;
 use BitFire\Config;
+use BitFire\JS_Fn;
 use BitFire\Request;
 use TF\CacheStorage;
 
@@ -640,6 +650,27 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
     return $f;
 }
 
+function js_fn(string $fn_name) : callable {
+    return function($arg) use ($fn_name) { return "{$fn_name}($arg)"; };
+}
+
+function js_int_obfuscate(int $number) : JS_Fn {
+    // convert ascii printable character range (32-126) to actual char values, shuffle the result array and turn into string
+    $z = join('', \TF\array_shuffle(array_map(function($x) { return chr($x); }, range(32, 126))));
+    // dictionary name, function name, 
+    $num_str = strval($number);
+    $dict_name = 'z' . \TF\random_str(5);
+    $fn_name = 'x' . \TF\random_str(5);
+
+    $char_fn = js_fn("+{$dict_name}.charAt");
+    $js_code = "function $fn_name() { return " .
+        "let {$dict_name}='".addslashes($z)."';" . 
+        \TF\each_character($num_str, function (string $c, int $idx) use ($z, $num_str, $char_fn) : string {
+            $idx = strpos($z, $num_str[$idx]);
+            return $char_fn($idx);
+        });
+    return new JS_Fn($js_code, $fn_name);
+}
 
 /**
  * make a new js challenge script and set a cookie
@@ -653,9 +684,18 @@ function make_js_challenge(\BitFire\IPData $ip) : string { // }, string $trackin
     //echo make_js_challenge($request->ip, Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
     \TF\debug("x-bitfire-code: [" . $answer->code . "]");
 
-    for($i=0,$m=strlen((string)$ip->op1);$i<$m;$i++) {
 
+    $z = join('', \TF\array_shuffle(array_map(function($x) { return chr($x); }, range(32, 126))));
+    $s1 = strval($ip->op1);
+    $j  = "let dict='".addslashes($z)."';\n";
+    $j .= "let o=''";
+    for($i=0,$m=strlen($s1); $i<$m; $i++) {
+        $idx = strpos($z, $s1[$i]);
+        $j .= "+dict.charAt($idx)";
     }
+    $j .= "; console.log(o);\n";
+    exit("<script>$j</script>\n");
+
 
     $js  = "function _0x8bab5c(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$answer->code};}";
     $js .= '
