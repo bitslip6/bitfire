@@ -33,7 +33,7 @@ function ends_with(string $haystack, string $needle) { return strrpos($haystack,
 function say($color = '\033[39m', $prefix = "") : callable { return function($line) use ($color, $prefix) : string { return (strlen($line) > 0) ? "{$color}{$prefix}{$line}\033[32m\n" : ""; }; } 
 function last_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, -1, 1)[0] : $default; }
 function first_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, 0, 1)[0] : $default; }
-function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', ''), 0, $len); }
+function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
 function un_json(string $data) { return json_decode($data, true, 6); }
 function en_json($data) : string { return json_encode($data); }
 function un_json_array(array $data) { return \TF\un_json('['. join(",", $data) . ']'); }
@@ -844,7 +844,7 @@ function cache_bust(?string $url="") : string {
         $url = trim($url, " \t&?");
         return $url . ((strpos($url, '?') != false) ? "&" : '?') . get_random_param(\BitFire\Config::str('cache_bust_parameter'));
     }
-    return $url;
+    return trim($url, '?&');
 }
 
 // return date in GMT time
