@@ -107,7 +107,20 @@ class Answer {
     public $oper;
     public $ans;
     public $code;
-    
+
+    public function code_fn() : string {
+        switch($this->oper) {
+            case 1:
+                return "*";
+            case 2:
+                return "/";
+            case 3:
+                return "+";
+            case 4:
+                return "-";
+        }
+    }
+
     public function __construct(int $op1, int $op2, int $oper) {
         $this->op1 = $op1;
         $this->op2 = $op2;
@@ -650,25 +663,30 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
     return $f;
 }
 
+// return a function that returns a string to call $fn_name with the argument 
 function js_fn(string $fn_name) : callable {
     return function($arg) use ($fn_name) { return "{$fn_name}($arg)"; };
 }
 
+// create obfuscated JavaScript for $number
 function js_int_obfuscate(int $number) : JS_Fn {
     // convert ascii printable character range (32-126) to actual char values, shuffle the result array and turn into string
     $z = join('', \TF\array_shuffle(array_map(function($x) { return chr($x); }, range(32, 126))));
-    // dictionary name, function name, 
+    // integer to string, set dictionary name, function name, 
     $num_str = strval($number);
-    $dict_name = 'z' . \TF\random_str(5);
-    $fn_name = 'x' . \TF\random_str(5);
-
+    $dict_name = 'z' . \TF\random_str(3);
+    $fn_name = 'x' . \TF\random_str(3);
+    // js function call on param
     $char_fn = js_fn("+{$dict_name}.charAt");
-    $js_code = "function $fn_name() { return " .
-        "let {$dict_name}='".addslashes($z)."';" . 
-        \TF\each_character($num_str, function (string $c, int $idx) use ($z, $num_str, $char_fn) : string {
-            $idx = strpos($z, $num_str[$idx]);
-            return $char_fn($idx);
-        });
+
+    // create an index into the dictionary for each integer position
+    $code = \TF\each_character($num_str, function (string $c, int $idx) use ($z, $num_str, $char_fn) : string {
+        $idx = strpos($z, $num_str[$idx]);
+        return $char_fn($idx);
+    });
+
+    // the actual js function
+    $js_code = sprintf("function %s(){let %s='%s';return parseInt(''%s);}", $fn_name, $dict_name, addslashes($z), $code);
     return new JS_Fn($js_code, $fn_name);
 }
 
@@ -685,21 +703,16 @@ function make_js_challenge(\BitFire\IPData $ip) : string { // }, string $trackin
     \TF\debug("x-bitfire-code: [" . $answer->code . "]");
 
 
-    $z = join('', \TF\array_shuffle(array_map(function($x) { return chr($x); }, range(32, 126))));
-    $s1 = strval($ip->op1);
-    $j  = "let dict='".addslashes($z)."';\n";
-    $j .= "let o=''";
-    for($i=0,$m=strlen($s1); $i<$m; $i++) {
-        $idx = strpos($z, $s1[$i]);
-        $j .= "+dict.charAt($idx)";
-    }
-    $j .= "; console.log(o);\n";
-    exit("<script>$j</script>\n");
-
-
-    $js  = "function _0x8bab5c(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$answer->code};}";
-    $js .= '
-    function BITB() { var u=new URL(window.location.href); 
+    $fn1_name = '_0x' . \TF\random_str(4);
+    $fn2_name = '_0x' . \TF\random_str(4);
+    $fn3 = js_int_obfuscate($ip->op1);
+    $fn4 = js_int_obfuscate($ip->op2);
+    $fn5 = js_int_obfuscate(mt_rand(1000,500000));
+    $fn6 = js_int_obfuscate(mt_rand(1000,500000));
+    
+    $js  = "function $fn1_name(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$fn3->fn_name}() {$answer->code_fn()} {$fn4->fn_name}();}";
+    $js .= $fn5->code . "\n" .$fn4->code . "\n" . $fn3->code . "\n" . $fn6->code . "\n";
+    $js .= "function $fn2_name() { var u=new URL(window.location.href);".'
 var e=document; 
 if (!e._bitfire) { 
 e._bitfire=1; 
@@ -707,9 +720,10 @@ t=screen.width+"_"+screen.height;
 n=(new Date).getTimezoneOffset(); 
 var p=u.searchParams;
 p.append("'.Config::str(CONFIG_USER_TRACK_PARAM).'", 1);
-p.append("_bfa",_0x8bab5c());
+p.append("_bfa",'.$fn1_name().');
 p.append("_bfx",t);
 p.append("_bfz",n);
+p.append("_bfsp",p);
 window.location.replace(u);
 } } document.addEventListener("DOMContentLoaded", BITB);';
 
