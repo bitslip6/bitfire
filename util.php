@@ -97,6 +97,25 @@ function file_recurse(string $dirname, callable $fn) : array {
     return $result;
 }
 
+function reverse(callable $function) {
+    return function (...$args) use ($function) {
+        return $function(...array_reverse($args));
+    };
+}
+
+function pipeline(callable $a, callable $b) {
+    $list = func_get_args();
+
+    return function ($value = null) use (&$list) {
+        return array_reduce($list, function ($accumulator, callable $a) {
+            return $a($accumulator);
+        }, $value);
+    };
+}
+
+function compose(callable $a, callable $b) {
+    return reverse('\TF\pipeline')(...func_get_args());
+}
 
 /**
  * returns a function that will cache the call to $fn with $key for $ttl
@@ -127,6 +146,41 @@ function partial_right(callable $fn, ...$args) : callable {
     return function(...$x) use ($fn, $args) {
         return $fn(...array_merge($x, $args));
     };
+}
+
+class Effect {
+    private $out = '';
+    private $response = 0;
+    private $headers = array();
+    private $cookies = array();
+    private $cache = array();
+
+    public function out(string $line) { $this->out .= $line; }
+    public function header(string $name, string $value) { $this->headers[$name] = $value; }
+    public function cookie(string $name, string $value) { $this->cookies[$name] = $value; }
+    public function response_code(int $code) { $this->response = $code; }
+    public function update(string $key, \TF\CacheItem $item) { $this->cache[$key] = $item; }
+
+    public function read_out() : string { return $this->out; }
+    public function read_headers() : array { return $this->headers; }
+    public function read_cookies() : array { return $this->headers; }
+    public function read_code() : int { return $this->response; }
+
+    public function run() {
+        if (strlen($this->out) > 0) {
+            echo $this->out;
+        }
+        if ($this->response > 0) {
+            http_response_code($this->response);
+        }
+        do_for_all_key_value($this->cookies, \TF\partial_right('\TF\cookie', \TF\DAY));
+        do_for_all_key_value($this->headers, 'Effect::header_join');
+        do_for_all_key_value($this->cache, function(string $key, \TF\CacheItem $item) {
+            CacheStorage::get_instance()->update_data($item->key, $item->fn, $item->init, $item->ttl);
+        });
+    }
+
+    protected static function header_join(string $key, string $value) { return "$key: $value"; }
 }
 
 
@@ -734,7 +788,7 @@ function debug(string $fmt, ...$args) {
     static $idx = 0;
     if (\BitFire\Config::enabled("debug_file")) {
         file_put_contents(\BitFire\Config::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
-    } else if (\BitFire\Config::enabled("debug_header")) {
+    } else if (\BitFire\Config::enabled("debug_header") && !headers_sent()) {
         header("x-bitfire-$idx: " . sprintf("$fmt", ...$args));
     }
     $idx++;

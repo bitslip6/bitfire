@@ -1,0 +1,110 @@
+# BEGIN WebARX
+
+#BASIC ID=1
+RedirectMatch 409 .(htaccess|htpasswd|errordocs|logs)$
+ServerSignature Off
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP_COOKIE} !^.*wordpress_logged_in.*$ [NC]
+  RewriteRule ^readme*.*html$ index.php?webarx_fpage=101 [L,QSA]
+  RewriteRule ^license*.*txt$ index.php?webarx_fpage=102 [L,QSA]
+  RewriteRule ^wp-config*.*php$ index.php?webarx_fpage=103 [L,QSA]
+</IfModule>
+
+#BASIC
+
+#BLOCK WP FILE ACCESS  ID=2
+
+# Block the include-only files.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP_COOKIE} !^.*wordpress_logged_in.*$ [NC]
+  RewriteRule ^wp-admin/includes/ index.php?webarx_fpage=201 [NC,L]
+  RewriteRule ^wp-includes/[^/]+.php$ index.php?webarx_fpage=202 [NC,L]
+  RewriteRule ^wp-content/uploads/(.*).php$ index.php?webarx_fpage=202 [NC,L]
+  RewriteRule ^wp-includes/js/tinymce/langs/.+.php index.php?webarx_fpage=203 [NC,L]
+  RewriteRule ^wp-includes/theme-compat/ index.php?webarx_fpage=204 [NC,L]
+</IfModule>
+
+#BLOCK WP FILE ACCESS
+
+#BLOCK DEBUG LOG ACCESS
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^debug*.*log$ index.php?webarx_fpage=502 [L,QSA]
+</IfModule>
+
+#BLOCK DEBUG LOG ACCESS
+
+#DISABLE INDEX VIEWS
+Options -Indexes
+
+#DISABLE INDEX VIEWS
+
+#FORBID PROXY COMMENT POSTING ID=7
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTP_COOKIE} !^.*wordpress_logged_in.*$ [NC]
+  RewriteCond %{REQUEST_METHOD} ^POST
+  RewriteCond %{HTTP:VIA} !^$ [OR]
+  RewriteCond %{HTTP:FORWARDED} !^$ [OR]
+  RewriteCond %{HTTP:USERAGENT_VIA} !^$ [OR]
+  RewriteCond %{HTTP:X_FORWARDED_FOR} !^$ [OR]
+  RewriteCond %{HTTP:X_FORWARDED_HOST} !^$ [OR]
+  RewriteCond %{HTTP:PROXY_CONNECTION} !^$ [OR]
+  RewriteCond %{HTTP:XPROXY_CONNECTION} !^$ [OR]
+  RewriteCond %{HTTP:HTTP_PC_REMOTE_ADDR} !^$ [OR]
+  RewriteCond %{HTTP:HTTP_CLIENT_IP} !^$
+  RewriteRule wp-comments-post\.php index.php?webarx_fpage=7 [NC]
+</IfModule>
+
+#FORBID PROXY COMMENT POSTING
+
+#WPSCAN ID=19
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+  RewriteCond %{REMOTE_ADDR} !=18.221.197.243
+  RewriteRule ^(.*)/plugins/(.*)readme\.(txt|html)$ index.php?webarx_fpage=19 [NC,L] 
+</IfModule>
+
+#WPSCAN
+
+# END WebARX
+
+
+# php -- BEGIN cPanel-generated handler, do not edit
+# Set the “ea-php74” package as the default “PHP” programming language.
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php74 .php .php7 .phtml
+</IfModule>
+# php -- END cPanel-generated handler, do not edit
+
+# BEGIN cPanel-generated php ini directives, do not edit
+# Manual editing of this file may result in unexpected behavior.
+# To make changes to this file, use the cPanel MultiPHP INI Editor (Home >> Software >> MultiPHP INI Editor)
+# For more information, read our documentation (https://go.cpanel.net/EA4ModifyINI)
+<IfModule php7_module>
+   php_value default_charset "UTF-8"
+   php_value auto_prepend_file "/home4/vipdisco/bitfire/startup.php"
+</IfModule>
+<IfModule lsapi_module>
+   php_value default_charset "UTF-8"
+   php_value auto_prepend_file "/home4/vipdisco/bitfire/startup.php"
+</IfModule>
+# END cPanel-generated php ini directives, do not edit
+
+# BEGIN WordPress
+# The directives (lines) between "BEGIN WordPress" and "END WordPress" are
+# dynamically generated, and should only be modified via WordPress filters.
+# Any changes to the directives between these markers will be overwritten.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+
+# END WordPress

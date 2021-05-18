@@ -11,6 +11,20 @@ interface Storage {
     public function update_data(string $key_name, callable $fn, callable $init, int $ttl);
 }
 
+class CacheItem {
+    public $key;
+    public $fn;
+    public $init;
+    public $ttl;
+
+    public function __construct(string $key_name, callable $fn, callable $init, int $ttl) {
+        $this->key = $key_name;
+        $this->fn = $fn;
+        $this->init = $init;
+        $this->ttl = $ttl;
+    }
+}
+
 /**
  * trivial cache abstraction with support for apcu, shared memory and zend opcache 
  */
@@ -31,7 +45,6 @@ class CacheStorage implements Storage {
      * remove all created semaphores...
      */
     protected function __construct(?string $type = 'nop') {
-//if(function_exists('shmop_open')) { die ("shm\n"); }
         if ($type === "apcu" && function_exists('apcu_store')) {
             self::$_type = $type;
         }
@@ -65,7 +78,6 @@ class CacheStorage implements Storage {
                 return;
             case "shmop":
                 $this->_shmop->write($key_name, $seconds, $data);
-                //header("x-write-$key_name: [". var_export($data, true));
                 return;
             case "apcu":
                 \apcu_store("_bitfire:$key_name", $data, $seconds);
@@ -109,10 +121,14 @@ class CacheStorage implements Storage {
         $this->unlock($sem);
     }
 
+    /**
+     * update cache entry @key_name with result of $fn or $init if it is expired.
+     * return the cached item, or if expired, init or $fn
+     */
     public function update_data(string $key_name, callable $fn, callable $init, int $ttl) {
         $sem = $this->lock($key_name);
         $data = $this->load_data($key_name);
-        if ($data === null) { header("x-update-$key_name-null: " . var_export($data, true)); $data = $init(); }
+        if ($data === null) { $data = $init(); }
         $updated = $fn($data);
         $this->save_data($key_name, $updated, $ttl);
         $this->unlock($sem);
@@ -132,7 +148,6 @@ class CacheStorage implements Storage {
                 break;
             case "shmop":
                 $tmp = $this->_shmop->read($key_name);
-                //header("x-read-$key_name: ". var_export($tmp, true));
                 $success = ($tmp !== NULL);
                 $value = ($success) ? $tmp : NULL;
                 break;
@@ -243,9 +258,6 @@ class BitInspectFileStore implements BitInspectStore {
     }
 
     private function request_to_name(array $page) {
-        //$data = "{$page['METHOD']}:{$page['HOST']}:{$page['PATH']}";
-        //str_replace("/")
-        //return substr($page['PATH'], -5)."/".crc32($data).".json";
         $path = join('/', $page);
         if ($path === "") { $path = "/root"; }
         return "$path.json";
