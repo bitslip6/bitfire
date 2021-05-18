@@ -325,7 +325,7 @@ class BitFire
             'request' => $request);
         $bf = BitFire::get_instance()->bot_filter;
         if ($bf != null) {
-            $data['browser'] = $bf->browser;
+            $data['browser'] = (array) $bf->browser;
             $data['rate'] = $bf->ip_data;
         }
         
@@ -370,7 +370,7 @@ class BitFire
                 if ($this->cached_page_is_valid($page)) {
                     header("x-cached: 1");
                     // add a js challenge if the request is not to a bot
-                    if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser['bot'] == false) {
+                    if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser->bot == false) {
                         echo \BitFireBot\make_js_challenge(
                             $this->_request->ip,
                             Config::str(CONFIG_USER_TRACK_PARAM),

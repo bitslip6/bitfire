@@ -349,9 +349,9 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
     $bot_filter = BitFire::get_instance()->bot_filter;
     $valid = -1;
     if ($bot_filter !== null) {
-        $bot = $bot_filter->browser['bot'] ?? false;
-        $valid = $bot_filter->browser['valid'] ?? -1;
-        $whitelist = $bot_filter->browser[AGENT_WHITELIST] ?? false;
+        $bot = $bot_filter->browser->bot;
+        $valid = $bot_filter->browser->valid;
+        $whitelist = $bot_filter->browser->whitelist ?? false;
     }
 
     if ($block === null && !$bot) { return; }
