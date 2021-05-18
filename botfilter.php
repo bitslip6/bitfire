@@ -1,16 +1,38 @@
 <?php
 namespace BitFire;
 
-use function BitFireBot\bot_calc_answer;
-use function TF\parse_ini;
+const MAX_HOST_HEADER_LEN = 80;
 
-/*
-const BOT_ANS_OP2=4;
-const BOT_ANS_OP1=3;
-const BOT_ANS_CODE_POS=2;
-const BOT_ANS_OP_POS=1;
-const BOT_ANS_ANS_POS=0;
-*/
+const AGENT_MATCH = array(
+    "brave" => "(brave)/\s*(\d+\.\d+)",
+    "opera" => "(opr)/\s*(\d+.\d+)",
+    "chrome" => "(chrome)/\s*(\d+\.\d+)",
+    "firefox" => "(firefox)/?\s*(\d+\.\d+)",
+    "android" => "(android)/?\s*(\d+\.d+)",
+    "safari" => "(safari)/\s*(\d+\.\d+)",
+    "edge" => "(edge)/\s*(\d+\.\d+)",
+    "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
+    "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
+    "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
+    "bot" => "(\w+)\s*([\d+\.]+)"
+);
+
+class UserAgent {
+    public $os;
+    public $whitelist;
+    public $browser;
+    public $ver;
+    public $bot;
+    public $valid = 0;
+
+    public function __construct(?string $os, ?string $browser, ?string $ver, bool $whitelist, bool $bot) {
+        $this->os = $os;
+        $this->browser = $browser;
+        $this->ver = $ver;
+        $this->whitelist = $whitelist;
+        $this->bot = $bot;
+    }
+}
 
 class JS_Fn {
     public $js_code;
@@ -20,21 +42,6 @@ class JS_Fn {
         $this->fn_name = $name;
     }
 }
-
-
-const AGENT_MATCH = array(
-        "brave" => "(brave)/\s*([\d+\.]+)",
-        "opera" => "(opr)/\s*([\d+\.]+)",
-        "chrome" => "(chrome)/\s*([\d+\.]+)",
-        "firefox" => "(firefox)/?\s*([\d+\.]+)",
-        "android" => "(android)/?\s*([\d+\.]+)",
-        "safari" => "(safari)/\s*([\d+\.]+)",
-        "edge" => "(edge)/\s*([\d+\.]+)",
-        "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
-        "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
-        "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
-        "bot" => "(\w+)\s*([\d+\.]+)"
-    );
 
 class IPData {
     public $rr;
@@ -55,7 +62,7 @@ class IPData {
         $this->ua_crc = $ua_crc;
     }
 
-    public function make_new(string $ip, string $ua) : IPData {
+    public static function make_new(string $ip, string $ua) : IPData {
         $data = new IPData(\BitFireBot\ip_to_int($ip), crc32($ua));
         $data->rr = 0;
         $data->rr_time = time() + 5*60;
@@ -63,43 +70,6 @@ class IPData {
         return $data;
     }
 }
-
-/*
-$data = IPData::make_new("127.0.0.1", "Mozilla/5.0 chrome 125");
-print_r($data);
-echo "\n";
-die("hit\n");
-$j = json_encode($data);
-print_r($j);
-echo "\n" . strlen($j) . " \n";
-$s = serialize($data);
-print_r($s);
-echo "\n" . strlen($s) . " \n";
-//4 4 2 2 1 2 4
-//$p = pack("iiSSCSI", $data->ip_crc, $data->ua_crc, $data->ctr_404, $data->ctr_500, $data->valid, $data->rr, $data->rr_time);
-var_dump($data->ip_crc);
-//$p = pack("L", $data->ip_crc);
-$q = 50821;
-$t1 = pack("NN", $data->ip_crc, $data->ua_crc);
-$a1 = unpack("Nip/Nua", $t1);
-echo "($q) ANS: [" . $a1['ip'] . "] ( " . $a1['ua'] . ") \n";
-die();
-
-$p = pack("N", $data->ip_crc);
-//printf("%d %d %d %d\n", $p[0], $p[1], $p[2], $p[3]);
-printf("%d\n", $p);
-echo "\n[$p] (" . strlen($p) . ")\n";
-$a = unpack("Nip", $p) . "\n\n";
-echo "IP: " . $a['ip'] . "\n";
-/*
-print_r($a['ip']);
-var_dump($a);
-var_dump($a[0]);
-var_dump($a[1]);
-var_dump($a[2]);
-var_dump($a[3]);
-die("hit\n");
-*/
 
 class Answer {
     public $op1;
@@ -118,7 +88,10 @@ class Answer {
                 return "+";
             case 4:
                 return "-";
+            default:
+                return "+";
         }
+        return "+";
     }
 
     public function __construct(int $op1, int $op2, int $oper) {
@@ -153,7 +126,6 @@ class Challenge {
     public $ip;
     public $ua_crc;
 
-    //public function __construct(string $ip, int $valid, int $exp_time, string $ua, $answer) {
     protected function __construct(int $ip_int, int $valid, int $ua_crc, int $exp_time, $answer) {
         $this->ip = $ip_int;
         $this->valid = $valid;
@@ -169,7 +141,7 @@ class Challenge {
 
 
 // 2 calls = 29: cpu
-function match_fails(int $fail_code, MatchType $type, \BitFire\Request $request) : \TF\MaybeBlock {
+function constraint_check(int $fail_code, MatchType $type, \BitFire\Request $request) : \TF\MaybeBlock {
     if ($type->match($request)) {
         return BitFire::new_block($fail_code, $type->get_field(), $type->matched_data(), 'static match', FAIL_DURATION[$fail_code]??0);
     }
@@ -258,10 +230,7 @@ class BotFilter {
             FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
             FAIL_METHOD => new MatchType(MatchType::NOTIN, "method", Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );
-
     }
-
-    
 
     /**
      * inspect the UA, determine human or bot
@@ -271,48 +240,30 @@ class BotFilter {
      */
     public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
 
-        // handle wp-cron and other self requested pages
-        if (Config::enabled("skip_local_bots") &&
-            (\BitFireBot\is_local_request($request) || \BitFireBot\is_local_wordpress($request))) {
-            return \TF\Maybe::$FALSE;
-        }
-
+        $block = \TF\Maybe::$FALSE;
+        // EARLY BAIL OUTS...
         // ignore urls that receive consistant bot access that may be difficult to identify
         if (in_array($request->path, Config::arr("ignore_bot_urls"))) {
-            return \TF\Maybe::$FALSE;
+            return $block;
         }
 
-        // request has no host header
-        if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
-            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request->host)) {
-                // allow valid whitelist bots to access the site
-                if (!isset($this->browser[AGENT_WHITELIST])) {
-                    $maybe = BitFire::new_block(FAIL_INVALID_DOMAIN, "host", $request->host, \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
-                    if (!$maybe->empty()) { return $maybe; }
-                }
-            }
+        // handle wp-cron and other self requested pages
+        if (Config::enabled("skip_local_bots") && (\BitFireBot\is_local_request($request))) {
+            return $block;
         }
 
-        if (strlen($request->host) > 80) {
-            $maybe = BitFire::new_block(FAIL_HOST_TOO_LONG, "HTTP_HOST", $request->host, 'len < 80', BLOCK_SHORT);
-            if (!$maybe->empty()) { return $maybe; }
-        }
+        // check host header is not garbage
+        $block->do('\BitFireBot\header_check', $request);
 
         // ugly, impure crap
         $this->ip_data = get_ip_data($request->ip, $request->agent);
     
-        //echo Config::str(CONFIG_USER_TRACK_COOKIE) . "\n";
-        //echo Config::str(CONFIG_ENCRYPT_KEY) . "\n";
-        //print_r($request->ip);
-
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
-        $this->browser[AGENT_WHITELIST] = false;
 
         // match constraints
-        // TODO: better naming
         // cpu: 52
-        $maybe_block = \TF\map_whilenot($this->_constraints, "\BitFire\match_fails", $request);
+        $maybe_block = \TF\map_whilenot($this->_constraints, "\BitFire\constraint_check", $request);
         $maybe_block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
 
         // bot tracking cookie
@@ -322,12 +273,12 @@ class BotFilter {
             $request->ip);
 
         // set browser validity to cookie value or server ip data
-        $this->browser['valid'] = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
-        \TF\debug("x-valid: ". $this->browser['valid'] . " ip_data_valid [" . $this->ip_data->valid . "]");
+        $this->browser->valid = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
+        \TF\debug("x-valid: ". $this->browser->valid . " ip_data_valid [" . $this->ip_data->valid . "]");
 
         // check the browser cookie answer matches the request
         // TODO: move to a function
-        if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->browser['valid'] < 2 && isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
+        if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->browser->valid < 2 && isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
             
             \TF\debug("x-challenge-param-val: ". $_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)]);
             $url = \BitFireBot\strip_path_tracking_params($request);
@@ -368,8 +319,7 @@ class BotFilter {
         }
 
         // handle robots
-        if ($this->browser[AGENT_BOT]) {
-            $this->browser[AGENT_WHITELIST] = false;
+        if ($this->browser->bot) {
             if (Config::enabled(CONFIG_WHITELIST_ENABLE) && $maybe_block->empty()) {
                 $agents = \parse_ini_file(WAF_DIR."cache/whitelist_agents.ini");
                 $maybe_block->doifnot('\BitFireBot\whitelist_inspection',
@@ -378,7 +328,7 @@ class BotFilter {
                     $agents['botwhitelist']);
 
                 // set agent whitelist status
-                $this->browser[AGENT_WHITELIST] = ($maybe_block->empty());
+                $this->browser->whitelist = ($maybe_block->empty());
             }
             else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
                 $maybe_block->doifnot('\BitFireBot\blacklist_inspection', $request, file(WAF_DIR.'cache/bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
@@ -386,12 +336,25 @@ class BotFilter {
         }
         // handle humans
         else if (Config::enabled(CONFIG_REQUIRE_BROWSER)) {
-            if ($request->ajax === false && $this->browser['valid'] < 2) {
+            if ($request->ajax === false && $this->browser->valid < 2) {
                 \BitFireBot\require_browser_or_die($request, $maybe_botcookie, $this->ip_data);
             } else {
-                \TF\debug("x-bitfire-req: [" . $request->ajax . " - " . $this->browser['valid'] . "]");
+                \TF\debug("x-bitfire-req: [" . $request->ajax . " - " . $this->browser->valid . "]");
             }
         }
+
+        // TODO: MOVE DOWN IN STACK
+        // request has no host header
+        if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
+            if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request->host)) {
+                // allow valid whitelist bots to access the site
+                if (!isset($this->browser->whitelist)) {
+                    $maybe = BitFire::new_block(FAIL_INVALID_DOMAIN, "host", $request->host, \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
+                    if (!$maybe->empty()) { return $maybe; }
+                }
+            }
+        }
+
 
         return $maybe_block;
     }
@@ -407,6 +370,7 @@ use BitFire\Challenge;
 use BitFire\Config;
 use BitFire\JS_Fn;
 use BitFire\Request;
+use BitFire\UserAgent;
 use TF\CacheStorage;
 
 use function BitFire\reporting;
@@ -424,6 +388,16 @@ use const BitFire\FAIL_IS_BLACKLIST;
 use const BitFire\FAIL_MISS_WHITELIST;
 use const BitFire\FAIL_RR_TOO_HIGH;
 
+/**
+ * check bad bots that send crap in the host header
+ */
+function header_check(\BitFire\Request $request) : \TF\MaybeBlock {
+    // BAD BOTS THAT SEND CRAP
+    if (strlen($request->host) > \BitFire\MAX_HOST_HEADER_LEN) {
+        return BitFire::new_block(\BitFire\FAIL_HOST_TOO_LONG, "HTTP_HOST", $request->host, 'len < 80', \BitFire\BLOCK_SHORT);
+    }
+    return \TF\Maybe::$FALSE;
+}
 
 
 /**
@@ -435,18 +409,18 @@ function ip_to_int(string $ip) : int {
 }
 
 /**
- * return true for local wordpress requests (ie: wp-cron, etc)
- */
-function is_local_wordpress(\BitFire\Request $request) : bool {
-    return (\TF\ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false);
-}
-
-/**
  * return true if the request is from the local server
  */
-function is_local_request(\BitFire\Request $request) {
-    return ($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']);
+function is_local_request(\BitFire\Request $request) : bool {
+    if ($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']) {
+        return true;
+    }
+    if (\TF\ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false) {
+        return true;
+    }
+    return false;
 }
+
 /**
  * force ssl scheme if host is unwrapping SSL for us, could be faked, but then
  */
@@ -547,9 +521,7 @@ function parse_whois_line(string $line) : string {
 // true otherwise
 // PURE
 function validate_host_header(array $valid_domains, string $host) : bool {
-    return (!empty($valid_domains)) ?
-        \TF\in_array_ending($valid_domains, $host) :
-        true;
+    return (!empty($valid_domains)) ?  \TF\in_array_ending($valid_domains, $host) : true;
 }
 
 /**
@@ -612,35 +584,37 @@ function blacklist_inspection(\BitFire\Request $request, ?array $blacklist) : \T
  * return array('os', 'browser', 'ver', 'bot':bool)
  * PURE
  * total: 58 
- * return array("os" => $os, "browser" => $browser[0], "ver" => $browser[1], "bot" => $browser[0] === "bot");
+ * return UserAgent
  */
-function parse_agent(string $user_agent) : array {
+function parse_agent(string $user_agent) : UserAgent {
 
-    $user_agent = strtolower($user_agent);
-    $agent = array("os" => "bot", "browser" => "bot", "ver" => "x", "bot" => true);
-    // return robots...
+    $agent = new UserAgent(NULL, $user_agent, "1.0", false, true);
+
+    // return robots immediately...
     if (substr($user_agent, 0, 11) !== "mozilla/5.0") {
         return $agent;
     }
 
     // cpu: 50, could rewrite as imperative and save here
     $os_list = array("linux", "android", "os x", "windows", "iphone", "ipad");
-    $os = array_reduce($os_list, function(string $cry, string $os) use ($user_agent) {
-        return (strpos($user_agent, $os) !== false) ? $os : $cry;
+    $agent->os = array_reduce($os_list, function(string $carry, string $os) use ($user_agent) {
+        return (strpos($user_agent, $os) !== false) ? $os : $carry;
     }, "bot");
 
 
     // cpu: 50, could rewrite as imperative and save here
-    $browser = array_reduce(array_keys(AGENT_MATCH), function(array $cry, string $match_key) use ($user_agent) {
-        if ($cry[0] === "bot") {
+    return array_reduce(array_keys(AGENT_MATCH), function(\BitFire\UserAgent $carry, string $match_key) use ($user_agent) {
+        if ($carry->bot) {
             $pattern = AGENT_MATCH[$match_key];
             preg_match("!$pattern!", $user_agent, $matches);
-            return (isset($matches[2])) ? [$match_key, $matches[1], $matches[2]] : $cry;
+            if (isset($matches[2])) {
+                $carry->browser = $match_key;
+                $carry->ver = $matches[2];
+                $carry->bot = false;
+            }
         }
-        return $cry;
-    }, array("bot", "bot", "1.0"));
-
-    return array("os" => $os, "whitelist" => false, "browser" => $browser[1], "ver" => $browser[2], "bot" => $browser[0] === "bot");
+        return $carry;
+    }, $agent);
 }
 
 
@@ -753,10 +727,22 @@ function require_browser_or_die(\BitFire\Request $request, \TF\MaybeStr $cookie,
     if (Config::is_block(CONFIG_REQUIRE_BROWSER)) { exit(); }
 }
 
+function send_browser_verification(\BitFire\IPData $ip_data) {
+    $effect = new \TF\Effect();
+    $effect->response_code(202);
+    $effect->update(new \TF\CacheItem(
+        'metrics-'.\TF\utc_date('G'),
+        function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; },
+        function() { return BITFIRE_METRICS_INIT; },
+        \TF\DAY
+    );
+}
+
 /**
  * strip off all internal parameters from request and return a url without any internal parameters
+ * PURE!
  */
-function strip_path_tracking_params(\BitFire\Request $request) {
+function strip_path_tracking_params(\BitFire\Request $request) : string {
     unset($request->post['_bfa']) ;
     unset($request->post['_bfx']) ;
     unset($request->post['_bfz']) ;
@@ -766,6 +752,6 @@ function strip_path_tracking_params(\BitFire\Request $request) {
     unset($_GET[Config::str('cache_bust_parameter')]) ;
     unset($_REQUEST[Config::str('cache_bust_parameter')]) ;
 
-    return($request->path . '?' . http_build_query($request->get));
+    return($request->path . trim('?' . http_build_query($request->get), '?&'));
 }
 
