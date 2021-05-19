@@ -130,7 +130,6 @@ $config=array (
   'block_file' => 'cache/block.json',
   'debug_file' => false,
   'debug_header' => true,
-  'bitfire_param' => '_kbuqyrkc',
   'browser_cookie' => '_ltfc',
   'block_page' => 'blocked.php',
   'dashboard_path' => '/bitfire',

@@ -1,6 +1,8 @@
 <?php
 namespace BitFire;
 
+use TF\CacheItem;
+
 const MAX_HOST_HEADER_LEN = 80;
 
 const AGENT_MATCH = array(
@@ -42,6 +44,8 @@ class JS_Fn {
         $this->fn_name = $name;
     }
 }
+
+const IPData = '\BitFire\IPData';
 
 class IPData {
     public $rr;
@@ -253,18 +257,19 @@ class BotFilter {
         }
 
         // check host header is not garbage
-        $block->do('\BitFireBot\header_check', $request);
+        $block->doifnot('\BitFireBot\header_check', $request);
 
         // ugly, impure crap
         $this->ip_data = get_ip_data($request->ip, $request->agent);
     
+        // block constraints
+        // cpu: 52
+        $block->doifnot('\TF\map_whilenot', $this->_constraints, "\BitFire\constraint_check", $request);
+        $block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
+
+
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
-
-        // match constraints
-        // cpu: 52
-        $maybe_block = \TF\map_whilenot($this->_constraints, "\BitFire\constraint_check", $request);
-        $maybe_block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
 
         // bot tracking cookie
         $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
@@ -276,11 +281,36 @@ class BotFilter {
         $this->browser->valid = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
         \TF\debug("x-valid: ". $this->browser->valid . " ip_data_valid [" . $this->ip_data->valid . "]");
 
-        // check the browser cookie answer matches the request
+
+        if (Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+            if (isset($_POST['_bfxa'])) {
+                verify_browser()->run();
+            }
+        }
+
+        if ($this->browser->bot == false && $request->ajax === false && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+
+            if (isset($_POST['_bfxa'])) {
+
+            }
+
+            if ($request->ajax === false && $this->browser->valid < 2) {
+                \BitFireBot\send_browser_verification($this->ip_data)->run();
+                exit();
+            } else {
+                \TF\debug("x-bitfire-req: [" . $request->ajax . " - " . $this->browser->valid . "]");
+                die("DEBUG IT!\n");
+            }
+            die("HIT HERE! IT!\n");
+
+        }
+
+die("NO BROWSER!\n");
+
+                // check the browser cookie answer matches the request
         // TODO: move to a function
-        if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->browser->valid < 2 && isset($_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)])) {
+        if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->browser->valid < 2 && isset($_POST['_bfxa'])) {
             
-            \TF\debug("x-challenge-param-val: ". $_REQUEST[Config::str(CONFIG_USER_TRACK_PARAM)]);
             $url = \BitFireBot\strip_path_tracking_params($request);
 
             $answer = new Answer($this->ip_data->op1, $this->ip_data->op2, $this->ip_data->oper);
@@ -336,12 +366,24 @@ class BotFilter {
         }
         // handle humans
         else if (Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+/*
+echo ("<pre>\n");
+print_r($this);
+die("BLOCK!");
+*/
             if ($request->ajax === false && $this->browser->valid < 2) {
-                \BitFireBot\require_browser_or_die($request, $maybe_botcookie, $this->ip_data);
+                //\BitFireBot\require_browser_or_die($request, $maybe_botcookie, $this->ip_data);
+                $effect = \BitFireBot\send_browser_verification($this->ip_data);
+                print_r($effect);
+                die("SEND IT!\n");
+                \TF\dbg($effect);
             } else {
                 \TF\debug("x-bitfire-req: [" . $request->ajax . " - " . $this->browser->valid . "]");
             }
+            die("HIT HERE! IT!\n");
         }
+        die("DIE\n");
+
 
         // TODO: MOVE DOWN IN STACK
         // request has no host header
@@ -360,6 +402,56 @@ class BotFilter {
     }
 }
 
+function bot_metric_inc(string $stat) : \TF\CacheItem {
+    return new \TF\CacheItem(
+        'metrics-'.\TF\utc_date('G'), 
+        function($data) use ($stat) { $data[$stat] = ($data[$stat]??0) + 1; return $data; },
+        function() { return BITFIRE_METRICS_INIT; },
+        \TF\DAY);
+}
+
+/**
+ * verifies the response matches the expected bot verification code
+ * PURE! 
+ */
+function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $cookie) : \TF\Effect {
+
+    $effect = \TF\Effect::new();
+    $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
+    $correct_answer = ($answer->ans != 0) ? $answer->ans : $cookie->extract('a')->value('int');
+    \TF\debug("x-valid-answer: ($correct_answer)");
+
+    // unable to read correct answer from ip_data or cookie, increment broken counter
+    if ($correct_answer == 0) {
+        return $effect->update(bot_metric_inc('broken'))
+            ->status(STATUS_SERVER_STATE_FAIL);
+    }
+
+    // correct answer
+    if ($correct_answer === intval($_POST['_bfa']??-1) || $correct_answer == intval($request->post['_bfa']??-1)) {
+        \TF\debug("x-challenge: pass");
+        // increase metric counter
+        $effect->update(bot_metric_inc('valid'))
+            ->status(STATUS_OK)
+            // set the response valid cookie
+            ->cookie(\TF\en_json(array('ip' => $request->ip, 'v' => 2, 'et' => time() + 60*60)))
+            // update the ip_data valid state for 60 minutes, TODO: make this real func, not anon-func
+            ->update(new CacheItem('BITFIRE_IP_'.$request->ip, function ($data) {
+                        $ip_data = unpack_ip_data($data); $ip_data['valid'] = 2; return pack_ip_data($ip_data);
+                    },
+                    function() use ($request) { return \BitFire\new_ip_data($request->ip, $request->agent); },
+                    60*60));
+    }
+    // incorrect answer
+    else {
+        \TF\debug("x-challenge: fail");
+        $effect->out(file_get_contents(WAF_DIR . "views/browser_required.html"))
+            ->status(STATUS_FAIL)
+            ->exit(true);
+    }
+
+    return $effect;
+}
 
 namespace BitFireBot;
 
@@ -382,7 +474,6 @@ use const BitFire\BLOCK_SHORT;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
-use const BitFire\CONFIG_USER_TRACK_PARAM;
 use const BitFire\FAIL_FAKE_WHITELIST;
 use const BitFire\FAIL_IS_BLACKLIST;
 use const BitFire\FAIL_MISS_WHITELIST;
@@ -682,7 +773,7 @@ function make_js_challenge(\BitFire\IPData $ip) : string { // }, string $trackin
     $js .= $fn5->js_code . "\n" .$fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
     $js .= "_0x2264=['body','name','716898irJcQR','input','type','1JyCSgW','458938jhQaDj','submit','appendChild','12521RCnfSZ','731620bsLeul','60978tKMbmi','38yNhlJk','method','action','value','865714LjSURW','createElement','679754RgBBzH','17JXalWl'];(function(_0x82ed12,_0x26c7d9){const _0x429c60=_0x4a61;while(!![]){try{const _0x150118=-parseInt(_0x429c60(0x10e))*parseInt(_0x429c60(0x106))+parseInt(_0x429c60(0x107))*parseInt(_0x429c60(0x118))+-parseInt(_0x429c60(0x115))+parseInt(_0x429c60(0x111))+-parseInt(_0x429c60(0x114))*-parseInt(_0x429c60(0x119))+-parseInt(_0x429c60(0x10d))+parseInt(_0x429c60(0x10b));if(_0x150118===_0x26c7d9)break;else _0x82ed12['push'](_0x82ed12['shift']());}catch(_0x14d3d5){_0x82ed12['push'](_0x82ed12['shift']());}}}(_0x2264,0x96138));function _0x4a61(_0x19d3b3,_0x4d8bcc){_0x19d3b3=_0x19d3b3-0x106;let _0x22646a=_0x2264[_0x19d3b3];return _0x22646a;}function post(_0xfddbd3,_0x1e23f1,_0x5af7a2='post'){const _0x244f79=_0x4a61,_0x370c95=document['createElement']('form');_0x370c95[_0x244f79(0x108)]=_0x5af7a2,_0x370c95[_0x244f79(0x109)]=_0xfddbd3;for(const _0x1d3b01 in _0x1e23f1){if(_0x1e23f1['hasOwnProperty'](_0x1d3b01)){const _0x3d2f26=document[_0x244f79(0x10c)](_0x244f79(0x112));_0x3d2f26[_0x244f79(0x113)]='hidden',_0x3d2f26[_0x244f79(0x110)]=_0x1d3b01,_0x3d2f26[_0x244f79(0x10a)]=_0x1e23f1[_0x1d3b01],_0x370c95[_0x244f79(0x117)](_0x3d2f26);}}document[_0x244f79(0x10f)][_0x244f79(0x117)](_0x370c95),_0x370c95[_0x244f79(0x116)]();}";
     $js .= "function $fn2_name() { ".'var e=document;if(!e._bitfire){e._bitfire=1;n=(new Date).getTimezoneOffset(); 
-post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfx":n,"'.Config::str(CONFIG_USER_TRACK_PARAM).'":1}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
+post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfx":n,"_bfxa":1}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
 
     $challenge = make_challenge_cookie($answer, $ip->ip_crc);
     $crypt = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY), json_encode($challenge));
@@ -723,19 +814,26 @@ function require_browser_or_die(\BitFire\Request $request, \TF\MaybeStr $cookie,
     http_response_code(202);
     \TF\cache_bust();
 
-    echo make_js_challenge($ip_data, Config::str(CONFIG_USER_TRACK_PARAM), Config::str(CONFIG_ENCRYPT_KEY), Config::str(CONFIG_USER_TRACK_COOKIE)) . "\n";
+    echo make_js_challenge($ip_data);
     if (Config::is_block(CONFIG_REQUIRE_BROWSER)) { exit(); }
 }
 
-function send_browser_verification(\BitFire\IPData $ip_data) {
-    $effect = new \TF\Effect();
-    $effect->response_code(202);
-    $effect->update(new \TF\CacheItem(
-        'metrics-'.\TF\utc_date('G'),
-        function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; },
-        function() { return BITFIRE_METRICS_INIT; },
-        \TF\DAY
-    );
+/**
+ * send the browser verification challenge
+ * PURE! 
+ */
+function send_browser_verification(\BitFire\IPData $ip_data) : \TF\Effect {
+    $effect = \TF\Effect::new()
+        ->response_code(300)
+        ->update(new \TF\CacheItem(
+            'metrics-'.\TF\utc_date('G'),
+            function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; },
+            function() { return BITFIRE_METRICS_INIT; },
+            \TF\DAY
+        ))
+        ->out(make_js_challenge($ip_data));
+    $e2 = \TF\cache_prevent($effect);
+    return $e2;
 }
 
 /**
@@ -746,7 +844,7 @@ function strip_path_tracking_params(\BitFire\Request $request) : string {
     unset($request->post['_bfa']) ;
     unset($request->post['_bfx']) ;
     unset($request->post['_bfz']) ;
-    unset($request->post[Config::str(CONFIG_USER_TRACK_PARAM)]) ;
+    unset($request->post['_bfxa']) ;
     unset($request->get[Config::str('cache_bust_parameter')]) ;
     unset($request->post[Config::str('cache_bust_parameter')]) ;
     unset($_GET[Config::str('cache_bust_parameter')]) ;

@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 namespace TF;
 
+use const BitFire\CONFIG_ENCRYPT_KEY;
+
 if (defined("_TF_UTIL")) { return; }
 
 
@@ -148,39 +150,54 @@ function partial_right(callable $fn, ...$args) : callable {
     };
 }
 
+/**
+ * send the header
+ */
+function header_send(string $key, string $value) : void { header("$key: $value"); }
+
 class Effect {
     private $out = '';
     private $response = 0;
+    private $exit = false;
     private $headers = array();
-    private $cookies = array();
+    private $cookie = '';
     private $cache = array();
+    private $status = 0;
 
-    public function out(string $line) { $this->out .= $line; }
-    public function header(string $name, string $value) { $this->headers[$name] = $value; }
-    public function cookie(string $name, string $value) { $this->cookies[$name] = $value; }
-    public function response_code(int $code) { $this->response = $code; }
-    public function update(string $key, \TF\CacheItem $item) { $this->cache[$key] = $item; }
+    public static function new() : Effect { return new Effect(); }
 
+    public function out(string $line) : Effect { $this->out .= $line; return $this; }
+    public function header(string $name, string $value) : Effect { $this->headers[$name] = $value; return $this; }
+    public function cookie(string $value) : Effect { $this->cookie = $value; return $this; }
+    public function response_code(int $code) : Effect { $this->response = $code; return $this; }
+    public function update(\TF\CacheItem $item) : Effect { $this->cache[$item->key] = $item; return $this; }
+    public function exit(bool $should_exit = true) : Effect { $this->exit = $should_exit; return $this; }
+    public function status(int $status) : Effect { $this->status = $status; return $this; }
+
+    public function read_exit() : bool { return $this->exit; }
     public function read_out() : string { return $this->out; }
     public function read_headers() : array { return $this->headers; }
-    public function read_cookies() : array { return $this->headers; }
+    public function read_cookie() : string { return $this->cookie; }
+    public function read_cache() : array { return $this->cache; }
     public function read_code() : int { return $this->response; }
+    public function read_status() : int { return $this->status; }
 
     public function run() {
-        if (strlen($this->out) > 0) {
-            echo $this->out;
-        }
         if ($this->response > 0) {
             http_response_code($this->response);
         }
-        do_for_all_key_value($this->cookies, \TF\partial_right('\TF\cookie', \TF\DAY));
-        do_for_all_key_value($this->headers, 'Effect::header_join');
-        do_for_all_key_value($this->cache, function(string $key, \TF\CacheItem $item) {
+        \TF\cookie(\BitFire\Config::str(\BitFire\CONFIG_USER_TRACK_COOKIE), \TF\encrypt_ssl(\BitFire\Config::str(\BitFire\CONFIG_ENCRYPT_KEY), $this->cookie), \TF\DAY); 
+        do_for_all_key_value($this->headers, '\TF\header_send');
+        do_for_all_key_value($this->cache, function($nop, \TF\CacheItem $item) {
             CacheStorage::get_instance()->update_data($item->key, $item->fn, $item->init, $item->ttl);
         });
+        if (strlen($this->out) > 0) {
+            echo $this->out;
+        }
+        if ($this->exit) {
+            exit();
+        }
     }
-
-    protected static function header_join(string $key, string $value) { return "$key: $value"; }
 }
 
 
@@ -899,6 +916,27 @@ function cache_bust(?string $url="") : string {
         return $url . ((strpos($url, '?') != false) ? "&" : '?') . get_random_param(\BitFire\Config::str('cache_bust_parameter'));
     }
     return trim($url, '?&');
+}
+
+/**
+ * add cache prevention headers
+ */
+function cache_prevent(\TF\Effect $effect) : \TF\Effect {
+    $effect->header("cache-control", "no-store, private, no-cache, max-age=0");
+    $effect->header("expires", gmdate('D, d M Y H:i:s \G\M\T', 100000));
+    return $effect;
+}
+
+/**
+ * add a random value for parameter named $param_name
+ * PURE!
+ */
+function add_cache_bust_parameter(string $url, ?string $param_name=NULL) : string {
+    if ($param_name) {
+        $url_trim = trim($url, " \t&?");
+        return $url_trim . ((strpos($url_trim, '?') != false) ? "&" : '?') . \TF\get_random_param($param_name);
+    }
+    return $url;
 }
 
 // return date in GMT time
