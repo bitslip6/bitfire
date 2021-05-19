@@ -373,7 +373,6 @@ class BitFire
                     if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser->bot == false) {
                         echo \BitFireBot\make_js_challenge(
                             $this->_request->ip,
-                            Config::str(CONFIG_USER_TRACK_PARAM),
                             Config::str(CONFIG_ENCRYPT_KEY),
                             Config::str(CONFIG_USER_TRACK_COOKIE));
                     }
