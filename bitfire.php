@@ -52,6 +52,7 @@ class MatchType
     protected $_value;
     protected $_matched;
     protected $_block_time;
+    protected $_match_str;
 
     const EXACT = 0;
     const CONTAINS = 1;
@@ -65,6 +66,7 @@ class MatchType
         $this->_value = $value;
         $this->_matched = 'none';
         $this->_block_time = $block_time;
+        $this->_match_str = '';
     }
 
     public function match(\BitFire\Request $request) : bool {
@@ -78,10 +80,15 @@ class MatchType
             case MatchType::CONTAINS: 
                 if (is_array($this->_value)) {
                     foreach ($this->_value as $v) {
-                        $m = strstr($this->_matched, $v);
-                        if ($m !== false) { $result = true; }
+                        $m = strpos($this->_matched, $v);
+
+                        if ($m !== false) { 
+                            $result = true;
+                            $this->_match_str = $v;
+                            break;
+                        }
                     }
-                } else { $result = strpos($this->_matched, $this->_value) !== false; }
+                } else {  $result = strpos($this->_matched, $this->_value) !== false; }
                 break;
             case MatchType::IN: 
                 $result = in_array($this->_matched, $this->_value);
@@ -94,7 +101,13 @@ class MatchType
                 break;
             default:
         }
+
+        if ($result && $this->_match_str === '') { $this->_match_str = $this->_value; }
         return $result;
+    }
+
+    public function match_pattern() : string {
+        return $this->_match_str;
     }
 
     public function matched_data() : string {
@@ -320,7 +333,7 @@ class BitFire
      */
     protected static function reporting(Block $block, \BitFire\Request $request) {
         $data = array('time' => \TF\utc_date('r'), 'tv' => \TF\utc_time(),
-            'exec' => number_format(microtime(true) - $GLOBALS['start_time'], 6). ' sec',
+            'exec' => @number_format(microtime(true) - $GLOBALS['start_time']??0, 6). ' sec',
             'block' => $block,
             'request' => $request);
         $bf = BitFire::get_instance()->bot_filter;
