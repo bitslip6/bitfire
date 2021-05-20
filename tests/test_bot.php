@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use BitFire\Answer;
 use BitFire\UserAgent;
 
 use const BitFire\STATUS_FAIL;
@@ -13,6 +14,8 @@ if (!defined("WAF_DIR")) {
 }
 include_once WAF_DIR . "util.php";
 
+$bf = \BitFire\BitFire::get_instance();
+
 function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
 }
@@ -24,9 +27,9 @@ function test_do_for_all() : void {
 }
 
 function test_make_js_challange() : void {
-    $ip = \BitFire\IPData::make_new("127.0.0.1", "Mozilla/5.0 chrome 125");
-    $s = make_js_challenge($ip);
-    assert_gt(strlen($s), 2048, "js challenge too short");
+    $ip_data = \BitFire\map_ip_data(\BitFire\new_ip_data("127.0.0.1", "Mozilla/5.0 chrome 12.5"));
+    $script = \BitFireBot\make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper);
+    assert_gt(strlen($script), 2048, "js challenge too short");
 }
 
 function test_js_obfuscate() : void {
@@ -67,9 +70,9 @@ function test_parse_agent($data) : void {
 }
 
 
-function test_browser_send_verify() : void {
+function test_send_browser_verification() : void {
     $ip_data = \BitFire\IPData::make_new("Mozilla/5.0 unit test browser", "127.0.0.1");
-    $effect = \BitFireBot\send_browser_verification($ip_data);
+    $effect = \BitFireBot\send_browser_verification($ip_data, "secret_encryption_key");
 
     assert_eq($effect->read_code(), 300, "did not set http response value correctly");
     assert_true(in_array("expires", array_keys($effect->read_headers())), "did not set expires header");
@@ -126,3 +129,120 @@ function test_verify_browser() : void {
     assert_gt($cookie['et'], time()+60, "did not set valid cookie expire time");
     assert_gt(count($effects->read_cache()), 1, "did not update enough server side state/metrics");
 }
+
+function test_bot_metric_inc() : void {
+    $item = \BitFire\bot_metric_inc("valid");
+    assert_gt(strlen($item->key), 8, "did not set metric");
+    assert_gt($item->ttl, 0, "cache item ttl is too short");
+    assert_true(is_callable($item->fn) , "cache fn is not callable");
+}
+
+function test_make_challenge_cookie() : void {
+    $answer = new Answer(513, 9123, 4);
+    $cookie = \BitFireBot\make_challenge_cookie($answer->ans, "127.0.0.1");
+    assert_gt($cookie['et'], time()+60, "expire time too short");
+    assert_eq($cookie['v'], 1, "verify did not default to 1");
+    assert_eq($cookie['a'], -8610, "challenge answer was not encoded correctly");
+    assert_eq($cookie['ip'], "127.0.0.1", "source ip was not encoded correctly");
+}
+
+function test_open_char() : void {
+    assert_eq(\BitFireBot\oper_char(1), "*", "operation mulitplication failed");
+    assert_eq(\BitFireBot\oper_char(2), "/", "operation division failed");
+    assert_eq(\BitFireBot\oper_char(3), "+", "operation addition failed");
+    assert_eq(\BitFireBot\oper_char(4), "-", "operation subtraction failed");
+    assert_eq(\BitFireBot\oper_char(0), "+", "operation default failed");
+}
+
+function test_js_fn() : void {
+    $fn = \BitFireBot\js_fn('foofunc');
+
+    assert_eq($fn("arg1"), "foofunc(arg1)", "calling foofunc from function generator failed");
+}
+
+function test_blacklist_inspection() : void {
+
+    $request = new \Bitfire\Request();
+    $request->agent = "Mozilla/5.0 chrome 15.5 evil/1.0 safari 536.17";
+    $blacklist = array("curl/1.0", "evil/1.0");
+    $block = \BitFireBot\blacklist_inspection($request, $blacklist);
+
+    assert_false($block->empty(), "black list block did not block");
+    assert_eq($block->extract("parameter")->value("string"), "user_agent", "black list block did not block");
+    assert_eq($block->extract("code")->value("int"), 25001, "block code incorrect");
+
+    $blacklist = array("curl/1.0", "foobar/1.0");
+    $block = \BitFireBot\blacklist_inspection($request, $blacklist);
+    assert_true($block->empty(), "black list block did not block");
+}
+
+/**
+ * @type network
+ */
+function test_verify_bot_as() : void {
+    $result = \BitFireBot\verify_bot_as("129.134.27.1", "AS32934");
+    assert_true($result, "facebook as match");
+
+    $result = \BitFireBot\verify_bot_as("192.134.27.1", "AS32934");
+    assert_false($result, "facebook as MIS match");
+}
+
+
+/**
+ * @type network
+ */
+function test_memoization_verify_bot_as() : void {
+    $result = \BitFireBot\fast_verify_bot_as("129.134.27.1", "AS32934");
+    assert_true($result, "facebook as match");
+
+    $result = \BitFireBot\fast_verify_bot_as("129.134.27.1", "AS32934");
+    assert_true($result, "FAST facebook as match");
+}
+
+/**
+ * validate request rate
+ */
+function test_validate_rr() : void {
+    $agent = "Mozilla/5.0 unit test browser";
+    $ip = "127.0.0.1";
+    $ip_data = \BitFire\IPData::make_new($agent, $ip);
+
+    \BitFire\Config::set_value("rate_limit", "block");
+    $ip_data->rr = 39;
+    $block = \BitFireBot\validate_rr(40, $ip_data);
+    assert_true($block->empty(), "sub threshold rate was incorrectly blocked");
+
+    $ip_data->rr = 40;
+    $block = \BitFireBot\validate_rr(40, $ip_data);
+    assert_true($block->empty(), "sub threshold rate was incorrectly blocked");
+
+    $ip_data->rr = 41;
+    $block = \BitFireBot\validate_rr(40, $ip_data);
+    assert_false($block->empty(), "above threshold rate was incorrectly NOT blocked");
+
+    \BitFire\Config::set_value("rate_limit", "report");
+    $ip_data->rr = 41;
+    $block = \BitFireBot\validate_rr(40, $ip_data);
+    assert_true($block->empty(), "REPORT about threshold rate was incorrectly blocked");
+
+    \BitFire\Config::set_value("rate_limit", "report");
+    $block = \BitFireBot\validate_rr(40, $ip_data);
+    assert_true($block->empty(), "BLOCK about threshold rate was incorrectly blocked");
+}
+
+function test_ip_to_int() : void {
+    $id = \BitFireBot\ip_to_int("127.0.0.1");
+    assert_eq($id, 3619153832, "ip to int produced unexpected number");
+    $id = \BitFireBot\ip_to_int("fe80::6ce4:e95c:5c83:8d91");
+    assert_eq($id, 3624240963, "ip to int produced unexpected number");
+}
+
+function test_header_check() : void {
+    $request = new \BitFire\Request();
+    $request->host = "anormaldomainname.com";
+    assert_true(\BitFireBot\header_check($request)->empty(), "normal domain name failed header check");
+
+    $request->host = "a really long abnormal domain name with lots of grap in it and another whatever com";
+    assert_false(\BitFireBot\header_check($request)->empty(), "normal domain name failed header check");
+}
+
