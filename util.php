@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 namespace TF;
 
+use const BitFire\CONFIG_COOKIES;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 
 if (defined("_TF_UTIL")) { return; }
@@ -122,7 +123,7 @@ function compose(callable $a, callable $b) {
 /**
  * returns a function that will cache the call to $fn with $key for $ttl
  */
-function memoize(callable $fn, string $key, int $ttl) {
+function memoize(callable $fn, string $key, int $ttl) : callable {
     return function(...$args) use ($fn, $key, $ttl) {
         $result = \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, \TF\partial($fn, ...$args));
         return $result;
@@ -186,7 +187,9 @@ class Effect {
         if ($this->response > 0) {
             http_response_code($this->response);
         }
-        \TF\cookie(\BitFire\Config::str(\BitFire\CONFIG_USER_TRACK_COOKIE), \TF\encrypt_ssl(\BitFire\Config::str(\BitFire\CONFIG_ENCRYPT_KEY), $this->cookie), \TF\DAY); 
+        if (\BitFire\Config::enabled(CONFIG_COOKIES)) {
+            \TF\cookie(\BitFire\Config::str(\BitFire\CONFIG_USER_TRACK_COOKIE), \TF\encrypt_ssl(\BitFire\Config::str(\BitFire\CONFIG_ENCRYPT_KEY), $this->cookie), \TF\DAY); 
+        }
         do_for_all_key_value($this->headers, '\TF\header_send');
         do_for_all_key_value($this->cache, function($nop, \TF\CacheItem $item) {
             CacheStorage::get_instance()->update_data($item->key, $item->fn, $item->init, $item->ttl);
@@ -203,6 +206,7 @@ class Effect {
 
 interface MaybeI {
     public static function of($x) : MaybeI;
+    public function effect(callable $fn) : MaybeI;
     public function then(callable $fn, bool $spread = false) : MaybeI;
     public function map(callable $fn) : MaybeI;
     public function if(callable $fn) : MaybeI;
@@ -288,7 +292,7 @@ class MaybeA implements MaybeI {
     }
     public function append($value) : MaybeI { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
     public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
-    public function extract(string $key, $default = NULL) : MaybeI { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } return new static($default); }
+    public function extract(string $key, $default = NULL) : MaybeI { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } if (is_object($this->_x)) { return new static($this->_x->$key??$default); } return new static($default); }
     public function index(int $index) : MaybeI { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? NULL); } return new static(NULL); }
     public function isa(string $type) : bool { return $this->_x instanceof $type; }
     public function __toString() : string { return (string)$this->_x; }
@@ -381,7 +385,7 @@ function apidata($method, $params) {
  * @return string message.iv
  */
 function encrypt_ssl(string $password, string $text) : string {
-    assert(between(strlen($password), 12, 32), "cipher password length is out of bounds: [$password]");
+    assert(between(strlen($password), 12, 32), "cipher password length is out of bounds (12/32): [$password]");
     $iv = random_str(16);
     return openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
 }
