@@ -3,7 +3,7 @@ nasl
 absinthe
 extractor
 getcontent
-BilboBFAC
+bilbobfac
 brutus
 bsqlbf
 cgichk
@@ -14,6 +14,7 @@ datacha
 dirbuster
 dotdotpwn
 scan
+evil
 flood
 secur
 radar
