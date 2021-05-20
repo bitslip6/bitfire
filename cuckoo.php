@@ -27,7 +27,7 @@ function reduce(int $num, callable $f, $x) {
 }
 
 // ghetto FP loop until max times or callable returns true
-function until(int $max = 10, callable $f): bool {
+function until(int $max, callable $f): bool {
     $r = false;
     while ($r === false && $max > 0) {
         $r = $f($max--);
@@ -289,10 +289,7 @@ function cuckoo_read(array $ctx, string $key) {
     $header = cuckoo_find_header_for_read($ctx, $key);
 
     return ($header === null || $header['len'] < 1) ? null :
-        (unserialize(
-            shmop_read($ctx['rid'], 
-            $header['offset'],
-            $header['len'])));
+        (unserialize(shmop_read($ctx['rid'], $header['offset'], $header['len'])));
 }
 
 
@@ -318,16 +315,11 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
     // initial slot header (15 bytes)
     $header_block = pack("LLLnC", 0, 0, 0, 0, 0 | CUCKOO_EMPTY);
 
-    //reduce($items, function($x) use ($exp_empty_block, $exp_full_block, $header_block, $ctx) {
     reduce($items, function($x) use ($header_block, $ctx) {
 
-        //echo "HEADER: " . ($x * CUCKOO_SLOT_SIZE_BYTES) . " - \n";
-        $s = (shmop_write($ctx['rid'], $header_block, $x * CUCKOO_SLOT_SIZE_BYTES) !== false) ;
-        //if (!$s) { die ("fail to write hdr\n"); }
+        (@shmop_write($ctx['rid'], $header_block, $x * CUCKOO_SLOT_SIZE_BYTES) !== false) ;
         $block = pack("Ln", (mt_rand(1,50) == 2) ? 1 : time() + 60, $x);
-        //echo "DATA: [$x] " . ($ctx['mem_start'] + ($x * CUCKOO_SLOT_SIZE_BYTES)) . " - \n";
-        $s = (shmop_write($ctx['rid'], $block,    $ctx['mem_start'] + ($x * CUCKOO_EXP_SIZE_BYTES)) !== false);
-        //if (!$s) { die ("fail to write data\n"); }
+        (@shmop_write($ctx['rid'], $block,    $ctx['mem_start'] + ($x * CUCKOO_EXP_SIZE_BYTES)) !== false);
         return $x+1;
     }, 0);
 
