@@ -1,10 +1,13 @@
 <?php declare(strict_types=1);
 namespace TF;
 
+use Traversable;
+
 use const BitFire\CONFIG_COOKIES;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 
 if (defined("_TF_UTIL")) { return; }
+define("_TF_UTIL", 1);
 
 
 const DS = DIRECTORY_SEPARATOR;
@@ -18,24 +21,17 @@ const MINUTE=60;
  * debug output
  */
 function dbg($x) {echo "<pre>";print_r($x);die("\nFIN"); }
-function do_for_all(array $data, callable $fn) { foreach ($data as $item) { $fn($item); } }
+function each_yield_kv(Traversable $data, callable $fn) { $result = array(); foreach ($data as $item) { $y = $fn($item); $result[$y->key()] = $y->current(); } return $result; }
 function do_for_all_key_names(array $data, array $keynames, callable $fn) { foreach ($keynames as $item) { $fn($data[$item], $item); } }
 function do_for_all_key(array $data, callable $fn) { foreach ($data as $key => $item) { $fn($key); } }
 function do_for_all_key_value(array $data, callable $fn) { foreach ($data as $key => $item) { $fn($key, $item); } }
 function do_for_all_key_value_recursive(array $data, callable $fn) { foreach ($data as $key => $item) { if (is_array($item)) { do_for_all_key_value_recursive($item, $fn); } else { $fn($key, $item); } } }
 function between($data, $min, $max) { return $data >= $min && $data <= $max; }
-function keep_if_key(array $data, callable $fn) { $result = $data; foreach ($data as $key => $item) { if (!$fn($key)) { unset($result[$key]); } return $result; }}
-function if_then_do(callable $test_fn, callable $action, $optionals = null) : callable { return function($argument) use ($test_fn, $action, $optionals) { if ($argument && $test_fn($argument, $optionals)) { $action($argument); }}; }
 function is_equal_reduced($value) : callable { return function($initial, $argument) use ($value) { return ($initial || $argument === $value); }; }
 function is_regex_reduced($value) : callable { return function($initial, $argument) use ($value) { return ($initial || preg_match("/$argument/", $value) >= 1); }; }
 function find_regex_reduced($value) : callable { return function($initial, $argument) use ($value) { return (preg_match("/$argument/", $value) <= 0 ? $initial : $value); }; }
-function is_contain($value) : callable { return function($argument) use ($value) { return (strpos($argument, $value) !== false); }; }
-function is_not_contain($value) : callable { return function($argument) use ($value) { return (strpos($argument, $value) === false); }; }
 function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
 function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
-function say($color = '\033[39m', $prefix = "") : callable { return function($line) use ($color, $prefix) : string { return (strlen($line) > 0) ? "{$color}{$prefix}{$line}\033[32m\n" : ""; }; } 
-function last_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, -1, 1)[0] : $default; }
-function first_element(array $items, $default = "") { return (count($items) > 0) ? array_slice($items, 0, 1)[0] : $default; }
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
 function un_json(string $data) { return json_decode($data, true, 6); }
 function en_json($data) : string { return json_encode($data); }
@@ -48,64 +44,46 @@ function take_nth(?string $input, string $separator, int $index) : string { if (
 function read_stream($stream) { $data = ""; if($stream) { while (!feof($stream)) { $data .= fread($stream , 2048); } } return $data; }
 // $fn = $result .= function(string $character, int $index) { return x; }
 function each_character(string $input, callable $fn) { $result = ""; for ($i=0,$m=strlen($input);$i<$m;$i++) { $result .= $fn($input[$i], $i); } return $result; }
+function not(bool $input) { return !$input; }
 
-/* // flatten multi-depth array
-function flatten(array $array) : array {
-    $return = array();
-    array_walk_recursive($array, function($a) use (&$return) { $return[] = $a; });
-    return $return;
-}
-
-function array_flatten($array) {
-    $return = array();
-    foreach ($array as $key => $value) {
-        if (is_array($value)){
-            $return = array_merge($return, array_flatten($value));
-        } else {
-            $return[$key] = $value;
-        }
-    }
-    return $return;
-}
-*/
-
+function trim_off(string $input, string $trim_char) : string { $idx = strpos($input, $trim_char); $x = substr($input, 0, ($idx) ? $idx : strlen($input)); return $x; }
+function url_compare(string $url1, string $url2) : bool { return (trim($url1, "/") === trim($url2, "/")); } 
 
 /**
  * recursively perform a function over directory traversal.
  */
-function file_recurse(string $dirname, callable $fn) : array {
-    $maxfiles = 1000;
+function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL) : array {
+    $dir_iterator = new \RecursiveDirectoryIterator($dirname);
+    $recurse_iterator = new \RecursiveIteratorIterator($dir_iterator);
+    $iterator = $recurse_iterator;
+    if ($regex_filter !== NULL) {
+        $iterator = new \RegexIterator($recurse_iterator, $regex_filter);
+        $iterator->setFlags(\RegexIterator::USE_KEY);
+    }
     $result = array();
-    if ($dh = \opendir($dirname)) {
-        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0) {
-            $path = $dirname . '/' . $file;
-            if (!$file || $file === '.' || $file === '..' || is_link($file)) {
-                continue;
-            } if (is_dir($path)) {
-                $r = file_recurse($path, $fn);
-                if (!empty($r)) {
-                    if (is_array($r)) {
-                        foreach($r as $i) { $result[] = $i; }
-                    }
-                }
-            }
-            else {
-                $r = \call_user_func($fn, $path);
-                if (!empty($r)) { $result[] = $r; }
-            }
-        }
-        \closedir($dh);
-    }   
+    foreach ($iterator as $file) {
+        $item = $fn($file->getPathname());
+        if (!empty($item)) { $result[] = $item; }
+    }
 
     return $result;
 }
 
-function reverse(callable $function) {
+ 
+
+
+/**
+ * reverse function arguments
+ */
+function fn_reverse(callable $function) {
     return function (...$args) use ($function) {
         return $function(...array_reverse($args));
     };
 }
 
+/**
+ * pipeline a series of callables in reverse order
+ */
 function pipeline(callable $a, callable $b) {
     $list = func_get_args();
 
@@ -116,8 +94,11 @@ function pipeline(callable $a, callable $b) {
     };
 }
 
+/**
+ * compose functions in forward order
+ */
 function compose(callable $a, callable $b) {
-    return reverse('\TF\pipeline')(...func_get_args());
+    return fn_reverse('\TF\pipeline')(...func_get_args());
 }
 
 /**
@@ -125,8 +106,7 @@ function compose(callable $a, callable $b) {
  */
 function memoize(callable $fn, string $key, int $ttl) : callable {
     return function(...$args) use ($fn, $key, $ttl) {
-        $result = \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, \TF\partial($fn, ...$args));
-        return $result;
+        return \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, \TF\partial($fn, ...$args));
     };
 }
 
@@ -141,6 +121,7 @@ function partial(callable $fn, ...$args) : callable {
         return $fn(...array_merge($args, $x));
     };
 }
+
 /**
  * same as partial, but reverse argument order
  * lock in right parameter
@@ -152,10 +133,19 @@ function partial_right(callable $fn, ...$args) : callable {
 }
 
 /**
- * send the header
+ * send the http header
+ * Effect helper
+ * NOT PURE!
  */
-function header_send(string $key, string $value) : void { header("$key: $value"); }
+function header_send(string $key, string $value) : void {
+    
+    \TF\debug("header_send [$key] = [$value]");
+    header("$key: $value");
+}
 
+/**
+ * abstract away effects
+ */
 class Effect {
     private $out = '';
     private $response = 0;
@@ -167,19 +157,32 @@ class Effect {
 
     public static function new() : Effect { return new Effect(); }
 
+    // response content effect
     public function out(string $line) : Effect { $this->out .= $line; return $this; }
+    // response header effect
     public function header(string $name, string $value) : Effect { $this->headers[$name] = $value; return $this; }
+    // response cookie effect
     public function cookie(string $value) : Effect { $this->cookie = $value; return $this; }
+    // response code effect
     public function response_code(int $code) : Effect { $this->response = $code; return $this; }
+    // update cache entry effect
     public function update(\TF\CacheItem $item) : Effect { $this->cache[$item->key] = $item; return $this; }
+    // exit the script effect (when run is called)
     public function exit(bool $should_exit = true) : Effect { $this->exit = $should_exit; return $this; }
+    // an effect status code that can be read later
     public function status(int $status) : Effect { $this->status = $status; return $this; }
 
+    // return true if the effect will exit 
     public function read_exit() : bool { return $this->exit; }
+    // return the effect content
     public function read_out() : string { return $this->out; }
+    // return the effect headers
     public function read_headers() : array { return $this->headers; }
+    // return the effect cookie (only 1 cookie supported)
     public function read_cookie() : string { return $this->cookie; }
+    // return the effect cache update
     public function read_cache() : array { return $this->cache; }
+    // return the effect response code
     public function read_code() : int { return $this->response; }
     public function read_status() : int { return $this->status; }
 
@@ -216,6 +219,7 @@ interface MaybeI {
     /** execute $fn runs if maybe is empty */
     public function doifnot(callable $fn, ...$args) : MaybeI;
     public function empty() : bool;
+    public function set_if_empty($value) : MaybeI;
     public function errors() : array;
     public function value(string $type = null);
     public function append($value) : MaybeI;
@@ -249,8 +253,9 @@ class MaybeA implements MaybeI {
                 $fn(...$this->_x) :
                 $fn($this->_x)
             );
+            if (empty($this->_x)) { $this->_errors[] = func_name($fn) . ", created null [" . var_export($this->_x, true) . "]"; }
         } else {
-            $this->_errors[] = func_name($fn) . " : " . var_export($this->_x, true);
+            $this->_errors[] = func_name($fn) . ", [" . var_export($this->_x, true) . "]";
         }
 
         return $this;
@@ -258,16 +263,22 @@ class MaybeA implements MaybeI {
     public function map(callable $fn) : MaybeI { 
         if (is_array($this->_x) && !empty($this->_x)) {
             $this->_x = array_map($fn, $this->_x);
+            if (empty($this->_x)) { $this->_errors[] = func_name($fn) . ", created null [" . var_export($this->_x, true) . "]"; }
         } else {
             $this->then($fn);
         }
         return $this;
     }
-    public function effect(callable $fn) : MaybeI { if (!empty($this->_x)) { $fn($this->_x); } return $this; }
-    public function if(callable $fn) : MaybeI { if ($fn($this->_x) === false) { $this->_x = NULL; } return $this; }
+    public function set_if_empty($value): MaybeI { if ($this->empty()) { $this->assign($value); } return $this; }
+    public function effect(callable $fn) : MaybeI { if (!empty($this->_x)) { $fn($this->_x); } else { 
+        $this->_errors[] = func_name($fn) . ", null effect! [" . var_export($this->_x, true) . "]";
+    } return $this; }
+    public function if(callable $fn) : MaybeI { if ($fn($this->_x) === false) { $this->_errors[] = func_name($fn) . " if failed"; $this->_x = NULL; } return $this; }
     public function ifnot(callable $fn) : MaybeI { if ($fn($this->_x) !== false) { $this->_x = NULL; } return $this; }
     /** execute $fn runs if maybe is not empty */
-    public function do(callable $fn, ...$args) : MaybeI { if (!empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
+    public function do(callable $fn, ...$args) : MaybeI { if (!empty($this->_x)) { $this->assign($fn(...$args)); } else { 
+        $this->_errors[] = func_name($fn) . ", null effect! [" . var_export($this->_x, true) . "]";
+    } return $this; }
     /** execute $fn runs if maybe is empty */
     public function doifnot(callable $fn, ...$args) : MaybeI { if (empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     public function empty() : bool { return empty($this->_x); } // false = true
@@ -305,6 +316,7 @@ class MaybeBlock extends MaybeA {
 }
 class MaybeStr extends MaybeA {
     public function __invoke() : ?string { return (string)$this->_x; }
+    public function compare(string $test) : bool { return (!empty($this->_x)) ? $this->_x == $test : false; }
 }
 Maybe::$FALSE = MaybeBlock::of(NULL);
 
@@ -407,7 +419,15 @@ function raw_decrypt(string $cipher, string $iv, string $password) {
  */
 function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
 
-    if (!$cipher || strlen($cipher) < 20) { return MaybeStr::of(false); }
+    if (!$password || strlen($password) < 8) { 
+        \TF\debug("wont decrypt with short encryption key");
+        return MaybeStr::of(false);
+    }
+    if (!$cipher || strlen($cipher) < 8) { 
+        \TF\debug("wont decrypt with no encryption data");
+        return MaybeStr::of(false);
+    }
+
 
     $exploder = partial("explode", ".");
     $decrypt = partial_right("TF\\raw_decrypt", $password);
@@ -573,6 +593,41 @@ function fast_ip_lookup(string $ip, string $type = "A") : MaybeStr {
 }
 
 
+/**
+ * http request via curl
+ */
+function bit_curl(string $method, string $url, $data, array $optional_headers = NULL) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, ($method === "POST")?1:0);
+
+    $content = (is_array($data)) ? http_build_query($data) : $data;
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
+    if ($optional_headers != NULL) {
+        $headers = map_reduce($optional_headers, function($key, $value, $carry) { $carry[] = "$key: $value"; return $carry; }, array());
+        \TF\debug("curl headers: " . print_r($headers, true));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    }
+    
+    // Receive server response ...
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    
+    $server_output = curl_exec($ch);
+    if ($server_output) {
+        \TF\debug("curl returned: " . strlen($server_output));
+    } else {
+        \TF\debug("curl returned: " . var_export($server_output, true));
+        $tmp_file = WAF_DIR . "cache/temp_file.txt";
+        @\file_put_contents($tmp_file, $content);
+        $result = @system("curl -X$method -d @$tmp_file $url", $code);
+        \TF\debug("curl system command returned [$code]");
+        return $result;
+    }
+    curl_close($ch);
+    
+    return $server_output;
+}
+
 
 
 /**
@@ -590,10 +645,12 @@ function fast_ip_lookup(string $ip, string $type = "A") : MaybeStr {
  * @return string the server response.
  */
 function bit_http_request(string $method, string $url, $data, array $optional_headers = null) {
+    
     // build the post content paramater
     $content = (is_array($data)) ? http_build_query($data) : $data;
     
     $optional_headers['Content-Length'] = strlen($content);
+	\TF\debug("header len  - " . strlen($content));
     if (!isset($optional_headers['Content-Type'])) {
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
@@ -606,17 +663,20 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
     $ctx = stream_context_create($params);
-    debug("bit_http [%s]", $url);
-    $foo = @file_get_contents($url, false, $ctx);
-    if ($foo === false) {
-        $cmd = "curl -X$method --header 'content-Type: '{$optional_headers['Content-Type']}' " . escapeshellarg($url);
-        if (strlen($content) > 0) {
-            $cmd .= " -d ".escapeshellarg($content);
-        }
-        $foo = system($cmd);
-    }
 
-    return $foo;
+    debug("http_req [$method] [$url] len [" . strlen($content) . "]");
+    debug("http_header [%s]", $params['http']['header']);
+    $response = @file_get_contents($url, false, $ctx);
+    if ($response === false) {
+        debug("http_resp fail");
+        if (function_exists('curl_init')) {
+            return bit_curl($method, $url, $data, $optional_headers);
+        }
+        return "";
+    } else {
+        debug("http_resp len " . strlen($response));
+    }
+    return $response;
 }
 
 /**
@@ -635,156 +695,6 @@ function http_ctx(string $method, int $timeout) : array {
             'allow_self_signed' => true,
         )
     );
-}
-
-
-/**
- * international text, pulls language from $_SEVER['HTTP_ACCEPT_LANG']
- * NOT PURE
- * example:
- * txt::set_section('dashboard');
- * txt::_s('msg_name', 'cap');
- */
-class txt {
-    // crappy state variables...
-    protected static $_data = array();
-    protected static $_section = "";
-    protected static $_lang = "";
-
-
-    // required to be set at least 1x
-    public static function set_section(string $section) : void {
-        if (txt::$_lang === "") {
-            txt::$_lang = txt::lang_from_http($_SERVER['HTTP_ACCEPT_LANG'] ?? "*");
-        }
-        txt::$_section = $section;
-    }
-
-    // process accept lang into a path
-    protected static function lang_from_http(string $accept) : string {
-
-        $default_lang = "en";
-        // split language on , iterate over each, code is last match wins, we reverse because higher priority are first
-        return array_reduce(array_reverse(explode(",", $accept)), function($current, $lang) use ($default_lang) {
-            // accept languages look like fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5
-            $lang = preg_split("/[-;]/", $lang);
-            // if language accepts anything, use default
-            $lang = $lang == "*" ? $default_lang : $lang;
-
-            return (is_dir(WAF_DIR . "lang" . DS . $lang[0])) ? $lang[0] : $current;
-        }, $default_lang);
-
-    }
-
-    protected static function section_loaded(string $section) : bool {
-        return isset(txt::$_data[$section]);
-    }
-
-    protected static function find_pot_file(string $section) : string {
-         $file = WAF_DIR . "lang" . DS . txt::$_lang . DS . $section . ".po";
-         assert(file_exists($file), "no language PO file for [".txt::$_lang."] [$section]");
-         return $file;
-    }
-
-    protected static function load_lines(string $section) : array {
-        $data = file(txt::find_pot_file($section));
-        return ($data) ? $data : array();
-    }
-
-    protected static function msg_type(string $type) : string {
-        $r = "comment";
-        switch($type) {
-            case "msgid":
-                $r = "msgid";
-                break;
-            case "msgid_plural":
-                $r = "msgid_plural";
-                break;
-            case "msgstr":
-                $r = "msgstr";
-            case "msgstr[0]":
-                $r = "msgstr";
-            case "msgstr[1]":
-                $r = "msgstr_plural";
-            default:
-                $r ="comment";
-        }
-        return $r; 
-    }
-
-    /**
-     * load a pot file section if not already loaded
-     */
-    protected static function load_section(string $section) {
-        // only do this 1x
-        if (isset(txt::$_data[$section])) { return; }
-
-        txt::$_data[$section] = array();
-        $id = "";
-        do_for_all(txt::load_lines($section), function ($line) use ($section, &$id) {
-            $parts = explode(" ", $line, 2);
-            if (count($parts) !== 2) { return; }
-
-            $type = txt::msg_type($parts[0]);
-            $msg_value = txt::msg_value($parts[1]);
-            if ($type === "msgid" || $type === "msgid_plural") {
-               $id = trim($msg_value); 
-            } else if ($type === "msgstr") {
-                txt::$_data[$section][$id] = trim($msg_value);
-            } else if ($type === "msgstr_plural") {
-                txt::$_data[$section]["{$id}_plural"] = trim($msg_value);
-            }
-            
-        }); 
-    }
-
-    protected static function msg_value(string $value) : string {
-        return ($value[0] === '"') ?
-            htmlentities(str_replace('\\"', '"', substr($value, 1, -2))) :
-            $value;
-    }
-
-    /**
-     * get translated singular text from POT file named $section with $msgid
-     */
-    public static function _s(string $msgid, string $mods = "") : string {
-        assert(txt::$_section != "", "must set a text section first");
-        txt::load_section(txt::$_section);
-        $r = txt::mod(txt::$_data[txt::$_section][$msgid] ?? "ID:$msgid", $mods);
-        return $r;
-    }
-
-    /**
-     * get translated plural text from POT file named $section with $msgid
-     */
-    public static function _p(string $msgid, string $mods = "") : string {
-        assert(txt::$_section != "", "must set a text section first");
-        txt::load_section(txt::$_section);
-        $r = txt::mod(txt::$_data[txt::$_section]["{$msgid}_plural"] ?? $msgid, $mods);
-        return $r;
-    }
-
-    /**
-     * | separated list of modifiers to apply
-     **/  
-    public static function mod(string $input, string $mods) : string {
-        if ($mods === "") { return $input; }
-        return array_reduce(explode("|", $mods), function($carry, $mod) use($input) {
-            switch($mod) {
-                case "ucf":
-                    return ucfirst($carry);
-                case "upper":
-                    return strtoupper($carry);
-                case "lower":
-                    return strtolower($carry);
-                case "ucw":
-                case "cap":
-                    return ucwords($carry);
-                default:
-                    return $carry;
-            }
-        }, $input);
-    }
 }
 
 
@@ -810,7 +720,8 @@ function debug(string $fmt, ...$args) {
     if (\BitFire\Config::enabled("debug_file")) {
         file_put_contents(\BitFire\Config::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
     } else if (\BitFire\Config::enabled("debug_header") && !headers_sent()) {
-        header("x-bitfire-$idx: " . sprintf("$fmt", ...$args));
+        $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), sprintf($fmt, ...$args));
+        header("x-bitfire-$idx: $tmp");
     }
     $idx++;
 }
@@ -826,13 +737,13 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
     if (($fh = @fopen($filename, "r")) === false) { return array('empty'); }
     $sz = min(($lines*$line_sz), $st['size']);
     // debug("read %d trailing lines [%s], bytes: %d", $lines, $filename, $sz);
-    if ($sz <= 1) { return array("no size"); }
+    if ($sz <= 1) { return array(); }
     fseek($fh, -$sz, SEEK_END);
     $d = fread($fh, $sz);
     $eachln = explode("\n", $d);
     // \TF\dbg("each: " . count($eachln) . " d : " . strlen($d) . " sz: $sz\n");
     $lines = min(count($eachln), $lines)-1;
-    if ($lines <= 0) { return array("no lines"); }
+    if ($lines <= 0) { return array(); }
     $s = array_splice($eachln, -($lines+1), $lines);
     return $s;
 }
