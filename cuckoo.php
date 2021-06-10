@@ -128,10 +128,11 @@ function cuckoo_lock_for_write(array $ctx, $block_size): bool {
     });
 }
 
+// does NOTHING!
 function cuckoo_mem_defrag($ctx): void {
     $final = null;
 
-    reduce(intval(ceil($ctx['items'] / 64)), function($x) use ($ctx, &$final) {
+    reduce(intval(ceil($ctx['slots'] / 64)), function($x) use ($ctx, &$final) {
         $read_len = (CUCKOO_EXP_SIZE_BYTES * 64);
         $start_byte = $x * $read_len;
 
