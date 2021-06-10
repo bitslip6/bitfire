@@ -20,11 +20,6 @@ function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
 }
 
-function test_do_for_all() : void {
-    $start = array("item1" => array("value1", "v2", "v3"), "item2" => "value2");
-    \TF\do_for_all($start, 'json_encode');
-    assert_true(true, "empty test");
-}
 
 function test_make_js_challange() : void {
     $ip_data = \BitFire\map_ip_data(\BitFire\new_ip_data("127.0.0.1", "Mozilla/5.0 chrome 12.5"));
