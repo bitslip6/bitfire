@@ -4,7 +4,7 @@ namespace BitFire;
 //tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU); 
 
 // system root paths and timing
-$start_time = \microtime(true);
+$GLOBALS['start_time'] = \microtime(true);
 const DS = DIRECTORY_SEPARATOR;
 define("BLOCK_DIR", sys_get_temp_dir() . DS . "_BITFIRE_BLOCKS");
 define("WAF_DIR", realpath(__DIR__) . DS); 
@@ -26,7 +26,7 @@ try {
             register_shutdown_function('\BitFire\post_request', $bitfire->_request, $block, $ip_data);
             \BitFire\block_ip($block, $ip_data);
             return $block;
-        })->then(function(\BitFire\Block $block) use ($start_time) {
+        })->then(function(\BitFire\Block $block) {
             \TF\debug("block 2");
             if ($block->code > 0) {
                 \TF\debug("block 3");
@@ -43,7 +43,7 @@ catch (\Exception $e) {
 }
 
 $m1 = microtime(true);
-\TF\debug("time: [" . round((($m1-$start_time)*1000),3) . "ms]");
+\TF\debug("time: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H:i:s") . " GMT");
 //$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 9 || $elm['cpu'] > 9); }); 
 //uasort($data, '\TF\prof_sort');
 //file_put_contents("/tmp/prof.pass.json", json_encode($data, JSON_PRETTY_PRINT));
