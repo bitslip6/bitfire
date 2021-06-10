@@ -107,6 +107,8 @@ class Answer {
                 break;
         }
     }
+
+    public function __toString() : string { return strval($this->ans); }
 }
 
 class Challenge {
@@ -172,7 +174,6 @@ function map_ip_data(string $ip_data) : IPData {
 
 function unpack_ip_data(string $data) : array {
     $d = unpack("Nip/Nua/Sctr_404/Sctr_500/Srr/Nrrtime/Cvalid/Nop1/Nop2/Coper", $data);
-    \TF\debug("x-unpack-ans: " . $d['op1'] . " . " . $d['op2'] . " . " . $d['oper']);
     return $d;
 }
 
@@ -184,10 +185,10 @@ function pack_ip_data(array $ip_data) : string {
 /**
  * load the local data for the remote IP
  */
-function get_ip_data(string $remote_addr, string $agent) : IPData {
+function get_server_ip_data(string $remote_addr, string $agent) : IPData {
 
     $ip_key = "BITFIRE_IP_$remote_addr";
-    \TF\debug("x-cache-key: [$ip_key]");
+    // \TF\debug("x-cache-key: [$ip_key]");
     $data = \TF\CacheStorage::get_instance()->update_data($ip_key, function ($data) {
 
         $t = time();
@@ -221,7 +222,8 @@ class BotFilter {
         $this->cache = $cache;
         $this->_constraints = array(
             FAIL_PHPUNIT => new MatchType(MatchType::CONTAINS, "path", '/phpunit', BLOCK_SHORT),
-            FAIL_WP_ENUM => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', BLOCK_SHORT),
+            FAIL_WP_ENUM => new MatchType(MatchType::REGEX, "post_raw", '/td_optin_webhook.*?kraked_url/', BLOCK_MEDIUM),
+            FAIL_THRIVE_KRAKEN => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', BLOCK_SHORT),
             FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
             FAIL_METHOD => new MatchType(MatchType::NOTIN, "method", Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );
@@ -252,7 +254,7 @@ class BotFilter {
         $block->doifnot('\BitFireBot\header_check', $request);
 
         // ugly, impure crap
-        $this->ip_data = get_ip_data($request->ip, $request->agent);
+        $this->ip_data = get_server_ip_data($request->ip, $request->agent);
     
         // block constraints
         // cpu: 52
@@ -334,12 +336,14 @@ function bot_metric_inc(string $stat) : \TF\CacheItem {
  * @test test_verify_browser
  * PURE! 
  */
-function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $cookie) : \TF\Effect {
+function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeStr $cookie) : \TF\Effect {
 
     $effect = \TF\Effect::new();
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
-    $correct_answer = ($answer->ans != 0) ? $answer->ans : $cookie->extract('a')->value('int');
-    \TF\debug("x-valid-answer: ($correct_answer)");
+    $correct_answer = $cookie->extract('a')->extract('ans');
+    \TF\debug("x-valid-answer 1: ($correct_answer)");
+    $correct_answer->set_if_empty($answer->ans);
+    \TF\debug("x-valid-answer 2: ($correct_answer)");
 
     // unable to read correct answer from ip_data or cookie, increment broken counter
     if ($correct_answer == 0) {
@@ -348,7 +352,7 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $
     }
 
     // correct answer
-    if ($correct_answer === intval($_POST['_bfa']??-1) || $correct_answer == intval($request->post['_bfa']??-1)) {
+    if ($correct_answer->value('int') === intval($_POST['_bfa']??-1) || $correct_answer == intval($request->post['_bfa']??-1)) {
         \TF\debug("x-challenge: pass");
         // increase metric counter
         $effect->update(bot_metric_inc('valid'))
@@ -364,7 +368,7 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $
     }
     // incorrect answer
     else {
-        \TF\debug("x-challenge: fail");
+        \TF\debug("x-challenge: fail [%d] / [%d]", $correct_answer->value('int'), intval($_POST['_bfa']));
         $effect->out(file_get_contents(WAF_DIR . "views/browser_required.html"))
             ->status(STATUS_FAIL)
             ->exit(true);
@@ -649,11 +653,17 @@ function parse_agent(string $user_agent) : UserAgent {
  * PURE!
  */
 function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip) : \TF\MaybeStr {
-    return \TF\decrypt_ssl($encrypt_key, $cookie_data)
+    $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
         ->then("TF\\un_json")
         ->if(function($cookie) use ($src_ip) {
-            return (is_array($cookie) && (($cookie['ip']??'') === $src_ip) && (($cookie['et'] ?? 0) > time()));
+            if (!isset($cookie['ip'])) {
+                return false;
+            } else {
+                $src_ip_crc = \BitFireBot\ip_to_int($src_ip);
+                return (is_array($cookie) && (intval($cookie['ip']??0) == intval($src_ip_crc)) && ((intval($cookie['et']??0)) > time()));
+            }
         });
+    return $r;
 }
 
 /**
@@ -691,38 +701,6 @@ function js_int_obfuscate(int $number) : JS_Fn {
     return new JS_Fn($js_code, $fn_name);
 }
 
-/**
- * make a new js challenge script and set a cookie
- * NOT PURE, SETS CLIENT COOKIE!
- */
-/*
-function make_js_challenge(Answer $answer, string $nonce) {
-    \TF\debug("x-challenge: sent " . $ip->op1 . " [{$ip->oper}] " . $ip->op2);
-    //$answer = new Answer($ip->op1, $ip->op2, $ip->oper);
-    \TF\debug("x-bitfire-code: [" . $answer->code . "]");
-
-
-    $fn1_name = '_0x' . \TF\random_str(4);
-    $fn2_name = '_0x' . \TF\random_str(4);
-    $fn3 = js_int_obfuscate($ip->op1);
-    $fn4 = js_int_obfuscate($ip->op2);
-    $fn5 = js_int_obfuscate(mt_rand(1000,500000));
-    $fn6 = js_int_obfuscate(mt_rand(1000,500000));
-    
-    $js  = "function $fn1_name(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$fn3->fn_name}() ".code_fn($answer->oper)." {$fn4->fn_name}();}";
-    $js .= $fn5->js_code . "\n" .$fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
-    $js .= "_0x2264=['body','name','716898irJcQR','input','type','1JyCSgW','458938jhQaDj','submit','appendChild','12521RCnfSZ','731620bsLeul','60978tKMbmi','38yNhlJk','method','action','value','865714LjSURW','createElement','679754RgBBzH','17JXalWl'];(function(_0x82ed12,_0x26c7d9){const _0x429c60=_0x4a61;while(!![]){try{const _0x150118=-parseInt(_0x429c60(0x10e))*parseInt(_0x429c60(0x106))+parseInt(_0x429c60(0x107))*parseInt(_0x429c60(0x118))+-parseInt(_0x429c60(0x115))+parseInt(_0x429c60(0x111))+-parseInt(_0x429c60(0x114))*-parseInt(_0x429c60(0x119))+-parseInt(_0x429c60(0x10d))+parseInt(_0x429c60(0x10b));if(_0x150118===_0x26c7d9)break;else _0x82ed12['push'](_0x82ed12['shift']());}catch(_0x14d3d5){_0x82ed12['push'](_0x82ed12['shift']());}}}(_0x2264,0x96138));function _0x4a61(_0x19d3b3,_0x4d8bcc){_0x19d3b3=_0x19d3b3-0x106;let _0x22646a=_0x2264[_0x19d3b3];return _0x22646a;}function post(_0xfddbd3,_0x1e23f1,_0x5af7a2='post'){const _0x244f79=_0x4a61,_0x370c95=document['createElement']('form');_0x370c95[_0x244f79(0x108)]=_0x5af7a2,_0x370c95[_0x244f79(0x109)]=_0xfddbd3;for(const _0x1d3b01 in _0x1e23f1){if(_0x1e23f1['hasOwnProperty'](_0x1d3b01)){const _0x3d2f26=document[_0x244f79(0x10c)](_0x244f79(0x112));_0x3d2f26[_0x244f79(0x113)]='hidden',_0x3d2f26[_0x244f79(0x110)]=_0x1d3b01,_0x3d2f26[_0x244f79(0x10a)]=_0x1e23f1[_0x1d3b01],_0x370c95[_0x244f79(0x117)](_0x3d2f26);}}document[_0x244f79(0x10f)][_0x244f79(0x117)](_0x370c95),_0x370c95[_0x244f79(0x116)]();}";
-    $js .= "function $fn2_name() { ".'var e=document;if(!e._bitfire){e._bitfire=1;n=(new Date).getTimezoneOffset(); 
-post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfx":n,"_bfxa":1}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
-
-    $challenge = make_challenge_cookie($answer, $ip->ip_crc);
-    $crypt = \TF\encrypt_ssl(Config::str(CONFIG_ENCRYPT_KEY), json_encode($challenge));
-
-    return \TF\Effect::new()
-        ->cookie($crypt)
-        ->out("<html><head><script nonce=\"$nonce\">{$js}</script></head><body id='body'></body></html>");
-}
-*/
 
 /**
  * make the html javascript challenge
@@ -740,7 +718,7 @@ function make_js_script(int $op1, int $op2, int $oper, string $nonce="_rand_") :
     $js .= $fn5->js_code . "\n" .$fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
     $js .= "_0x2264=['body','name','716898irJcQR','input','type','1JyCSgW','458938jhQaDj','submit','appendChild','12521RCnfSZ','731620bsLeul','60978tKMbmi','38yNhlJk','method','action','value','865714LjSURW','createElement','679754RgBBzH','17JXalWl'];(function(_0x82ed12,_0x26c7d9){const _0x429c60=_0x4a61;while(!![]){try{const _0x150118=-parseInt(_0x429c60(0x10e))*parseInt(_0x429c60(0x106))+parseInt(_0x429c60(0x107))*parseInt(_0x429c60(0x118))+-parseInt(_0x429c60(0x115))+parseInt(_0x429c60(0x111))+-parseInt(_0x429c60(0x114))*-parseInt(_0x429c60(0x119))+-parseInt(_0x429c60(0x10d))+parseInt(_0x429c60(0x10b));if(_0x150118===_0x26c7d9)break;else _0x82ed12['push'](_0x82ed12['shift']());}catch(_0x14d3d5){_0x82ed12['push'](_0x82ed12['shift']());}}}(_0x2264,0x96138));function _0x4a61(_0x19d3b3,_0x4d8bcc){_0x19d3b3=_0x19d3b3-0x106;let _0x22646a=_0x2264[_0x19d3b3];return _0x22646a;}function post(_0xfddbd3,_0x1e23f1,_0x5af7a2='post'){const _0x244f79=_0x4a61,_0x370c95=document['createElement']('form');_0x370c95[_0x244f79(0x108)]=_0x5af7a2,_0x370c95[_0x244f79(0x109)]=_0xfddbd3;for(const _0x1d3b01 in _0x1e23f1){if(_0x1e23f1['hasOwnProperty'](_0x1d3b01)){const _0x3d2f26=document[_0x244f79(0x10c)](_0x244f79(0x112));_0x3d2f26[_0x244f79(0x113)]='hidden',_0x3d2f26[_0x244f79(0x110)]=_0x1d3b01,_0x3d2f26[_0x244f79(0x10a)]=_0x1e23f1[_0x1d3b01],_0x370c95[_0x244f79(0x117)](_0x3d2f26);}}document[_0x244f79(0x10f)][_0x244f79(0x117)](_0x370c95),_0x370c95[_0x244f79(0x116)]();}";
     $js .= "function $fn2_name() { ".'var e=document;if(!e._bitfire){e._bitfire=1;n=(new Date).getTimezoneOffset(); 
-post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfx":n,"_bfxa":1}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
+post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfx":n,"_bfxa":1,"_gen":"'.date('H:i:s').'"}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
 
     return "<html><head><script nonce=\"$nonce\">{$js}</script></head><body id='body'></body></html>";
 }
@@ -770,17 +748,19 @@ function make_challenge_cookie($answer, string $ip) : array {
 function send_browser_verification(\BitFire\IPData $ip_data, string $encryption_key) : \TF\Effect {
 
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
+    \TF\debug("send verify answer: $answer");
 
     $effect = \TF\Effect::new()
-        ->response_code(300)
+        ->response_code(303)
         ->update(new \TF\CacheItem(
             'metrics-'.\TF\utc_date('G'),
             function($data) { $data['challenge'] = ($data['challenge']??0) + 1; return $data; },
             function() { return BITFIRE_METRICS_INIT; },
             \TF\DAY
         ))
+        ->exit(true)
         ->out(make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper))
-        ->cookie(\TF\encrypt_ssl($encryption_key, json_encode(make_challenge_cookie($answer, $ip_data->ip_crc))));
+        ->cookie(json_encode(make_challenge_cookie($answer, $ip_data->ip_crc)));
 
     return \TF\cache_prevent($effect);
 }
