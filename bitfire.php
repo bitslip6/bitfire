@@ -36,6 +36,7 @@ class Request
     public $get;
     public $get_freq = array();
     public $post;
+    public $post_raw;
     public $post_freq = array();
     public $cookies;
 
@@ -259,9 +260,11 @@ class BitFire
      */
     protected function __construct() {
 
+        $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
+        $this->api_call();
+
         if (Config::enabled(CONFIG_ENABLED)) {
             $this->uid = substr(\uniqid(), 5, 8);
-            $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
             
             // we will need cache storage and secure cookies
             $this->cache = \TF\CacheStorage::get_instance();
@@ -272,7 +275,6 @@ class BitFire
                 \BitFirePRO\send_pro_mfa($this->_request);
             }
         }
-        $this->api_call();
     }
     
     /**
@@ -292,18 +294,19 @@ class BitFire
     }
 
     protected function api_call() {
-        if ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET)) {
-            require_once WAF_DIR."api.php";
+        if (isset($_GET[BITFIRE_COMMAND])) {
+            $fn = '\\BitFire\\' . htmlentities($_REQUEST[BITFIRE_COMMAND]??'nop');
+            if (!in_array($fn, BITFIRE_API_FN)) { print_r(BITFIRE_API_FN); exit("unknown function [$fn]"); }
 
-            $fn = '\\BitFire\\' . htmlentities($_GET[BITFIRE_COMMAND]??'nop');
-            if (!in_array($fn, BITFIRE_API_FN)) { exit("unknown function [$fn]"); }
 
-            $result = $fn($this->_request);
-            exit ($result);
-        } else if ($_GET[BITFIRE_INTERNAL_PARAM]??'' === 'report') {
-            require_once WAF_DIR."headers.php";
-            exit (\BitFireHeader\header_report($this->_request));
-        }
+            $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
+
+            if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET) ||
+             ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET))) {
+                require_once WAF_DIR."api.php";
+                exit($fn($this->_request));
+            }
+        } else { \TF\debug("no api command"); }
     }
 
     /**
@@ -384,10 +387,7 @@ class BitFire
                     header("x-cached: 1");
                     // add a js challenge if the request is not to a bot
                     if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser->bot == false) {
-                        echo \BitFireBot\make_js_challenge(
-                            $this->_request->ip,
-                            Config::str(CONFIG_ENCRYPT_KEY),
-                            Config::str(CONFIG_USER_TRACK_COOKIE));
+                        \BitFireBot\send_browser_verification($this->bot_filter->ip_data, Config::str(CONFIG_ENCRYPT_KEY))->run();
                     }
                     // serve the static page!
                     echo file_get_contents($page);
@@ -430,7 +430,8 @@ class BitFire
         }
 
         // dashboard requests, TODO: MOVE TO api.php
-        if ($this->_request->path === Config::str(CONFIG_DASHBOARD_PATH)) {
+        //if (trim($this->_request->path,"/") == trim(Config::str(CONFIG_DASHBOARD_PATH), "/")) {
+        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH)) || $_GET[BITFIRE_COMMAND] == "DASHBOARD") {
             require_once WAF_DIR."dashboard.php";
             serve_dashboard($this->_request->path);
         }
