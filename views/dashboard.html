@@ -13,11 +13,11 @@
     -->
 
 	<link rel="shortcut icon" href="https://www.bitslip6.com/img/shield64.png">
-    <link rel="stylesheet" href="https://bitfire.co/dash/vs2015.css" />
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/vs2015.css" />
 
     <!-- Theme CSS -->
-    <link rel="stylesheet" href="https://bitfire.co/dash/theme.min.css" id="stylesheetLight">
-    <link rel="stylesheet" href="https://bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
 
     <style>
       body { display: none; }
@@ -29,14 +29,20 @@
       .pr1 { margin-top: 20px; }
       .card-body { padding: 0.5rem !important; }
 
+      image.type { fill: #e63757; }
+
       svg { fill: #977; }
       svg.blue { fill: #30b7e5; }
       svg.green { fill: #21d97e; }
       svg.yellow { fill: #f6c343; }
       svg.red { fill: #e63757; }
+      img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
+      img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
+      img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+
 
       .oh { overflow: auto; }
-      .wrap { white-space: break-spaces; }
+      .wrap { white-space: break-spaces; line-break: anywhere; }
       .nowrap { white-space: nowrap; }
       
       .hidden { display: none; }
@@ -100,9 +106,43 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
     <script>
         window.ERROR = [];
+        
+        function url_to_path(url) {
+          console.log(url);
+          let s = url.indexOf("/");
+          return url.substr(s);
+        }
 
         function add_exception(ex) {
-          console.log(ex);
+          console.log("path: ", url_to_path(ex.getAttribute("data-ex-url")));
+          console.log("code: ", ex.getAttribute("data-ex-code"));
+          postData("<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=add_api_exception",
+          {"BITFIRE_API":"add_api_exception",
+            "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
+            "code": ex.getAttribute("data-ex-code"),
+            "path": url_to_path(ex.getAttribute("data-ex-url"))})
+            .then(data => {
+              console.log(data);
+              if (data == "success") { alert("exception added"); }
+              else { alert("unable to add exception"); }
+
+            });
+        }
+        
+        // Example POST method implementation:
+        async function postData(url = '', data = {}) {
+          // Default options are marked with *
+          const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            redirect: 'follow',
+            referrerPolicy: 'same-origin',
+            body: JSON.stringify(data)
+          });
+          return response.text(); // parses JSON response into native JavaScript objects
         }
 
         function cc_to_flag(cc) {
@@ -113,8 +153,8 @@
         }
 
         
-        const VERSION = 127;
-        const VERSION_STR = "1.3.7";
+        const VERSION = 143;
+        const VERSION_STR = "1.4.3";
         const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
         const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
         const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -136,7 +176,7 @@
           var e = GBI(elm);
           console.log(e);
           e.innerText = cap(type);
-          fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>').then(data => { console.log(data); });
+          fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
           if (type == "block" || type == "on") {
             e.classList.remove("btn-warning");
             e.classList.remove("btn-secondary");
@@ -648,7 +688,7 @@
               <div class="col">
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire PRO: Release 1.3.7
+                  BitFire PRO: Release 1.4.3
                 </h6>
                 <p style="font-size:.75rem;color:#666;">
                 BitFire PRO is licensed for commercial use and includes cash back guarantee if your site is compromised. email: info@bitslip6.com for details</p>
@@ -759,18 +799,18 @@
       <td class="nowrap" scope="row">
       <div class="avatar-group">
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/fix.svg" alt="exception" width="24" 
-          title="add exception for <?php echo MESSAGE_CLASS[\BitFire\code_class($line['block']['code'])] . ' parameter: ' . $line['block']['parameter']?>"
-          class="avatag-img rounded-circle" style="cursor:pointer;" onclick="add_exception()" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['exception_img']?>" alt="exception" width="24" 
+          title="<?php echo $line['exception_title'];?>"
+          class="avatag-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['request']['path']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img type rounded-circle red" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
         </div>
       </div>
       </td>
@@ -841,22 +881,28 @@
       <td class="nowrap" scope="row">
       <div class="avatar-group">
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/fix.svg" alt="exception" width="24" 
+        <!--
+          <img src="https://www.bitfire.co/assets/fix.svg" alt="exception" width="24" 
           title="add exception for <?php echo MESSAGE_CLASS[$line['classId']] . ' parameter: ' . $line['item']?>"
-          class="avatag-img rounded-circle" style="cursor:pointer;" onclick="add_exception()" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+          class="avatag-img rounded-circle grey_blue" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+        -->
+
+          <img src="https://www.bitfire.co/assets/<?php echo $line['exception_img']?>" alt="exception" width="24" 
+          title="<?php echo $line['exception_title'];?>"
+          class="avatag-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['item']?>" data-ex-code="<?php echo $line['eventid']?>" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle red" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
         </div>
       </div>
       </td>
-      <td class="nowrap"><?php $t=time(); echo date('M d, H:i:s', strtotime($line['ts']??$t));?></td>
+      <td class="nowrap"><?php $t=time(); echo date('M d, H:i:s', intval(\TF\trim_off($line['ts']??$t, '.')));?></td>
       <td class="nowrap" style="min-width:100px;"><?php echo "<strong>" . $line['ip'] . '</strong>'?></td>
       <td class="nowrap">
         <div style="float:left"><?php echo "<strong>" . $line['verb'] . "&nbsp;&nbsp;&nbsp;" . $line['scheme'] . "://" . $line['url']?></strong></div>
@@ -901,7 +947,7 @@
       <td class="nowrap" style="min-width:125px;"><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
       <td class="wrap"><?php 
         $tmp = BitFireBot\parse_agent($line['ua']);
-        echo $tmp['browser'] . "/". join('.', array_slice(explode('.', $tmp['ver']), 0, 2)) ?></td>
+        echo $tmp->browser . "/". join('.', array_slice(explode('.', $tmp->ver), 0, 2)) ?></td>
       <td class="nowrap">
         <a tabindex="<?php echo $idx++;?>" role="button" class="btn btn-sm btn-danger" 
         data-toggle="popover"
@@ -953,8 +999,8 @@
     <!-- JAVASCRIPT
     ================================================== -->
     <!-- Libs JS -->
-    <script src="https://bitfire.co/dash/bootstrap.bundle.min.js"></script>
-    <script src="https://bitfire.co/dash/chart.min.js"></script>
+    <script src="https://www.bitfire.co/dash/bootstrap.bundle.min.js"></script>
+    <script src="https://www.bitfire.co/dash/chart.min.js"></script>
     <!--
     <script src="https://bitfire.co/dash/flatpicker.min.js"></script>
     <script src="https://bitfire.co/dash/dropzone.min.js"></script>
@@ -962,10 +1008,10 @@
     <script src="https://bitfire.co/dash/highlight.pack.min.js"></script>
     <script src="https://bitfire.co/dash/quill.min.js"></script>
     -->
-    <script src="https://bitfire.co/dash/jquery.mask.min.js"></script>
-    <script src="https://bitfire.co/dash/list.min.js"></script>
-    <script src="https://bitfire.co/dash/select2.min.js"></script>
-    <script src="https://bitfire.co/dash/Chart.extension.js"></script>
+    <script src="https://www.bitfire.co/dash/jquery.mask.min.js"></script>
+    <script src="https://www.bitfire.co/dash/list.min.js"></script>
+    <script src="https://www.bitfire.co/dash/select2.min.js"></script>
+    <script src="https://www.bitfire.co/dash/Chart.extension.js"></script>
 
     <script>
       
@@ -1093,7 +1139,7 @@
 
       //show_pie("classChart", {"percent": [50, 50], "counts": [100, 100]});
 
-fetch("https://bitfire.co/ver.php")
+fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
   .then(response => response.json())
   .then(response => {
     console.log(response);
@@ -1119,14 +1165,15 @@ fetch("https://bitfire.co/ver.php")
       GBI("upgrade_link").innerText = "Upgrade to " + latest_str;
       GBI("upgrade_link").classList.remove("btn-secondary");
       GBI("upgrade_link").classList.add("btn-warning");
+      GBI("upgrade_link").addEventListener("click", "upgrade");
     }
   });
 
       const request = async () => {
-        const response1 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response2 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response3 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
-        const response4 = await fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>');
+        const response1 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        const response2 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        const response3 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        const response4 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
 
         //console.log("fetched");
         
@@ -1150,11 +1197,15 @@ fetch("https://bitfire.co/ver.php")
         
         window.setTimeout(function() {
           let scr = document.createElement('script');
-          scr.setAttribute('src','https://bitfire.co/dash/theme.min.js');
+          scr.setAttribute('src','https://www.bitfire.co/dash/theme.min.js');
           document.body.appendChild(scr);
         }, 100);
       }
       request();
+
+      function upgrade() {
+        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=upgrade&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+      }
 
       function toggle_features() {
         var elms = document.getElementsByClassName("feature");
@@ -1185,8 +1236,8 @@ fetch("https://bitfire.co/ver.php")
       }
 
       GBI("lock").addEventListener("click", function() {
-        GBI("lock").innerText = "unlocking...";
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>')
+        GBI("lock").innerText = "locking...";
+        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
           console.log(response); 
           GBI("lock").innerText = "LOCK SITE";
@@ -1196,8 +1247,8 @@ fetch("https://bitfire.co/ver.php")
       });     
 
       GBI("unlock").addEventListener("click", function() {
-        GBI("unlock").innerText = "locking...";
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>')
+        GBI("unlock").innerText = "unlocking...";
+        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
           console.log(response); 
           GBI("unlock").innerText = "UNLOCK SITE";
@@ -1213,7 +1264,7 @@ fetch("https://bitfire.co/ver.php")
     </script>
 
     <!-- Theme JS -->
-    <script src="https://bitfire.co/dash/dashkit.min.js"></script>
+    <script src="https://www.bitfire.co/dash/dashkit.min.js"></script>
 
 
     <script>
