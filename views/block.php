@@ -7,7 +7,7 @@
 http_response_code(\BitFire\Config::int('response_code', 500));
 if (\BitFire\Config::enabled('debug')) {
     $end_time = \microtime(true);
-    echo "BitFire block time: " . \number_format((($end_time - $start_time)*1000), 3) . " ms\n";
+    echo "BitFire block time: " . \number_format((($end_time - $GLOBALS['start_time'])*1000), 3) . " ms\n";
     print_r($block);
 }
 ?>
