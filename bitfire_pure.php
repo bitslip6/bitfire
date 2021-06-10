@@ -64,10 +64,13 @@ function match_block_exception(?Block $block, Exception $exception, string $host
  * load exceptions from disk
  */
 function load_exceptions() : array {
-    $exceptions = array();
+    $decoded = false;
     if (file_exists(WAF_DIR."cache/exceptions.json")) {
-        $exceptions = json_decode(file_get_contents(WAF_DIR."cache/exceptions.json"), true);
+        $decoded = json_decode(file_get_contents(WAF_DIR."cache/exceptions.json"), true);
     }
+    $exceptions = (!$decoded) ? array() : $decoded;
+    \TF\debug("loaded exceptions " . count($exceptions));
+
     return array_map('\BitFire\map_exception', $exceptions);
 }
 
@@ -76,6 +79,7 @@ function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) : boo
     if ($ex1->host != $ex2->host) { return false; }
     if ($ex1->parameter != $ex2->parameter) { return false; }
     if ($ex1->url != $ex2->url) { return false; }
+    \TF\debug("match exception");
     return true;
 }
 
@@ -84,14 +88,18 @@ function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) : boo
  */
 function remove_exception(\BitFire\Exception $ex) {
     $exceptions = array_filter(load_exceptions(), function(\BitFire\Exception $test) use ($ex) { return ($ex->uuid === $test->uuid) ? false : true; }); 
-    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($exceptions), LOCK_EX);
+    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($exceptions, JSON_PRETTY_PRINT), LOCK_EX);
 }
 
-function add_exception(\BitFire\Exception $ex) {
+// add an exception to the cache/exceptions.json file, return true if successful
+function add_exception(\BitFire\Exception $ex) : bool {
     $exceptions = load_exceptions();
-    $ex['uuid'] = (isset($ex['uuid'])) ? $ex['uuid'] : \TF\random_str(8);
-    $exceptions[] = $ex;
-    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($exceptions), LOCK_EX);
+    $ex->uuid = ($ex->uuid !== NULL) ? $ex->uuid : \TF\random_str(8);
+    $ex2 = array_filter($exceptions, \TF\compose("\TF\\not", \TF\partial_right("\BitFire\match_exception", $ex)));
+    \TF\debug("filtered exceptions " . count($ex2));
+    $ex2[] = $ex;
+    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($ex2, JSON_PRETTY_PRINT), LOCK_EX);
+    return count($ex2) >= count($exceptions) ;
 }
 
 
@@ -161,9 +169,9 @@ function process_request2(array $get, array $post, array $server, array $cookie 
     $request->get = \TF\map_mapvalue($get, '\\BitFire\\each_input_param');
     $request->post = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
     $request->cookies = \TF\map_mapvalue($cookie, '\\BitFire\\each_input_param', false);
-    //$request->cookies = $cookie;
     $request->get_freq = freq_map($request->get);
     $request->post_freq = freq_map($request->post);
+    $request->post_raw = ($server['REQUEST_METHOD'] == "POST") ? file_get_contents("php://input") : "";
     $request->ajax = is_ajax($request);
 
     return $request;
