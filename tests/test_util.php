@@ -4,15 +4,10 @@ if (!defined("WAF_DIR")) {
     define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
 }
 include_once WAF_DIR . "util.php";
+include_once WAF_DIR . "botfilter.php";
 
 function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
-}
-
-function test_do_for_all() : void {
-    $start = array("item1" => array("value1", "v2", "v3"), "item2" => "value2");
-    \TF\do_for_all($start, 'json_encode');
-    assert_true(true, "empty test");
 }
 
 
@@ -46,6 +41,17 @@ function test_can_decrypt_ssl() : void {
     $original_message = "a test message";
     $encrypted = TF\encrypt_ssl("passwordpasswordpassword", $original_message);
     $decrypted = TF\decrypt_ssl("passwordpasswordpassword", $encrypted)();
+
+    $cookie = "1482yFkhMQL3G8BPj2gLl8HLTR0uBsqnEftNezVfqrJ6F13dfhoT0ZNTsQ3VxCZ2btfsIE7VI8uBEiK2TChVZOWs1zuokxiiH2p/lz01Nwy2bPNkNRnhoZRwFlC1B2X6WsR6nOQWW1ZVAZmjU1NS489Evof+DzEY2sLxRSBqkoYtR2/MaERsnzq6yt3buc6yGH0dcRRwKN1wS2piurM3WBJnpBOSKcBA2ypYh6U4T9RnvCOyCJgr3S9TCu6KYYeX.a_PUSViMBIYw9IG0";
+    $key = "PzYSeYq99o8iuzHny6YdsCT2";
+    $foo = \TF\decrypt_ssl($key, $cookie);
+    echo "[$key] [$cookie] = [$foo]\n";
+    $r = \BitFireBot\decrypt_tracking_cookie($cookie, $key, "184.99.74.210");
+    print_r($r);
+
+    
+    ->cookie(\TF\encrypt_ssl($encryption_key, json_encode(make_challenge_cookie($answer, $ip_data->ip_crc))));
+
     assert_eq($original_message, $decrypted , "decrypted message did not match original");
 }
 

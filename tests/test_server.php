@@ -75,3 +75,10 @@ function test_process_batch() {
     assert_gt(count($exceptions), 0, "unable to find exception for script tag");
     var_export($exceptions);
 }
+
+function test_get_wordpress_hashes() : void {
+    
+    $hashes = \BitFireSvr\get_wordpress_hashes(__DIR__ . "/wp");
+    file_put_contents("/tmp/out.txt", TF\en_json($hashes));
+
+}
