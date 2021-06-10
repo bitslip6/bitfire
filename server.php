@@ -71,19 +71,55 @@ function hash_file(string $filename, string $sym_ver) : ?array {
 
     $result['e'] = $i['extension'];
     $t = "/{$sym_ver}/{$shortname}";
-    $c = file_get_contents($filename);
-    $result['c'] = crc32($c);
+	$result['t'] = crc32(join('', array_map('trim', file($filename))));
     $result['p'] = crc32($t);
-    //$result['v'] = $sym_ver;
     $result['f'] = $t;
 
     return $result;
 }
 
+function find_wordpress_root(string $root_dir) : array {
+    $roots = \TF\file_recurse($root_dir, function($file) : string {
+        $d = dirname(realpath($file), 2);
+        //echo "\n\n - $d -\n\n";
+        return $d;
+    }, '/wp-includes\/version.php$/');
+    //\TF\dbg($roots);
+    return $roots;
+}
 
-function hash_wp_root(string $root) : array {
-    $hashes = \TF\file_recurse($_SERVER['DOCUMENT_ROOT'] . "/$root", '\BitFireSvr\hash_file');
-    return $hashes;
+function get_wordpress_version(string $root_dir) : string {
+    $full_path = "$root_dir/wp-includes/version.php";
+    $wp_version = "0";
+    include_once $full_path;
+    if ($wp_version === "0") { die("WTF?\n"); }
+    return \TF\trim_off($wp_version, "-");
+}
+
+
+/**
+ * return an array of ('filename', size, crc32(path), crc32(space_trim_content))
+ */
+function get_wordpress_hashes(string $root_dir) : array {
+
+    $version = get_wordpress_version($root_dir);
+    if (version_compare($version, "5.0.0") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
+
+    $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : array {
+        $path = str_replace($root_dir, "/$version/src", $file);
+        $nospace_data = join('', array_map('trim', file($file)));
+        // is plugin
+        if (stripos($path, "/wp-content/plugins/") !== false) {
+            if (preg_match("/\/plugins\/(\w+)/", $path, $matches)) {
+                $plugin = $matches[1];
+                $path = str_replace("/$version/src/wp-content/plugins/$plugin", "", $path);
+                return array($plugin, filesize($file), crc32($path), crc32($nospace_data));//, basename($path));
+            }
+        }
+        return array('', filesize($file), crc32($path), crc32($nospace_data), basename($path));
+    }, "/.*\.php$/");
+
+    return array("ver" => $version, "root" => $root_dir, "int" => text_to_int($version), "files" => array_splice($r, 0, 1000));
 }
 
 
