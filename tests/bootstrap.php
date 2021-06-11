@@ -5,11 +5,11 @@ if (!defined("WAF_DIR")) {
 }
 
 
-require_once WAF_DIR . "util.php";
-require_once WAF_DIR . "botfilter.php";
-require_once WAF_DIR . "webfilter.php";
-require_once WAF_DIR . "bitfire.php";
-require_once WAF_DIR . "storage.php";
+require_once WAF_DIR . "src/util.php";
+require_once WAF_DIR . "src/botfilter.php";
+require_once WAF_DIR . "src/webfilter.php";
+require_once WAF_DIR . "src/bitfire.php";
+require_once WAF_DIR . "src/storage.php";
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $_SERVER['HTTP_HOST'] = 'unit_test';
