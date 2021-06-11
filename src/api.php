@@ -5,6 +5,8 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
 use TF\CacheStorage;
+
+use function TF\bit_http_request;
 use function TF\ends_with;
 use function TF\map_reduce;
 
@@ -163,6 +165,35 @@ function make_code(\BitFire\Request $request) {
 
 function is_quoted(string $data) : bool {
     return ($data === "true" || $data === "false" || ctype_digit($data)) ? true : false;
+}
+
+function upgrade(\Bitfire\Request $request) {
+    if (\version_compare($_GET['ver'], BITFIRE_SYM_VER, '>')) { 
+        $dest = WAF_DIR."cache/{$_GET['ver']}.tar.gz";
+        $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/bitfire_{$_GET['ver']}.tar.gz";
+        $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
+        $len = strlen($content->value("string"));
+        $content->then(\TF\partial('\file_put_contents', $dest));
+
+        if ($content->value('int') < $len) {
+            \TF\debug("error writting [%d] bytes to [%s]", $len, $dest);
+            exit("error writing file $dest");
+        }
+        
+        
+    }
+}
+
+function set_pass(\BitFire\Request $request) {
+    \TF\debug("save pass");
+    if (strlen($_GET['pass1']??'') < 8) {
+        \TF\debug("pass short %s - %s", $_GET['pass1']??'');
+        exit("password is too short");
+    }
+    $p1 = sha1($_GET['pass1']??'');
+    \TF\debug("pass sha1 %s ", $p1);
+    $wrote = \TF\file_replace(WAF_DIR."config.ini", "password = 'default'", "password = '$p1'");
+    exit(($wrote) ? "success" : "unable to write to: " . WAF_DIR."config.ini");
 }
 
 function toggle_config_value(\BitFire\Request $request) {
@@ -336,7 +367,13 @@ function repair_files(\BitFire\Request $request) {
 }
 
 
-if (file_exists(WAF_DIR . "proapi.php")) {
-    require WAF_DIR . "proapi.php";
+function clear_cache(\BitFire\Request $request) {
+    \TF\CacheStorage::get_instance()->clear_cache();
+    \TF\cache_bust();
+    die("cache cleared\n");
+}
+
+if (file_exists(WAF_DIR . "src/proapi.php")) {
+    require WAF_DIR . "src/proapi.php";
 }
 
