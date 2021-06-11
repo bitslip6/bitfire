@@ -1,5 +1,7 @@
 [
-{"parameter": "foo", "uuid": "sql_static_block", "code": 14003},
-{"parameter":"foo", "uuid": "generic_sql_1", "code": 14001},
-{"parameter":"foo", "uuid": "generic_sql_2", "code": 14002}
+{"parameter":"example", "uuid": "example_global_parameter_code_class", "code": 14000},
+{"parameter":"example", "uuid": "example_global_parameter_single_code", "code": 14003},
+{"parameter":"example", "uuid": "example_global_parameter_all_codes", "code": 0},
+{"parameter":"example", "path": "/some/path", "uuid": "example_parameter_one_url_all_codes", "code": 0},
+{"host": "www.my_domain.com", "path": "/some/path", "uuid": "example_all_parameters_one_url_one_domain_all_xss", "code": 10000},
 ]
