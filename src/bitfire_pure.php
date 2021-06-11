@@ -140,7 +140,7 @@ function process_ip(array $server) : string {
     $header_name = strtoupper(Config::str('ip_header', 'REMOTE_ADDR'));
     $ip = "n/a";
     switch ($header_name) {
-        case "X-FORWARDED-FOR":
+        case "FORWARDED":
             $ip = get_fwd_for($server[$header_name] ?? '127.0.0.1');
             break;
         case "REMOTE_ADDR":
