@@ -11,7 +11,7 @@ define("WAF_DIR", realpath(__DIR__) . DS);
 // create the block directory if it does not exist
 if (!file_exists(BLOCK_DIR)) { \mkdir(BLOCK_DIR, 0700, true); }
 
-include WAF_DIR."bitfire.php";
+include WAF_DIR."src/bitfire.php";
 try {
     \TF\parse_ini(WAF_DIR."config.ini");
 
