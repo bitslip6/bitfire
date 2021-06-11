@@ -54,7 +54,7 @@ class CacheStorage implements Storage {
             self::$_type = $type;
         }
         else if ($type === "shm" && function_exists('shm_attach')) {
-            require_once WAF_DIR . "shmop.php";
+            require_once WAF_DIR . "src/shmop.php";
             $this->_shm = new shm();
             self::$_type = $type;
         }

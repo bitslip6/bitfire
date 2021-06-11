@@ -196,7 +196,7 @@ function toggle_config_value(\BitFire\Request $request) {
 
 
 function dump_hashes(\BitFire\Request $request) {
-    require_once WAF_DIR . "/server.php";
+    require_once WAF_DIR . "/src/server.php";
     \TF\debug("search roots: "  . \TF\en_json($_SERVER['DOCUMENT_ROOT']));
     $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
     $roots = array_filter($roots, function ($x) { 
