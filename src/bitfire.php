@@ -8,7 +8,7 @@ define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
 require_once WAF_DIR."src/const.php";
 require_once WAF_DIR."src/storage.php";
 require_once WAF_DIR."src/util.php";
-require_once WAF_DIR."english.php";
+require_once WAF_DIR."src/english.php";
 
 
 class Headers
@@ -187,7 +187,8 @@ class Config {
 
     // get a string value with a default
     public static function str(string $name, string $default = '') : string {
-        return (string) Config::$_options[$name] ?? $default;
+        if (isset(Config::$_options[$name])) { return (string) Config::$_options[$name]; }
+        return (string) $default;
     }
 
     // get an integer value with a default
@@ -430,8 +431,7 @@ class BitFire
         }
 
         // dashboard requests, TODO: MOVE TO api.php
-        //if (trim($this->_request->path,"/") == trim(Config::str(CONFIG_DASHBOARD_PATH), "/")) {
-        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH)) || $_GET[BITFIRE_COMMAND] == "DASHBOARD") {
+        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH)) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
             require_once WAF_DIR."src/dashboard.php";
             serve_dashboard($this->_request->path);
         }
