@@ -774,7 +774,7 @@ function prof_sort(array $a, array $b) : int {
  */
 function file_replace(string $filename, string $find, string $replace) : bool {
     $in = file_get_contents($filename);
-    \TF\debug("file replace in len: " . strlen($in));
+    \TF\debug("file replace [%s] [%s] in len [%d] ",$filename, $replace, strlen($in));
     $out = str_replace($find, $replace, $in);
     \TF\debug("file replace out len: " . strlen($out));
     return file_write($filename, $out);
@@ -803,9 +803,11 @@ function parse_ini(string $ini_src) : void {
     } else {
         $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
         CFG::set($config);
-        if (CFG::enabled("cache_ini_files")) {
+        if (CFG::enabled("cache_ini_files") && is_writable($parsed_file)) {
             if (!file_write($parsed_file, "<?php\n\$config=". var_export($config, true).";\n")) {
-                file_replace($ini_src, "cache_ini_files = true", "cache_ini_files = false");
+                if (is_writable($ini_src)) {
+                    file_replace($ini_src, "cache_ini_files = true", "cache_ini_files = false");
+                }
             }
         }
         // auto configuration
