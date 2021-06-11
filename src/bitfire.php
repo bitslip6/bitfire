@@ -270,8 +270,6 @@ class BitFire
             // we will need cache storage and secure cookies
             $this->cache = \TF\CacheStorage::get_instance();
 
-            $exception_file = WAF_DIR . "cache/exceptions.json";
-
             if (function_exists('\BitFirePRO\send_pro_headers')) {
                 \BitFirePRO\send_pro_mfa($this->_request);
             }
