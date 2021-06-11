@@ -699,19 +699,6 @@ function http_ctx(string $method, int $timeout) : array {
 
 
 /**
- * test if the web user can write to a file (checks ownership and permission 6xx or 7xx)
- * NOT PURE
- */ 
-function really_writeable(string $filename) : bool {
-    $st = stat($filename);
-    $mode = intval(substr(decoct($st['mode']), -3, 1));
-    $writeable = ($st['uid'] === \Bitfire\Config::int('web_uid')) &&
-        (($mode === 6) || ($mode === 7));
-    if (!$writeable) { debug("%s is not writeable", $filename); }
-    return $writeable;
-}
-
-/**
  * add a line to the debug file (SLOW, does not wait until processing is complete)
  * NOT PURE
  */
@@ -784,11 +771,19 @@ function prof_sort(array $a, array $b) : int {
  */
 function file_replace(string $filename, string $find, string $replace) : bool {
     $in = file_get_contents($filename);
-    return file_write($filename, str_replace($find, $replace, $in));
+    \TF\debug("file replace in len: " . strlen($in));
+    $out = str_replace($find, $replace, $in);
+    \TF\debug("file replace out len: " . strlen($out));
+    return file_write($filename, $out);
 }
 
 function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
-    return (@file_put_contents($filename, $content, $opts) == strlen($content));
+    $len = strlen($content);
+    $result = (@file_put_contents($filename, $content, $opts) === $len);
+    if (!$result) {
+        \TF\debug("error write file [%s] len [%d]", $filename, $len);
+    }
+    return $result;
 }
 
 /**
@@ -808,7 +803,46 @@ function parse_ini(string $ini_src) : void {
             if (!file_write($parsed_file, "<?php\n\$config=". var_export($config, true).";\n")) {
                 file_replace($ini_src, "cache_ini_files = true", "cache_ini_files = false");
             }
-        };
+        }
+        // auto configuration
+        if (!\BitFire\Config::enabled("configured")) {
+            if (\BitFire\Config::str("encryption_key") === "default_encryption_key") {
+                $enc = \TF\random_str(32);
+                file_replace($ini_src, "encryption_key = 'default_encryption_key'", "encryption_key = '$enc'");
+            }
+            if (\BitFire\Config::str("secret") === "default_secret_value") {
+                $sec = \TF\random_str(24);
+                file_replace($ini_src, "secret = 'default_secret_value'", "secret = '$sec'");
+            }
+            if (\BitFire\Config::str("cache_type") === "nop") {
+                if (function_exists('shmop_open')) {
+                    file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
+                }
+                else if (function_exists('apcu')) {
+                    file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'apcu'");
+                }
+                else if (function_exists('shm_get_var')) {
+                    file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shm'");
+                }
+            }
+            if (isset($_SERVER['X-FORWARDED-FOR'])) {
+                file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\"");
+            }
+            else if (isset($_SERVER['FORWARDED'])) {
+                file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
+            }
+            if (\BitFire\Config::str("browser_cookie") === "_bitfire") {
+                $sec = \TF\random_str(5);
+                file_replace($ini_src, "browser_cookie = '_bitfire'", "browser_cookie = '_{$sec}'");
+            }
+            if (count($_COOKIE) > 1) {
+                file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
+            }
+            $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
+            file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
+            file_replace($ini_src, "configured = false", "configured = true");
+        }
+
     }
 }
 
