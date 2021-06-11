@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 namespace BitFire;
-use TF\CacheStorage;
+
 require WAF_DIR . "src/bitfire_pure.php";
 
 
