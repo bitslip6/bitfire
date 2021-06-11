@@ -9,8 +9,8 @@ const FEATURE_NAMES = array('geolocation', 'midi', 'notifications', 'push', 'syn
 
 const CSP = array('child-src', 'connect-src', 'default-src', 'font-src',
             'frame-src', 'img-src', 'manifest-src', 'media-src', 'object-src', 'prefetch-src',
-            'script-src', 'style-src', 'webrtc-src', 'worker-src', 'base-uri',
-            'form-action', 'frame-ancestors', 'upgrade-insecure-requests');
+            'script-src', 'style-src', 'style-src-elem', 'script-src-attr', 'style-src', 
+            'style-src-elem', 'style-src-attr', 'worker-src');
 
 /**
  * log CSP report failures
@@ -29,25 +29,19 @@ function send_security_headers(\BitFire\Request $request) : void {
     core_headers($path);
 
     // set strict transport security (HSTS)
-    if (\Bitfire\Config::enabled("enforce_ssl_1year")) {
+    if (\Bitfire\Config::str("enforce_ssl_1year") == "block" || \Bitfire\Config::str("enforce_ssl_1year") === true) {
         force_ssl_with_sts();
     }
 
-    // set a default feature policy
-    if (\BitFire\Config::enabled("feature_policy")) {
-
-        $policy = array('geolocation' => '', 'midi' => '', 'notifications' => '', 'push' => '', 'sync-xhr' => '', 'microphone' => '', 'gyroscope' => '', 'speaker' => '', 'vibrate' => '', 'fullscreen' => '', 'payment' => '');
-        foreach(\BitFire\Config::arr("allowed_features") as $feature => $value) {
-            $policy[$feature] = $value;
-        }
-        header(\TF\map_reduce($policy, function($key, $value, $carry) {
-                return  $carry . $key . "=('$value'), ";
-            }, "Permissions-Policy: ") );
-    }
-    
     if (\BitFire\Config::enabled("nel")) {
         header('{"report_to":"bitfire","max_age":2592000,"include_subdomains":true}');
     }
+
+    // PRO HEADERS
+    if (function_exists('\BitFirePRO\send_pro_headers')) {
+        \BitFirePRO\send_pro_headers($request);
+    }
+ 
 }
 
 function core_headers(string $path) : void {
@@ -58,7 +52,6 @@ function core_headers(string $path) : void {
     header("X-Content-Type-Options: nosniff");
     header("X-XSS-Protection: 1; mode=block");
     header("Referrer-Policy: strict-origin-when-cross-origin");
-    header('Report-To: {"group":"bitfire","max_age":2592000,"endpoints":[{"url"'.$path.'"}],"include_subdomains":true}');
 }
 
 function force_ssl_with_sts() : void {
