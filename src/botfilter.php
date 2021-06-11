@@ -307,7 +307,6 @@ class BotFilter {
 
         // javascript browser challenges
         if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
-
             if (isset($_POST['_bfxa'])) {
                 $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
@@ -353,9 +352,10 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeStr
     $correct_answer->set_if_empty($answer->ans);
     \TF\debug("x-valid-answer 2: ($correct_answer)");
 
-    // unable to read correct answer from ip_data or cookie, increment broken counter
+    // unable to read correct answer from ip_data or cookie, increment broken counter, try to redirect back to a working page
     if ($correct_answer->value('int') == 0) {
         return $effect->update(bot_metric_inc('broken'))
+            ->header("Location", $request->path)
             ->status(STATUS_SERVER_STATE_FAIL);
     }
 
