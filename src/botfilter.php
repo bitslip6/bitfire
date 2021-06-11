@@ -321,8 +321,6 @@ class BotFilter {
             }
         }
 
-        in_ar
-
         return $block;
     }
 }
