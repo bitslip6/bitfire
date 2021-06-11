@@ -1,23 +1,21 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 
-//tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU); 
-
 // system root paths and timing
 $GLOBALS['start_time'] = \microtime(true);
 const DS = DIRECTORY_SEPARATOR;
-define("BLOCK_DIR", sys_get_temp_dir() . DS . "_BITFIRE_BLOCKS");
 define("WAF_DIR", realpath(__DIR__) . DS); 
+define("BLOCK_DIR", WAF_DIR . DS . "blocks");
+
 // create the block directory if it does not exist
 if (!file_exists(BLOCK_DIR)) { \mkdir(BLOCK_DIR, 0700, true); }
 
 include WAF_DIR."src/bitfire.php";
 try {
     \TF\parse_ini(WAF_DIR."config.ini");
-
     \TF\debug("begin");
-    if (isset($_GET['clear'])) { \TF\CacheStorage::get_instance()->clear_cache(); \TF\cache_bust(); die("cache cleared\n"); }
-    if (Config::str('pro_key')) { include WAF_DIR . "pro.php"; }
+
+    if (Config::str('pro_key') && file_exists(WAF_DIR . "src/pro.php") ) { include WAF_DIR . "src/pro.php"; }
     $bitfire = \Bitfire\BitFire::get_instance(); 
     $bitfire->inspect()
         ->then(function (\BitFire\Block $block) use ($bitfire) {
@@ -44,6 +42,3 @@ catch (\Exception $e) {
 
 $m1 = microtime(true);
 \TF\debug("time: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H:i:s") . " GMT");
-//$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 9 || $elm['cpu'] > 9); }); 
-//uasort($data, '\TF\prof_sort');
-//file_put_contents("/tmp/prof.pass.json", json_encode($data, JSON_PRETTY_PRINT));

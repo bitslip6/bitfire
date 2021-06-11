@@ -17,7 +17,9 @@
 
     <!-- Theme CSS -->
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.bundle.css" id="stylesheetLight">
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
 
     <style>
       body { display: none; }
@@ -28,11 +30,13 @@
       */
       .pr1 { margin-top: 20px; }
       .card-body { padding: 0.5rem !important; }
+      .center { text-align: center; }
 
+      .zn1 { z-index: -1;}
       image.type { fill: #e63757; }
 
       svg { fill: #977; }
-      svg.blue { fill: #30b7e5; }
+      .blue { fill: #30b7e5; color: #30b7e5; }
       svg.green { fill: #21d97e; }
       svg.yellow { fill: #f6c343; }
       svg.red { fill: #e63757; }
@@ -103,7 +107,6 @@
     <!-- Title -->
     <title>BitFire : Control Panel</title>
 
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
     <script>
         window.ERROR = [];
         
@@ -318,7 +321,7 @@
             Settings
           </h6>
           <?php if (!$config_writeable) { ?>
-          <h6 class="navbar-heading btn-warning">
+          <h6 class="navbar-heading btn-warning center">
             config.ini not writeable
           </h6>
           <?php } ?>
@@ -351,9 +354,8 @@
                     </a>
                   
                     <div class="dropdown-menu dropdown-menu-right">
-                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'alert')">Alert</a>
-                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'block')">Block</a>
-                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'off')">Off</a>
+                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'true')">Enabled</a>
+                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'false')">Disabled</a>
                     </div>
                   </div>
 
@@ -377,43 +379,6 @@
                       </div>
                     </div>
                   </li>
-
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link chilabel" style="float: left;">
-                      Spam Filter
-                    </span>
-
-                    <div class="dropdown">
-                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <button id="spam_filter_enabled" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['spam_filter_enabled']; ?> </button>
-                      </a>
-                    
-                      <div class="dropdown-menu dropdown-menu-right">
-                        <a href="#" class="dropdown-item" onclick="toggle('spam_filter_enabled', 'alert')">Alert</a>
-                        <a href="#" class="dropdown-item" onclick="toggle('spam_filter_enabled', 'block')">Block</a>
-                        <a href="#" class="dropdown-item" onclick="toggle('spam_filter_enabled', 'off')">Off</a>
-                      </div>
-                    </div>
-                  </li>
-
-                  <li class="nav-item ">
-                    <span href="#" class="nav-link chilabel" style="float: left;">
-                      XSS Filter
-                    </span>
-
-                    <div class="dropdown">
-                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <button id="xss_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['xss_block']; ?> </button>
-                      </a>
-                    
-                      <div class="dropdown-menu dropdown-menu-right">
-                        <a href="#" class="dropdown-item" onclick="toggle('xss_block', 'alert')">Alert</a>
-                        <a href="#" class="dropdown-item" onclick="toggle('xss_block', 'block')">Block</a>
-                        <a href="#" class="dropdown-item" onclick="toggle('xss_block', 'off')">Off</a>
-                      </div>
-                    </div>
-                  </li>
-
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
                       SQL Filter
@@ -663,6 +628,10 @@
             </a>
           </div>
         -->
+        <button type="button" class="btn btn-primary" id="password_btn" data-toggle="modal" data-target="#password_set">
+         Set Dashboard Password 
+        </button>
+        
 
          
         </div> <!-- / .navbar-collapse -->
@@ -688,14 +657,14 @@
               <div class="col">
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire PRO: Release 1.4.3
+                  BitFire FREE : Release 1.4.3
                 </h6>
                 <p style="font-size:.75rem;color:#666;">
-                BitFire PRO is licensed for commercial use and includes cash back guarantee if your site is compromised. email: info@bitslip6.com for details</p>
+                  Upgrade to <span class="blue font-weight-bold">PRO</span> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
 
                 <!-- Title -->
                 <h1 class="header-title">
-                  BitFire Dashboard
+                  BitFire Dashboard 
                 </h1>
 
               </div>
@@ -929,6 +898,7 @@
 
       </div>
 
+     
 
 
 
@@ -952,6 +922,7 @@
     <script src="https://www.bitfire.co/dash/Chart.extension.js"></script>
 
     <script>
+      
       
       function show_bars(chart_id, hr_set) {
         let total = 0;
@@ -991,6 +962,23 @@
   });
       }
 
+
+      function save_pass() {
+        let p1 = GBI("pass1").value;
+        let p2 = GBI("pass2").value;
+        if (p1 != p2) { alert("password does not match"); return; }
+        if (p1.length < 8) { alert("password must be at least 8 characters"); return; }
+        console.log(p1);
+        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=set_pass&pass1='+encodeURIComponent(p1)+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+          .then(response => response.text())
+          .then(response => {
+            console.log(response);
+            if (response == "success") {
+              alert("password updated successfully");
+              $("#password_set").modal("hide");
+            }
+          });
+      }
       
       
       function show_pie(id, data, label_fn) {
@@ -1122,6 +1110,8 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
         const data4 = await response4.json();
 
 
+        let sp = GBI("save_pass");
+        sp.addEventListener("click", save_pass);
         update_challenge(data4);
         
         //console.log("data4", data4);
@@ -1174,6 +1164,8 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
       }
 
       GBI("lock").addEventListener("click", function() {
+        alert("Site Lock only available in PRO");
+        return;
         GBI("lock").innerText = "locking...";
         fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
@@ -1194,18 +1186,42 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
           GBI("unlock_div").classList.add("hidden");
         });
       });  
-/*
-      //.then(response => response.json())
-      //.then(data => show_pie('classChart', data));
-      */
-
     </script>
 
     <!-- Theme JS -->
     <script src="https://www.bitfire.co/dash/dashkit.min.js"></script>
 
 
+    
+      <div class="modal fade" id="password_set" role="dialog" data-backdrop="static" data-keyboard="false" tabindex="-1">
+        <div class="modal-dialog" role="document" id="password_set2">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="pass_title">Set BitFire Password</h5>
+              <!--
+              <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+              -->
+            </div>
+            <div class="modal-body">
+              <p>BitFire password is required to access the dashboard.  If you forget the password, change the "password" configuration item in config.ini to "default" to relaunch this modal or set it to the SHA1 value of your password</p>
+              <label style="width:150px;">Password:</label>
+              <input id="pass1" type="password" name="pass1" /><br />
+              <label style="width:150px;">Repeat Password:</label>
+              <input id="pass2" type="password" name="pass1" />
+            </div>
+            <div class="modal-footer">
+              <button id="password_close" type="button" class="btn btn-secondary hidden" data-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary" id="save_pass">Save Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
     <script>
+      GBI("password_btn").addEventListener("click", function() {
+        GBI('password_close').classList.remove("hidden");
+      });
+    <?php if ($password_reset) { echo "$('password_set').modal('show');\n"; } ?>
     </script>
+
   </body>
 </html>

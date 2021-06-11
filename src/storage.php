@@ -49,7 +49,7 @@ class CacheStorage implements Storage {
             self::$_type = $type;
         }
         else if ($type === "shmop" && function_exists('shmop_open')) {
-            require_once WAF_DIR . "cuckoo.php";
+            require_once WAF_DIR . "src/cuckoo.php";
             $this->_shmop = new cuckoo();
             self::$_type = $type;
         }
