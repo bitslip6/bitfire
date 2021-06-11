@@ -27,7 +27,7 @@ function reduce(int $num, callable $f, $x) {
 }
 
 // ghetto FP loop until max times or callable returns true
-function until(int $max = 10, callable $f): bool {
+function until(int $max, callable $f): bool {
     $r = false;
     while ($r === false && $max > 0) {
         $r = $f($max--);
@@ -128,10 +128,11 @@ function cuckoo_lock_for_write(array $ctx, $block_size): bool {
     });
 }
 
+// does NOTHING!
 function cuckoo_mem_defrag($ctx): void {
     $final = null;
 
-    reduce(intval(ceil($ctx['items'] / 64)), function($x) use ($ctx, &$final) {
+    reduce(intval(ceil($ctx['slots'] / 64)), function($x) use ($ctx, &$final) {
         $read_len = (CUCKOO_EXP_SIZE_BYTES * 64);
         $start_byte = $x * $read_len;
 
@@ -274,8 +275,8 @@ function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn) {
 
     return if_else($header !== null, 
         function() use ($ctx, $header) {
-            return unserialize(shmop_read($ctx['rid'], 
-                $header['offset'], $header['len']), array("allowed_classes" => array('TF\Maybe'))); },
+            return (shmop_read($ctx['rid'], 
+                $header['offset'], $header['len'])); },
         function() use ($ctx, $key, $ttl, $fn) {
             $data = $fn();
             cuckoo_write($ctx, $key, $ttl, $data);
@@ -289,10 +290,7 @@ function cuckoo_read(array $ctx, string $key) {
     $header = cuckoo_find_header_for_read($ctx, $key);
 
     return ($header === null || $header['len'] < 1) ? null :
-        unserialize(
-            shmop_read($ctx['rid'], 
-            $header['offset'],
-            $header['len']), array("allowed_classes" => array('TF\Maybe')));
+        (unserialize(shmop_read($ctx['rid'], $header['offset'], $header['len'])));
 }
 
 
@@ -311,7 +309,6 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
 
 
     // initial expired memory block (5 bytes)
-
     //$exp_full_block = pack("Ln", time() + 60, 0);
     //$exp_empty_block = pack("Ln", 1, 0);
     //$exp_block = pack("Ln", time() + 60, 0);
@@ -319,11 +316,11 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
     // initial slot header (15 bytes)
     $header_block = pack("LLLnC", 0, 0, 0, 0, 0 | CUCKOO_EMPTY);
 
-    //reduce($items, function($x) use ($exp_empty_block, $exp_full_block, $header_block, $ctx) {
     reduce($items, function($x) use ($header_block, $ctx) {
-        shmop_write($ctx['rid'], $header_block, $x * CUCKOO_SLOT_SIZE_BYTES);
+
+        (@shmop_write($ctx['rid'], $header_block, $x * CUCKOO_SLOT_SIZE_BYTES) !== false) ;
         $block = pack("Ln", (mt_rand(1,50) == 2) ? 1 : time() + 60, $x);
-        shmop_write($ctx['rid'], $block,    $ctx['mem_start'] + ($x * CUCKOO_EXP_SIZE_BYTES));
+        (@shmop_write($ctx['rid'], $block,    $ctx['mem_start'] + ($x * CUCKOO_EXP_SIZE_BYTES)) !== false);
         return $x+1;
     }, 0);
 
@@ -408,5 +405,9 @@ class cuckoo {
 
     public static function write(string $key, int $ttl, $item) { 
         return cuckoo_write(self::$ctx, $key, $ttl, $item);
+    }
+
+    public static function clear() {
+        cuckoo_init_memory(self::$ctx, 29000, 128);
     }
 }

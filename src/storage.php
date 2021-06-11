@@ -1,34 +1,42 @@
 <?php declare(strict_types=1);
 namespace TF;
-/**
- * TODO: refactor and make more DRY, possibly functional
- */
 
+/**
+ * generic storage interface for temp / permenant storage
+ */
 interface Storage {
     public function save_data(string $key_name, $data, int $ttl);
     public function load_data(string $key_name);
-    public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$data);
-    public function update_data(string $key_name, callable $fn, $init, int $ttl);
+    public function load_or_cache(string $key_name, int $ttl, callable $generator);
+    public function update_data(string $key_name, callable $fn, callable $init, int $ttl);
+}
+
+class CacheItem {
+    public $key;
+    public $fn;
+    public $init;
+    public $ttl;
+
+    public function __construct(string $key_name, callable $fn, callable $init, int $ttl) {
+        $this->key = $key_name;
+        $this->fn = $fn;
+        $this->init = $init;
+        $this->ttl = $ttl;
+    }
 }
 
 /**
  * trivial cache abstraction with support for apcu, shared memory and zend opcache 
  */
 class CacheStorage implements Storage {
-    protected static $_type = 'shmop';
+    protected static $_type = 'nop';
     protected static $_instance = null;
     protected $_shmop = null;
     protected $_shm = null;
 
-    // a string of, apcu, opcache, shmop, shmem
-    public static function set_type(string $cache_type) {
-        assert(in_array($cache_type, array('shm', 'shmop', 'apcu', 'nop')));
-        self::$_type = $cache_type;
-    }
-
     public static function get_instance() : CacheStorage {
         if (self::$_instance === null) {
-            self::$_instance = new CacheStorage(self::$_type);
+            self::$_instance = new CacheStorage(\Bitfire\Config::str('cache_type', 'nop'));
         }
         return self::$_instance;
     }
@@ -36,19 +44,21 @@ class CacheStorage implements Storage {
     /**
      * remove all created semaphores...
      */
-    //public function __destruct() {
-    //}
-
-    protected function __construct($type = 'nop') {
-        if ($type !== '') { self::$_type = $type; }
-        if (self::$_type === "shmop") {
-            require_once WAF_DIR . "cuckoo.php";
+    protected function __construct(?string $type = 'nop') {
+        if ($type === "apcu" && function_exists('apcu_store')) {
+            self::$_type = $type;
+        }
+        else if ($type === "shmop" && function_exists('shmop_open')) {
+            require_once WAF_DIR . "src/cuckoo.php";
             $this->_shmop = new cuckoo();
+            self::$_type = $type;
         }
-        if (self::$_type === "shm") {
-            require_once WAF_DIR . "shmop.php";
+        else if ($type === "shm" && function_exists('shm_attach')) {
+            require_once WAF_DIR . "src/shmop.php";
             $this->_shm = new shm();
+            self::$_type = $type;
         }
+        else { self::$_type = 'nop'; }
     }
 
     // take a key and return an opcode path
@@ -94,8 +104,9 @@ class CacheStorage implements Storage {
         return $sem;
     }
     
+    // unlock the semaphore if it is not null
     public function unlock($sem) {
-        if ($sem != null && function_exists('sem_acquire')) { sem_release(($sem)); }
+        if ($sem != null && function_exists('sem_release')) { sem_release(($sem)); }
     }
 
     /**
@@ -110,10 +121,14 @@ class CacheStorage implements Storage {
         $this->unlock($sem);
     }
 
-    public function update_data(string $key_name, callable $fn, $init, int $ttl) {
+    /**
+     * update cache entry @key_name with result of $fn or $init if it is expired.
+     * return the cached item, or if expired, init or $fn
+     */
+    public function update_data(string $key_name, callable $fn, callable $init, int $ttl) {
         $sem = $this->lock($key_name);
         $data = $this->load_data($key_name);
-        if ($data === null) { $data = $init; }
+        if ($data === null) { $data = $init(); }
         $updated = $fn($data);
         $this->save_data($key_name, $updated, $ttl);
         $this->unlock($sem);
@@ -127,13 +142,14 @@ class CacheStorage implements Storage {
         $success = false;
         switch (self::$_type) {
             case "shm":
-                $value = $this->_shm->read($key_name);
-                $success = ($value !== null);
+                $tmp = $this->_shm->read($key_name);
+                $success = ($tmp !== NULL);
+                $value = ($success) ? $tmp : NULL;
                 break;
             case "shmop":
-                $value = $this->_shmop->read($key_name);
-                $success = ($value !== null);
-                // echo "\nshmop [$key_name]\n";print_r($value);
+                $tmp = $this->_shmop->read($key_name);
+                $success = ($tmp !== NULL);
+                $value = ($success) ? $tmp : NULL;
                 break;
             case "apcu":
                 $value = \apcu_fetch("_bitfire:$key_name", $success);
@@ -152,13 +168,21 @@ class CacheStorage implements Storage {
     /**
      * load the data from cache, else call $generator
      */
-    public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$params) {
+    public function load_or_cache(string $key_name, int $ttl, callable $generator) {
         assert(self::$_type !== null, "must call set_type before using cache");
         if (($data = $this->load_data($key_name)) === null) {
-            $data = $generator(...$params);
+            $data = $generator();
             $this->save_data($key_name, $data, $ttl);
         }
         return $data;
+    }
+
+    public function clear_cache() : void {
+        switch (self::$_type) {
+            case "shmop":
+                $value = $this->_shmop->clear();
+                break;
+        }
     }
 }
 
@@ -179,7 +203,7 @@ class FileStorage implements Storage {
      * returns num bytes written or false
      */
     public function save_data(string  $key_name, $data, int $ttl) {
-        return file_put_contents($this->key2name($key_name), json_encode($data, true), LOCK_EX);
+        return file_put_contents($this->key2name($key_name), json_encode($data), LOCK_EX);
     }
 
     /**
@@ -190,7 +214,7 @@ class FileStorage implements Storage {
         return ($contents !== false) ? \TF\un_json($contents) : null;
     }
 
-    public function update_data(string $key_name, callable $fn, $init, int $ttl) {
+    public function update_data(string $key_name, callable $fn, callable $init, int $ttl) {
         $data = $this->load_data($key_name);
         if ($data === null) { $data = $init; }
         $this->save_data($key_name, $fn($data), $ttl);
@@ -199,9 +223,9 @@ class FileStorage implements Storage {
     /**
      * load the data from cache, else call $generator
      */
-    public function load_or_cache(string $key_name, int $ttl, callable $generator, ...$data) {
+    public function load_or_cache(string $key_name, int $ttl, callable $generator) {
         if (($data = $this->load_data($key_name)) === null) {
-            $data = $generator(...$data);
+            $data = $generator();
             $this->save_data($key_name, $data, $ttl);
         }
         return $data;
@@ -234,9 +258,6 @@ class BitInspectFileStore implements BitInspectStore {
     }
 
     private function request_to_name(array $page) {
-        //$data = "{$page['METHOD']}:{$page['HOST']}:{$page['PATH']}";
-        //str_replace("/")
-        //return substr($page['PATH'], -5)."/".crc32($data).".json";
         $path = join('/', $page);
         if ($path === "") { $path = "/root"; }
         return "$path.json";
