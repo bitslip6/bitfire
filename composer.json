@@ -22,9 +22,5 @@
     },
     "require": {
         "php": "^7.0.33"
-    },
-    "scripts": {
-        "post-install-cmd": "updatekeys.sh"
-    },
-    "bin": "updatekeys.sh"
+    }
 }
