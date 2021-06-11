@@ -75,7 +75,7 @@
         "covered": 24,
         "total": 146
       },
-      "name": "webfilter.php"
+      "name": "src/webfilter.php"
     },
     {
       "blob_id": "3fd58f11e2111cdf9616e675b6279c51c1982cbd",
