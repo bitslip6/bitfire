@@ -1,14 +1,14 @@
 <?php declare(strict_types=1);
 namespace BitFire;
-use TF\CacheStorage;
-require WAF_DIR . "bitfire_pure.php";
+
+require WAF_DIR . "src/bitfire_pure.php";
 
 
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
-require_once WAF_DIR."const.php";
-require_once WAF_DIR."storage.php";
-require_once WAF_DIR."util.php";
-require_once WAF_DIR."english.php";
+require_once WAF_DIR."src/const.php";
+require_once WAF_DIR."src/storage.php";
+require_once WAF_DIR."src/util.php";
+require_once WAF_DIR."src/english.php";
 
 
 class Headers
@@ -36,6 +36,7 @@ class Request
     public $get;
     public $get_freq = array();
     public $post;
+    public $post_raw;
     public $post_freq = array();
     public $cookies;
 
@@ -52,6 +53,7 @@ class MatchType
     protected $_value;
     protected $_matched;
     protected $_block_time;
+    protected $_match_str;
 
     const EXACT = 0;
     const CONTAINS = 1;
@@ -65,6 +67,7 @@ class MatchType
         $this->_value = $value;
         $this->_matched = 'none';
         $this->_block_time = $block_time;
+        $this->_match_str = '';
     }
 
     public function match(\BitFire\Request $request) : bool {
@@ -78,10 +81,15 @@ class MatchType
             case MatchType::CONTAINS: 
                 if (is_array($this->_value)) {
                     foreach ($this->_value as $v) {
-                        $m = strstr($this->_matched, $v);
-                        if ($m !== false) { $result = true; }
+                        $m = strpos($this->_matched, $v);
+
+                        if ($m !== false) { 
+                            $result = true;
+                            $this->_match_str = $v;
+                            break;
+                        }
                     }
-                } else { $result = strpos($this->_matched, $this->_value) !== false; }
+                } else {  $result = strpos($this->_matched, $this->_value) !== false; }
                 break;
             case MatchType::IN: 
                 $result = in_array($this->_matched, $this->_value);
@@ -94,7 +102,13 @@ class MatchType
                 break;
             default:
         }
+
+        if ($result && $this->_match_str === '') { $this->_match_str = $this->_value; }
         return $result;
+    }
+
+    public function match_pattern() : string {
+        return $this->_match_str;
     }
 
     public function matched_data() : string {
@@ -123,33 +137,83 @@ class Block {
     }
 }
 
+class Exception {
+    public $code;
+    public $parameter;
+    public $url;
+    public $host;
+    public $uuid;
+
+    public function __construct(int $code = 0, string $uuid = 'x', ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
+        $this->code = $code;
+        $this->parameter = $parameter;
+        $this->url = $url;
+        $this->host = $host;
+        $this->uuid = $uuid;
+    }
+}
+
+
 class Config {
     public static $_options = null;
+    private static $_nonce = null;
 
+    public static function nonce() : string {
+        if (self::$_nonce == null) {
+            self::$_nonce = str_replace(array('-','+','/'), "", \TF\random_str(10));
+        }
+        return self::$_nonce;
+    }
+
+    // set the full list of configuration options
     public static function set(array $options) : void {
         Config::$_options = $options;
     }
 
+    // execute $fn if option enabled
+    public static function if_en(string $option_name, $fn) {
+        if (Config::$_options[$option_name]) { $fn(); }
+    }
+
+    // set a single value
     public static function set_value(string $option_name, $value) {
         Config::$_options[$option_name] = $value;
     }
 
-    public static function str(string $name, string $default = '') {
-        return Config::$_options[$name] ?? $default;
+    // return true if value is set to true or "block"
+    public static function is_block(string $name) : bool {
+        return (Config::$_options[$name]??'' == 'block' || Config::$_options[$name]??'' == true) ? true : false;
     }
 
-    public static function int(string $name, int $default = 0) {
+    // get a string value with a default
+    public static function str(string $name, string $default = '') : string {
+        if (isset(Config::$_options[$name])) { return (string) Config::$_options[$name]; }
+        return (string) $default;
+    }
+
+    // get an integer value with a default
+    public static function int(string $name, int $default = 0) : int {
         return intval(Config::$_options[$name] ?? $default);
     }
 
     public static function arr(string $name, array $default = array()) : array {
-        return Config::$_options[$name] ?? $default;
+        return (isset(Config::$_options[$name]) && is_array(Config::$_options[$name])) ? Config::$_options[$name] : $default;
     }
 
     public static function enabled(string $name, bool $default = false) : bool {
         if (!isset(Config::$_options[$name])) { return $default; }
-        if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report") { return true; }
+        if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report" || Config::$_options[$name] == true) { return true; }
         return (bool)Config::$_options[$name];
+    }
+
+    public static function disabled(string $name, bool $default = true) : bool {
+        return !Config::enabled($name, $default);
+    }
+
+    public static function file(string $name) : string {
+        if (!isset(Config::$_options[$name])) { return ''; }
+        if (Config::$_options[$name][0] === '/') { return (string)Config::$_options[$name]; }
+        return WAF_DIR . (string)Config::$_options[$name];
     }
 }
 
@@ -167,7 +231,7 @@ class BitFire
     public $cache;
     // request unique id
     public $uid;
-    public static $_exceptions = array();
+    public static $_exceptions = NULL;
     public static $_reporting = array();
 
     public static $_fail_reasons = array();
@@ -197,18 +261,19 @@ class BitFire
      */
     protected function __construct() {
 
+        $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
+        $this->api_call();
+
         if (Config::enabled(CONFIG_ENABLED)) {
             $this->uid = substr(\uniqid(), 5, 8);
-            $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
             
             // we will need cache storage and secure cookies
             $this->cache = \TF\CacheStorage::get_instance();
 
-            
-            //$exception_file = WAF_DIR . "cache/exceptions.json";
-            //self::$_exceptions = (file_exists($exception_file)) ? \TF\un_json(file_get_contents($exception_file)) : array();
+            if (function_exists('\BitFirePRO\send_pro_headers')) {
+                \BitFirePRO\send_pro_mfa($this->_request);
+            }
         }
-        $this->api_call();
     }
     
     /**
@@ -216,60 +281,66 @@ class BitFire
      */
     public function __destruct() {
         if (!Config::enabled(CONFIG_REPORT_FILE) || count(self::$_reporting) < 1) { return; }
-        $opts = (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0;
+        // encoder is json_encode with pretty printing if file has word "pretty" in it
+        $encoder = \TF\partial_right('json_encode', (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0);
+        @file_put_contents(Config::file(CONFIG_REPORT_FILE), join(",", array_map($encoder, self::$_reporting)) . "\n", FILE_APPEND);
+/*
         $out = "";
         foreach (self::$_reporting as $report) {
             $out .= json_encode($report, $opts) . "\n";
         }
-        file_put_contents(Config::str(CONFIG_REPORT_FILE), $out, FILE_APPEND);
+*/
     }
 
     protected function api_call() {
-        if ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET)) {
-            require_once WAF_DIR."api.php";
+        if (isset($_GET[BITFIRE_COMMAND])) {
+            $fn = '\\BitFire\\' . htmlentities($_REQUEST[BITFIRE_COMMAND]??'nop');
+            if (!in_array($fn, BITFIRE_API_FN)) { print_r(BITFIRE_API_FN); exit("unknown function [$fn]"); }
 
-            $fn = '\\BitFire\\' . htmlentities($_GET[BITFIRE_COMMAND]??'nop');
-            if (!in_array($fn, BITFIRE_API_FN)) { exit("unknown function [$fn]"); }
 
-            $result = $fn($this->_request);
-            exit ($result);
-        } else if ($_GET[BITFIRE_INTERNAL_PARAM]??'' === 'report') {
-            require_once WAF_DIR."headers.php";
-            exit (\BitFireHeader\header_report($this->_request));
-        }
+            $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
+
+            if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET) ||
+             ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET))) {
+                require_once WAF_DIR."src/api.php";
+                exit($fn($this->_request));
+            }
+        } else { \TF\debug("no api command"); }
     }
 
     /**
      * append an exception to the list of exceptions
      */
-    public function add_exception(array $exception) {
+    public function add_exception(Exception $exception) {
         self::$_exceptions[] = $exception;
     }
 
     /**
      * create a new block, returns a maybe of a block, empty if there is an exception for it
      */
-    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\Maybe {
+    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\MaybeBlock {
         if ($code === FAIL_NOT) { return \TF\Maybe::$FALSE; }
         $block = new Block($code, $parameter, $value, $pattern, $block_time);
+        $req = BitFire::get_instance()->_request;
         if (is_report($block)) {
-            self::reporting($block, BitFire::get_instance()->_request);
+            self::reporting($block, $req);
             return \TF\Maybe::$FALSE;
         }
-        return filter_block_exceptions($block, self::$_exceptions);
+        self::$_exceptions = (self::$_exceptions === NULL) ? load_exceptions() : self::$_exceptions;
+        return filter_block_exceptions($block, self::$_exceptions, $req);
     }
     
     /**
      * TODO: format blocks the same way as reports
      */
     protected static function reporting(Block $block, \BitFire\Request $request) {
-        $data = array('time' => date('r'),
-            'exec' => number_format(microtime(true) - $GLOBALS['m0'], 6). ' sec',
+        $data = array('time' => \TF\utc_date('r'), 'tv' => \TF\utc_time(),
+            'exec' => @number_format(microtime(true) - $GLOBALS['start_time']??0, 6). ' sec',
             'block' => $block,
             'request' => $request);
         $bf = BitFire::get_instance()->bot_filter;
         if ($bf != null) {
-            $data['browser'] = $bf->browser;
+            $data['browser'] = (array) $bf->browser;
             $data['rate'] = $bf->ip_data;
         }
         
@@ -309,19 +380,16 @@ class BitFire
             count($site_cookies) === 0) {
                 // update the cache after this request
                 register_shutdown_function([$this, 'update_cache_behind']);
-                $page = 'root:' . cache_unique();
+                $page = WAF_DIR . 'cache/root:' . cache_unique();
                 // we have a cached page that is not too old
-                if ($this->cached_page_is_valid()) {
+                if ($this->cached_page_is_valid($page)) {
+                    header("x-cached: 1");
                     // add a js challenge if the request is not to a bot
-                    if ($this->bot_filter != null && $this->bot_filter->browser['bot'] == false) {
-                        echo \BitFireBot\make_js_challenge(
-                            $this->_request->ip,
-                            Config::str(CONFIG_USER_TRACK_PARAM),
-                            Config::str(CONFIG_ENCRYPT_KEY),
-                            Config::str(CONFIG_USER_TRACK_COOKIE));
+                    if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser->bot == false) {
+                        \BitFireBot\send_browser_verification($this->bot_filter->ip_data, Config::str(CONFIG_ENCRYPT_KEY))->run();
                     }
                     // serve the static page!
-                    echo file_get_contents(WAF_DIR . "cache/$page");
+                    echo file_get_contents($page);
                     echo "<!-- cache -->\n";
                     exit();
                 }
@@ -331,9 +399,16 @@ class BitFire
     /**
      * test if BitFire::CACHE_PAGE is a valid cached page (exists and is not stale)
      */
-    public function cached_page_is_valid() {
-        $stat_data = @stat(BitFire::CACHE_PAGE);
-        return ($stat_data != false && ($stat_data['ctime'] + $this->_config[CONFIG_MAX_CACHE_AGE]) > time());
+    public function cached_page_is_valid(string $page) {
+        $stat_data = @stat($page);
+        $exp_time = $stat_data['ctime'] + Config::int(CONFIG_MAX_CACHE_AGE);
+        //echo "<!-- [$page]\n" . time() . "\n$exp_time\n"; print_r($stat_data); echo "-->\n";
+        $cache_valid = ($stat_data != false && $exp_time > time());
+        $h = "x-cache-valid: false";
+        if ($cache_valid) { $h = "x-cache-valid: true"; }
+        header($h);
+        //return false;
+        return $cache_valid;
     }
 
 
@@ -341,41 +416,53 @@ class BitFire
      * inspect a request and block failed requests
      * return false if inspection failed...
      */
-    public function inspect() : \TF\Maybe {
+    public function inspect() : \TF\MaybeBlock {
+
+        // block from the htaccess file
+        if (isset($this->_request->get['_block'])) {
+            return BitFire::new_block(28001, "_block", "url", $this->_request->get['_block'], 0);
+        }
+
+        // if we are disabled, just return
+        if ($this->_request === NULL || Config::disabled(CONFIG_ENABLED)) {
+            return \TF\MaybeBlock::of(NULL);
+        }
+
         // dashboard requests, TODO: MOVE TO api.php
-        if ($this->_request->path === Config::str(CONFIG_DASHBOARD_PATH)) {
-            require_once WAF_DIR."dashboard.php";
+        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH)) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
+            require_once WAF_DIR."src/dashboard.php";
             serve_dashboard($this->_request->path);
         }
         
 
-        $block = \TF\Maybe::$FALSE;
+        // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
+        \TF\Maybe::$FALSE = \TF\MaybeBlock::of(NULL);
+        $block = \TF\MaybeBlock::of(NULL);
+
         if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
 
         // don't inspect local commands
         if (!isset($_SERVER['REQUEST_URI'])) { return $block; }
 
-		if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
-            require_once WAF_DIR."headers.php";
-			\BitFireHeader\send_security_headers($this->_request);
-		}
-        
         // bot filtering
         if ($this->bot_filter_enabled()) {
-            require_once WAF_DIR . 'botfilter.php';
+            require_once WAF_DIR . 'src/botfilter.php';
             $this->bot_filter = new BotFilter($this->cache);
             $block = $this->bot_filter->inspect($this->_request);
         }
 
+        if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
+            require_once WAF_DIR."src/headers.php";
+			\BitFireHeader\send_security_headers($this->_request);
+		}
+
 
         // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            require_once WAF_DIR . 'webfilter.php';
+            require_once WAF_DIR . 'src/webfilter.php';
             $this->_web_filter = new \BitFire\WebFilter($this->cache);
             $block = $this->_web_filter->inspect($this->_request);
         }
-
-        $block->doifnot(array($this, "cache_behind"));
 
         return $block;
     }
