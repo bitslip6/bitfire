@@ -1,13 +1,13 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 use TF\CacheStorage;
-require WAF_DIR . "bitfire_pure.php";
+require WAF_DIR . "src/bitfire_pure.php";
 
 
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
-require_once WAF_DIR."const.php";
-require_once WAF_DIR."storage.php";
-require_once WAF_DIR."util.php";
+require_once WAF_DIR."src/const.php";
+require_once WAF_DIR."src/storage.php";
+require_once WAF_DIR."src/util.php";
 require_once WAF_DIR."english.php";
 
 
@@ -303,7 +303,7 @@ class BitFire
 
             if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET) ||
              ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET))) {
-                require_once WAF_DIR."api.php";
+                require_once WAF_DIR."src/api.php";
                 exit($fn($this->_request));
             }
         } else { \TF\debug("no api command"); }
@@ -432,7 +432,7 @@ class BitFire
         // dashboard requests, TODO: MOVE TO api.php
         //if (trim($this->_request->path,"/") == trim(Config::str(CONFIG_DASHBOARD_PATH), "/")) {
         if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH)) || $_GET[BITFIRE_COMMAND] == "DASHBOARD") {
-            require_once WAF_DIR."dashboard.php";
+            require_once WAF_DIR."src/dashboard.php";
             serve_dashboard($this->_request->path);
         }
         
@@ -448,20 +448,20 @@ class BitFire
 
         // bot filtering
         if ($this->bot_filter_enabled()) {
-            require_once WAF_DIR . 'botfilter.php';
+            require_once WAF_DIR . 'src/botfilter.php';
             $this->bot_filter = new BotFilter($this->cache);
             $block = $this->bot_filter->inspect($this->_request);
         }
 
         if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
-            require_once WAF_DIR."headers.php";
+            require_once WAF_DIR."src/headers.php";
 			\BitFireHeader\send_security_headers($this->_request);
 		}
 
 
         // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            require_once WAF_DIR . 'webfilter.php';
+            require_once WAF_DIR . 'src/webfilter.php';
             $this->_web_filter = new \BitFire\WebFilter($this->cache);
             $block = $this->_web_filter->inspect($this->_request);
         }

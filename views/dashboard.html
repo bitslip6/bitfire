@@ -923,68 +923,6 @@
 </table>
  
 
-       
-<!--
-<table class="table table-sm">
-  <thead class="details">
-    <tr>
-      <th scope="col">Time</th>
-      <th scope="col">IP</th>
-      <th scope="col">Browser</th>
-      <th scope="col">Code</th>
-      <th scope="col">Param</th>
-      <th scope="col">Value</th>
-      <th scope="col">Pattern</th>
-    </tr>
-  </thead>
-  <tbody style="font-size:10px;">
-    <?php 
-    require_once WAF_DIR."botfilter.php";
-    $idx = 0;
-    if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
-    <tr>
-      <td class="nowrap" scope="row"><?php echo date('M d, H:i:s', strtotime($line['tv']))?></td>
-      <td class="nowrap" style="min-width:125px;"><?php echo $line['ip'] . " <span class=\"country {$line['country']}\">" . $line['country']; ?></span></td>
-      <td class="wrap"><?php 
-        $tmp = BitFireBot\parse_agent($line['ua']);
-        echo $tmp->browser . "/". join('.', array_slice(explode('.', $tmp->ver), 0, 2)) ?></td>
-      <td class="nowrap">
-        <a tabindex="<?php echo $idx++;?>" role="button" class="btn btn-sm btn-danger" 
-        data-toggle="popover"
-        data-placement="top"
-        data-trigger="focus"
-        title="Details"
-        data-content="<?php echo htmlspecialchars(str_replace('"', "'", json_encode($line, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT))); ?>"><?php echo $line['eventid'] ?? '00000'; ?></a>
-        </td>
-
-      <td class="wrap"><?php echo htmlspecialchars($line['item'])?></td>
-      <td class="wrap"><?php echo htmlspecialchars($line['match'])?></td>
-      <td class="wrap"><?php echo htmlspecialchars($line['name'])?></td>
-    </tr>
-    <tr>
-      <td colspan="8" class="tbalt nowrap">
-        <?php if ($line['valid']??-1 >= 2) { ?>
-          <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg> 
-        <?php } else if ($line['whitelist']??false) { ?>
-          <svg class="blue" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
-        <?php } else if ($line['valid']??-1 > -1){ ?>
-          <svg class="red" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M21,15v-2h-3.07c-0.05-0.39-0.12-0.77-0.22-1.14l2.58-1.49l-1-1.73L16.92,10c-0.28-0.48-0.62-0.91-0.99-1.29 C15.97,8.48,16,8.25,16,8c0-0.8-0.24-1.55-0.65-2.18L17,4.17l-1.41-1.41l-1.72,1.72c-1.68-0.89-3.1-0.33-3.73,0L8.41,2.76L7,4.17 l1.65,1.65C8.24,6.45,8,7.2,8,8c0,0.25,0.03,0.48,0.07,0.72C7.7,9.1,7.36,9.53,7.08,10L4.71,8.63l-1,1.73l2.58,1.49 c-0.1,0.37-0.17,0.75-0.22,1.14H3v2h3.07c0.05,0.39,0.12,0.77,0.22,1.14l-2.58,1.49l1,1.73L7.08,18c1.08,1.81,2.88,3,4.92,3 s3.84-1.19,4.92-3l2.37,1.37l1-1.73l-2.58-1.49c0.1-0.37,0.17-0.75,0.22-1.14H21z M13,17h-2v-6h2V17z"/></g></g></svg>
-        <?php } else { ?>
-          <svg class="yellow" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14zM12 6.72c-1.96 0-3.5 1.52-3.5 3.47h1.75c0-.93.82-1.75 1.75-1.75s1.75.82 1.75 1.75c0 1.75-2.63 1.57-2.63 4.45h1.76c0-1.96 2.62-2.19 2.62-4.45 0-1.96-1.54-3.47-3.5-3.47zm-.88 8.8h1.76v1.76h-1.76z"/></svg>
-        <?php } ?>
-        <span class="method"><?php
-        echo htmlspecialchars($line['verb']) . '</span>';
-        echo $line['scheme'] . "://" . htmlspecialchars($line['url']);
-        echo (strlen($line['params']) > 0) ? '' . htmlspecialchars($line['params']) : "";
-        if ($line['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['ua'], 0, 64)); }
-      ?>
-      </td>
-    </tr>
-
-    <?php } } ?>
-  </tbody>
-</table>
--->
               </div>
             </div>
           </div>
