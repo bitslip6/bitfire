@@ -309,7 +309,7 @@ class MaybeA implements MaybeI {
     public function extract(string $key, $default = NULL) : MaybeI { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } if (is_object($this->_x)) { return new static($this->_x->$key??$default); } return new static($default); }
     public function index(int $index) : MaybeI { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? NULL); } return new static(NULL); }
     public function isa(string $type) : bool { return $this->_x instanceof $type; }
-    public function __toString() : string { return (string)$this->_x; }
+    public function __toString() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
 }
 class Maybe extends MaybeA {
     public function __invoke(string $type = null) { return $this->value($type); }
@@ -318,7 +318,7 @@ class MaybeBlock extends MaybeA {
     public function __invoke() : ?Block { return $this->_x; }
 }
 class MaybeStr extends MaybeA {
-    public function __invoke() : ?string { return (string)$this->_x; }
+    public function __invoke() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
     public function compare(string $test) : bool { return (!empty($this->_x)) ? $this->_x == $test : false; }
 }
 Maybe::$FALSE = MaybeBlock::of(NULL);
