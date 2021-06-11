@@ -307,6 +307,7 @@ class BotFilter {
 
         // javascript browser challenges
         if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+
             if (isset($_POST['_bfxa'])) {
                 $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
