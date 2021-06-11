@@ -4,7 +4,7 @@ namespace BitFire;
 use function TF\file_recurse;
 use function TF\really_writeable;
 
-require_once WAF_DIR . "api.php";
+require_once WAF_DIR . "src/api.php";
 
 /*
 //\TF\dbg($_SERVER);
@@ -65,7 +65,7 @@ function serve_dashboard(string $dashboard_path) {
         header("Cache-Control: no-store, private, no-cache, max-age=0");
         header('Expires: '.gmdate('D, d M Y H:i:s \G\M\T', 100000));
         http_response_code(203);
-        require_once WAF_DIR . "botfilter.php";
+        require_once WAF_DIR . "src/botfilter.php";
 
         $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR."config.ini.php");
 

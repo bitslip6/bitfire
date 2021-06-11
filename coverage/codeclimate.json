@@ -39,7 +39,7 @@
         "covered": 43,
         "total": 155
       },
-      "name": "storage.php"
+      "name": "src/storage.php"
     },
     {
       "blob_id": "5d9953dc368ed47a30274103044bc8faf048ff7b",
@@ -51,7 +51,7 @@
         "covered": 30,
         "total": 200
       },
-      "name": "cuckoo.php"
+      "name": "src/cuckoo.php"
     },
     {
       "blob_id": "5ede0c36a02c6de74fe72b6ede1416ea53a37220",
@@ -63,7 +63,7 @@
         "covered": 147,
         "total": 256
       },
-      "name": "botfilter.php"
+      "name": "src/botfilter.php"
     },
     {
       "blob_id": "8a61931295cc3813fc8508e96bf7c3340128225a",
@@ -87,7 +87,7 @@
         "covered": 168,
         "total": 420
       },
-      "name": "util.php"
+      "name": "src/util.php"
     },
     {
       "blob_id": "560bdea36d69f775c2825f4124a7e0f2e48b0715",
@@ -99,7 +99,7 @@
         "covered": 98,
         "total": 253
       },
-      "name": "bitfire.php"
+      "name": "src/bitfire.php"
     },
     {
       "blob_id": "526d25126c71f1ef40c30ef7ea678399afba269f",
@@ -111,7 +111,7 @@
         "covered": 59,
         "total": 213
       },
-      "name": "bitfire_pure.php"
+      "name": "src/bitfire_pure.php"
     },
     {
       "blob_id": "250aab144e95c6a2143c2ad2725251f8189e9a63",
@@ -123,7 +123,7 @@
         "covered": 2,
         "total": 27
       },
-      "name": "dashboard.php"
+      "name": "src/dashboard.php"
     },
     {
       "blob_id": "ea983334553436a2fb0b9293805e699f032364c6",
@@ -135,7 +135,7 @@
         "covered": 2,
         "total": 33
       },
-      "name": "headers.php"
+      "name": "src/headers.php"
     }
   ],
   "repo_token": ""
