@@ -306,7 +306,14 @@ class MaybeA implements MaybeI {
     }
     public function append($value) : MaybeI { $this->_x = (is_array($this->_x)) ? array_push($this->_x, $value) : $value; return $this; }
     public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
-    public function extract(string $key, $default = NULL) : MaybeI { if (is_array($this->_x)) { return new static($this->_x[$key] ?? $default); } if (is_object($this->_x)) { return new static($this->_x->$key??$default); } return new static($default); }
+    public function extract(string $key, $default = NULL) : MaybeI {
+        if (is_array($this->_x)) {
+            return new static($this->_x[$key] ?? $default);
+        } else if (is_object($this->_x)) {
+            return new static($this->_x->$key ?? $default);
+        }
+        return new static($default);
+    }
     public function index(int $index) : MaybeI { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? NULL); } return new static(NULL); }
     public function isa(string $type) : bool { return $this->_x instanceof $type; }
     public function __toString() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
@@ -789,6 +796,7 @@ function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
     return $result;
 }
 
+
 /**
  * load the ini file and cache the parsed code if possible
  * TODO: move initial config into separate function
@@ -812,53 +820,8 @@ function parse_ini(string $ini_src) : void {
         }
         // auto configuration
         if (!CFG::enabled("configured")) {
-            if (CFG::str("encryption_key") === "default_encryption_key") {
-                $enc = \TF\random_str(32);
-                file_replace($ini_src, "encryption_key = 'default_encryption_key'", "encryption_key = '$enc'");
-            }
-            if (CFG::str("secret") === "default_secret_value") {
-                $sec = \TF\random_str(24);
-                file_replace($ini_src, "secret = 'default_secret_value'", "secret = '$sec'");
-            }
-            if (CFG::str("cache_type") === "nop") {
-                if (function_exists('shmop_open')) {
-                    file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
-                }
-                else if (function_exists('apcu')) {
-                    file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'apcu'");
-                }
-                else if (function_exists('shm_get_var')) {
-                    file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shm'");
-                }
-            }
-            if (isset($_SERVER['X-FORWARDED-FOR'])) {
-                file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\"");
-            }
-            else if (isset($_SERVER['FORWARDED'])) {
-                file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
-            }
-            if (CFG::str("browser_cookie") === "_bitfire") {
-                $sec = \TF\random_str(5);
-                file_replace($ini_src, "browser_cookie = '_bitfire'", "browser_cookie = '_{$sec}'");
-            }
-            if (count($_COOKIE) > 1) {
-                file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
-            }
-            $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
-            file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
-            file_replace($ini_src, "configured = false", "configured = true");
-        }
-    }
-
-    // pro key and no pro files, download them UGLY, clean this!
-    if (strlen(CFG::str("pro_key")) > 20 && !file_exists(WAF_DIR. "pro.php")) {
-        $content = bit_http_request("GET", "https://bitfire.co/download.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "pro.php"));
-        if ($content) {
-            if (file_put_contents(WAF_DIR."pro.php", $content, LOCK_EX) !== strlen($content)) { \TF\debug("unable to write pro file"); };
-            $content = bit_http_request("GET", "https://bitfire.co/download.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "proapi.php"));
-            if ($content) {
-                if (file_put_contents(WAF_DIR."proapi.php", $content, LOCK_EX) !== strlen($content)) { \TF\debug("unable to write pro file"); };
-            }
+            require_once WAF_DIR . "src/server.php";
+            \BitFireSvr\update_config($ini_src);
         }
     }
 }
