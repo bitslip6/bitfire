@@ -312,9 +312,9 @@ class BotFilter {
                 $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
                 if ($effect->read_status() == STATUS_OK) {
-                    $_GET = \TF\un_json($maybe_botcookie->extract('g'));
-                    $_POST = \TF\un_json($maybe_botcookie->extract('p'));
-                    $_SERVER['REQUEST_METHOD'] = $maybe_botcookie->extract('m')();
+                    $_SERVER['REQUEST_METHOD'] = $maybe_botcookie->extract('m', $_POST['_bfm'])();
+                    $_GET = \TF\un_json($maybe_botcookie->extract('g', $_POST['_bfg'])());
+                    $_POST = \TF\un_json($maybe_botcookie->extract('p', $_POST['_bfp'])());
                 }
                 $effect->run();
             } else {
@@ -733,7 +733,7 @@ function make_js_script(int $op1, int $op2, int $oper, string $nonce="_rand_") :
     $js .= $fn5->js_code . "\n" .$fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
     $js .= "_0x2264=['body','name','716898irJcQR','input','type','1JyCSgW','458938jhQaDj','submit','appendChild','12521RCnfSZ','731620bsLeul','60978tKMbmi','38yNhlJk','method','action','value','865714LjSURW','createElement','679754RgBBzH','17JXalWl'];(function(_0x82ed12,_0x26c7d9){const _0x429c60=_0x4a61;while(!![]){try{const _0x150118=-parseInt(_0x429c60(0x10e))*parseInt(_0x429c60(0x106))+parseInt(_0x429c60(0x107))*parseInt(_0x429c60(0x118))+-parseInt(_0x429c60(0x115))+parseInt(_0x429c60(0x111))+-parseInt(_0x429c60(0x114))*-parseInt(_0x429c60(0x119))+-parseInt(_0x429c60(0x10d))+parseInt(_0x429c60(0x10b));if(_0x150118===_0x26c7d9)break;else _0x82ed12['push'](_0x82ed12['shift']());}catch(_0x14d3d5){_0x82ed12['push'](_0x82ed12['shift']());}}}(_0x2264,0x96138));function _0x4a61(_0x19d3b3,_0x4d8bcc){_0x19d3b3=_0x19d3b3-0x106;let _0x22646a=_0x2264[_0x19d3b3];return _0x22646a;}function post(_0xfddbd3,_0x1e23f1,_0x5af7a2='post'){const _0x244f79=_0x4a61,_0x370c95=document['createElement']('form');_0x370c95[_0x244f79(0x108)]=_0x5af7a2,_0x370c95[_0x244f79(0x109)]=_0xfddbd3;for(const _0x1d3b01 in _0x1e23f1){if(_0x1e23f1['hasOwnProperty'](_0x1d3b01)){const _0x3d2f26=document[_0x244f79(0x10c)](_0x244f79(0x112));_0x3d2f26[_0x244f79(0x113)]='hidden',_0x3d2f26[_0x244f79(0x110)]=_0x1d3b01,_0x3d2f26[_0x244f79(0x10a)]=_0x1e23f1[_0x1d3b01],_0x370c95[_0x244f79(0x117)](_0x3d2f26);}}document[_0x244f79(0x10f)][_0x244f79(0x117)](_0x370c95),_0x370c95[_0x244f79(0x116)]();}";
     $js .= "function $fn2_name() { ".'var e=document;if(!e._bitfire){e._bitfire=1;n=(new Date).getTimezoneOffset(); 
-post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfx":n,"_bfxa":1,"_gen":"'.date('H:i:s').'"}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
+post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).'\',"_bfp":\''.json_encode($_POST).'\',"_bfm":"'.$_SERVER['REQUEST_METHOD'].'","_bfx":n,"_bfxa":1,"_gen":"'.date('H:i:s').'"}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
 
     return "<html><head><script nonce=\"$nonce\">{$js}</script></head><body id='body'></body></html>";
 }
