@@ -419,8 +419,8 @@ class BitFire
     public function inspect() : \TF\MaybeBlock {
 
         // block from the htaccess file
-        if (isset($this->_request->get['_block'])) {
-            return BitFire::new_block(28001, "_block", "url", $this->_request->get['_block'], 0);
+        if (isset($this->_request->get['_bfblock'])) {
+            return BitFire::new_block(28001, "_bfblock", "url", $this->_request->get['_bfblock'], 0);
         }
 
         // if we are disabled, just return
