@@ -5,6 +5,9 @@ use Traversable;
 
 use const BitFire\CONFIG_COOKIES;
 use const BitFire\CONFIG_ENCRYPT_KEY;
+use const BitFire\CONFIG_USER_TRACK_COOKIE;
+use \BitFire\Config as CFG;
+use \BitFire\Block as Block;
 
 if (defined("_TF_UTIL")) { return; }
 define("_TF_UTIL", 1);
@@ -190,8 +193,8 @@ class Effect {
         if ($this->response > 0) {
             http_response_code($this->response);
         }
-        if (\BitFire\Config::enabled(CONFIG_COOKIES)) {
-            \TF\cookie(\BitFire\Config::str(\BitFire\CONFIG_USER_TRACK_COOKIE), \TF\encrypt_ssl(\BitFire\Config::str(\BitFire\CONFIG_ENCRYPT_KEY), $this->cookie), \TF\DAY); 
+        if (CFG::enabled(CONFIG_COOKIES) && $this->cookie != '') {
+            \TF\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), \TF\encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), $this->cookie), DAY); 
         }
         do_for_all_key_value($this->headers, '\TF\header_send');
         do_for_all_key_value($this->cache, function($nop, \TF\CacheItem $item) {
@@ -312,7 +315,7 @@ class Maybe extends MaybeA {
     public function __invoke(string $type = null) { return $this->value($type); }
 }
 class MaybeBlock extends MaybeA {
-    public function __invoke() : ?\BitFire\Block { return $this->_x; }
+    public function __invoke() : ?Block { return $this->_x; }
 }
 class MaybeStr extends MaybeA {
     public function __invoke() : ?string { return (string)$this->_x; }
@@ -535,7 +538,7 @@ function str_reduce(string $string, callable $fn, string $prefix = "", string $s
  * reverse ip lookup, takes ipv4 and ipv6 addresses, 
  */
 function reverse_ip_lookup(string $ip) : MaybeStr {
-    if (\BitFire\Config::str('dns_service', 'localhost')) {
+    if (CFG::str('dns_service', 'localhost')) {
         debug("gethostbyaddr %s", $ip);
         return MaybeStr::of(gethostbyaddr($ip));
     }
@@ -563,7 +566,7 @@ function ip_lookup(string $ip, string $type = "A") : MaybeStr {
     assert(in_array($type, array("A", "AAAA", "CNAME", "MX", "NS", "PTR", "SRV", "TXT", "SOA")), "invalid dns query type [$type]");
     debug("ip_lookup %s / %s", $ip, $type);
     $dns = null;
-    if (\BitFire\Config::str('dns_service') === 'localhost') {
+    if (CFG::str('dns_service') === 'localhost') {
         return MaybeStr::of(($type === "PTR") ?
             gethostbyaddr($ip) : gethostbyname($ip));
     }
@@ -704,9 +707,9 @@ function http_ctx(string $method, int $timeout) : array {
  */
 function debug(string $fmt, ...$args) {
     static $idx = 0;
-    if (\BitFire\Config::enabled("debug_file")) {
-        file_put_contents(\BitFire\Config::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
-    } else if (\BitFire\Config::enabled("debug_header") && !headers_sent()) {
+    if (CFG::enabled("debug_file")) {
+        file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
+    } else if (CFG::enabled("debug_header") && !headers_sent()) {
         $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), sprintf($fmt, ...$args));
         header("x-bitfire-$idx: $tmp");
     }
@@ -741,9 +744,9 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
  * NOT PURE 
  */
 function cookie(string $name, string $value, int $exp) : void {
-    if (!\BitFire\Config::enabled("cookies_enabled")) { return; }
+    if (!CFG::enabled("cookies_enabled")) { \TF\debug("wont set cookie, disabled"); return; }
     if (PHP_VERSION_ID < 70300) { 
-        setcookie($name, $value, $exp, '/; samesite=strict', '', false, true);
+        setcookie($name, $value, time() + $exp, '/; samesite=strict', '', false, true);
     } else {
         setcookie($name, $value, [
             'expires' => time() + $exp,
@@ -788,6 +791,7 @@ function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
 
 /**
  * load the ini file and cache the parsed code if possible
+ * TODO: move initial config into separate function
  * NOT PURE
  */
 function parse_ini(string $ini_src) : void {
@@ -795,26 +799,26 @@ function parse_ini(string $ini_src) : void {
     $parsed_file = "$ini_src.php";
     if (file_exists($parsed_file) && filemtime($parsed_file) > filemtime($ini_src)) {
         require "$ini_src.php";
-        \BitFire\Config::set($config);
+        CFG::set($config);
     } else {
         $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
-        \BitFire\Config::set($config);
-        if (\BitFire\Config::enabled("cache_ini_files")) {
+        CFG::set($config);
+        if (CFG::enabled("cache_ini_files")) {
             if (!file_write($parsed_file, "<?php\n\$config=". var_export($config, true).";\n")) {
                 file_replace($ini_src, "cache_ini_files = true", "cache_ini_files = false");
             }
         }
         // auto configuration
-        if (!\BitFire\Config::enabled("configured")) {
-            if (\BitFire\Config::str("encryption_key") === "default_encryption_key") {
+        if (!CFG::enabled("configured")) {
+            if (CFG::str("encryption_key") === "default_encryption_key") {
                 $enc = \TF\random_str(32);
                 file_replace($ini_src, "encryption_key = 'default_encryption_key'", "encryption_key = '$enc'");
             }
-            if (\BitFire\Config::str("secret") === "default_secret_value") {
+            if (CFG::str("secret") === "default_secret_value") {
                 $sec = \TF\random_str(24);
                 file_replace($ini_src, "secret = 'default_secret_value'", "secret = '$sec'");
             }
-            if (\BitFire\Config::str("cache_type") === "nop") {
+            if (CFG::str("cache_type") === "nop") {
                 if (function_exists('shmop_open')) {
                     file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
                 }
@@ -831,7 +835,7 @@ function parse_ini(string $ini_src) : void {
             else if (isset($_SERVER['FORWARDED'])) {
                 file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
             }
-            if (\BitFire\Config::str("browser_cookie") === "_bitfire") {
+            if (CFG::str("browser_cookie") === "_bitfire") {
                 $sec = \TF\random_str(5);
                 file_replace($ini_src, "browser_cookie = '_bitfire'", "browser_cookie = '_{$sec}'");
             }
@@ -842,7 +846,18 @@ function parse_ini(string $ini_src) : void {
             file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
             file_replace($ini_src, "configured = false", "configured = true");
         }
+    }
 
+    // pro key and no pro files, download them UGLY, clean this!
+    if (strlen(CFG::str("pro_key")) > 20 && !file_exists(WAF_DIR. "pro.php")) {
+        $content = bit_http_request("GET", "https://bitfire.co/download.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "pro.php"));
+        if ($content) {
+            if (file_put_contents(WAF_DIR."pro.php", $content, LOCK_EX) !== strlen($content)) { \TF\debug("unable to write pro file"); };
+            $content = bit_http_request("GET", "https://bitfire.co/download.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "proapi.php"));
+            if ($content) {
+                if (file_put_contents(WAF_DIR."proapi.php", $content, LOCK_EX) !== strlen($content)) { \TF\debug("unable to write pro file"); };
+            }
+        }
     }
 }
 
@@ -860,9 +875,9 @@ function cache_bust(?string $url="") : string {
     header("Cache-Control: no-store, private, no-cache, max-age=0");
     header('Expires: '.gmdate('D, d M Y H:i:s \G\M\T', 100000));
 
-    if (\BitFire\Config::enabled('cache_bust_parameter')) {
+    if (CFG::enabled('cache_bust_parameter')) {
         $url = trim($url, " \t&?");
-        return $url . ((strpos($url, '?') != false) ? "&" : '?') . get_random_param(\BitFire\Config::str('cache_bust_parameter'));
+        return $url . ((strpos($url, '?') != false) ? "&" : '?') . get_random_param(CFG::str('cache_bust_parameter'));
     }
     return trim($url, '?&');
 }
