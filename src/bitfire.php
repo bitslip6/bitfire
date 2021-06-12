@@ -42,7 +42,6 @@ class Request
 
     public $agent;
     public $referer;
-    public $ajax = false;
 }
 
 
