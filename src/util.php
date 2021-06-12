@@ -409,7 +409,10 @@ function apidata($method, $params) {
 function encrypt_ssl(string $password, string $text) : string {
     assert(between(strlen($password), 12, 32), "cipher password length is out of bounds (12/32): [$password]");
     $iv = random_str(16);
-    return openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
+    $e = openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
+    //$d = decrypt_ssl($password, $e);
+    //\TF\debug("decrypted: [%s] / [%s]", $e, $d);
+    return $e;
 }
 
 /**
@@ -417,7 +420,10 @@ function encrypt_ssl(string $password, string $text) : string {
  * PURE
  */ 
 function raw_decrypt(string $cipher, string $iv, string $password) {
-    return openssl_decrypt($cipher, "AES-128-CBC", $password, 0, $iv);
+    //\TF\debug("cipher [%s] iv [%s] pass [%s]", $cipher, $iv, $password);
+    $decrypt =  openssl_decrypt($cipher, "AES-128-CBC", $password, 0, $iv);
+    //\TF\debug("decrypt [%s]", $decrypt);
+    return $decrypt;
 }
 
 /**
@@ -431,21 +437,24 @@ function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
 
     if (!$password || strlen($password) < 8) { 
         \TF\debug("wont decrypt with short encryption key");
-        return MaybeStr::of(false);
+        return MaybeStr::of(NULL);
     }
     if (!$cipher || strlen($cipher) < 8) { 
         \TF\debug("wont decrypt with no encryption data");
-        return MaybeStr::of(false);
+        return MaybeStr::of(NULL);
     }
 
 
     $exploder = partial("explode", ".");
     $decrypt = partial_right("TF\\raw_decrypt", $password);
 
-    return MaybeStr::of($cipher)
+    $a = MaybeStr::of($cipher)
         ->then($exploder)
         ->if(function($x) { return is_array($x) && count($x) === 2; })
         ->then($decrypt, true);
+    //\TF\debug("errors: [%s]", var_export($a->errors()));
+    //\TF\dbg($a);
+    return $a;
 }
 
 
@@ -615,7 +624,6 @@ function bit_curl(string $method, string $url, $data, array $optional_headers = 
     curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
     if ($optional_headers != NULL) {
         $headers = map_reduce($optional_headers, function($key, $value, $carry) { $carry[] = "$key: $value"; return $carry; }, array());
-        \TF\debug("curl headers: " . print_r($headers, true));
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     }
     
@@ -718,6 +726,7 @@ function debug(string $fmt, ...$args) {
         file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
     } else if (CFG::enabled("debug_header") && !headers_sent()) {
         $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), sprintf($fmt, ...$args));
+        if (function_exists('untaint')) { untaint($tmp); }
         header("x-bitfire-$idx: $tmp");
     }
     $idx++;
@@ -824,7 +833,28 @@ function parse_ini(string $ini_src) : void {
             \BitFireSvr\update_config($ini_src);
         }
     }
+
+    check_pro_ver(CFG::str("pro_key"));
 }
+
+function check_pro_ver(string $pro_key) {
+    // pro key and no pro files, download them UGLY, clean this!
+    if (strlen($pro_key) > 20 && !file_exists(WAF_DIR. "src/proapi.php")) {
+        $out = WAF_DIR."src/pro.php";
+        $content = \TF\bit_http_request("POST", "https://bitfire.co/getpro.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "pro.php"));
+        \TF\debug("downloaded pro code [%d]", strlen($content));
+        if ($content && strlen($content) > 100) {
+            if (@file_put_contents($out, $content, LOCK_EX) !== strlen($content)) { \TF\debug("unable to write [%s]", $out); };
+            $content = \TF\bit_http_request("POST", "https://bitfire.co/getpro.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "proapi.php"));
+            \TF\debug("downloaded proapi code [%d]", strlen($content));
+            $out = WAF_DIR."src/proapi.php";
+            if ($content && strlen($content) > 100) {
+                if (@file_put_contents($out, $content, LOCK_EX) !== strlen($content)) { \TF\debug("unable to write [%s]", $out); };
+            }
+        }
+    }
+}
+
 
 // generate a random parameter value
 function get_random_param(?string $name) : string {
