@@ -180,7 +180,7 @@
           console.log(e);
           e.innerText = cap(type);
           fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
-          if (type == "block" || type == "on") {
+          if (type == "block" || type == "on" || type == "true") {
             e.classList.remove("btn-warning");
             e.classList.remove("btn-secondary");
             e.classList.add("btn-success");
@@ -657,7 +657,7 @@
               <div class="col">
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire FREE : Release 1.4.3
+                  BitFire FREE : Release <?php echo \BitFire\BITFIRE_SYM_VER?>
                 </h6>
                 <p style="font-size:.75rem;color:#666;">
                   Upgrade to <span class="blue font-weight-bold">PRO</span> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
@@ -1143,7 +1143,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
             element.classList.remove("btn-success");
             element.classList.remove("btn-secondary");
             element.classList.add("btn-warning");
-          } else if (element.innerText.trim() == "block") {
+          } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim == "on") {
             element.classList.remove("btn-warning");
             element.classList.remove("btn-secondary");
             element.classList.add("btn-success");
