@@ -262,6 +262,8 @@ class BitFire
     protected function __construct() {
 
         $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
+
+        if ($this->_request->path === "/favicon.ico") { http_response_code(404); die(); }
         $this->api_call();
 
         if (Config::enabled(CONFIG_ENABLED)) {
@@ -293,8 +295,8 @@ class BitFire
     }
 
     protected function api_call() {
+        $fn = '\\BitFire\\' . htmlentities($_REQUEST[BITFIRE_COMMAND]??'nop');
         if (isset($_GET[BITFIRE_COMMAND])) {
-            $fn = '\\BitFire\\' . htmlentities($_REQUEST[BITFIRE_COMMAND]??'nop');
             if (!in_array($fn, BITFIRE_API_FN)) { print_r(BITFIRE_API_FN); exit("unknown function [$fn]"); }
 
 
@@ -303,7 +305,11 @@ class BitFire
             if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET) ||
              ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET))) {
                 require_once WAF_DIR."src/api.php";
-                exit($fn($this->_request));
+                if (function_exists($fn)) {
+                    exit($fn($this->_request));
+                } else {
+                    \TF\debug("function does not exist"); exit("no function");
+                }
             }
         } else { \TF\debug("no api command"); }
     }
