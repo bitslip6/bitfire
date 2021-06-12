@@ -64,6 +64,8 @@ function update_config(string $ini_src) {
  */
 function line_at_a_time(string $filename) : iterable {
     $r = fopen($filename, 'r');
+    if (!$r) { return; }
+
     while (($line = fgets($r)) !== false) {
         yield trim($line);
     }
