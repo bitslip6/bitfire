@@ -8,6 +8,7 @@ use \BitFire\Config;
 
 
 function newbotfilter() : BitFire\BotFilter {
+    $_SERVER['REQUEST_METHOD'] = 'GET';
     $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
     $cache = \TF\CacheStorage::get_instance();
     return new BitFire\BotFilter($cache);
@@ -38,43 +39,8 @@ function it_should_validate_host_headers(array $data) : void {
     assert_eq($is_valid, $data[1], "host header validation failed [{$data[0]}]");
 }
 
-function ajax_data() : array {
-    return array(
-        "valid xml request" => array("any browser 1.0", 'XMLHttpRequest', '', '', true),
-        "valid xml request wf" => array("any browser 1.0", 'XMLHttpRequest', 'foo fetch', '', true),
-        "valid xml request wf_ui0" => array("any browser 1.0", 'XMLHttpRequest', 'foo fetch', '0', true),
-        "valid xml request wf_ui1" => array("any browser 1.0", 'XMLHttpRequest', 'foo fetch', '1', true),
-        "valid xml request wf_uifoo2" => array("any browser 1.0", 'XMLHttpRequest', 'cors', 'foo', true),
-        "valid xml request wf_uifoo3" => array("any browser 1.0", 'XMLHttpRequest', 'websocket', 'foo', true),
-        "invalid fetch request, UI fallback 1" => array("any browser 1.0", null, 'foo fetch', null, true),
-        //"invalid fetch request, UI fallback 2" => array("any browser 1.0", null, 'foo fetch', '1', false),
-        //"valid fetch request" => array("any browser 1.0", '', 'cors', '', true),
-        "valid fetch request" => array("any browser 1.0", '', 'websocket', '', true),
-        //"valid http" => array("any browser 1.0", '', '', '1', false),
-        //"valid dont upgrade request" => array("any browser 1.0", '', '', '0', false),
-        "valid empty upgrade request" => array("any browser 1.0", '', '', '', true),
-    );
-}
 
-
-/**
- * @dataprovider ajax_data
- */
-function it_should_identify_ajax_requests(array $data) : void {
-    $_SERVER['HTTP_X_REQUESTED_WITH'] = $data[1];
-    $_SERVER['HTTP_SEC_FETCH_MODE'] = $data[2];
-    $_SERVER['HTTP_USER_AGENT'] = $data[0];
-    $_SERVER['HTTP_USER_AGENT'] = $data[0];
-    $_SERVER['REQUEST_SCHEME'] = 'http';
-    $_SERVER['HTTP_UPGRADE_INSECURE_REQUESTS'] = $data[3];
-    $request = \BitFire\process_request2(array(), array(), $_SERVER, array());
-
-    $valid = \BitFire\is_ajax($request);
-    echo "[$valid] [{$data[4]}]\n";
-    assert_eq($valid, $data[4], "is ajax validation failed");
-}
-
-function agent_list() : array {
+function agent_list3() : array {
     return array(
         "linux browser 1" => array("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36", "linux", "chrome", "44.0.2403.157"),
         "linux browser 2" => array("Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:24.0) Gecko/20100101 Firefox/24.0", "linux", "firefox", "24.0"),
@@ -82,22 +48,23 @@ function agent_list() : array {
         "android 1" => array("Mozilla/5.0 (Linux; U; Android 2.2) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1", "android", "android", "2.2"),
         "android 2" => array("Mozilla/5.0 (Linux; Android 9; SM-G950F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/74.0.3729.157 Mobile Safari/537.36", "android", "chrome", "74.0.3729.157"),
         "android 3" => array("Mozilla/5.0 (Linux; U; Android 4.3; de-de; GT-I9300 Build/JSS15J) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30", "android", "android", "4.3"),
-        "android 4" => array("Mozilla/5.0 (Linux; U; Android 6.0.1; zh-CN; F5121 Build/34.0.A.1.247) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/40.0.2214.89 UCBrowser/11.5.1.944 Mobile Safari/537.36", "android", "chrome", "40.0.2214.89"),
-        "safari 1" => array("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.59.10 (KHTML, like Gecko) Version/5.1.9 Safari/534.59.10", "os x", "safari", "534.59.10")
+        "android 4" => array("Mozilla/5.0 (Linux; U; Android 6.0.1; zh-CN; F5121 Build/34.0.A.1.247) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/40.0.2214.89 UCBrowser/11.5.1.944 Mobile Safari/537.36", "android", "chrome", "40.0"),
+        "safari 1" => array("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.59.10 (KHTML, like Gecko) Version/5.1.9 Safari/534.59.10", "os x", "safari", "534.59")
     );
 }
 
 /**
- * @dataprovider agent_list
+ * @dataprovider agent_list3
  */
 function it_should_identify_agents(array $data) : void {
-    $parsed = BitFireBot\parse_agent($data[0]);
-    assert_eqic($parsed['os'], $data[1], "unable to detect os");
+    $parsed = BitFireBot\parse_agent(strtolower($data[0]));
+    //print_r($parsed);
+    assert_eqic($parsed->os, $data[1], "unable to detect os");
     if ($data[2] != null) {
-        assert_eqic($parsed['browser'], $data[2], "unable to detect browser");
+        assert_eqic($parsed->browser, $data[2], "unable to detect browser");
     }
     if ($data[3] != null) {
-        assert_eqic($parsed['ver'], $data[3], "unable to detect version");
+        assert_eqic($parsed->ver, $data[3], "unable to detect version");
     }
 }
 
@@ -108,7 +75,6 @@ function it_should_identify_agents(array $data) : void {
 function test_empty_botlist_returns_false() : void {
     $botlist1 = array("", false, "something");
     $empty_array = array();
-    CacheStorage::set_type("shmop");
     $in_list = BitFireBot\agent_in_list("", "157.240.213.10", $empty_array);
     assert_eq($in_list, 0, "test empty bot list returned valid bot!");
 
@@ -174,21 +140,21 @@ function test_verify_facebook_crawler() : void {
 
 
 // todo, add more browsers here ...
-function test_parse_agent() : void {
+function test_parse_agent2() : void {
     $answer = BitFireBot\parse_agent("Mozilla/5.0 (Linux; Android 7.1.2; AFTMM Build/NS6265; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/70.0.3538.110 Mobile Safari/537.36");
-    assert_eq($answer['os'], "android", "unable to find android os in user agent");
-    assert_eq($answer['browser'], "chrome", "unable to find android browser in user agent");
-    assert_eq($answer['ver'], "70.0.3538.110", "unable to find android ver in user agent");
+    assert_eq($answer->os, "android", "unable to find android os in user agent");
+    assert_eq($answer->browser, "chrome", "unable to find android browser in user agent");
+    assert_eq($answer->ver, "70.0.3538.110", "unable to find android ver in user agent");
 
     $answer = BitFireBot\parse_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36");
-    assert_eq($answer['os'], "windows", "unable to find windows os in user agent");
-    assert_eq($answer['browser'], "chrome", "unable to find chrome browser in user agent");
-    assert_eq($answer['ver'], "65.0.3325.181", "unable to find chrome ver in user agent");
+    assert_eq($answer->os, "windows", "unable to find windows os in user agent");
+    assert_eq($answer->browser, "chrome", "unable to find chrome browser in user agent");
+    assert_eq($answer->ver, "65.0.3325.181", "unable to find chrome ver in user agent");
 
     $answer = BitFireBot\parse_agent("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.75 Safari/537.36 OPR/36.0.2130.32");
-    assert_eq($answer['os'], "windows", "unable to find windows os in user agent");
-    assert_eq($answer['browser'], "opr", "unable to find opera browser in user agent");
-    assert_eq($answer['ver'], "36.0.2130.32", "unable to find opera ver in user agent");
+    assert_eq($answer->os, "windows", "unable to find windows os in user agent");
+    assert_eq($answer->browser, "opr", "unable to find opera browser in user agent");
+    assert_eq($answer->ver, "36.0.2130.32", "unable to find opera ver in user agent");
 }
 
 function test_strip_tracking_params() : void {
@@ -226,10 +192,12 @@ function test_whitelist_inspection() : void {
     assert_false($result->empty(), "did not correctly miss whitelist googlebot from non google ip");
 }
 
-function test_blacklist_inspection() : void {
+function test_blacklist_inspection2() : void {
     $_SERVER = array();
     $_SERVER['HTTP_USER_AGENT'] = 'T';
     $_SERVER['REQUEST_SCHEME'] = 'http';
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
     $request = \BitFire\process_request2(array(), array(), $_SERVER, array());
 
     $request->agent = "Mozilla/5.0 nmap1.2.3.4";
@@ -253,6 +221,8 @@ function test_basic_request_passes() : void {
     $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3';
     $_SERVER['HTTP_HOST'] = 'localhost:8080';
     $_SERVER['REQUEST_SCHEME'] = 'http';
+    $_SERVER['REQUEST_METHOD'] = 'GET';
+    $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
     $request = \BitFire\process_request2(array(), array(), $_SERVER, array());
 
     $maybe_block = $bf->inspect($request);
@@ -298,5 +268,3 @@ function test_is_ip_in_cidr_list() : void {
     //var_dump($result);
     //\TF\dbg($result);
 }
-
-CacheStorage::set_type('shmop');

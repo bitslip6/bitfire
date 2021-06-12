@@ -3,8 +3,8 @@
 if (!defined("WAF_DIR")) {
     define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
 }
-include_once WAF_DIR . "util.php";
-include_once WAF_DIR . "botfilter.php";
+include_once WAF_DIR . "src/util.php";
+include_once WAF_DIR . "src/botfilter.php";
 
 function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
@@ -31,6 +31,32 @@ function dead_can_ping_api() : void {
     assert_eq($pong, $id, "pong response invalid");
 }
 
+/**
+ * @type speed
+ */
+function test_read_raw_speed() : void {
+    $f1 = file ("/home/cory/tools/bitfire-release/cache/values.txt");
+    $f2 = file ("/home/cory/tools/bitfire-release/cache/keys.txt");
+}
+
+/**
+ * @type speed
+ */
+function test_read_enc_speed() : void {
+    $f1 = file_get_contents("/home/cory/tools/bitfire-release/cache/values.txt");
+    $dec = TF\decrypt_ssl("some_password", $f1);
+    $f2 = file_get_contents("/home/cory/tools/bitfire-release/cache/keys.txt");
+    $dec2 = TF\decrypt_ssl("some_password", $f2);
+}
+
+/**
+ * @type speed
+ */
+function test_recache_speed() : void {
+    $p1 = TF\recache_file(WAF_DIR."cache/keys.raw");
+    $p2 = TF\recache_file(WAF_DIR."cache/values.raw");
+}
+
 function test_can_encrypt_ssl() : void {
     $response = TF\encrypt_ssl("passwordpasswordpassword", "a test message");
     $parts = explode(".", $response);
@@ -41,16 +67,6 @@ function test_can_decrypt_ssl() : void {
     $original_message = "a test message";
     $encrypted = TF\encrypt_ssl("passwordpasswordpassword", $original_message);
     $decrypted = TF\decrypt_ssl("passwordpasswordpassword", $encrypted)();
-
-    //$cookie = "1482yFkhMQL3G8BPj2gLl8HLTR0uBsqnEftNezVfqrJ6F13dfhoT0ZNTsQ3VxCZ2btfsIE7VI8uBEiK2TChVZOWs1zuokxiiH2p/lz01Nwy2bPNkNRnhoZRwFlC1B2X6WsR6nOQWW1ZVAZmjU1NS489Evof+DzEY2sLxRSBqkoYtR2/MaERsnzq6yt3buc6yGH0dcRRwKN1wS2piurM3WBJnpBOSKcBA2ypYh6U4T9RnvCOyCJgr3S9TCu6KYYeX.a_PUSViMBIYw9IG0";
-    $cookie2 = "LefS1t6UEk1g8nLnCzIqYhM5%2BhlvU2EdVvwcoJ0MeYLgtP04LUWp7jDqOOF9XPfQQ77O8dlY5kq2gtbFD%2FQXu3NAVwyTSl0TZOa4%2BKKqpKm9qDoiH9jpaq8JASiNJnse7ixq5bxIsp%2FA1zExmtMzVen%2BniDsIsr0tu9icXcRXgs%3D.CIP7JNGyKy_Rz3u5";
-    $key = "PzYSeYq99o8iuzHny6YdsCT2";
-    $foo = \TF\decrypt_ssl($key, $cookie2);
-    echo "[$key] [$cookie2] = [$foo]\n";
-    $r = \BitFireBot\decrypt_tracking_cookie($cookie2, $key, "184.99.74.210");
-    print_r($r);
-    //->cookie(\TF\encrypt_ssl($encryption_key, json_encode(make_challenge_cookie($answer, $ip_data->ip_crc))));
-
     assert_eq($original_message, $decrypted , "decrypted message did not match original");
 }
 

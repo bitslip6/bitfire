@@ -12,14 +12,9 @@ use function BitFireBot\make_js_challenge;
 if (!defined("WAF_DIR")) {
     define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
 }
-include_once WAF_DIR . "util.php";
+include_once WAF_DIR . "src/util.php";
 
 $bf = \BitFire\BitFire::get_instance();
-
-function somefunc($a1, $a2, $a3, $a4 = "foobar") {
-    return "some func [$a1] [$a2] [$a3] [$a4]";
-}
-
 
 function test_make_js_challange() : void {
     $ip_data = \BitFire\map_ip_data(\BitFire\new_ip_data("127.0.0.1", "Mozilla/5.0 chrome 12.5"));
@@ -83,6 +78,7 @@ function test_verify_browser() : void {
     $request = new \BitFire\Request();
     $request->ip = $ip;
     $request->agent = $agent;
+    $request->path = "/";
     $request->post = array('_bfxa' => 1, '_bfa' => 0);
 
     $cookie = \TF\MaybeStr::of(NULL);
@@ -134,7 +130,7 @@ function test_bot_metric_inc() : void {
 
 function test_make_challenge_cookie() : void {
     $answer = new Answer(513, 9123, 4);
-    $cookie = \BitFireBot\make_challenge_cookie($answer->ans, "127.0.0.1");
+    $cookie = \BitFireBot\make_challenge_cookie($answer->ans, "127.0.0.1", "some user agent");
     assert_gt($cookie['et'], time()+60, "expire time too short");
     assert_eq($cookie['v'], 1, "verify did not default to 1");
     assert_eq($cookie['a'], -8610, "challenge answer was not encoded correctly");
