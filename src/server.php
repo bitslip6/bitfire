@@ -2,6 +2,7 @@
 namespace BitFireSvr;
 
 use BitFire\BitFire;
+use BitFire\Config as CFG;
 
 use function TF\ends_with;
 
@@ -16,6 +17,47 @@ const ACCESS_HOST = 11;
 const ACCESS_URL_METHOD = 12;
 const ACCESS_URL_URI = 13;
 
+
+/**
+ * call replace function $fn if config $param = $value.  replace with $new_value
+ */
+function replace_if_config(string $param, string $value, callable $fn, string $new_value) {
+    if (CFG::str($param) == $value) { $fn("$param = '$value'", "$param = '$new_value'"); }
+}
+
+/**
+ * update all system config values from defaults
+ */
+function update_config(string $ini_src) {
+    $replace_fn = \TF\partial('\TF\file_replace', $ini_src);
+    replace_if_config("encryption_key", "default_encryption_key", $replace_fn, \TF\random_str(32));
+    replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
+    replace_if_config("browser_cookie", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
+
+    if (CFG::str("cache_type") === "nop") {
+        if (function_exists('shmop_open')) {
+            \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
+        }
+        else if (function_exists('apcu')) {
+            \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'apcu'");
+        }
+        else if (function_exists('shm_get_var')) {
+            \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shm'");
+        }
+    }
+    if (isset($_SERVER['X-FORWARDED-FOR'])) {
+        \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\"");
+    }
+    else if (isset($_SERVER['FORWARDED'])) {
+        \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
+    }
+    if (count($_COOKIE) > 1) {
+        \TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
+    }
+    $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
+    \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
+    \TF\file_replace($ini_src, "configured = false", "configured = true");
+}
 
 /**
  * return a single line from a file at a time
