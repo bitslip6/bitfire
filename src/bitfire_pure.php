@@ -172,7 +172,6 @@ function process_request2(array $get, array $post, array $server, array $cookie 
     $request->get_freq = freq_map($request->get);
     $request->post_freq = freq_map($request->post);
     $request->post_raw = ($server['REQUEST_METHOD'] == "POST") ? file_get_contents("php://input") : "";
-    $request->ajax = is_ajax($request);
 
     return $request;
 }
@@ -222,48 +221,6 @@ function get_counts_reduce(array $carry, string $input) : array {
             ($counts[$key] ?? 0);
     }
     return $carry;
-}
-
-
-/**
- * returns true if the request is an ajax request
- * looks for an 'ajax' parameter to $request with the cached value of this call
- * if not found, inspects the request and returns the inspection result
- * TODO: add testing for some file download types? (*cough WF *cough)
- * PURE
- */
-function is_ajax(\BitFire\Request $request) : bool {
-    if ($request->ajax) { return $request->ajax; }
-    
-    $ajax = false;
-    if ($request->method !== 'GET') { $ajax = true; }
-    // path is a  wordpress ajax request
-    else if (\stripos($request->path, "ajax") !== false) { $ajax = true; }
-    
-    // accept || content type is requested as javascript
-    // if the client is looking for something other than html, it's ajax
-    else if (($request->headers->accept != '' && \stripos($request->headers->accept, 'text/html') === false) &&
-        ($request->headers->content != '' && \stripos($request->headers->content, 'text/html') === false)) { $ajax = true; }
-
-    // often these are set on fetch or xmlhttp requests
-    else if ($request->headers->requested_with !== '' || $request->headers->fetch_mode === 'cors' ||
-        $request->headers->fetch_mode === 'websocket') { $ajax = true; }
-
-    // fall back to using upgrade insecure (should only come on main http requests), this should work for all major browsers
-    /*
-    else {
-        $ajax = ($request->scheme == "http" && ($request->headers->upgrade_insecure === null || \strlen($request->headers->upgrade_insecure) < 1)) ? true : false;
-    }
-    */
-    if ($ajax) {
-        header("x-bf-ajax: true");
-    }
-    return $ajax;
-}
-
-// opposite of is_ajax
-function is_not_ajax(Request $request) : bool {
-    return !is_ajax($request);
 }
 
 /**
