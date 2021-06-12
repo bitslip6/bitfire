@@ -13,7 +13,7 @@ if (!file_exists(BLOCK_DIR)) { \mkdir(BLOCK_DIR, 0700, true); }
 include WAF_DIR."src/bitfire.php";
 try {
     \TF\parse_ini(WAF_DIR."config.ini");
-    \TF\debug("begin");
+    \TF\debug("begin " . BITFIRE_SYM_VER);
 
     if (Config::str('pro_key') && file_exists(WAF_DIR . "src/pro.php") ) { include WAF_DIR . "src/pro.php"; }
     $bitfire = \Bitfire\BitFire::get_instance(); 
@@ -41,4 +41,4 @@ catch (\Exception $e) {
 }
 
 $m1 = microtime(true);
-\TF\debug("time: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H:i:s") . " GMT");
+\TF\debug("time: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT");
