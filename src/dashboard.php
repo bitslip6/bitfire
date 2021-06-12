@@ -4,6 +4,7 @@ namespace BitFire;
 use function TF\file_recurse;
 
 require_once WAF_DIR . "src/api.php";
+require_once WAF_DIR . "src/const.php";
 
 /*
 //\TF\dbg($_SERVER);
@@ -54,6 +55,9 @@ function url_to_path($url) {
     return substr($url, $idx);
 }
 
+/**
+ * TODO: split this up into multiple functions
+ */
 function serve_dashboard(string $dashboard_path) {
     if (!isset($_SERVER['PHP_AUTH_PW']) ||
         (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
@@ -106,11 +110,6 @@ function serve_dashboard(string $dashboard_path) {
         }
     }
     
-    //die("blocks");
-    //$data = \TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 10, 2500);
-    //\TF\dbg($reporting);
-
-
     $locked = is_locked();
     $lock_action = ($locked) ? "unlock" : "lock";
     
@@ -118,8 +117,6 @@ function serve_dashboard(string $dashboard_path) {
         \TF\read_last_lines(Config::file(CONFIG_BLOCK_FILE), 20, 2500) :
         \TF\CacheStorage::get_instance()->load_data("log_data");
     $blocks = (isset($src[0])) ? array_reverse(add_country(\TF\un_json_array($src)), true) : array();
-
-    //\TF\dbg($blocks);
 
     for($i=0,$m=count($blocks); $i<$m; $i++) {
         //$cl = intval($blocks[$i]['block']['code']/1000)*1000;
