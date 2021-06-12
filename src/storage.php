@@ -169,7 +169,6 @@ class CacheStorage implements Storage {
      * load the data from cache, else call $generator
      */
     public function load_or_cache(string $key_name, int $ttl, callable $generator) {
-        assert(self::$_type !== null, "must call set_type before using cache");
         if (($data = $this->load_data($key_name)) === null) {
             $data = $generator();
             $this->save_data($key_name, $data, $ttl);
