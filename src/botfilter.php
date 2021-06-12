@@ -214,7 +214,7 @@ class BotFilter {
     public $browser;
     public $cache;
 
-    public $ip_data = array();
+    public $ip_data = NULL;
 
     protected $_constraints;
 
@@ -237,7 +237,6 @@ class BotFilter {
      * NOT PURE!
      */
     public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
-
         $block = \TF\Maybe::$FALSE;
         // EARLY BAIL OUTS...
         // ignore urls that receive consistant bot access that may be difficult to identify
@@ -268,7 +267,7 @@ class BotFilter {
         $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
             Config::str(CONFIG_ENCRYPT_KEY),
-            $request->ip);
+            $request->ip, $request->agent);
 
         // handle bots
         if ($block->empty() && $this->browser->bot) {
@@ -305,23 +304,32 @@ class BotFilter {
         $this->browser->valid = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
         \TF\debug("x-valid: " . $this->browser->valid . " ip_data_valid [" . $this->ip_data->valid . "]");
 
+        $this->verify_browser($request, $maybe_botcookie); 
+        return $block;
+    }
+
+    protected function verify_browser(\BitFire\Request $request, \TF\MaybeStr $maybe_botcookie) {
         // javascript browser challenges
         if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
             if (isset($_POST['_bfxa'])) {
                 $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
+                // UGLY, move this to function
                 if ($effect->read_status() == STATUS_OK) {
+                    // reset the get, post and request method with the original page request
                     $_SERVER['REQUEST_METHOD'] = $maybe_botcookie->extract('m', $_POST['_bfm'])();
                     $_GET = \TF\un_json($maybe_botcookie->extract('g', $_POST['_bfg'])());
                     $_POST = \TF\un_json($maybe_botcookie->extract('p', $_POST['_bfp'])());
+                    // remove any possible cache busting from the browser required reload script
+                    unset($_GET['_rqw']);
+                    $_SERVER['REQUEST_URI'] = str_replace('_rqw=xpr', '', $_SERVER['REQUEST_URI']);
                 }
                 $effect->run();
             } else {
-                send_browser_verification($this->ip_data, Config::str(CONFIG_ENCRYPT_KEY))->run();
+                send_browser_verification($this->ip_data, $request->agent)->run();
             }
         }
 
-        return $block;
     }
 }
 
@@ -338,6 +346,21 @@ function bot_metric_inc(string $stat) : \TF\CacheItem {
         \TF\DAY);
 }
 
+
+/**
+ * try to clear all server and client state and re-load the page
+ */
+function browser_clear(\BitFire\Request $request) : \TF\Effect {
+    $key = "BITFIRE_IP_".$request->ip;
+    \TF\debug("browser clear");
+    return \TF\Effect::new()->cookie('')
+    ->update(new \TF\CacheItem($key, function($x) { return ''; }, function() { return ''; }, -\TF\DAY))
+    ->update(bot_metric_inc('broken'))
+    ->header("Location", $request->path)
+    ->status(STATUS_SERVER_STATE_FAIL)
+    ->exit(true);
+}
+
 /**
  * verifies the response matches the expected bot verification code
  * @test test_verify_browser
@@ -346,17 +369,21 @@ function bot_metric_inc(string $stat) : \TF\CacheItem {
 function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeStr $cookie) : \TF\Effect {
 
     $effect = \TF\Effect::new();
+    // user manually refreshed the page, lets clear as much server state as we can and try to reload the original page
+    if ($request->get['_rqw']??'' === 'xpr') {
+        return browser_clear($request);
+    }
+
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     $correct_answer = $cookie->extract('a')->extract('ans');
     \TF\debug("x-valid-answer 1: ($correct_answer)");
     $correct_answer->set_if_empty($answer->ans);
     \TF\debug("x-valid-answer 2: ($correct_answer)");
 
-    // unable to read correct answer from ip_data or cookie, increment broken counter, try to redirect back to a working page
+    // unable to read correct answer from ip_data or cookie, increment broken counter, 
+    // lets clear as much server state as we can and try to reload the original page
     if ($correct_answer->value('int') == 0) {
-        return $effect->update(bot_metric_inc('broken'))
-            ->header("Location", $request->path)
-            ->status(STATUS_SERVER_STATE_FAIL);
+        return browser_clear($request);
     }
 
     // correct answer
@@ -366,7 +393,7 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeStr
         $effect->update(bot_metric_inc('valid'))
             ->status(STATUS_OK)
             // set the response valid cookie
-            ->cookie(\TF\en_json(array('ip' => $request->ip, 'v' => 2, 'et' => time() + 60*60, 'm' => $cookie->extract('m')(), 'g' => $cookie->extract('g'), 'p' => $cookie->extract('p')())))
+            ->cookie(\TF\en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 3600)))
             // update the ip_data valid state for 60 minutes, TODO: make this real func, not anon-func
             ->update(new CacheItem('BITFIRE_IP_'.$request->ip, function ($data) {
                         $ip_data = unpack_ip_data($data); $ip_data['valid'] = 2; return pack_ip_data($ip_data);
@@ -661,21 +688,24 @@ function parse_agent(string $user_agent) : UserAgent {
  * TODO: create test function
  * PURE!
  */
-function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip) : \TF\MaybeStr {
+function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeStr {
+    //untaint($cookie_data);
+    //\TF\debug("encrypted cookie [%s] [%s]", $encrypt_key, $cookie_data);
     $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
         ->then("TF\\un_json")
-        ->if(function($cookie) use ($src_ip) {
-            \TF\debug("decrypted cookie [%s] ", var_export($cookie, true));
+        ->if(function($cookie) use ($src_ip, $agent) {
             if (!isset($cookie['ip'])) {
-                \TF\debug("decrypted cookie has no ip");
+                \TF\debug("invalid decrypted cookie [%s] ", var_export($cookie, true));
                 return false;
             } else {
                 $src_ip_crc = \BitFireBot\ip_to_int($src_ip);
                 $cookie_match = (is_array($cookie) && (intval($cookie['ip']??0) == intval($src_ip_crc)));
                 $time_good = ((intval($cookie['et']??0)) > time());
+                $agent_good = crc32($agent) == $cookie['ua'];
                 if (!$cookie_match) { \TF\debug("cookie ip does not match"); }
                 if (!$time_good) { \TF\debug("cookie expired"); }
-                return ($cookie_match && $time_good);
+                if (!$agent_good) { \TF\debug("agent mismatch live: [%s] [%d] cookie:[%d]", $agent, crc32($agent), $cookie['ua']??0); }
+                return ($cookie_match && $time_good && $agent_good);
             }
         });
     return $r;
@@ -744,11 +774,12 @@ post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).
  * @test test_bot.php test_make_challenge_cookie
  * PURE!
  */
-function make_challenge_cookie($answer, string $ip) : array {
+function make_challenge_cookie($answer, string $ip, string $agent) : array {
     $d = array(
             'et' => time() + 60*10,
             'v' => 1,
             'a' => $answer,
+            'ua' => crc32($agent),
             'ip' => $ip,
             'm' => $_SERVER['REQUEST_METHOD'],
             'g' => json_encode($_GET),
@@ -763,7 +794,7 @@ function make_challenge_cookie($answer, string $ip) : array {
  * @test test_bot.php send_test_browser_verification
  * PURE! 
  */
-function send_browser_verification(\BitFire\IPData $ip_data, string $encryption_key) : \TF\Effect {
+function send_browser_verification(\BitFire\IPData $ip_data, string $agent) : \TF\Effect {
 
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     \TF\debug("send verify answer: $answer");
@@ -778,7 +809,7 @@ function send_browser_verification(\BitFire\IPData $ip_data, string $encryption_
         ))
         ->exit(true)
         ->out(make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper))
-        ->cookie(json_encode(make_challenge_cookie($answer, $ip_data->ip_crc)));
+        ->cookie(json_encode(make_challenge_cookie($answer, $ip_data->ip_crc, $agent)));
 
     return \TF\cache_prevent($effect);
 }
