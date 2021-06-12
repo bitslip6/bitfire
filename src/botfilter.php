@@ -245,7 +245,7 @@ class BotFilter {
         }
 
         // handle wp-cron and other self requested pages
-        if (Config::enabled("skip_local_bots") && (\BitFireBot\is_local_request($request))) {
+        if (Config::enabled("skip_local_bots", true) && (\BitFireBot\is_local_request($request))) {
             return $block;
         }
 
@@ -792,9 +792,14 @@ function make_challenge_cookie($answer, string $ip, string $agent) : array {
 /**
  * send the browser verification challenge
  * @test test_bot.php send_test_browser_verification
- * PURE! 
+ * PURE-ish, required Config! 
  */
 function send_browser_verification(\BitFire\IPData $ip_data, string $agent) : \TF\Effect {
+
+    if (Config::str('cache_type') !== 'nop' && Config::disabled("cookies_enabled")) {
+        \TF\debug("browser verify disabled, required cache_type or cookies");
+        return \TF\Effect::new();
+    }
 
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     \TF\debug("send verify answer: $answer");
