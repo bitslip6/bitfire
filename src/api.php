@@ -9,6 +9,7 @@ use TF\CacheStorage;
 use function TF\bit_http_request;
 use function TF\ends_with;
 use function TF\map_reduce;
+use function TF\str_reduce;
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -168,20 +169,45 @@ function is_quoted(string $data) : bool {
 }
 
 function upgrade(\Bitfire\Request $request) {
-    if (\version_compare($_GET['ver'], BITFIRE_SYM_VER, '>')) { 
+    if (\version_compare($_GET['ver'], BITFIRE_SYM_VER, '>=')) { 
         $dest = WAF_DIR."cache/{$_GET['ver']}.tar.gz";
         $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/bitfire_{$_GET['ver']}.tar.gz";
+        /*
         $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
-        $len = strlen($content->value("string"));
         $content->then(\TF\partial('\file_put_contents', $dest));
 
-        if ($content->value('int') < $len) {
-            \TF\debug("error writting [%d] bytes to [%s]", $len, $dest);
+        if ($content->value('int') < 50000) {
+            \TF\debug("unable to download $dest");
             exit("error writing file $dest");
         }
+        */
         
+        $cwd = getcwd();
+        $f = __FILE__;
+
+        $target = WAF_DIR . "cache";
+        require_once WAF_DIR."src/tar.php";
+        $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
+        //unlink($dest);
         
+        \TF\file_recurse(WAF_DIR."cache/bitfire-bitfire_{$_GET['ver']}", function ($x) {
+            //print_r($x);
+            //die("\nhit");
+            //\TF\dbg($x);
+            if (is_file($x)) {
+                $base = basename($x);
+                $path = dirname($x);
+                $root = str_replace(WAF_DIR."cache/bitfire-bitfire_{$_GET['ver']}/", "", $x);
+                echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
+				rename($x, WAF_DIR . $root);
+            }
+        });//, "/.*.php/");
+
+        exit("[$success] [$dest] $cwd [$f]");
+    } else {
+        \TF\debug("cowardly refusing to download same or older release");
     }
+    exit("version too old");
 }
 
 function set_pass(\BitFire\Request $request) {
