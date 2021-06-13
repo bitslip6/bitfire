@@ -9,6 +9,20 @@ class TarHeader {
     public $type;
 }
 
+function tar_read_file($fh, TarHeader $header) : string {
+    \TF\debug("read [%s] bytes %d", $header->filename, $header->size);
+    $result = "";
+    $ctr = 0;
+    while ($header->size > 0 && $ctr++ < 20000) {
+        $tmp = gzread($fh, 512);
+        $len = strlen($tmp);
+        if ($len != 512) { \TF\debug("only read %d bytes / 512", $len); }
+        $result .= substr($tmp, 0, min($header->size, 512));
+        $header->size -= strlen($tmp);
+    }
+    return $result;
+}
+
 /**
  * extract tar archive into destination directory
  */
@@ -17,19 +31,14 @@ function tar_extract(string $file, string $destination = "") : ?bool {
     if ($input == false) { return \TF\debug("unable to open [%s]", $file); }
 
     while(($header = tar_read_header($input, $destination))) {
-        if ((bool) $header->type) {
+        if ($header->type == 5) {
+            \TF\debug("mkdir [%s]", $header->filename);
             @mkdir($header->filename, 0755, true);
-        } else { 
-            $output = @fopen($header->filename, "wb");
-            if (!$output) { return \TF\debug("unable to open [%s]", $header->filename); }
-
-            while ($header->size > 0) {
-                $tmp = gzread($input, 512);
-                $len = strlen($tmp);
-                if ($len != fwrite($output, $tmp)) { return \TF\debug("unable to write %d bytes [%s]", $len, $header->filename); }
-                $header->size -= $len;
-            }
-            fclose($output);
+        }
+        // skip github file comments
+        else if ($header->type == 'g') { 
+        } else if ($header->size > 0) { 
+            file_put_contents($header->filename, tar_read_file($input, $header), LOCK_EX);
             @chmod($header->filename, $header->perm);
         }
     }
@@ -50,10 +59,10 @@ function tar_calc_checksum(string $block) : int {
 /**
  * parse a tar header
  */
-function tar_read_header($fh) : ?TarHeader {
+function tar_read_header($fh, string $dest) : ?TarHeader {
     $block = gzread($fh, 512);
     if ($block === false || strlen($block) != 512 || trim($block) === '') {
-        return \TF\debug("unable to read header block");
+        return \TF\debug("unable to read header block, end of archive");
     }
 
     $header = new TarHeader();
@@ -63,11 +72,13 @@ function tar_read_header($fh) : ?TarHeader {
         "a100filename/a8perm/a8uid/a8gid/a12size/a12mtime/a8checksum/a1typeflag/a100link/a6magic/a2version/a32uname/a32gname/a8devmajor/a8devminor/a155prefix",
         $block
     );
-    if (!$header || $header->checksum != OctDec(trim($data['checksum']))) {
-        return \TF\debug("calc checksum failed [%d] / [%d]", $header->checksum, $data['checksum']);
+    $uid = trim($data['uid']);
+    if ($uid != '' && !ctype_digit($uid)) { return \TF\debug("error reading header file [%d]!", $uid); }
+    if (!$header || ($data['checksum'] > 0 && $header->checksum != OctDec(trim($data['checksum'])))) {
+        return \TF\debug("calc checksum failed (%s) [%d] / [%d]", $header->filename, $header->checksum, $data['checksum']);
     }
 
-    $header->filename = trim($data['filename']);
+    $header->filename = $dest . "/" . trim($data['filename']);
     $header->perm     = OctDec(trim($data['perm']));
     $header->size     = OctDec(trim($data['size']));
     $header->type     = $data['typeflag'];

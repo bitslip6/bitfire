@@ -1,10 +1,13 @@
 <?php declare(strict_types=1);
 
+use function TF\tar_extract;
+
 if (!defined("WAF_DIR")) {
     define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
 }
 include_once WAF_DIR . "src/util.php";
 include_once WAF_DIR . "src/botfilter.php";
+include_once WAF_DIR . "src/tar.php";
 
 function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
@@ -189,3 +192,11 @@ function test_ip_to_country() : void {
     assert_eq(\TF\ip_to_country("54.213.205.144"), 1, "bitslip not in US");
 }
 
+
+/**
+ * @type tar
+ */
+function test_untar() : void {
+    BitFire\Config::set_value("debug_echo", true);
+    tar_extract(WAF_DIR."tests/bitfire-1.4.6.tar.gz", "/tmp");
+}
