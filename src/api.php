@@ -171,8 +171,7 @@ function is_quoted(string $data) : bool {
 function upgrade(\Bitfire\Request $request) {
     if (\version_compare($_GET['ver'], BITFIRE_SYM_VER, '>=')) { 
         $dest = WAF_DIR."cache/{$_GET['ver']}.tar.gz";
-        $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/bitfire_{$_GET['ver']}.tar.gz";
-        /*
+        $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/{$_GET['ver']}.tar.gz";
         $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
         $content->then(\TF\partial('\file_put_contents', $dest));
 
@@ -180,7 +179,6 @@ function upgrade(\Bitfire\Request $request) {
             \TF\debug("unable to download $dest");
             exit("error writing file $dest");
         }
-        */
         
         $cwd = getcwd();
         $f = __FILE__;
