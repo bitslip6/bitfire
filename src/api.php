@@ -190,14 +190,14 @@ function upgrade(\Bitfire\Request $request) {
         $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
         //unlink($dest);
         
-        \TF\file_recurse(WAF_DIR."cache/bitfire-bitfire_{$_GET['ver']}", function ($x) {
+        \TF\file_recurse(WAF_DIR."cache/bitfire-{$_GET['ver']}", function ($x) {
             //print_r($x);
             //die("\nhit");
             //\TF\dbg($x);
             if (is_file($x)) {
                 $base = basename($x);
                 $path = dirname($x);
-                $root = str_replace(WAF_DIR."cache/bitfire-bitfire_{$_GET['ver']}/", "", $x);
+                $root = str_replace(WAF_DIR."cache/bitfire-{$_GET['ver']}/", "", $x);
                 echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
 				rename($x, WAF_DIR . $root);
             }
