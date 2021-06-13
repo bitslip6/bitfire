@@ -55,7 +55,7 @@ function url_compare(string $url1, string $url2) : bool { return (trim($url1, "/
 /**
  * recursively perform a function over directory traversal.
  */
-function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL) : array {
+function file_recurse1(string $dirname, callable $fn, string $regex_filter = NULL) : array {
     $dir_iterator = new \RecursiveDirectoryIterator($dirname);
     $recurse_iterator = new \RecursiveIteratorIterator($dir_iterator);
     $iterator = $recurse_iterator;
@@ -71,6 +71,35 @@ function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL
 
     return $result;
 }
+
+/**
+ * recursively perform a function over directory traversal.
+ */
+function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL, array $result = array()) : array {
+    $maxfiles = 1000;
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0) {
+            $path = $dirname . '/' . $file;
+			// echo " regex [$regex_filter]\n";
+            if (!$file || $file === '.' || $file === '..' || is_link($file)) {
+                continue;
+            } if (is_dir($path)) {
+                $result = file_recurse($path, $fn, $regex_filter, $result);
+			} else if ($regex_filter != NULL) {
+				// echo "REGEX FILTER: $regex_filter\n";
+				if (preg_match($regex_filter, $path)) {
+                	$result[] = $fn($path);
+				}
+            } else {
+                $result[] = $fn($path);
+            }
+        }
+        \closedir($dh);
+    }
+    return $result;
+}
+
+
 
  
 
@@ -728,8 +757,10 @@ function debug(string $fmt, ...$args) {
         $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), sprintf($fmt, ...$args));
         if (function_exists('untaint')) { untaint($tmp); }
         header("x-bitfire-$idx: $tmp");
+        $idx++;
+    } else if (CFG::enabled("debug_echo")) {
+        printf("$fmt\n", ...$args);
     }
-    $idx++;
 }
 
 
