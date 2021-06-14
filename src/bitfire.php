@@ -6,8 +6,8 @@ require WAF_DIR . "src/bitfire_pure.php";
 
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
 require_once WAF_DIR."src/const.php";
-require_once WAF_DIR."src/storage.php";
 require_once WAF_DIR."src/util.php";
+require_once WAF_DIR."src/storage.php";
 require_once WAF_DIR."src/english.php";
 
 
@@ -285,32 +285,33 @@ class BitFire
         // encoder is json_encode with pretty printing if file has word "pretty" in it
         $encoder = \TF\partial_right('json_encode', (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0);
         @file_put_contents(Config::file(CONFIG_REPORT_FILE), join(",", array_map($encoder, self::$_reporting)) . "\n", FILE_APPEND);
-/*
+        /*
         $out = "";
         foreach (self::$_reporting as $report) {
             $out .= json_encode($report, $opts) . "\n";
         }
-*/
+        */
     }
 
-    protected function api_call() {
+    /**
+     * handle API calls
+     */
+    protected function api_call() : void {
+        if (!isset($_REQUEST[BITFIRE_COMMAND])) {
+            return;
+        }
+
         $fn = '\\BitFire\\' . htmlentities($_REQUEST[BITFIRE_COMMAND]??'nop');
-        if (isset($_GET[BITFIRE_COMMAND])) {
-            if (!in_array($fn, BITFIRE_API_FN)) { print_r(BITFIRE_API_FN); exit("unknown function [$fn]"); }
+        if (!in_array($fn, BITFIRE_API_FN)) {
+            exit("unknown function [$fn]");
+        }
 
+        $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
 
-            $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
-
-            if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET) ||
-             ($_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET))) {
-                require_once WAF_DIR."src/api.php";
-                if (function_exists($fn)) {
-                    exit($fn($this->_request));
-                } else {
-                    \TF\debug("function does not exist"); exit("no function");
-                }
-            }
-        } else { \TF\debug("no api command"); }
+        if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??$_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET, "no_such_value")) {
+            require_once WAF_DIR."src/api.php";
+            exit($fn($this->_request));
+        }
     }
 
     /**
@@ -434,7 +435,7 @@ class BitFire
         }
 
         // dashboard requests, TODO: MOVE TO api.php
-        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH)) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
+        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
             require_once WAF_DIR."src/dashboard.php";
             serve_dashboard($this->_request->path);
         }
@@ -465,7 +466,7 @@ class BitFire
         // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
             require_once WAF_DIR . 'src/webfilter.php';
-            $this->_web_filter = new \BitFire\WebFilter($this->cache);
+            $this->_web_filter = new \BitFire\WebFilter();
             $block = $this->_web_filter->inspect($this->_request);
         }
 
