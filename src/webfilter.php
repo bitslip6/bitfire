@@ -1,5 +1,9 @@
 <?php
 namespace BitFire;
+
+use TF\CacheStorage;
+use BitFire\Config as CFG;
+
 use function TF\map_reduce;
 
 const MIN_SQL_CHARS=8;
@@ -41,31 +45,51 @@ class StringResult {
 
 class WebFilter {
 
-    protected $_reducer;
 
-    public function __construct(\TF\CacheStorage $cache) {
-        $this->_reducer = \TF\partial('\\BitFIRE\\generic_reducer', 
-            $cache->load_or_cache("webkeys2", \TF\DAY, \TF\partial('\TF\recache_file', WAF_DIR.'cache/keys.raw')),
-            $cache->load_or_cache("webvalues2", \TF\DAY, \TF\partial('\TF\recache_file', WAF_DIR.'cache/values.raw')));
+    public function __construct() {
     }
 
     public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
-
         $block = \TF\MaybeBlock::$FALSE;
+        if ((count($request->get) + count($request->post)) == 0) {
+            return $block;
+        } 
+
+
         if (Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            $block->doifnot('\TF\map_whilenot', $request->get, $this->_reducer, NULL);
-            $block->doifnot('\TF\map_whilenot', $request->post, $this->_reducer, NULL);
-            $block->doifnot('\TF\map_whilenot', $request->cookies, $this->_reducer, NULL);
+            $cache = CacheStorage::get_instance();
+            
+            // update keys and values
+            $keyfile = WAF_DIR."cache/keys2.raw";
+            $valuefile = WAF_DIR."cache/values2.raw";
+            if (!file_exists($keyfile) || filemtime($keyfile) < time()-\TF\DAY) {
+                $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 0, "md5"=>md5(CFG::str("encryption_key")))));
+                $data->then(\TF\partial('\file_put_contents', $keyfile));
+                $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 1, "md5"=>md5(CFG::str("encryption_key")))));
+                $data->then(\TF\partial('\file_put_contents', $valuefile));
+            }
+
+            // the parameter reducer
+            $reducer = \TF\partial('\\BitFire\\generic_reducer', 
+                $cache->load_or_cache("webkeys3", \TF\DAY, \TF\partial('\TF\recache2_file', $keyfile)),
+                $cache->load_or_cache("webvalues3", \TF\DAY, \TF\partial('\TF\recache2_file', $valuefile)));
+
+            $block->doifnot('\TF\map_whilenot', $request->get, $reducer, NULL);
+            $block->doifnot('\TF\map_whilenot', $request->post, $reducer, NULL);
+            $block->doifnot('\TF\map_whilenot', $request->cookies, $reducer, NULL);
         }
+
 
         if (Config::enabled(CONFIG_SPAM_FILTER)) {
             $block = $block->doifnot('\BitFire\search_spam', http_build_query($request->get) . http_build_query($request->post));
         }
 
+
         // no easy way to pass these three parameters, a bit ugly for now...
         if (Config::enabled(CONFIG_SQL_FILTER)) {
             $block = $block->doifnot('\BitFire\sql_filter', $request);
         }
+
 
         if (Config::enabled(CONFIG_FILE_FILTER)) {
             $block->doifnot('\\BitFire\\file_filter', $_FILES);
@@ -130,7 +154,7 @@ function check_ext_mime(array $file) : \TF\MaybeBlock {
      // check file extensions...
     $info = pathinfo($file["tmp_name"]);
     if (\TF\ends_with(strtolower($file["name"]), "php") ||
-        in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
+        in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "php9", "phar"))) {
         return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
     }
         
