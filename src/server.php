@@ -132,11 +132,15 @@ function find_wordpress_root(string $root_dir) : array {
     return $roots;
 }
 
+/**
+ * get the wordpress version from a word press root directory
+ */
 function get_wordpress_version(string $root_dir) : string {
     $full_path = "$root_dir/wp-includes/version.php";
     $wp_version = "0";
-    include_once $full_path;
-    if ($wp_version === "0") { die("WTF?\n"); }
+    if (file_exists($full_path)) {
+        include_once $full_path;
+    }
     return \TF\trim_off($wp_version, "-");
 }
 
@@ -193,7 +197,7 @@ function get_server_config_file_list() :array {
 }
 
 
-function pattern_to_list_3(array $patterns) :array {
+function pattern_to_list_3(array $patterns) : array {
     return append_reduce('glob', $patterns);
 }
 
@@ -331,6 +335,7 @@ function is_browser_request(?\BitFire\Request $request) {
  */
 function process_access_file(string $file_name) : array {
 
+    if (!file_exists($file_name)) { return array(); }
     $batch_size = 0;
     $batch = array();
     $exceptions = array();
