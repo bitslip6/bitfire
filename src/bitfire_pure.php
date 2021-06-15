@@ -1,6 +1,10 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 use TF\MaybeBlock;
+use BitFire\Config as CFG;
+use TF\Effect as Effect;
+
+use function TF\utc_date;
 
 /**
  * dashboard view helper
@@ -171,7 +175,7 @@ function process_request2(array $get, array $post, array $server, array $cookie 
     $request->cookies = \TF\map_mapvalue($cookie, '\\BitFire\\each_input_param', false);
     $request->get_freq = freq_map($request->get);
     $request->post_freq = freq_map($request->post);
-    $request->post_raw = ($server['REQUEST_METHOD'] == "POST") ? file_get_contents("php://input") : "";
+    $request->post_raw = ($server['REQUEST_METHOD']??'GET' == "POST") ? file_get_contents("php://input") : "";
 
     return $request;
 }
@@ -371,8 +375,8 @@ function make_post_data(\BitFire\Request $request, Block $block, ?IPData $ip_dat
         "scheme" => $request->scheme,
         "ua" => $request->agent ?? '',
         "url" => $request->host . ':' . $request->port . $request->path,
-        "params" => param_to_str($request->get, true),
-        "post" => param_to_str($request->post, true),
+        "params" => \BitFire\Pure\param_to_str($request->get, Config::arr("filtered_logging")),
+        "post" => \BitFire\Pure\param_to_str($request->post, Config::arr("filtered_logging")),
         "verb" => $request->method,
         "ts" => \TF\utc_microtime(true),
         "tv" => \TF\utc_date("D H:i:s ") . \TF\utc_date('P'),
@@ -397,14 +401,49 @@ function make_post_data(\BitFire\Request $request, Block $block, ?IPData $ip_dat
     return $data;
 }
 
+
+
+
+const BLOCK_MAP = array(1 => 'short_block_time', 2 => 'medium_block_time', 3 => 'long_block_time');
+
+
+/**
+ * add static IP block for $block->block_time
+ * depends on CFG : block time, response_code, allow_ip_block, GLOBAL BLOCK_MAP
+ */
+function block_ip(?Block $block, ?Request $req) : Effect {
+    if (!CFG::enabled('allow_ip_block') || !$block || $block->block_time < 1) { return new Effect(); }
+
+    return \BitFire\Pure\ip_block($block, $req, 
+        CFG::int(BLOCK_MAP[$block->block_time]??'short_block_time', 600));
+}
+
+namespace BitFire\Pure;
+use \TF\Effect as Effect;
+use \BitFire\Block as Block;
+use \BitFire\Request as Request;
+
+
+/**
+ * pure implementation of ip file blocking
+ * TEST: test_pure.php:test_ip_block
+ */
+function ip_block(Block $block, Request $request, int $block_time) : Effect {
+    $blockfile = BLOCK_DIR . '/' . $request->ip;
+    $exp = time() + $block_time;
+    $block_info = json_encode(array('time' => \TF\utc_time(), "block" => $block, "request" => $request));
+    return 
+        Effect::new()->file(new \TF\FileMod($blockfile, $block_info, LOCK_EX, $exp));
+
+}
+
 /**
  * pure param to string with name filtering and sub array support
  */
-function param_to_str(array $params, $filter = false) : string {
+function param_to_str(array $params, array $filter) : string {
     $post_params = array();
-    $filtered_names = Config::arr("filtered_logging");
     foreach ($params as $key => &$val) {
-        if ($filtered_names[$key] ?? false) {
+        if ($filter[$key] ?? false) {
             $val = "**REDACTED**";
         } else if (is_array($val) === true) {
             $val = implode(',', $val);
@@ -412,23 +451,4 @@ function param_to_str(array $params, $filter = false) : string {
         $post_params[] = $key.'='.$val;
     }
     return implode('&', $post_params);
-}
-
-
-
-const BLOCK_MAP = array(1 => 'short_block_time', 2 => 'medium_block_time', 3 => 'long_block_time');
-/**
- * add static IP block for $block->block_time
- */
-function block_ip(?\BitFire\Block $block, ?IPData $ip_data) : void {
-    if (!Config::enabled('allow_ip_block') || !$block || $block->block_time < 1) { return; }
-   
-    $blockfile = BLOCK_DIR . $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-    @file_put_contents($blockfile, $ip_data->ref || \substr(\uniqid(), 5, 8));
-
-    $exp = time() + Config::int(BLOCK_MAP[$block->block_time]??'short_block_time', 600);
-    \touch($blockfile, $exp);
-    
-    \http_response_code(Config::int('response_code', 500));
-    include WAF_DIR . DS . "views/block.php";
 }
