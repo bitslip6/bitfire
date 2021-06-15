@@ -12,7 +12,7 @@ const AGENT_MATCH = array(
     "opera" => "(opr)/\s*(\d+.\d+)",
     "chrome" => "(chrome)/\s*(\d+\.\d+)",
     "firefox" => "(firefox)/?\s*(\d+\.\d+)",
-    "android" => "(android)/?\s*(\d+\.d+)",
+    "android" => "(android)/?\s*([\d+\.]+)",
     "safari" => "(safari)/\s*(\d+\.\d+)",
     "edge" => "(edge)/\s*(\d+\.\d+)",
     "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
@@ -244,24 +244,25 @@ class BotFilter {
             return $block;
         }
 
+        // get details about the agent
+        $this->browser = \BitFireBot\parse_agent($request->agent);
+
+        // ugly, impure crap
+        $this->ip_data = get_server_ip_data($request->ip, $request->agent);
+
         // handle wp-cron and other self requested pages
-        if (Config::enabled("skip_local_bots", true) && (\BitFireBot\is_local_request($request))) {
+        if (Config::enabled("skip_local_bots", false) && (\BitFireBot\is_local_request($request))) {
             return $block;
         }
 
         // check host header is not garbage
         $block->doifnot('\BitFireBot\header_check', $request);
-
-        // ugly, impure crap
-        $this->ip_data = get_server_ip_data($request->ip, $request->agent);
     
         // block constraints
         // cpu: 52
         $block->doifnot('\TF\map_whilenot', $this->_constraints, "\BitFire\constraint_check", $request);
         $block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
 
-        // get details about the agent
-        $this->browser = \BitFireBot\parse_agent($request->agent);
 
         // bot tracking cookie
         $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
@@ -271,7 +272,7 @@ class BotFilter {
 
         // handle bots
         if ($block->empty() && $this->browser->bot) {
-            // bot whitelist
+            // bot whitelist, TODO: can simplify and move agent parse and block check into a wrapper function
             if (Config::enabled(CONFIG_WHITELIST_ENABLE) && $block->empty()) {
                 $agents = \parse_ini_file(WAF_DIR."cache/whitelist_agents.ini");
                 $block->doifnot('\BitFireBot\whitelist_inspection',
@@ -283,7 +284,7 @@ class BotFilter {
                 $this->browser->whitelist = ($block->empty());
             }
             // bot blacklist
-            else if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
+            if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
                 $block->doifnot('\BitFireBot\blacklist_inspection', $request, file(WAF_DIR.'cache/bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
             }
         }
@@ -366,7 +367,7 @@ function browser_clear(\BitFire\Request $request) : \TF\Effect {
  * @test test_verify_browser
  * PURE! 
  */
-function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeStr $cookie) : \TF\Effect {
+function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $cookie) : \TF\Effect {
 
     $effect = \TF\Effect::new();
     // user manually refreshed the page, lets clear as much server state as we can and try to reload the original page
@@ -404,7 +405,7 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeStr
     // incorrect answer: TODO: if this is a POST, then we need to redirect BACK to a GET so that if the user
     // refreshes the page, they don't POST again the wrong data...
     else {
-        \TF\debug("x-challenge: fail [%d] / [%d]", $correct_answer->value('int'), intval($_POST['_bfa']));
+        \TF\debug("x-challenge: fail [%d] / [%d]", $correct_answer->value('int'), intval($_POST['_bfa']??'NULL'));
         $effect->out(file_get_contents(WAF_DIR . "views/browser_required.html"))
             ->status(STATUS_FAIL)
             ->exit(true);
@@ -466,7 +467,7 @@ function ip_to_int(string $ip) : int {
  * NOT PURE! depends in $_SERVER variable
  */
 function is_local_request(\BitFire\Request $request) : bool {
-    if ($_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']) {
+    if ($_SERVER['REMOTE_ADDR']??'127.0.0.1' === $_SERVER['SERVER_ADDR']??'127.0.0.2') {
         return true;
     }
     if (\TF\ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false) {
@@ -653,7 +654,7 @@ function blacklist_inspection(\BitFire\Request $request, ?array $blacklist) : \T
  */
 function parse_agent(string $user_agent) : UserAgent {
 
-    $agent = new UserAgent(NULL, $user_agent, "1.0", false, true);
+    $agent = new UserAgent('bot', $user_agent, "x", false, true);
 
     // return robots immediately...
     if (substr($user_agent, 0, 11) !== "mozilla/5.0") {
@@ -684,11 +685,22 @@ function parse_agent(string $user_agent) : UserAgent {
 
 
 /**
+ * get the user tracking cookie from Config and $_COOKIE vars.
+ * requires ip and agent to validate the cookie
+ */
+function get_tracking_cookie(string $ip, string $agent) : \TF\MaybeA {
+    return \BitFireBot\decrypt_tracking_cookie(
+        $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
+        Config::str(CONFIG_ENCRYPT_KEY),
+        $ip, $agent);
+}
+
+/**
  * returns a maybe with tracking data or an empty monad...
  * TODO: create test function
  * PURE!
  */
-function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeStr {
+function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeA {
     //untaint($cookie_data);
     //\TF\debug("encrypted cookie [%s] [%s]", $encrypt_key, $cookie_data);
     $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
