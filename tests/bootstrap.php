@@ -16,7 +16,7 @@ $_SERVER['HTTP_HOST'] = 'unit_test';
 $_SERVER['REQUEST_URI'] = 'http://localhost/some/url';
 $_SERVER['REQUEST_METHOD'] = 'GET';
 
-define('BLOCK_DIR', '/tmp/block');
+define('BLOCK_DIR', '/tmp/blocks');
 
 function make_config() : void {
     $_SERVER['REQUEST_URI'] = "http://localhost";
