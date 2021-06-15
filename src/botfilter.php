@@ -222,8 +222,8 @@ class BotFilter {
         $this->cache = $cache;
         $this->_constraints = array(
             FAIL_PHPUNIT => new MatchType(MatchType::CONTAINS, "path", '/phpunit', BLOCK_SHORT),
-            FAIL_WP_ENUM => new MatchType(MatchType::REGEX, "post_raw", '/td_optin_webhook.*?kraked_url/', BLOCK_MEDIUM),
-            FAIL_THRIVE_KRAKEN => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', BLOCK_SHORT),
+            FAIL_THRIVE_KRAKEN => new MatchType(MatchType::REGEX, "post_raw", '/td_optio?n_webhook.*?kraked_url/', BLOCK_MEDIUM),
+            //FAIL_WP_ENUM => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', 0),
             FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
             FAIL_METHOD => new MatchType(MatchType::NOTIN, "method", Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );
