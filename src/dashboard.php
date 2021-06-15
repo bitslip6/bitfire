@@ -44,7 +44,7 @@ function isdis() {
 function is_locked() : bool {
     $ctr = 0;
     file_recurse($_SERVER['DOCUMENT_ROOT'], function($file) use (&$ctr) {
-        if (is_writeable($file)) { $ctr++; if ($ctr < 5) { \TF\debug("")}}
+        if (is_writeable($file)) { $ctr++; if ($ctr < 5) { \TF\debug("writeable [$file]"); }}
     }, "/.php$/");
     \TF\debug("lock ctr: [$ctr]");
     return ($ctr <= 1);
@@ -134,7 +134,7 @@ function serve_dashboard(string $dashboard_path) {
         $blocks[$i]['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
         $blocks[$i]['exception_title'] = ($has_exception) ?
         "exception already added for this block" :
-        "add exception for " . MESSAGE_CLASS[$cl] . ' url: ' . $parts['path'];
+        "add exception for " . MESSAGE_CLASS[$cl]??'unknown' . ' url: ' . $parts['path'];
 
 
 
