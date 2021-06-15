@@ -55,9 +55,9 @@ function match_block_exception(?Block $block, Exception $exception, string $host
         $ex_class = code_class($exception->code);
         $bl_class = code_class($block->code);
         // handle entire blocking class
-        if ($ex_class === $exception->code && $ex_class === $bl_class) { return NULL; } 
+        if ($ex_class === $bl_class) { return NULL; } 
         // handle specific code class
-        if ($exception->code !== 0 && $block->code !== $exception->code) { return $block; }
+        if ($block->code !== $exception->code) { return $block; }
     }
     \TF\debug("filtered block exception - code: {$exception->code} param: {$exception->parameter} uuid: {$exception->uuid}");
     return NULL;
@@ -323,7 +323,6 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $whitelist = $bot_filter->browser->whitelist ?? false;
     }
 
-    if ($block === null && !$bot) { return; }
     if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot", $request->agent, 0); }
     else if ($block === null) { $block = new Block(31002, "return code", strval($response_code), $request->agent, 0); }
 
