@@ -44,7 +44,7 @@ function isdis() {
 function is_locked() : bool {
     $ctr = 0;
     file_recurse($_SERVER['DOCUMENT_ROOT'], function($file) use (&$ctr) {
-        if (is_writeable($file)) { $ctr++; }
+        if (is_writeable($file)) { $ctr++; if ($ctr < 5) { \TF\debug("")}}
     }, "/.php$/");
     \TF\debug("lock ctr: [$ctr]");
     return ($ctr <= 1);
