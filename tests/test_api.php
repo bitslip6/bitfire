@@ -3,7 +3,7 @@
 use function BitFire\get_wordpress_hashes;
 
 if (!defined("WAF_DIR")) {
-    define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
+    define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR);
 }
 
 include_once WAF_DIR . "src/api.php";

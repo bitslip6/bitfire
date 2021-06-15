@@ -10,8 +10,9 @@ use function BitFireBot\js_int_obfuscate;
 use function BitFireBot\make_js_challenge;
 
 if (!defined("WAF_DIR")) {
-    define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
+    define('WAF_DIR', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR);
 }
+include_once WAF_DIR . "src/bitfire.php";
 include_once WAF_DIR . "src/util.php";
 
 $bf = \BitFire\BitFire::get_instance();
@@ -61,10 +62,11 @@ function test_parse_agent($data) : void {
 
 
 function test_send_browser_verification() : void {
+    \BitFire\Config::set_value("cookies_enabled", true);
     $ip_data = \BitFire\IPData::make_new("Mozilla/5.0 unit test browser", "127.0.0.1");
     $effect = \BitFireBot\send_browser_verification($ip_data, "secret_encryption_key");
 
-    assert_eq($effect->read_code(), 300, "did not set http response value correctly");
+    assert_eq($effect->read_code(), 303, "did not set http response value correctly");
     assert_true(in_array("expires", array_keys($effect->read_headers())), "did not set expires header");
     assert_true(in_array("cache-control", array_keys($effect->read_headers())), "did not set cache-control header");
     assert_gt(count($effect->read_cache()), 0, "no cache update found");
@@ -100,22 +102,22 @@ function test_verify_browser() : void {
     assert_eq($effects->read_status(), \BitFire\STATUS_OK, "verify addition JS with server side state fail");
 
     $cookie = \TF\un_json($effects->read_cookie());
-    assert_eq($cookie['ip'], $ip, "did not set internal cookie IP value");
+    assert_eq($cookie['ip'], crc32($ip), "did not set internal cookie IP value");
     assert_gt($cookie['v'], 1, "did not set valid cookie value");
     assert_gt($cookie['et'], time()+60, "did not set valid cookie expire time");
     assert_gt(count($effects->read_cache()), 1, "did not update enough server side state/metrics");
 
     // verify with cookie state
-    $cookie = \TF\MaybeA::of(array('a' => 245));
+    $cookie = \TF\MaybeA::of(array('a' => array('ans' => 245)));
     $ip_data = \BitFire\IPData::make_new($agent, $ip);
     $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), STATUS_FAIL, "fail with incorrect cookie answer");
     
-    $cookie = \TF\MaybeA::of(array('a' => 246));
+    $cookie = \TF\MaybeA::of(array('a' => array('ans' => 246)));
     $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), \BitFire\STATUS_OK, "fail to verify cookie answer");
     $cookie = \TF\un_json($effects->read_cookie());
-    assert_eq($cookie['ip'], $ip, "did not set internal cookie IP value");
+    assert_eq($cookie['ip'], crc32($ip), "did not set internal cookie IP value");
     assert_gt($cookie['v'], 1, "did not set valid cookie value");
     assert_gt($cookie['et'], time()+60, "did not set valid cookie expire time");
     assert_gt(count($effects->read_cache()), 1, "did not update enough server side state/metrics");
