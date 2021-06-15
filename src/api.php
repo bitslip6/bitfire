@@ -186,10 +186,9 @@ function upgrade(\Bitfire\Request $request) {
         $target = WAF_DIR . "cache";
         require_once WAF_DIR."src/tar.php";
         $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
-        //unlink($dest);
         
         \TF\file_recurse(WAF_DIR."cache/bitfire-{$_GET['ver']}", function ($x) {
-            if (is_file($x) && ! \TF\ends_with($x, "ini")) {
+            if (is_file($x) && stripos($x, "ini") === false) {
                 $base = basename($x);
                 $path = dirname($x);
                 $root = str_replace(WAF_DIR."cache/bitfire-{$_GET['ver']}/", "", $x);
