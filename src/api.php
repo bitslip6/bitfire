@@ -189,10 +189,7 @@ function upgrade(\Bitfire\Request $request) {
         //unlink($dest);
         
         \TF\file_recurse(WAF_DIR."cache/bitfire-{$_GET['ver']}", function ($x) {
-            //print_r($x);
-            //die("\nhit");
-            //\TF\dbg($x);
-            if (is_file($x)) {
+            if (is_file($x) && ! \TF\ends_with($x, "ini")) {
                 $base = basename($x);
                 $path = dirname($x);
                 $root = str_replace(WAF_DIR."cache/bitfire-{$_GET['ver']}/", "", $x);
