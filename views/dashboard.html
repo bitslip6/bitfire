@@ -864,10 +864,10 @@
           <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle red" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" title="browser: <?php echo $line['browser']->browser??'?' . ' ver: '' . $line['browser']->ver??'?'; ?>" alt="agent" width="24" class="avatag-img rounded-circle" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" title="Origin Country: <?php echo $line['country'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
         </div>
       </div>
       </td>
