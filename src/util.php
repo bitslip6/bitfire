@@ -3,6 +3,7 @@ namespace TF;
 
 use Traversable;
 
+use const BitFire\CONFIG_CACHE_TYPE;
 use const BitFire\CONFIG_COOKIES;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
@@ -138,7 +139,25 @@ function compose(callable $a, callable $b) {
  */
 function memoize(callable $fn, string $key, int $ttl) : callable {
     return function(...$args) use ($fn, $key, $ttl) {
-        return \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, \TF\partial($fn, ...$args));
+        if (CFG::str(CONFIG_CACHE_TYPE) !== 'nop') {
+            return \TF\CacheStorage::get_instance()->load_or_cache($key, $ttl, \TF\partial($fn, ...$args));
+        }
+        // TODO: simplify this.  we need to handle the case where we want to store reverse IP lookup data in a browser cookie when
+        // we have no server cache.  need a load_or_cache for client cookies
+        else if (CFG::enabled(CONFIG_COOKIES)) {
+            $r = \BitFire\BitFire::get_instance()->_request;
+            $maybe_cookie = \BitFireBot\get_tracking_cookie($r->ip, $r->agent);
+            $result = $maybe_cookie->extract($key);
+            if ($result) { return $result; }
+            $cookie = $maybe_cookie() || array();
+            $cookie[$key] = $fn(...$args);
+            $cookie_data = \TF\encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), $this->cookie);
+            $_COOKIE[CFG::str(CONFIG_USER_TRACK_COOKIE)] = $cookie_data;
+            \TF\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), $cookie_data, DAY); 
+        } else {
+            \TF\debug("unable to memoize $fn");
+            return $fn(...$args);
+        }
     };
 }
 
@@ -175,6 +194,20 @@ function header_send(string $key, string $value) : void {
     header("$key: $value");
 }
 
+
+class FileMod {
+    public $filename;
+    public $content;
+    public $write_mode;
+    public $modtime;
+    public function __construct(string $filename, string $content, int $write_mode, int $modtime = 0) {
+        $this->filename = $filename;
+        $this->content = $content;
+        $this->write_mode = $write_mode;
+        $this->modtime = $modtime;
+    }
+}
+
 /**
  * abstract away effects
  */
@@ -185,6 +218,7 @@ class Effect {
     private $headers = array();
     private $cookie = '';
     private $cache = array();
+    private $file_outs = array();
     private $status = 0;
 
     public static function new() : Effect { return new Effect(); }
@@ -203,6 +237,8 @@ class Effect {
     public function exit(bool $should_exit = true) : Effect { $this->exit = $should_exit; return $this; }
     // an effect status code that can be read later
     public function status(int $status) : Effect { $this->status = $status; return $this; }
+    // an effect to write a file to the filesystem
+    public function file(FileMod $mod) : Effect { $this->file_outs[] = $mod; return $this; }
 
     // return true if the effect will exit 
     public function read_exit() : bool { return $this->exit; }
@@ -216,7 +252,10 @@ class Effect {
     public function read_cache() : array { return $this->cache; }
     // return the effect response code
     public function read_code() : int { return $this->response; }
+    // return the effect function status code
     public function read_status() : int { return $this->status; }
+    // return the effect filesystem changes
+    public function read_files() : array { return $this->file_outs; }
 
     public function run() {
         if ($this->response > 0) {
@@ -234,6 +273,11 @@ class Effect {
         }
         if ($this->exit) {
             exit();
+        }
+        // write all effect files
+        foreach ($this->file_outs as $file) {
+            file_put_contents($file->filename, $file->content, $file->write_mode);
+            if ($file->modtime > 0) { \touch($file->filename, $file->modtime); }
         }
     }
 }
@@ -405,6 +449,15 @@ function recache(array $lines) : array {
         }
     }
     return $a;
+}
+
+function recache2(string $in) : array {
+    return explode("\n", decrypt_ssl(md5(CFG::str("encryption_key")), $in)());
+}
+
+function recache2_file(string $filename) : array {
+    if (!file_exists($filename)) { return array(); }
+    return recache2(file_get_contents($filename));
 }
 
 /**
@@ -695,9 +748,13 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
     
     // build the post content paramater
     $content = (is_array($data)) ? http_build_query($data) : $data;
-    
-    $optional_headers['Content-Length'] = strlen($content);
-	\TF\debug("header len  - " . strlen($content));
+    $params = http_ctx($method, 2);
+    if ($method === "POST") {
+        $params['http']['content'] = $content;
+        $optional_headers['Content-Length'] = strlen($content);
+	    \TF\debug("header len  - " . strlen($content));
+    } else { $url .= "?" . $content; }
+
     if (!isset($optional_headers['Content-Type'])) {
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
@@ -705,8 +762,7 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
         $optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent";
     }
 
-    $params = http_ctx($method, 2);
-    $params['http']['content'] = $content;
+    
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
     $ctx = stream_context_create($params);
@@ -859,7 +915,7 @@ function parse_ini(string $ini_src) : void {
             }
         }
         // auto configuration
-        if (!CFG::enabled("configured")) {
+        if (CFG::disabled("configured")) {
             require_once WAF_DIR . "src/server.php";
             \BitFireSvr\update_config($ini_src);
         }
