@@ -141,6 +141,7 @@ function serve_dashboard(string $dashboard_path) {
         $blocks[$i]['type_img'] = CODE_CLASS[$blocks[$i]['classId']];
         $browser = \BitFireBot\parse_agent($blocks[$i]['ua']);
         if (!$browser->bot && !$browser->browser) { $browser->browser = "chrome"; }
+        $blocks[$i]['browser'] = $browser;
         $blocks[$i]['agent_img'] = ($browser->bot)?'robot.svg':($browser->browser.".png");
         $blocks[$i]['country_img'] = strtolower($blocks[$i]['country']) . ".svg";
         if ($blocks[$i]['country_img'] == "-.svg") {
