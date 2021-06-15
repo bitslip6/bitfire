@@ -17,10 +17,9 @@ function access_log_lines() : array {
 }
 
 /** TESTS */
-function test_conf_globing() : array {
+function test_conf_globing() : void {
     $r = \BitFireSvr\pattern_to_list_3(\BitFireSvr\get_server_config_file_list());
     assert_gt(count($r), 1, "unable to glob any http configs");
-    return $r;
 }
 
 function test_get_all_confs()  {
@@ -72,8 +71,6 @@ function test_process_batch() {
     \BitFire\Config::set_value("blacklist_enable", false);
     \BitFire\Config::set_value("require_full_browser", false);
     $exceptions = \BitFireSvr\process_access_file("access.log");
-    // assert_gt(count($exceptions), 0, "unable to find exception for script tag");
-    var_export($exceptions);
 }
 
 function test_get_wordpress_hashes() : void {

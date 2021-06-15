@@ -42,11 +42,11 @@ function it_should_validate_host_headers(array $data) : void {
 
 function agent_list3() : array {
     return array(
-        "linux browser 1" => array("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36", "linux", "chrome", "44.0.2403.157"),
+        "linux browser 1" => array("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36", "linux", "chrome", "44.0"),
         "linux browser 2" => array("Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:24.0) Gecko/20100101 Firefox/24.0", "linux", "firefox", "24.0"),
         "linux browser 3" => array("Apache/2.4.34 (Ubuntu) OpenSSL/1.1.1 (internal dummy connection)", 'bot', '', 'x'),
         "android 1" => array("Mozilla/5.0 (Linux; U; Android 2.2) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1", "android", "android", "2.2"),
-        "android 2" => array("Mozilla/5.0 (Linux; Android 9; SM-G950F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/74.0.3729.157 Mobile Safari/537.36", "android", "chrome", "74.0.3729.157"),
+        "android 2" => array("Mozilla/5.0 (Linux; Android 9; SM-G950F Build/PPR1.180610.011; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/74.0.3729.157 Mobile Safari/537.36", "android", "chrome", "74.0"),
         "android 3" => array("Mozilla/5.0 (Linux; U; Android 4.3; de-de; GT-I9300 Build/JSS15J) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30", "android", "android", "4.3"),
         "android 4" => array("Mozilla/5.0 (Linux; U; Android 6.0.1; zh-CN; F5121 Build/34.0.A.1.247) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/40.0.2214.89 UCBrowser/11.5.1.944 Mobile Safari/537.36", "android", "chrome", "40.0"),
         "safari 1" => array("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/534.59.10 (KHTML, like Gecko) Version/5.1.9 Safari/534.59.10", "os x", "safari", "534.59")
@@ -141,31 +141,22 @@ function test_verify_facebook_crawler() : void {
 
 // todo, add more browsers here ...
 function test_parse_agent2() : void {
-    $answer = BitFireBot\parse_agent("Mozilla/5.0 (Linux; Android 7.1.2; AFTMM Build/NS6265; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/70.0.3538.110 Mobile Safari/537.36");
+    $answer = BitFireBot\parse_agent(strtolower("Mozilla/5.0 (Linux; Android 7.1.2; AFTMM Build/NS6265; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/70.0.3538.110 Mobile Safari/537.36"));
     assert_eq($answer->os, "android", "unable to find android os in user agent");
     assert_eq($answer->browser, "chrome", "unable to find android browser in user agent");
-    assert_eq($answer->ver, "70.0.3538.110", "unable to find android ver in user agent");
+    assert_eq($answer->ver, "70.0", "unable to find android ver in user agent");
 
-    $answer = BitFireBot\parse_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36");
+    $answer = BitFireBot\parse_agent(strtolower("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36"));
     assert_eq($answer->os, "windows", "unable to find windows os in user agent");
     assert_eq($answer->browser, "chrome", "unable to find chrome browser in user agent");
-    assert_eq($answer->ver, "65.0.3325.181", "unable to find chrome ver in user agent");
+    assert_eq($answer->ver, "65.0", "unable to find chrome ver in user agent");
 
-    $answer = BitFireBot\parse_agent("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.75 Safari/537.36 OPR/36.0.2130.32");
+    $answer = BitFireBot\parse_agent(strtolower("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.75 Safari/537.36 OPR/36.0.2130.32"));
     assert_eq($answer->os, "windows", "unable to find windows os in user agent");
-    assert_eq($answer->browser, "opr", "unable to find opera browser in user agent");
-    assert_eq($answer->ver, "36.0.2130.32", "unable to find opera ver in user agent");
+    assert_eq($answer->browser, "opera", "unable to find opera browser in user agent");
+    assert_eq($answer->ver, "36.0", "unable to find opera ver in user agent");
 }
 
-function test_strip_tracking_params() : void {
-    $url = "/some/random/path";
-    $request = new \BitFire\Request();
-    $request->path = $url;
-    $request->get = array('_bfa' => "123456", 'random' => 'some_data', '_bfx' => '123', '_bfz' => '456', Config::str(CONFIG_USER_TRACK_PARAM) => 'tracking_id');
-    $updated_url = BitFireBot\strip_path_tracking_params($request);
-
-    assert_eq($updated_url, "$url?random=some_data", "stripping _bfa/x/z parameters failed");
-}
 
 
 function ip_verify_list() : array {

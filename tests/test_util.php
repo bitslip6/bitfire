@@ -197,6 +197,6 @@ function test_ip_to_country() : void {
  * @type tar
  */
 function test_untar() : void {
-    BitFire\Config::set_value("debug_echo", true);
     tar_extract(WAF_DIR."tests/bitfire-1.4.6.tar.gz", "/tmp");
+    assert_true(file_exists("/tmp/bitfire-1.4.6"), "unable to extract test file");
 }

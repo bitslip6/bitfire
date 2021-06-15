@@ -8,7 +8,6 @@ function test_basic_request() {
     $bitfire->inspect();
     $s1 = microtime(true);
     $t = $s1 - $s0;
-    echo " time $t\n";
     assert_lt($t, 0.0015, "inspection took too long!");
 }
 
