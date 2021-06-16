@@ -6,6 +6,8 @@ use function TF\file_recurse;
 require_once WAF_DIR . "src/api.php";
 require_once WAF_DIR . "src/const.php";
 
+const PAGE_SZ = 30;
+
 /*
 //\TF\dbg($_SERVER);
 $roots = \BitFire\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
@@ -23,6 +25,14 @@ foreach ($roots as $root) {
 //die();
 \TF\dbg($result);
 */
+
+function country_enricher(array $country_info) : callable {
+    return function (array $input) use ($country_info): array {
+        $code = \TF\ip_to_country($input['request']['ip']??$input['ip']??'');
+        $input['country'] = $country_info[$code];
+        return $input;
+    };
+}
 
 function add_country($data) {
     if (!is_array($data) || count($data) < 1) { return $data; }
@@ -69,6 +79,7 @@ function serve_dashboard(string $dashboard_path) {
     }
 
     if ($_GET['_infoz']??'' === 'show') { phpinfo(); die(); }
+    $page = intval($_GET['page']??0);
 
        
     // try to prevent proxy caching for this page
@@ -78,14 +89,23 @@ function serve_dashboard(string $dashboard_path) {
     require_once WAF_DIR . "src/botfilter.php";
 
     $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR."config.ini.php");
-
-    $report_count = count(file(Config::file(CONFIG_REPORT_FILE)));//system("wc -l " . Config::file(CONFIG_REPORT_FILE) . "| wc -f 1 -d ' '"); //(is_array($x)) ? count($x) : 0;
-    $config_orig = Config::$_options;
     $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
     $config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
+    $config_orig = Config::$_options;
+    $exceptions = \BitFire\load_exceptions();
+
+    $report = \TF\remove_lines(\TF\file_data(Config::file(CONFIG_REPORT_FILE)), 400);
+    $reporting = array_map(
+        country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))),
+        array_map('\TF\un_json', array_slice($report->lines, $page*PAGE_SZ, PAGE_SZ)));
+    $report_count = $report->num_lines;
+
+
+    
+
+    //$report_count = count(file(Config::file(CONFIG_REPORT_FILE)));
     $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500)));
     $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
-    $exceptions = \BitFire\load_exceptions();
 
     for($i=0,$m=count($reporting); $i<$m; $i++) {
         //$cl = intval($reporting[$i]['block']['code']/1000)*1000;
@@ -113,10 +133,40 @@ function serve_dashboard(string $dashboard_path) {
     $locked = is_locked();
     $lock_action = ($locked) ? "unlock" : "lock";
     
-    $src = (Config::enabled(CONFIG_BLOCK_FILE)) ?
-        \TF\read_last_lines(Config::file(CONFIG_BLOCK_FILE), 20, 2500) :
-        \TF\CacheStorage::get_instance()->load_data("log_data");
-    $blocks = (isset($src[0])) ? array_reverse(add_country(\TF\un_json_array($src)), true) : array();
+    $block = \TF\remove_lines(\TF\file_data(Config::file(CONFIG_BLOCK_FILE)), 400);
+    $all_blocks = array_map(
+        country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))),
+        array_map('\TF\un_json', $block->lines));
+    $block_count = $block->num_lines;
+
+
+    $check_day = time() - \TF\DAY - \TF\DAY;
+    $block_24 = array_filter($all_blocks, function ($x) use ($check_day) { return $x['ts'] > $check_day; });
+    $block_count_24 = count($block_24);
+    $blocks = array_slice($all_blocks, $page*PAGE_SZ, PAGE_SZ);
+
+    // calculate hr data
+    $hr_data = array_reduce($block_24, function ($carry, $x) {
+        $hr = (int)date('H', (int)$x['ts']);
+        $carry[$hr]++;
+        return $carry;
+    }, array(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0));
+
+    // calculate country data
+    $country_data = array_reduce($block_24, function ($carry, $x) {
+        $carry[$x['country']] = isset($carry[$x['country']]) ? $carry[$x['country']] + 1 : 1;
+        return $carry;
+    }, array());
+
+    // calculate type data
+    $type_data = array_reduce($block_24, function ($carry, $x) {
+        $class = code_class($x['eventid']);
+        $carry[$class] = isset($carry[$class]) ? $carry[$class] + 1 : 1;
+        return $carry;
+    }, array());
+
+
+
 
     for($i=0,$m=count($blocks); $i<$m; $i++) {
         //$cl = intval($blocks[$i]['block']['code']/1000)*1000;
