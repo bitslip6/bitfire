@@ -176,8 +176,8 @@ function upgrade(\Bitfire\Request $request) {
         \TF\file_recurse(WAF_DIR, function ($x) use ($v) {
             if (is_file($x) 
                 && stripos($x, "ini") === false
-                && ($x[0] === ".") === false
-                ) {
+                && stripos($x, "/.") === false) {
+
                 if (!is_writeable($x)) { exit ("unable to upgrade: $x is not writeable"); }
             }
         });
