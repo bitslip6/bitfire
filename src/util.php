@@ -21,6 +21,19 @@ const DAY=86400;
 const HOUR=3600;
 const MINUTE=60;
 
+class FileData {
+    public $filename;
+    public $num_lines;
+    public $lines;
+    public $exists = false;
+    public function __construct(string $filename) {
+        $this->filename = $filename;
+        $this->exists = file_exists($filename);
+        $this->num_lines = 0;
+        $this->lines = array();
+    }
+}
+
 /**
  * debug output
  */
@@ -839,6 +852,32 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
     if ($lines <= 0) { return array(); }
     $s = array_splice($eachln, -($lines+1), $lines);
     return $s;
+}
+
+
+
+/**
+ * NOT PURE, reads into for filename
+ */
+function file_data(string $filename) : FileData {
+    $data = new FileData($filename);
+    if ($data->exists) {
+        $data->lines = file($filename);
+        $data->num_lines = count($data->lines);
+    }
+    return $data;
+}
+
+/**
+ * truncate the file to max num_lines, returns true if result file is <= $num_lines long
+ */
+function remove_lines(FileData $file, int $num_lines) : FileData {
+    if ($file->num_lines > $num_lines) { 
+        $file->lines = array_slice($file->lines, -$num_lines);
+        $content = join("\n", $file->lines);
+        file_put_contents($file->filename, $content, LOCK_EX);
+    }
+    return $file;
 }
 
 
