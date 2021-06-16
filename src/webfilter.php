@@ -71,8 +71,8 @@ class WebFilter {
 
             // the parameter reducer
             $reducer = \TF\partial('\\BitFire\\generic_reducer', 
-                $cache->load_or_cache("webkeys3", \TF\DAY, \TF\partial('\TF\recache2_file', $keyfile)),
-                $cache->load_or_cache("webvalues3", \TF\DAY, \TF\partial('\TF\recache2_file', $valuefile)));
+                $cache->load_or_cache("webkeys4", \TF\DAY, \TF\partial('\TF\recache2_file', $keyfile)),
+                $cache->load_or_cache("webvalues4", \TF\DAY, \TF\partial('\TF\recache2_file', $valuefile)));
 
             $block->doifnot('\TF\map_whilenot', $request->get, $reducer, NULL);
             $block->doifnot('\TF\map_whilenot', $request->post, $reducer, NULL);
