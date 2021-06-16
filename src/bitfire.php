@@ -1,10 +1,10 @@
 <?php declare(strict_types=1);
 namespace BitFire;
 
-require WAF_DIR . "src/bitfire_pure.php";
 
 
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
+require_once WAF_DIR."src/bitfire_pure.php";
 require_once WAF_DIR."src/const.php";
 require_once WAF_DIR."src/util.php";
 require_once WAF_DIR."src/storage.php";
@@ -284,7 +284,7 @@ class BitFire
         if (!Config::enabled(CONFIG_REPORT_FILE) || count(self::$_reporting) < 1) { return; }
         // encoder is json_encode with pretty printing if file has word "pretty" in it
         $encoder = \TF\partial_right('json_encode', (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0);
-        @file_put_contents(Config::file(CONFIG_REPORT_FILE), join(",", array_map($encoder, self::$_reporting)) . "\n", FILE_APPEND);
+        @file_put_contents(Config::file(CONFIG_REPORT_FILE), join(",\n", array_map($encoder, self::$_reporting)) . "\n", FILE_APPEND);
         /*
         $out = "";
         foreach (self::$_reporting as $report) {
@@ -340,6 +340,7 @@ class BitFire
      * TODO: format blocks the same way as reports
      */
     protected static function reporting(Block $block, \BitFire\Request $request) {
+
         $data = array('time' => \TF\utc_date('r'), 'tv' => \TF\utc_time(),
             'exec' => @number_format(microtime(true) - $GLOBALS['start_time']??0, 6). ' sec',
             'block' => $block,
