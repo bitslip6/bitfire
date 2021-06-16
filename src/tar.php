@@ -31,8 +31,10 @@ function tar_extract(string $file, string $destination = "") : ?bool {
 
     while(($header = tar_read_header($input, $destination))) {
         if ($header->type == 5) {
-            if (!mkdir($header->filename, 0755, true)) {
-                return \TF\debugF("error mkdir [%s]", $header->filename);
+            if (!file_exists($header->filename)) {
+                if (!mkdir($header->filename, 0755, true)) {
+                    return \TF\debugF("error mkdir [%s]", $header->filename);
+                }
             }
         }
         // skip github file comments
