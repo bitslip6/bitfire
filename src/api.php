@@ -171,6 +171,16 @@ function is_quoted(string $data) : bool {
 function upgrade(\Bitfire\Request $request) {
     $v = htmlentities($_GET['ver']);
     if (\version_compare($v, BITFIRE_SYM_VER, '>=')) {
+
+        // ensure that all files are witeable
+        \TF\file_recurse(WAF_DIR, function ($x) use ($v) {
+            if (is_file($x) && stripos($x, "ini") === false) {
+                if (!is_writeable($x)) { exit ("unable to upgrade: $x is not writeable"); }
+            }
+        });
+
+
+        // download the archive TODO: check checksum
         $dest = WAF_DIR."cache/{$v}.tar.gz";
         $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/{$v}.tar.gz";
         $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
@@ -184,17 +194,21 @@ function upgrade(\Bitfire\Request $request) {
         $cwd = getcwd();
         $f = __FILE__;
 
+        //  extract archive
         $target = WAF_DIR . "cache";
         require_once WAF_DIR."src/tar.php";
         $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
         
+        // replace files
         \TF\file_recurse(WAF_DIR."cache/bitfire-{$v}", function ($x) use ($v) {
             if (is_file($x) && stripos($x, "ini") === false) {
                 $base = basename($x);
                 $path = dirname($x);
                 $root = str_replace(WAF_DIR."cache/bitfire-{$v}/", "", $x);
-                echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
-				//rename($x, WAF_DIR . $root);
+                //echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
+				if (!rename($x, WAF_DIR . $root)) {
+                    exit("upgrade failed");
+                }
             }
         });//, "/.*.php/");
 
