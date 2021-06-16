@@ -18,7 +18,6 @@ const AGENT_MATCH = array(
     "explorer" => "(msie\s*|trident/)\s*([\d+\.]+)",
     "msie" => "(msie\s*|trident/[\d+\.]+;\s+rv:)\s*([\d+\.]+)",
     "vivaldi" => "(vivaldi)/\s*([\d+\.]+)",
-    "bot" => "(\w+)\s*([\d+\.]+)"
 );
 
 class UserAgent {
