@@ -465,7 +465,15 @@ function recache(array $lines) : array {
 }
 
 function recache2(string $in) : array {
-    return explode("\n", decrypt_ssl(md5(CFG::str("encryption_key")), $in)());
+    $path = explode("\n", decrypt_ssl(md5(CFG::str("encryption_key")), $in)());
+    $idx = 0;
+    $foo = array_reduce($path, function ($carry, $x) use (&$idx) { 
+        if ($idx++ % 2 == 0) { $carry['tmp'] = $x; }
+        else { $carry[$x] = $carry['tmp']; unset($carry['tmp']); }
+        return $carry;
+    }, array());
+    unset($foo['tmp']);
+    return $foo;
 }
 
 function recache2_file(string $filename) : array {
