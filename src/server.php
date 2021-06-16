@@ -57,6 +57,11 @@ function update_config(string $ini_src) {
     $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
     \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
     \TF\file_replace($ini_src, "configured = false", "configured = true");
+
+    $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/random_path/contact")."\n";
+    $robot_file = $_SERVER['DOCUMENT_ROOT']."/robots.txt";
+    \TF\file_replace($robot_file, $robot_content, "");
+    file_put_contents($robot_file, $robot_content, FILE_APPEND);
 }
 
 /**
