@@ -177,7 +177,6 @@ function upgrade(\Bitfire\Request $request) {
             if (is_file($x) 
                 && stripos($x, "ini") === false
                 && stripos($x, "/.") === false) {
-
                 if (!is_writeable($x)) { exit ("unable to upgrade: $x is not writeable"); }
             }
         });
