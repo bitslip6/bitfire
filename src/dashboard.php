@@ -200,6 +200,7 @@ function serve_dashboard(string $dashboard_path) {
     }
 
     $password_reset = (Config::str('password') === 'default');
+    $is_free = (strlen(Config::str('pro_key')) < 20);
     exit(require WAF_DIR . "views/dashboard.html");
 }
 
