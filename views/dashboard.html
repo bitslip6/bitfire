@@ -173,9 +173,11 @@
 
 
         function update_challenge(data) {
-          console.log(data);
-          GBI("check").innerText = data.challenge;
-          GBI("pass").innerText = data.valid;
+          if (GBI("check")) { 
+            console.log(data);
+            GBI("check").innerText = data.challenge;
+            GBI("pass").innerText = data.valid;
+          }
         }
 
         function toggle(elm, type) {
@@ -301,6 +303,8 @@
                   <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
                   Blocks: </span> <span class="lnum" id="blocks">(<?php echo $block_count ?>)</span>
             </li>
+
+            <?php if (\BitFire\Config::str("cache_type", "nop") != "nop") { echo \BitFire\Config::str("cache_type"); ?>
             <li class="nav-item">
                 <span class="chilabel">
                   <svg xmlns="http://www.w3.org/20 00/svg" enable-background="new 0 0 24 24" height="24" viewBox="0 0 24 24" width="24"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M17,11c0.34,0,0.67,0.04,1,0.09V6.27L10.5,3L3,6.27v4.91c0,4.54,3.2,8.79,7.5,9.82c0.55-0.13,1.08-0.32,1.6-0.55 C11.41,19.47,11,18.28,11,17C11,13.69,13.69,11,17,11z"/><path d="M17,13c-2.21,0-4,1.79-4,4c0,2.21,1.79,4,4,4s4-1.79,4-4C21,14.79,19.21,13,17,13z M17,14.38c0.62,0,1.12,0.51,1.12,1.12 s-0.51,1.12-1.12,1.12s-1.12-0.51-1.12-1.12S16.38,14.38,17,14.38z M17,19.75c-0.93,0-1.74-0.46-2.24-1.17 c0.05-0.72,1.51-1.08,2.24-1.08s2.19,0.36,2.24,1.08C18.74,19.29,17.93,19.75,17,19.75z"/></g></g></svg>
@@ -311,6 +315,7 @@
                   <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none" fill-rule="evenodd"/><g fill-rule="evenodd"><path d="M9 17l3-2.94c-.39-.04-.68-.06-1-.06-2.67 0-8 1.34-8 4v2h9l-3-3zm2-5c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4"/><path d="M15.47 20.5L12 17l1.4-1.41 2.07 2.08 5.13-5.17 1.4 1.41z"/></g></svg>
                   Pass: </span> <span class="lnum" id="pass"></span>
             </li>
+            <?php } ?>
 
 
           </ul>
@@ -1125,6 +1130,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
         }
       }
     }
+    window.LATEST = latest_str;
     
     if (behind == 0) {
       GBI("upgrade_link").innerText = "Software Up To Date";
@@ -1134,7 +1140,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
       GBI("upgrade_link").innerText = "Upgrade to " + latest_str;
       GBI("upgrade_link").classList.remove("btn-secondary");
       GBI("upgrade_link").classList.add("btn-warning");
-      GBI("upgrade_link").addEventListener("click", "upgrade");
+      GBI("upgrade_link").addEventListener("click", upgrade);
     }
   });
 
@@ -1176,7 +1182,12 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
       request();
 
       function upgrade() {
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=upgrade&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        console.log("upgrade!");
+        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=upgrade&ver='+window.LATEST+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+          .then(response => response.text())
+          .then(response => {
+            alert(response);
+          });
       }
 
       function toggle_features() {
