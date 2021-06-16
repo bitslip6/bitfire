@@ -44,13 +44,13 @@ function test_read_raw_speed() : void {
 
 /**
  * @type speed
- */
 function test_read_enc_speed() : void {
     $f1 = file_get_contents("/home/cory/tools/bitfire-release/cache/values.txt");
     $dec = TF\decrypt_ssl("some_password", $f1);
     $f2 = file_get_contents("/home/cory/tools/bitfire-release/cache/keys.txt");
     $dec2 = TF\decrypt_ssl("some_password", $f2);
 }
+*/
 
 /**
  * @type speed
