@@ -700,10 +700,12 @@
               <div class="col">
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire FREE : Release <?php echo \BitFire\BITFIRE_SYM_VER?>
+                  BitFire <?php echo ($is_free) ? "FREE" : "PRO" ?> : Release <?php echo \BitFire\BITFIRE_SYM_VER?>
                 </h6>
                 <p style="font-size:.75rem;color:#666;">
+                <?php if ($is_free) { ?>
                   Upgrade to <span class="blue font-weight-bold">PRO</span> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
+                <?php } ?>
 
                 <!-- Title -->
                 <h1 class="header-title">
