@@ -21,6 +21,6 @@ define('BLOCK_DIR', '/tmp/blocks');
 function make_config() : void {
     $_SERVER['REQUEST_URI'] = "http://localhost";
     \BitFire\Config::set(parse_ini_file('config.ini'));
-    \BitFire\Config::set_value('cache_type', 'shmop');
+    \BitFire\Config::set_value('cache_type', 'nop');
 }
 make_config();
