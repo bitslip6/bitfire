@@ -169,9 +169,10 @@ function is_quoted(string $data) : bool {
 }
 
 function upgrade(\Bitfire\Request $request) {
-    if (\version_compare($_GET['ver'], BITFIRE_SYM_VER, '>=')) { 
-        $dest = WAF_DIR."cache/{$_GET['ver']}.tar.gz";
-        $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/{$_GET['ver']}.tar.gz";
+    $v = htmlentities($_GET['ver']);
+    if (\version_compare($v, BITFIRE_SYM_VER, '>=')) {
+        $dest = WAF_DIR."cache/{$v}.tar.gz";
+        $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/{$v}.tar.gz";
         $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
         $content->then(\TF\partial('\file_put_contents', $dest));
 
@@ -187,13 +188,13 @@ function upgrade(\Bitfire\Request $request) {
         require_once WAF_DIR."src/tar.php";
         $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
         
-        \TF\file_recurse(WAF_DIR."cache/bitfire-{$_GET['ver']}", function ($x) {
+        \TF\file_recurse(WAF_DIR."cache/bitfire-{$v}", function ($x) use ($v) {
             if (is_file($x) && stripos($x, "ini") === false) {
                 $base = basename($x);
                 $path = dirname($x);
-                $root = str_replace(WAF_DIR."cache/bitfire-{$_GET['ver']}/", "", $x);
+                $root = str_replace(WAF_DIR."cache/bitfire-{$v}/", "", $x);
                 echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
-				rename($x, WAF_DIR . $root);
+				//rename($x, WAF_DIR . $root);
             }
         });//, "/.*.php/");
 
