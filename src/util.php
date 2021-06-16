@@ -821,17 +821,33 @@ function http_ctx(string $method, int $timeout) : array {
     );
 }
 
+/**
+ * call debug and return NULL
+ */
+function debugN(string $fmt, ...$args) : ?bool {
+    debug($fmt, ...$args);
+    return NULL;
+}
+
+/**
+ * call debug and return FALSE
+ */
+function debugF(string $fmt, ...$args) : bool {
+    debug($fmt, ...$args);
+    return false;
+}
+
 
 /**
  * add a line to the debug file (SLOW, does not wait until processing is complete)
  * NOT PURE
  */
-function debug(string $fmt, ...$args) {
+function debug(string $fmt, ...$args) : void {
     static $idx = 0;
     if (CFG::enabled("debug_file")) {
         file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
     } else if (CFG::enabled("debug_header") && !headers_sent()) {
-        $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), sprintf($fmt, ...$args));
+        $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), substr(sprintf($fmt, ...$args), 0, 128));
         if (function_exists('untaint')) { untaint($tmp); }
         header("x-bitfire-$idx: $tmp");
         $idx++;
