@@ -65,7 +65,7 @@
         border-radius: .25rem;
       }
       .dropdown-toggle {
-        width: 50px;
+        width: 65px;
       }
       
       .nav-sm .nav-link {
@@ -96,11 +96,14 @@
         background-color: #EFEFEF;
         font-family: monospace;
       }
+      .tbalt td {
+        border-bottom: 1px solid #CCC;
+      }
       .table-sm th { padding: .5rem .25rem; }
 
       span.method { padding: .45rem .75rem; font-weight: bold; color #111; }
       tr.inforow td {
-        background-image: linear-gradient(to bottom, rgba(240,240,240,0),95%, rgba(240,240,240,1)100%);
+        background-image: linear-gradient(to bottom, rgba(240,240,240,0),92%, rgba(240,240,240,1)100%);
       }
     </style>
     
@@ -156,8 +159,8 @@
         }
 
         
-        const VERSION = 143;
-        const VERSION_STR = "1.4.3";
+        const VERSION = <?php echo \BitFire\BITFIRE_VER; ?>;
+        const VERSION_STR = "<?php echo \BitFire\BITFIRE_SYM_VER; ?>";
         const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
         const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
         const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -296,7 +299,7 @@
             <li class="nav-item">
                 <span class="chilabel">
                   <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
-                  Blocks: </span> <span class="lnum" id="blocks">-</span>
+                  Blocks: </span> <span class="lnum" id="blocks">(<?php echo $block_count ?>)</span>
             </li>
             <li class="nav-item">
                 <span class="chilabel">
@@ -509,7 +512,7 @@
               <a class="nav-link" href="#sidebarSettings" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-7H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-1.75 9c0 .23-.02.46-.05.68l1.48 1.16c.13.11.17.3.08.45l-1.4 2.42c-.09.15-.27.21-.43.15l-1.74-.7c-.36.28-.76.51-1.18.69l-.26 1.85c-.03.17-.18.3-.35.3h-2.8c-.17 0-.32-.13-.35-.29l-.26-1.85c-.43-.18-.82-.41-1.18-.69l-1.74.7c-.16.06-.34 0-.43-.15l-1.4-2.42c-.09-.15-.05-.34.08-.45l1.48-1.16c-.03-.23-.05-.46-.05-.69 0-.23.02-.46.05-.68l-1.48-1.16c-.13-.11-.17-.3-.08-.45l1.4-2.42c.09-.15.27-.21.43-.15l1.74.7c.36-.28.76-.51 1.18-.69l.26-1.85c.03-.17.18-.3.35-.3h2.8c.17 0 .32.13.35.29l.26 1.85c.43.18.82.41 1.18.69l1.74-.7c.16-.06.34 0 .43.15l1.4 2.42c.09.15.05.34-.08.45l-1.48 1.16c.03.23.05.46.05.69z"/></svg>
                 &nbsp;Settings
-                &nbsp;<span style="color:#999;font-size:12px;"> ( 5 ) </span>
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 6 ) </span>
               </a>
               <div class="collapse " id="sidebarSettings">
                 <ul class="nav nav-sm flex-column">
@@ -541,13 +544,30 @@
                       </a>
                     
                       <div class="dropdown-menu dropdown-menu-right">
-                        <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'nop')">NOP</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'nop')">None</a>
                         <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'apc')">APC</a>
                         <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'shmop')">Shmop</a>
                         <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'shm')">Shm</a>
                       </div>
                     </div>
                   </li>
+                  
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Cookie Support
+                    </span>
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="cookies_enabled" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['cookies_enabled']; ?> </button>
+                      </a>
+                      
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#!" class="dropdown-item" onclick="toggle('cookies_enabled', 'true')">Enabled</a>
+                        <a href="#!" class="dropdown-item" onclick="toggle('cookies_enabled', 'false')">Disabled</a>
+                      </div>
+                    </div>
+                  </li>
+
 
                   <li class="nav-item ">
                     <span href="#" class="nav-link chilabel" style="float: left;">
@@ -609,6 +629,24 @@
                       </div>
                     </div>
                   </li>
+                  
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Debug Header
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="debug_header" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['debug_header']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#!" class="dropdown-item" onclick="toggle('debug_header', 'true')">Enabled</a>
+                        <a href="#!" class="dropdown-item" onclick="toggle('debug_header', 'false')">Disabled</a>
+                      </div>
+                    </div>
+                  </li>
+
                 </ul>
               </div>
             </li>
@@ -688,7 +726,7 @@
             <div class="card card-fill">
               <div class="card-header">
                 <h4>24 Hour Blocks By Type
-                <span class="text-secondary" id="block_total">()</span>
+                <span class="text-secondary" id="block_total">(<?php echo $block_count_24; ?>)</span>
                 </h4>
               </div>
               <div class="card-body">
@@ -708,7 +746,7 @@
           <div class="col-12 col-lg-4">
             <div class="card card-fill">
               <div class="card-header">
-                <h4>24 Hour Blocks By IP
+                <h4>24 Hour Blocks By Country
                 <span class="text-secondary" id="ip_total">()</span>
                 </h4>
               </div>
@@ -839,7 +877,7 @@
     <tr>
       <th scope="col"></th>
       <th scope="col">Time</th>
-      <th scope="col">IP</th>
+      <th scope="col">IP</thtfi>
       <th scope="col">URL / Agent</th>
     </tr>
   </thead>
@@ -926,12 +964,13 @@
       
       function show_bars(chart_id, hr_set) {
         let total = 0;
-        //console.log("chart id", chart_id);
-        for(var d in hr_set) {
-          console.log(d, hr_set[d]);
-          total += hr_set[d];
+        console.log("chart id", chart_id, hr_set);
+        for (var i=0;i<hr_set.data.length;i++) {
+          //console.log("show bars: ", i, hr_set.data[i]);
+          total += hr_set.data[i];
         }
         console.log("total: ", total);
+
         GBI("block_sum_total").innerText = "(" + total + ")";
         
         //console.log(hr_set);
@@ -952,7 +991,7 @@
       labels: [...Array(24).keys()],
       datasets: [{
         label: 'Block per Hour',
-        data: hr_set,
+        data: hr_set.data,
         backgroundColor: [
           '#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289',
           '#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289'
@@ -983,17 +1022,21 @@
       
       function show_pie(id, data, label_fn) {
         //console.log("show pie", id, data.counts);
-        console.log(Chart.defaults.doughnut);
+        //console.log(Chart.defaults.doughnut);
+        //console.log("data ", data);
         
         //data.counts.sort((a, b) => { console.log(a, b); return 1; });
 
 
         let data_labels = [];
         let data_per = [];
-        for (const [key, value] of Object.entries(data.counts)) {
+        for (const [key, value] of Object.entries(data.data)) {
+          console.log(key, value);
           data_labels.push(label_fn(key, value));
           data_per.push(value);
         }
+        console.log(data_labels);
+        console.log(data_per);
         
         var opts = {
           type: 'doughnut',
@@ -1055,7 +1098,7 @@
         22000: "general web",
         23000: "wrong domain",
         24000: "bot whitelist",
-        25000: "bad agent",
+        25000: "malicious agent",
         26000: "request rate",
         70000: "malware"
       };
@@ -1096,17 +1139,19 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
   });
 
       const request = async () => {
-        const response1 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_block_types&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
-        const response2 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
-        const response3 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        //const response2 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        //const response3 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
         const response4 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
 
         //console.log("fetched");
         
-        const data1 = await response1.json();
-        const data2 = await response2.json();
-        const data3 = await response3.json();
-        console.log("await 3", data3);
+        //const data2 = await response2.json();
+        const data2 = {"total":<?php echo count($hr_data)?>, "data":<?php echo json_encode($hr_data); ?>};
+        const data3 = {"total":<?php echo count($country_data)?>, "data":<?php echo json_encode($country_data); ?>};
+        const data5 = {"total":<?php echo count($type_data)?>, "data":<?php echo json_encode($type_data); ?>};
+        console.log("data5", data5);
+
+        //const data3 = await response3.json();
         const data4 = await response4.json();
 
 
@@ -1116,9 +1161,8 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
         
         //console.log("data4", data4);
 
-        show_pie('classChart', data1, label_type);
-        GBI("block_total").innerText = "(" + data1.total + ")";
-        GBI("blocks").innerText = data1.total;
+        show_pie('classChart', data5, label_type);
+
         show_pie('classChart2', data3, label_value);
         GBI("ip_total").innerText = "(" + data3.total + ")";
         show_bars('hrChart', data2);
@@ -1153,8 +1197,8 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
             element.classList.add("btn-secondary");
           }
         }
-
       }
+
       toggle_features();
 
       var elms = document.getElementsByClassName("country");
