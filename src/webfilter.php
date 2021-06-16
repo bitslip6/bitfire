@@ -309,7 +309,7 @@ function generic(string $name, string $value, array $values, array $keys) : \TF\
  * dynamic analysis
  */
 function dynamic_match(int $key, string $needle, string $value, string $name) : \TF\MaybeBlock {
-    if (preg_match($needle, $value) === 1) {
+    if (empty($needle) == false && preg_match($needle, $value) === 1) {
         return BitFire::new_block($key, $name, $value, 'static match');
     }
     return \TF\Maybe::$FALSE;
