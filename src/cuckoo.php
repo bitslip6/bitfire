@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 namespace TF;
 const CUCKOO_SLOT_SIZE_BYTES = 15;
 const CUCKOO_EXP_SIZE_BYTES = 6;
