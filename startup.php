@@ -1,5 +1,17 @@
-<?php declare(strict_types=1);
+<?php
 namespace BitFire;
+
+if (PHP_VERSION_ID < 70000) {
+    header("x-bitfire: requires php 7.0");
+    return;
+}
+
+function at(array $elm, $idx, $default) {
+	if($elm && isset($elm[$idx])) {
+		return $elm[$idx];
+	}
+	return $default;
+}
 
 //tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU);
 
@@ -15,7 +27,7 @@ try {
     \TF\debug("begin " . BITFIRE_SYM_VER);
     
     if (\BitFire\Config::enabled("allow_ip_block", false)) {
-        $blockfile = BLOCK_DIR . DS . $_SERVER[Config::str('ip_header', 'REMOTE_ADDR')]??'';
+        $blockfile = BLOCK_DIR . DS . at($_SERVER, Config::str('ip_header', 'REMOTE_ADDR'), '127.0.0.1');
         if (file_exists($blockfile) && filemtime($blockfile) > time()) { 
             $m1 = microtime(true);
             \TF\debug("ip block: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT");
