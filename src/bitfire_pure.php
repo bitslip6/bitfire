@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 namespace BitFire;
 use TF\MaybeBlock;
 use BitFire\Config as CFG;
