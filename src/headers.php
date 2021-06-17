@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 namespace BitFireHeader;
 
 const CONFIG_ENFORCE_SSL = "enforce_ssl_1year";
