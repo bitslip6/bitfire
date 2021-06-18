@@ -26,13 +26,60 @@ class FileData {
     public $num_lines;
     public $lines;
     public $exists = false;
+
+    public static function new(string $filename) {
+        return new FileData($filename);
+    }
+
     public function __construct(string $filename) {
         $this->filename = $filename;
         $this->exists = file_exists($filename);
-        $this->num_lines = 0;
-        $this->lines = array();
+    }
+    public function read() : FileData {
+        if ($this->exists) {
+            $this->lines = file($this->filename);
+            $this->num_lines = count($this->lines);
+        }
+        return $this;
+    }
+    public function apply_ln(callable $fn) : FileData {
+        if ($this->num_lines > 0) {
+            $this->lines = $fn($this->lines);
+            $this->num_lines = count($this->lines);
+        }
+        return $this;
+    }
+    public function apply(callable $fn) : FileData {
+        if ($this->num_lines > 0) {
+            $tmp = $fn($this);
+            $this->lines = $tmp->lines;
+            $this->num_lines = count($tmp->lines);
+            $this->filename = $tmp->filename;
+            $this->exists = $tmp->exists;
+        }
+        return $this;
+    }
+    public function map(callable $fn) : FileData {
+        if ($this->num_lines > 0) {
+            $this->lines = array_map($fn, $this->lines);
+        }
+        return $this;
     }
 }
+
+/**
+ * NOT PURE, reads into for filename
+ */
+function file_data(string $filename) : FileData {
+    $data = new FileData($filename);
+    if ($data->exists) {
+        $data->lines = file($filename);
+        $data->num_lines = count($data->lines);
+    }
+    return $data;
+}
+    
+    
 
 /**
  * debug output
@@ -880,17 +927,6 @@ function read_last_lines(string $filename, int $lines, int $line_sz) : ?array {
 
 
 
-/**
- * NOT PURE, reads into for filename
- */
-function file_data(string $filename) : FileData {
-    $data = new FileData($filename);
-    if ($data->exists) {
-        $data->lines = file($filename);
-        $data->num_lines = count($data->lines);
-    }
-    return $data;
-}
 
 /**
  * truncate the file to max num_lines, returns true if result file is <= $num_lines long
