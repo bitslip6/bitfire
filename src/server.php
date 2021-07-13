@@ -111,18 +111,20 @@ function strip_root(string $file) : string {
 
 
 // run the hash functions on a file
-function hash_file(string $filename, string $sym_ver) : ?array {
+function hash_file(string $filename, string $plugin_id) : ?array {
     $filename = str_replace("//", "/", $filename);
     $i = pathinfo($filename);
     if ($i['extension'] !== "php") { return null; }
     $result = array();
-    $shortname  = strip_root($filename);
+    $shortname = preg_replace("/.*\/tags\/.*\/(.*)/", "$1", $filename);
 
-    $result['e'] = $i['extension'];
-    $t = "/{$sym_ver}/{$shortname}";
-	$result['t'] = crc32(join('', array_map('trim', file($filename))));
-    $result['p'] = crc32($t);
-    $result['f'] = $t;
+    //$result['e'] = $i['extension'];
+    //$t = "/{$sym_ver}/{$shortname}";
+	$result['crc_path'] = crc32(join('', array_map('trim', file($filename))));
+    $result['crc_trim'] = crc32($shortname);
+    $result['name'] = $shortname;
+    $result['plugin_id'] = $plugin_id;
+    $result['size'] = filesize($filename);
 
     return $result;
 }
@@ -130,10 +132,8 @@ function hash_file(string $filename, string $sym_ver) : ?array {
 function find_wordpress_root(string $root_dir) : array {
     $roots = \TF\file_recurse($root_dir, function($file) : string {
         $d = dirname(realpath($file), 2);
-        //echo "\n\n - $d -\n\n";
         return $d;
     }, '/wp-includes\/version.php$/');
-    //\TF\dbg($roots);
     return $roots;
 }
 
