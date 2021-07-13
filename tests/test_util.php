@@ -13,6 +13,11 @@ function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
 }
 
+function test_wp() : void {
+require_once WAF_DIR . "src/wordpress.php";
+   $creds = \BitFireWP\wp_parse_credentials("/home/cory/wp-hashes/fullwp/develop.svn.wordpress.org/trunk");
+} 
+
 
 function test_ends_with() : void {
     $needle = "foobar";
@@ -44,13 +49,13 @@ function test_read_raw_speed() : void {
 
 /**
  * @type speed
+ */
 function test_read_enc_speed() : void {
     $f1 = file_get_contents("/home/cory/tools/bitfire-release/cache/values.txt");
     $dec = TF\decrypt_ssl("some_password", $f1);
     $f2 = file_get_contents("/home/cory/tools/bitfire-release/cache/keys.txt");
     $dec2 = TF\decrypt_ssl("some_password", $f2);
 }
-*/
 
 /**
  * @type speed
