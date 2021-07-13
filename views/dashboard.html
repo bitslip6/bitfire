@@ -860,7 +860,7 @@
         echo htmlspecialchars($line['request']['method']) . '</span>' . htmlspecialchars($line['request']['scheme'] . "://" . $line['request']['host'] . $line['request']['path'] .
           '?' . urldecode(http_build_query($line['request']['get'])));
         // if ($line['browser']['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)); }
-        echo "<div  class='right'>&nbsp;&nbsp;<b>AGENT:</b>&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)) . "</div>";
+        echo "<div  class='right'>&nbsp;&nbsp;<b>AGENT:</b>&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 88)) . "</div>";
       ?></td>
     </tr-->
     <?php } } ?>
@@ -1107,6 +1107,8 @@
         24000: "bot whitelist",
         25000: "malicious agent",
         26000: "request rate",
+        31000: "Unknown File",
+        32000: "Redirect",
         70000: "malware"
       };
 
@@ -1221,8 +1223,9 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
       }
 
       GBI("lock").addEventListener("click", function() {
-        alert("Site Lock only available in PRO");
-        return;
+        <?php if ($is_free) {
+        echo "alert('Site Lock only available in PRO');\n
+        return;"; } ?>
         GBI("lock").innerText = "locking...";
         fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
