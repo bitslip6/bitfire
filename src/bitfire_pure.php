@@ -311,7 +311,7 @@ function filter_bulky_headers(array $headers) : array {
 function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : void {
     //@file_put_contents("/tmp/log.txt", "POST REQUEST: " .var_export($block, true). "\n" . var_export($ip_data, true) ."\n\n", FILE_APPEND);
     $response_code = http_response_code();
-    if ($block === null && $response_code < 300) { return; } 
+    if ($block === null && $response_code <= 302) { return; } 
 
     // add browser data if available
     $bot = $whitelist = false;
@@ -323,8 +323,8 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $whitelist = $bot_filter->browser->whitelist ?? false;
     }
 
-    if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot", $request->agent, 0); }
-    else if ($block === null) { $block = new Block(31002, "return code", strval($response_code), $request->agent, 0); }
+    //if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot, ALLOWED", $request->agent, 0); }
+    if ($block === null) { $block = new Block(31002, "return code, ALLOWED", strval($response_code), $request->agent, 0); }
 
 
     $class = code_class($block->code);
@@ -354,7 +354,7 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
 
 
     $content = json_encode($data)."\n";
-    if (Config::enabled('report_file') && $data["pass"] === true) {
+    if (Config::enabled('report_file') && ($data["pass"] === true)) {
         $file = Config::file('report_file');
         file_put_contents($file, $content, FILE_APPEND);
     }  else if (Config::enabled(CONFIG_BLOCK_FILE)) {
