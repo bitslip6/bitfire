@@ -86,6 +86,7 @@ function file_data(string $filename) : FileData {
  */
 function dbg($x) {echo "<pre>";print_r($x);die("\nFIN"); }
 function each_yield_kv(Traversable $data, callable $fn) { $result = array(); foreach ($data as $item) { $y = $fn($item); $result[$y->key()] = $y->current(); } return $result; }
+function do_for_each(array $data, callable $fn) { $r = array(); foreach ($data as $elm) { $r[] = $fn($elm); } return $r; }
 function do_for_all_key_names(array $data, array $keynames, callable $fn) { foreach ($keynames as $item) { $fn($data[$item], $item); } }
 function do_for_all_key(array $data, callable $fn) { foreach ($data as $key => $item) { $fn($key); } }
 function do_for_all_key_value(array $data, callable $fn) { foreach ($data as $key => $item) { $fn($key, $item); } }
@@ -109,6 +110,8 @@ function read_stream($stream) { $data = ""; if($stream) { while (!feof($stream))
 // $fn = $result .= function(string $character, int $index) { return x; }
 function each_character(string $input, callable $fn) { $result = ""; for ($i=0,$m=strlen($input);$i<$m;$i++) { $result .= $fn($input[$i], $i); } return $result; }
 function not(bool $input) { return !$input; }
+function last(array $in) { $last = min(count($in)-1,0); return count($in) == 0 ? NULL : $in[$last]; }
+function remove(string $chars, string $in) { return str_replace(str_split($chars), '', $in); }
 
 function trim_off(string $input, string $trim_char) : string { $idx = strpos($input, $trim_char); $x = substr($input, 0, ($idx) ? $idx : strlen($input)); return $x; }
 function url_compare(string $url1, string $url2) : bool { return (trim($url1, "/") === trim($url2, "/")); } 
@@ -822,12 +825,13 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
         $optional_headers['Content-Length'] = strlen($content);
 	    \TF\debug("header len  - " . strlen($content));
     } else { $url .= "?" . $content; }
+    $url = trim($url, "?&");
 
     if (!isset($optional_headers['Content-Type'])) {
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
-        $optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent";
+		$optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
     }
 
     
@@ -891,6 +895,7 @@ function debugF(string $fmt, ...$args) : bool {
  */
 function debug(string $fmt, ...$args) : void {
     static $idx = 0;
+    if (!class_exists('\BitFire\Config')) { return; }
     if (CFG::enabled("debug_file")) {
         file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
     } else if (CFG::enabled("debug_header") && !headers_sent()) {
