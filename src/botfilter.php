@@ -264,7 +264,7 @@ class BotFilter {
 
 
         // bot tracking cookie
-        $maybe_botcookie = \BitFireBot\decrypt_tracking_cookie(
+        $maybe_botcookie = \TF\decrypt_tracking_cookie(
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
             Config::str(CONFIG_ENCRYPT_KEY),
             $request->ip, $request->agent);
@@ -389,11 +389,18 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $
     // correct answer
     if ($correct_answer->value('int') === intval($_POST['_bfa']??-1) || $correct_answer->value('int') === intval($request->post['_bfa']??-1)) {
         \TF\debug("x-challenge: pass");
+
+        $wp_admin = -1;
+        $wp_login_data = \BitFireWP\wp_get_login_cookie($_COOKIE);
+        if (!empty($wp_login_data)) {
+            $wp_admin = \BitFireWP\wp_validate_cookie($wp_login_data, $_SERVER['DOCUMENT_ROOT']??getcwd());
+        }
+
         // increase metric counter
         $effect->update(bot_metric_inc('valid'))
             ->status(STATUS_OK)
             // set the response valid cookie
-            ->cookie(\TF\en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 3600)))
+            ->cookie(\TF\en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 3600, 'wp' => $wp_admin)))
             // update the ip_data valid state for 60 minutes, TODO: make this real func, not anon-func
             ->update(new CacheItem('BITFIRE_IP_'.$request->ip, function ($data) {
                         $ip_data = unpack_ip_data($data); $ip_data['valid'] = 2; return pack_ip_data($ip_data);
@@ -688,39 +695,12 @@ function parse_agent(string $user_agent) : UserAgent {
  * requires ip and agent to validate the cookie
  */
 function get_tracking_cookie(string $ip, string $agent) : \TF\MaybeA {
-    return \BitFireBot\decrypt_tracking_cookie(
+    return \TF\decrypt_tracking_cookie(
         $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
         Config::str(CONFIG_ENCRYPT_KEY),
         $ip, $agent);
 }
 
-/**
- * returns a maybe with tracking data or an empty monad...
- * TODO: create test function
- * PURE!
- */
-function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeA {
-    //untaint($cookie_data);
-    //\TF\debug("encrypted cookie [%s] [%s]", $encrypt_key, $cookie_data);
-    $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
-        ->then("TF\\un_json")
-        ->if(function($cookie) use ($src_ip, $agent) {
-            if (!isset($cookie['ip'])) {
-                \TF\debug("invalid decrypted cookie [%s] ", var_export($cookie, true));
-                return false;
-            } else {
-                $src_ip_crc = \BitFireBot\ip_to_int($src_ip);
-                $cookie_match = (is_array($cookie) && (intval($cookie['ip']??0) == intval($src_ip_crc)));
-                $time_good = ((intval($cookie['et']??0)) > time());
-                $agent_good = crc32($agent) == $cookie['ua'];
-                if (!$cookie_match) { \TF\debug("cookie ip does not match"); }
-                if (!$time_good) { \TF\debug("cookie expired"); }
-                if (!$agent_good) { \TF\debug("agent mismatch live: [%s] [%d] cookie:[%d]", $agent, crc32($agent), $cookie['ua']??0); }
-                return ($cookie_match && $time_good && $agent_good);
-            }
-        });
-    return $r;
-}
 
 /**
  * return a function that returns a string to call $fn_name with the argument 
