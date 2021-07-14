@@ -193,10 +193,19 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
  */
 function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBlock {
 
-    // block super basic
-    if (strpos($value, "from", strpos($value, "select", strpos($value, "union")))) {
+    // block union select - super basic
+    $find = function(string $search) use ($value) : callable {
+        return function(int $offset) use ($value, $search) : int {
+            return strpos($value, $search, $offset);
+        };
+    };
+
+    $maybe_found = \TF\MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
+
+    if ($maybe_found->value('int') > 10) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
+
     if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
         return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
@@ -229,7 +238,8 @@ function check_removed_sql(StringResult $stripped_comments, int $total_control, 
 
         // we removed at least half of the input, look like sql to me..
         if (in_array($name, Config::arr("filtered_logging")) == false) {
-            if ($result->len < ($stripped_comments->len / 2) || $result->len < ($stripped_comments->len - 20)) {
+            $removed_len = strlen($sql_removed);
+            if ($result->len < ($removed_len / 2) || $result->len < ($removed_len - 20)) {
                 return BitFire::new_block(FAIL_SQL_FOUND, $name, $value, 'sql identified', 0);
             } else if ($result->len < 15) {
                 return search_short_sql($name, $result->value);
@@ -244,7 +254,8 @@ function check_removed_sql(StringResult $stripped_comments, int $total_control, 
  * remove sql strings 
  */
 function strip_strings(string $value) : StringResult {
-    $stripped = map_reduce(array("/\s+/sm" => ' ', "/^[^']+/sm" => '', "/'[^']+$/sm" => '', "/'[^']*'/sm" => '', "/as\s\w+/sm" => ''), function($search, $replace, $carry) {
+    $stripped = map_reduce(array("/\s+/sm" => ' ', "/'[^']+$/sm" => '', "/'[^']*'/sm" => '', "/as\s\w+/sm" => ''), function($search, $replace, $carry) {
+        // echo "STRIP: ($search) ($replace) ($carry)\n";
         return preg_replace($search, $replace, $carry);
     }, $value);
     return new StringResult($stripped, strlen($stripped));
