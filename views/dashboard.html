@@ -1224,8 +1224,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
 
       GBI("lock").addEventListener("click", function() {
         <?php if ($is_free) {
-        echo "alert('Site Lock only available in PRO');\n
-        return;"; } ?>
+        echo "alert('Site Lock only available in PRO');\nreturn;"; } ?>
         GBI("lock").innerText = "locking...";
         fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
