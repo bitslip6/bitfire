@@ -1111,3 +1111,30 @@ function array_shuffle(array $in) : array {
     return $out;
 }
 
+/**
+ * returns a maybe with tracking data or an empty monad...
+ * TODO: create test function
+ * PURE!
+ */
+function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeA {
+    //untaint($cookie_data);
+    \TF\debug("encrypted cookie [%s] [%s]", $encrypt_key, $cookie_data);
+    $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
+        ->then("TF\\un_json")
+        ->if(function($cookie) use ($src_ip, $agent) {
+            if (!isset($cookie['wp']) && !isset($cookie['ip'])) {
+                \TF\debug("invalid decrypted cookie [%s] ", var_export($cookie, true));
+                return false;
+            } else if (isset($cookie['ip'])) {
+                $src_ip_crc = \BitFireBot\ip_to_int($src_ip);
+                $cookie_match = (is_array($cookie) && (intval($cookie['ip']??0) == intval($src_ip_crc)));
+                $time_good = ((intval($cookie['et']??0)) > time());
+                $agent_good = crc32($agent) == $cookie['ua'];
+                if (!$cookie_match) { \TF\debug("cookie ip does not match"); }
+                if (!$time_good) { \TF\debug("cookie expired"); }
+                if (!$agent_good) { \TF\debug("agent mismatch live: [%s] [%d] cookie:[%d]", $agent, crc32($agent), $cookie['ua']??0); }
+                return ($cookie_match && $time_good && $agent_good);
+            } else { return true; }
+        });
+    return $r;
+}
