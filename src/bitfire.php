@@ -9,6 +9,7 @@ require_once WAF_DIR."src/const.php";
 require_once WAF_DIR."src/util.php";
 require_once WAF_DIR."src/storage.php";
 require_once WAF_DIR."src/english.php";
+require_once WAF_DIR."src/wordpress.php";
 
 
 class Headers
@@ -424,6 +425,27 @@ class BitFire
      * return false if inspection failed...
      */
     public function inspect() : \TF\MaybeBlock {
+
+        // WordPress admin, TODO: move to a function
+        // Do we have a logged in word press cookie? don't block.
+        $maybe_botcookie = \TF\decrypt_tracking_cookie(
+            $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
+            Config::str(CONFIG_ENCRYPT_KEY),
+            $this->_request->ip, $this->_request->agent);
+        if ($maybe_botcookie->extract("wp")() > 0) { 
+            return \TF\Maybe::$FALSE;
+        }
+
+        $wp_login_data = \BitFireWP\wp_get_login_cookie($_COOKIE);
+        if (!empty($wp_login_data)) {
+            $data = $maybe_botcookie->value('array');
+            $data['wp'] = (\BitFireWP\wp_validate_cookie($wp_login_data, $_SERVER['DOCUMENT_ROOT']??getcwd()))?2:0;
+            if ($data['wp']) {
+                \TF\Effect::new()->cookie(json_encode($data))->run();
+            }
+        }
+
+        
 
         // block from the htaccess file
         if (isset($this->_request->get['_bfblock'])) {
