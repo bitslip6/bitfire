@@ -1,6 +1,7 @@
 <?php
 namespace BitFire;
 
+use \BitFire\Config as CFG;
 use function TF\file_recurse;
 
 require_once WAF_DIR . "src/api.php";
@@ -27,9 +28,11 @@ foreach ($roots as $root) {
 */
 
 function country_enricher(array $country_info) : callable {
-    return function (array $input) use ($country_info): array {
-        $code = \TF\ip_to_country($input['request']['ip']??$input['ip']??'');
-        $input['country'] = $country_info[$code];
+    return function (?array $input) use ($country_info): ?array {
+		if (!empty($input)) {
+			$code = \TF\ip_to_country($input['request']['ip']??$input['ip']??'');
+			$input['country'] = $country_info[$code];
+		}
         return $input;
     };
 }
@@ -94,11 +97,15 @@ function serve_dashboard(string $dashboard_path) {
     $config_orig = Config::$_options;
     $exceptions = \BitFire\load_exceptions();
 
-    $report = \TF\remove_lines(\TF\file_data(Config::file(CONFIG_REPORT_FILE)), 400);
-    $reporting = array_map(
-        country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))),
-        array_map('\TF\un_json', array_slice($report->lines, $page*PAGE_SZ, PAGE_SZ)));
-    $report_count = $report->num_lines;
+
+
+    $report_file = \TF\FileData::new(CFG::file(CONFIG_REPORT_FILE))
+        ->read()
+        ->apply(\TF\partial_right('\TF\remove_lines', 400))
+        ->apply_ln(\TF\partial_right('array_slice', $page*PAGE_SZ, PAGE_SZ, false))
+        ->map('\TF\un_json')
+        ->map(country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))));
+    $report_count = $report_file->num_lines;
 
 
     
@@ -107,6 +114,7 @@ function serve_dashboard(string $dashboard_path) {
     $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500)));
     $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
 
+	/*
     for($i=0,$m=count($reporting); $i<$m; $i++) {
         //$cl = intval($reporting[$i]['block']['code']/1000)*1000;
         $cl = \BitFire\code_class($reporting[$i]['block']['code']);
@@ -129,19 +137,21 @@ function serve_dashboard(string $dashboard_path) {
             $reporting[$i]['country_img'] = "us.svg";
         }
     }
+	 */
     
     $locked = is_locked();
     $lock_action = ($locked) ? "unlock" : "lock";
     
     $block = \TF\remove_lines(\TF\file_data(Config::file(CONFIG_BLOCK_FILE)), 400);
-    $all_blocks = array_map(
+    $all_blocks = array_reverse(array_map(
         country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))),
-        array_map('\TF\un_json', $block->lines));
+        array_map('\TF\un_json', $block->lines)));
     $block_count = $block->num_lines;
+    $all_blocks = array_filter($all_blocks, function ($x) { return !empty($x) && isset($x['ts']) && isset($x['eventid']); });
 
 
-    $check_day = time() - \TF\DAY - \TF\DAY;
-    $block_24 = array_filter($all_blocks, function ($x) use ($check_day) { return $x['ts'] > $check_day; });
+    $check_day = time() - \TF\DAY;// - \TF\DAY;
+    $block_24 = array_filter($all_blocks, function ($x) use ($check_day) { return isset($x['ts']) && $x['ts'] > $check_day; });
     $block_count_24 = count($block_24);
     $blocks = array_slice($all_blocks, $page*PAGE_SZ, PAGE_SZ);
 
