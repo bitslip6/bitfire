@@ -71,7 +71,7 @@ function wp_parse_credentials(string $root) : ?\DB\Creds {
     if (isset($defines["SECURE_AUTH_KEY"])) {
         $creds = array_to_creds($defines);
 		$creds->salt_key = $defines["LOGGED_IN_KEY"] . $defines["LOGGED_IN_SALT"];
-        \TF\debug("salt key: {$creds->salt_key}");
+        // \TF\debug("salt key: {$creds->salt_key}");
         return $creds;
     }
     return NULL;
@@ -95,14 +95,29 @@ function wp_fetch_salt(string $root, string $scheme) : string {
 
 // validate an auth cookie
 function wp_validate_cookie(string $cookie, string $root) : bool {
+    //die("validate cookie\n");
     $data = Parts::of("|", $cookie)->name("username", "exp", "token", "hmac");
     $creds = wp_parse_credentials($root);
     $db = \DB\DB::cred_connect($creds);
     $sql = $db->fetch("SELECT SUBSTRING(user_pass, 9, 4) AS pass FROM " . $creds->prefix . "users WHERE user_login = {login} LIMIT 1", array("login" => $data->at("username")));
     $key_src = concat_fn("|")($data->at("username"), $sql->col("pass"), $data->at("exp"), $data->at("token"));
 
-    $key = hash_hmac( 'md5', $key_src, wp_fetch_salt($root, "auth"));
+    $key = hash_hmac('md5', $key_src, wp_fetch_salt($root, "auth"));
     $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
     return hash_equals($hash, $data->at("hmac"));
 }
 
+// return the wp cookie value
+function wp_get_login_cookie(array $cookies) : string {
+    $wp = array_filter($cookies, function ($x) {
+        if (strpos($x, "wordpress_") !== false) {
+            if ((strpos($x, "wordpress_logged_in") === false) && (strpos($x, "wordpress_test") === false)) {
+                return true;
+            }
+        }
+        return false;
+    }, ARRAY_FILTER_USE_KEY);
+    if (count($wp) < 1) { return ""; }
+    //\TF\dbg($wp);
+    return array_values($wp)[0];
+}

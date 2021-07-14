@@ -360,7 +360,7 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
     }  else if (Config::enabled(CONFIG_BLOCK_FILE)) {
         file_put_contents(Config::file(CONFIG_BLOCK_FILE), $content, FILE_APPEND);
     }
-    \TF\bit_http_request("POST", "https://www.bitslip6.com/botmatch/_doc",
+    \TF\bit_http_request("POST", "https://www.bitfire.co/blocks.php",
     $content, array("Content-Type" => "application/json"));
 }
 
