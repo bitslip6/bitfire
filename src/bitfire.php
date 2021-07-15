@@ -426,6 +426,24 @@ class BitFire
      */
     public function inspect() : \TF\MaybeBlock {
 
+        // block from the htaccess file
+        if (isset($this->_request->get['_bfblock'])) {
+            return BitFire::new_block(28001, "_bfblock", "url", $this->_request->get['_bfblock'], 0);
+        }
+
+        // if we are disabled, just return
+        if ($this->_request === NULL || Config::disabled(CONFIG_ENABLED)) {
+            return \TF\MaybeBlock::of(NULL);
+        }
+
+        // dashboard requests, TODO: MOVE TO api.php
+        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
+            require_once WAF_DIR."src/dashboard.php";
+            serve_dashboard($this->_request->path);
+        }
+		die("I3\n");
+
+
         // WordPress admin, TODO: move to a function
         // Do we have a logged in word press cookie? don't block.
         $maybe_botcookie = \TF\decrypt_tracking_cookie(
@@ -446,22 +464,6 @@ class BitFire
         }
 
         
-
-        // block from the htaccess file
-        if (isset($this->_request->get['_bfblock'])) {
-            return BitFire::new_block(28001, "_bfblock", "url", $this->_request->get['_bfblock'], 0);
-        }
-
-        // if we are disabled, just return
-        if ($this->_request === NULL || Config::disabled(CONFIG_ENABLED)) {
-            return \TF\MaybeBlock::of(NULL);
-        }
-
-        // dashboard requests, TODO: MOVE TO api.php
-        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
-            require_once WAF_DIR."src/dashboard.php";
-            serve_dashboard($this->_request->path);
-        }
         
 
         // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
