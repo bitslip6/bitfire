@@ -122,7 +122,7 @@
         function add_exception(ex) {
           console.log("path: ", url_to_path(ex.getAttribute("data-ex-url")));
           console.log("code: ", ex.getAttribute("data-ex-code"));
-          postData("<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=add_api_exception",
+          postData("<?php echo $dashboard_path?>?BITFIRE_API=add_api_exception",
           {"BITFIRE_API":"add_api_exception",
             "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
             "code": ex.getAttribute("data-ex-code"),
@@ -184,7 +184,7 @@
           var e = GBI(elm);
           console.log(e);
           e.innerText = cap(type);
-          fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
+          fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
           if (type == "block" || type == "on" || type == "true") {
             e.classList.remove("btn-warning");
             e.classList.remove("btn-secondary");
@@ -1015,7 +1015,7 @@
         if (p1 != p2) { alert("password does not match"); return; }
         if (p1.length < 8) { alert("password must be at least 8 characters"); return; }
         console.log(p1);
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=set_pass&pass1='+encodeURIComponent(p1)+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=set_pass&pass1='+encodeURIComponent(p1)+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
           .then(response => response.text())
           .then(response => {
             console.log(response);
@@ -1187,7 +1187,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
 
       function upgrade() {
         console.log("upgrade!");
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=upgrade&ver='+window.LATEST+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=upgrade&ver='+window.LATEST+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
           .then(response => response.text())
           .then(response => {
             alert(response);
@@ -1226,7 +1226,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
         <?php if ($is_free) {
         echo "alert('Site Lock only available in PRO');\nreturn;"; } ?>
         GBI("lock").innerText = "locking...";
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
           console.log(response); 
           GBI("lock").innerText = "LOCK SITE";
@@ -1237,7 +1237,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
 
       GBI("unlock").addEventListener("click", function() {
         GBI("unlock").innerText = "unlocking...";
-        fetch('<?php echo \Bitfire\Config::str("dashboard_path")?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
         .then(response => {
           console.log(response); 
           GBI("unlock").innerText = "UNLOCK SITE";
