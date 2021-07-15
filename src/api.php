@@ -209,7 +209,7 @@ function upgrade(\Bitfire\Request $request) {
                 $root = str_replace(WAF_DIR."cache/bitfire-{$v}/", "", $x);
                 //echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
 				if (!rename($x, WAF_DIR . $root)) {
-                    exit("upgrade failed");
+                    // exit("upgrade failed");
                 }
             }
         });//, "/.*.php/");
