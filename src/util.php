@@ -114,7 +114,7 @@ function last(array $in) { $last = min(count($in)-1,0); return count($in) == 0 ?
 function remove(string $chars, string $in) { return str_replace(str_split($chars), '', $in); }
 
 function trim_off(string $input, string $trim_char) : string { $idx = strpos($input, $trim_char); $x = substr($input, 0, ($idx) ? $idx : strlen($input)); return $x; }
-function url_compare(string $url1, string $url2) : bool { return (trim($url1, "/") === trim($url2, "/")); } 
+function url_compare(string $haystack, string $needle) : bool { return (ends_with(trim($haystack, "/"), trim($needle, "/"))); } 
 
 /**
  * recursively perform a function over directory traversal.
