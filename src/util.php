@@ -605,8 +605,6 @@ function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
         ->then($exploder)
         ->if(function($x) { return is_array($x) && count($x) === 2; })
         ->then($decrypt, true);
-    //\TF\debug("errors: [%s]", var_export($a->errors()));
-    //\TF\dbg($a);
     return $a;
 }
 
