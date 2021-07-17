@@ -6,12 +6,14 @@ if (PHP_VERSION_ID < 70000) {
     return;
 }
 
-function at(array $elm, $idx, $default) {
-	if($elm && isset($elm[$idx])) {
-		return $elm[$idx];
+if (!function_exists('\BitFire\at')) {
+	function at(array $elm, $idx, $default) {
+		if($elm && isset($elm[$idx])) { return $elm[$idx]; }
+		return $default;
 	}
-	return $default;
 }
+else if (defined("WAF_DIR")) { header("bitfire-x: inc 2x"); return; }
+
 
 //tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU);
 
