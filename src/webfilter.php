@@ -176,7 +176,7 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
     if (preg_match('/\s*(or|and)\s+(\d+|true|false|\'\w+\'|)\s*!?=(\d+|true|false|\'\w+\'|)/sm', $value)) {
         return BitFire::get_instance()->new_block(FAIL_SQL_OR, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
-    if (preg_match('/\'?.*?(or|and|where|order\s+by)\s+[^\s]+(;|--|#|\'|\/\*)?/sm', $value)) {
+    if (preg_match('/\'?.*?(or|and|where|order\s+by)\s+[^\s]+(;|--|#|\'|\/\*)/sm', $value)) {
         return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
     if (preg_match('/select\s+(all|distinct|distinctrow|high_priority|straight_join|sql_small_result|sql_big_result|sql_buffer_result|sql_no_cache|sql_calc_found_rows)*\s*[^\s]+\s+(into|from)/sm', $value)) {
@@ -212,12 +212,15 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
 
     // block short sql,
     $total_control = sum_sql_control_chars($counts);
-    if ($total_control <= 0) { return search_short_sql($name, $value); }
 
     $stripped_comments = strip_comments($value);
         
+    $block = \TF\Maybe::$FALSE;
     // look for the short injection types
-    $block = search_short_sql($name, $stripped_comments->value);
+	if ($total_control > 0) { 
+		$block->doifnot('\BitFire\search_short_sql', $name, $value);
+		$block->doifnot('\BitFire\search_short_sql', $name, $stripped_comments->value);
+	}
     $block->doifnot('\BitFire\check_removed_sql', $stripped_comments, $total_control, $name, $value);
 
     return $block;
