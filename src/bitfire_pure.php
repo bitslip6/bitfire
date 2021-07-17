@@ -35,7 +35,7 @@ function is_report(Block $block) : bool {
 function alert_or_block($config) : string {
     if ($config === 'report' || $config === 'alert') { return 'report'; }
     if (!$config) { return 'off'; }
-    return 'block';
+    return 'on';
 }
 
 function map_exception(array $raw) : \BitFire\Exception {
@@ -367,7 +367,9 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
 /**
  * create the base log data
  */
-function make_post_data(\BitFire\Request $request, Block $block, ?IPData $ip_data) : array {
+function make_post_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : array {
+
+    if ($block == NULL) { $block = new Block(50000, "n/a", "n/a", "n/a"); }
     
     $data = array(
         "ip" => $request->ip,
@@ -390,7 +392,7 @@ function make_post_data(\BitFire\Request $request, Block $block, ?IPData $ip_dat
     );
     
     // add ip data to the log
-    if ($ip_data->rr > 0) {
+    if ($ip_data != NULL && $ip_data->rr > 0) {
         $data['rr1m'] = $ip_data->rr;
         $data['ref'] = $ip_data->ref;
         $data['404'] = $ip_data->ctr_404;
