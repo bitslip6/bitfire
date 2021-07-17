@@ -4,6 +4,7 @@ namespace BitFire;
 use TF\CacheItem;
 
 use function BitFireBot\send_browser_verification;
+use BitFire\Config AS CFG;
 
 const MAX_HOST_HEADER_LEN = 80;
 
@@ -304,13 +305,16 @@ class BotFilter {
         $this->browser->valid = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
         \TF\debug("x-valid: " . $this->browser->valid . " ip_data_valid [" . $this->ip_data->valid . "]");
 
-        $this->verify_browser($request, $maybe_botcookie); 
+        if (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop') {
+            $this->verify_browser($request, $maybe_botcookie); 
+        }
         return $block;
     }
 
     protected function verify_browser(\BitFire\Request $request, \TF\MaybeStr $maybe_botcookie) {
         // javascript browser challenges
         if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+            \TF\debug("verify browser");
             if (isset($_POST['_bfxa'])) {
                 $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
@@ -473,10 +477,14 @@ function ip_to_int(string $ip) : int {
  * NOT PURE! depends in $_SERVER variable
  */
 function is_local_request(\BitFire\Request $request) : bool {
-    if ($_SERVER['REMOTE_ADDR']??'127.0.0.1' === $_SERVER['SERVER_ADDR']??'127.0.0.2') {
+    $addr1 = $_SERVER['REMOTE_ADDR']??'127.0.0.1';
+	$addr2 = $_SERVER['SERVER_ADDR']??'127.0.0.2';
+    if ($addr1 == $addr2) {
+        \TF\debug("127 [%s] [%s]", $addr1, $addr2);
         return true;
     }
     if (\TF\ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false) {
+        \TF\debug("wp-cron || wordpress");
         return true;
     }
     return false;
