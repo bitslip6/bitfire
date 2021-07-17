@@ -10,6 +10,7 @@ require_once WAF_DIR."src/util.php";
 require_once WAF_DIR."src/storage.php";
 require_once WAF_DIR."src/english.php";
 require_once WAF_DIR."src/wordpress.php";
+require_once WAF_DIR."src/botfilter.php";
 
 
 class Headers
@@ -441,7 +442,6 @@ class BitFire
             require_once WAF_DIR."src/dashboard.php";
             serve_dashboard($this->_request->path);
         }
-		die("I3\n");
 
 
         // WordPress admin, TODO: move to a function
@@ -477,7 +477,6 @@ class BitFire
 
         // bot filtering
         if ($this->bot_filter_enabled()) {
-            require_once WAF_DIR . 'src/botfilter.php';
             $this->bot_filter = new BotFilter($this->cache);
             $block = $this->bot_filter->inspect($this->_request);
         }
