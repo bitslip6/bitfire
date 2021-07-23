@@ -267,12 +267,15 @@ function dump_hashes(\BitFire\Request $request) {
     require_once WAF_DIR . "/src/server.php";
     \TF\debug("search roots: "  . \TF\en_json($_SERVER['DOCUMENT_ROOT']));
     $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+    \TF\debug("found roots: " . \TF\en_json($roots));
+/*
     $roots = array_filter($roots, function ($x) { 
         $is_old = (stripos($x, "/old") !== false);
         \TF\debug("check root $x [$is_old]");
         return !$is_old;
     });
     \TF\debug("found roots: "  . \TF\en_json($roots));
+*/
 
     // save ref to hashes and match with response...
     $hashes = array_map('\BitFireSvr\get_wordpress_hashes', $roots);
@@ -283,6 +286,7 @@ function dump_hashes(\BitFire\Request $request) {
         }
         return false;
     });
+    //file_put_contents("/tmp/hash.txt", json_encode($hashes, JSON_PRETTY_PRINT));
     //exit(\TF\en_json($hashes));
     //\TF\bit_http_request("POST", "http://bitfire.co/hash.php", "[{'ver':1,'files':[[0,1,2,3,4]}]");
     
@@ -291,8 +295,11 @@ function dump_hashes(\BitFire\Request $request) {
         $offset = 0;
         while ($offset < count($root['files'])) {
 */
-            $result = \TF\bit_http_request("POST", "http://bitfire.co/hash.php?x=9", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
-            $decoded = \TF\un_json($result);
+    $result = \TF\bit_http_request("POST", "http://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+    //\TF\dbg($result);
+
+    //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
+    $decoded = \TF\un_json($result);
 
 //        }
 //    }
@@ -305,7 +312,7 @@ function dump_hashes(\BitFire\Request $request) {
         foreach ($decoded as $root) {
             if (is_array($root)) {
                 foreach ($root as $file) {
-                    //print_r($file);
+                    print_r($file);
                     $path = "http://develop.svn.wordpress.org/tags" . $file[0];
                     $parts = explode("/", $file[0]);
                     $out = $file[4] . "/" . join("/", array_slice($parts, 3));
