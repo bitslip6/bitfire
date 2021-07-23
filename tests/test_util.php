@@ -14,8 +14,8 @@ function somefunc($a1, $a2, $a3, $a4 = "foobar") {
 }
 
 function test_wp() : void {
-require_once WAF_DIR . "src/wordpress.php";
-   $creds = \BitFireWP\wp_parse_credentials("/home/cory/wp-hashes/fullwp/develop.svn.wordpress.org/trunk");
+    require_once WAF_DIR . "src/wordpress.php";
+    $creds = \BitFireWP\wp_parse_credentials("/home/wp-hashes/fullwp/develop.svn.wordpress.org/trunk");
 } 
 
 
