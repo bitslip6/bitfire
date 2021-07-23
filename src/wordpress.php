@@ -47,7 +47,7 @@ function define_to_array(array $input, $define_line) : array {
     if (preg_match("/define\s*\(\s*['\"]([a-zA-Z_]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]/", $define_line, $matches)) {
         $input[$matches[1]] = $matches[2];
     }
-    if (preg_match("/table_prefix\s*=\s*['\"]([a-zA-Z_]+)/", $define_line, $matches)) {
+    if (preg_match("/table_prefix\s*=\s*['\"]([a-z0-9A-Z_]+)/", $define_line, $matches)) {
         $input["prefix"] = $matches[1];
     }
 
@@ -58,7 +58,7 @@ function define_to_array(array $input, $define_line) : array {
 function array_to_creds(?array $defines) : ?\DB\Creds {
     $creds = NULL;
     if ($defines && count($defines) > 5) {
-        $creds = new \DB\Creds($defines['DB_USER']??'', $defines['DB_PASSWORD']??'', $defines['DB_HOST']??'', $defines['DB_NAME']??'', $defines['predix']??'wp_');
+        $creds = new \DB\Creds($defines['DB_USER']??'', $defines['DB_PASSWORD']??'', $defines['DB_HOST']??'', $defines['DB_NAME']??'', $defines['prefix']??'wp_');
     }
     return $creds;
 }
@@ -66,22 +66,22 @@ function array_to_creds(?array $defines) : ?\DB\Creds {
 
 // parse wp-config into db credentials
 function wp_parse_credentials(string $root) : ?\DB\Creds {
+    $creds = NULL;
     $defines = wp_parse_define($root);
-
     if (isset($defines["SECURE_AUTH_KEY"])) {
         $creds = array_to_creds($defines);
-		$creds->salt_key = $defines["LOGGED_IN_KEY"] . $defines["LOGGED_IN_SALT"];
-        // \TF\debug("salt key: {$creds->salt_key}");
-        return $creds;
     }
-    return NULL;
+    return $creds;
 }
 
 // parse out all defines from the wp-config
 function wp_parse_define(string $root) : array {
-    $config_file = "$root/wp-config.php";
-    $data = file($config_file);
-    $defines = array_reduce($data, '\BitFireWP\define_to_array', array());
+    static $defines = array();
+    if (count($defines) < 1) {
+        $config_file = "$root/wp-config.php";
+        $data = file($config_file);
+        $defines = array_reduce($data, '\BitFireWP\define_to_array', array());
+    }
 	return $defines;
 }
 
@@ -90,21 +90,26 @@ function wp_parse_define(string $root) : array {
 function wp_fetch_salt(string $root, string $scheme) : string {
 	$scheme = strtoupper($scheme);
 	$defines = wp_parse_define($root);
+	if (!isset($defines["{$scheme}_KEY"])) { \TF\debug("auth define [$scheme] missing"); return ""; }
 	return $defines["{$scheme}_KEY"] . $defines["{$scheme}_SALT"];
 }
 
 // validate an auth cookie
 function wp_validate_cookie(string $cookie, string $root) : bool {
-    //die("validate cookie\n");
     $data = Parts::of("|", $cookie)->name("username", "exp", "token", "hmac");
     $creds = wp_parse_credentials($root);
     $db = \DB\DB::cred_connect($creds);
     $sql = $db->fetch("SELECT SUBSTRING(user_pass, 9, 4) AS pass FROM " . $creds->prefix . "users WHERE user_login = {login} LIMIT 1", array("login" => $data->at("username")));
+    if ($sql->empty()) { \TF\debug("wp-auth failed to load db user data"); return false; }
     $key_src = concat_fn("|")($data->at("username"), $sql->col("pass"), $data->at("exp"), $data->at("token"));
 
-    $key = hash_hmac('md5', $key_src, wp_fetch_salt($root, "auth"));
-    $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
-    return hash_equals($hash, $data->at("hmac"));
+    $key_list = array("auth", "secure_auth", "logged_in");
+    foreach ($key_list as $name) {
+        $key = hash_hmac('md5', $key_src, wp_fetch_salt($root, $name));
+        $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
+        if (hash_equals($hash, $data->at("hmac"))) { \TF\debug("wp match [%s]", $name); return true; }
+    }
+    \TF\debug("wp auth failed");
 }
 
 // return the wp cookie value
@@ -118,6 +123,5 @@ function wp_get_login_cookie(array $cookies) : string {
         return false;
     }, ARRAY_FILTER_USE_KEY);
     if (count($wp) < 1) { return ""; }
-    //\TF\dbg($wp);
     return array_values($wp)[0];
 }
