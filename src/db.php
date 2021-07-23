@@ -7,7 +7,6 @@ class Creds {
     public $password;
     public $prefix;
     public $db_name;
-    public $salt_key;
 
     public function __construct(string $user, string $pass, string $host, string $db_name, string $pre = "") {
         $this->username = $user;
@@ -134,7 +133,7 @@ class SQL {
     protected $_sql;
     protected $_len;
 
-    public static function from(?array $x, string $sql="") : SQL { $sql = new SQL(); $sql->_x = $x; $sql->_len < count($x); $sql->_sql = $sql; return $sql; }
+    public static function from(?array $x, string $sql="") : SQL { $sql = new SQL(); $sql->_x = $x; $sql->_len < (is_array($x)) ? count($x) : 0; $sql->_sql = $sql; return $sql; }
     
     /**
      * set internal dataset to value of $name at current row index 
@@ -234,12 +233,12 @@ class SQL {
     public function ifnot(callable $fn) : SQL { if ($fn($this->_data) !== false) { $this->_data = NULL; } return $this; }
     // return true if we have an empty result set
     public function empty() : bool { return empty($this->_x); } 
-    public function count() : int { return count($this->_x); } 
+    public function count() : int { return is_array($this->_x) ? count($this->_x) : 0; } 
     // get all errors
     public function errors() : array { return $this->_errors; }
     // size of result set
     public function size() : int { return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1); }
-    public function data() : array { return $this->_x; }
+    public function data() : ?array { return $this->_x; }
     public function __toString() : string { return (string)$this->_data; }
 }
 
