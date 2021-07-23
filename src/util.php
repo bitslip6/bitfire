@@ -110,7 +110,7 @@ function read_stream($stream) { $data = ""; if($stream) { while (!feof($stream))
 // $fn = $result .= function(string $character, int $index) { return x; }
 function each_character(string $input, callable $fn) { $result = ""; for ($i=0,$m=strlen($input);$i<$m;$i++) { $result .= $fn($input[$i], $i); } return $result; }
 function not(bool $input) { return !$input; }
-function last(array $in) { $last = min(count($in)-1,0); return count($in) == 0 ? NULL : $in[$last]; }
+function last(array $in) { $last = max(count($in)-1,0); return count($in) == 0 ? NULL : $in[$last]; }
 function remove(string $chars, string $in) { return str_replace(str_split($chars), '', $in); }
 
 function trim_off(string $input, string $trim_char) : string { $idx = strpos($input, $trim_char); $x = substr($input, 0, ($idx) ? $idx : strlen($input)); return $x; }
@@ -978,6 +978,9 @@ function prof_sort(array $a, array $b) : int {
  * replace file contents inline
  */
 function file_replace(string $filename, string $find, string $replace) : bool {
+    if (!file_exists($filename)) { 
+        if (!touch($filename)) { return false; }
+    }
     $in = file_get_contents($filename);
     \TF\debug("file replace [%s] [%s] in len [%d] ",$filename, $replace, strlen($in));
     $out = str_replace($find, $replace, $in);
@@ -1115,24 +1118,25 @@ function array_shuffle(array $in) : array {
  * PURE!
  */
 function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeA {
-    //untaint($cookie_data);
-    \TF\debug("encrypted cookie [%s] [%s]", $encrypt_key, $cookie_data);
-    $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
-        ->then("TF\\un_json")
-        ->if(function($cookie) use ($src_ip, $agent) {
-            if (!isset($cookie['wp']) && !isset($cookie['ip'])) {
-                \TF\debug("invalid decrypted cookie [%s] ", var_export($cookie, true));
-                return false;
-            } else if (isset($cookie['ip'])) {
-                $src_ip_crc = \BitFireBot\ip_to_int($src_ip);
-                $cookie_match = (is_array($cookie) && (intval($cookie['ip']??0) == intval($src_ip_crc)));
-                $time_good = ((intval($cookie['et']??0)) > time());
-                $agent_good = crc32($agent) == $cookie['ua'];
-                if (!$cookie_match) { \TF\debug("cookie ip does not match"); }
-                if (!$time_good) { \TF\debug("cookie expired"); }
-                if (!$agent_good) { \TF\debug("agent mismatch live: [%s] [%d] cookie:[%d]", $agent, crc32($agent), $cookie['ua']??0); }
-                return ($cookie_match && $time_good && $agent_good);
-            } else { return true; }
-        });
+    static $r = NULL;
+    if ($r == NULL) {
+        $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
+            ->then("TF\\un_json")
+            ->if(function($cookie) use ($src_ip, $agent) {
+                if (!isset($cookie['wp']) && !isset($cookie['ip'])) {
+                    \TF\debug("invalid decrypted cookie [%s] ", var_export($cookie, true));
+                    return false;
+                } else if (isset($cookie['ip'])) {
+                    $src_ip_crc = \BitFireBot\ip_to_int($src_ip);
+                    $cookie_match = (is_array($cookie) && (intval($cookie['ip']??0) == intval($src_ip_crc)));
+                    $time_good = ((intval($cookie['et']??0)) > time());
+                    $agent_good = crc32($agent) == $cookie['ua'];
+                    if (!$cookie_match) { \TF\debug("cookie ip does not match"); }
+                    if (!$time_good) { \TF\debug("cookie expired"); }
+                    if (!$agent_good) { \TF\debug("agent mismatch live: [%s] [%d] cookie:[%d]", $agent, crc32($agent), $cookie['ua']??0); }
+                    return ($cookie_match && $time_good && $agent_good);
+                } else { return true; }
+            });
+    }
     return $r;
 }
