@@ -29,6 +29,8 @@ function replace_if_config(string $param, string $value, callable $fn, string $n
  * update all system config values from defaults
  */
 function update_config(string $ini_src) {
+    if (!is_writeable($ini_src)) { return; }
+
     $replace_fn = \TF\partial('\TF\file_replace', $ini_src);
     replace_if_config("encryption_key", "default_encryption_key", $replace_fn, \TF\random_str(32));
     replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
@@ -58,10 +60,12 @@ function update_config(string $ini_src) {
     \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
     \TF\file_replace($ini_src, "configured = false", "configured = true");
 
-    $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/random_path/contact")."\n";
     $robot_file = $_SERVER['DOCUMENT_ROOT']."/robots.txt";
-    \TF\file_replace($robot_file, $robot_content, "");
-    file_put_contents($robot_file, $robot_content, FILE_APPEND);
+    if (file_exists($robot_file) && is_writeable($robot_file)) {
+        $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/random_path/contact")."\n";
+        \TF\file_replace($robot_file, $robot_content, "");
+        file_put_contents($robot_file, $robot_content, FILE_APPEND);
+    }
 }
 
 /**
@@ -117,6 +121,10 @@ function hash_file(string $filename, string $plugin_id) : ?array {
     if ($i['extension'] !== "php") { return null; }
     $result = array();
     $shortname = preg_replace("/.*\/tags\/.*\/(.*)/", "$1", $filename);
+    if (!$shortname || $shortname == $filename) {
+        $shortname = preg_replace("/.*\/$name\/.*\/(.*)/", "$1", $filename);
+    }
+    
 
     //$result['e'] = $i['extension'];
     //$t = "/{$sym_ver}/{$shortname}";
@@ -159,6 +167,7 @@ function get_wordpress_hashes(string $root_dir) : array {
     if (version_compare($version, "5.0.0") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
 
     $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : array {
+
         $path = str_replace($root_dir, "/$version/src", $file);
         $nospace_data = join('', array_map('trim', file($file)));
         // is plugin
@@ -166,13 +175,15 @@ function get_wordpress_hashes(string $root_dir) : array {
             if (preg_match("/\/plugins\/(\w+)/", $path, $matches)) {
                 $plugin = $matches[1];
                 $path = str_replace("/$version/src/wp-content/plugins/$plugin", "", $path);
-                return array($plugin, filesize($file), crc32($path), crc32($nospace_data));//, basename($path));
+                return array($plugin, filesize($file), crc32($path), crc32($nospace_data), $file);
             }
         }
-        return array('', filesize($file), crc32($path), crc32($nospace_data), basename($path));
+        if ($file == "$root_dir/index.php") { $path = str_replace("index.php", "_index.php", $path); \TF\debug("INDEX: %s", $file); }
+        if ($file == "$root_dir/wp-admin/index.php") { $path = str_replace("index.php", "_index.php", $path); \TF\debug("INDEX: %s", $file); }
+        return array('', filesize($file), crc32($path), crc32($nospace_data), $file);
     }, "/.*\.php$/");
 
-    return array("ver" => $version, "root" => $root_dir, "int" => text_to_int($version), "files" => array_splice($r, 0, 1000));
+    return array("ver" => $version, "root" => $root_dir, "int" => text_to_int($version), "files" => $r);//array_splice($r, 0, 1000));
 }
 
 
