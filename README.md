@@ -93,6 +93,7 @@ BitFire is built from pure PHP and has no external dependencies.  BitFire can ta
 ## Getting Started
 
 Security from F to A in 5 minutes https://www.youtube.com/watch?v=DHhEW2otdng
+Install Guide: https://bitfire.co/bitfire-install
 
 ### Prerequisites
 
