@@ -29,11 +29,11 @@ try {
     \TF\debug("begin " . BITFIRE_SYM_VER);
     
     if (\BitFire\Config::enabled("allow_ip_block", false)) {
-        $blockfile = BLOCK_DIR . DS . at($_SERVER, Config::str('ip_header', 'REMOTE_ADDR'), '127.0.0.1');
+        $blockfile = BLOCK_DIR . DS . at($_SERVER, Config::str_up('ip_header', 'REMOTE_ADDR'), '127.0.0.1');
         if (file_exists($blockfile) && filemtime($blockfile) > time()) { 
             $m1 = microtime(true);
             \TF\debug("ip block: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT");
-            exit(include WAF_DIR."views/block.php");
+            exit(include \BitFire\Config::file("block_page"));
         }
     }
 
