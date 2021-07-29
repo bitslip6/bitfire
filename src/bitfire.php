@@ -222,6 +222,21 @@ class Config {
     }
 }
 
+/**
+ * NOT PURE.  depends on: $_SERVER['PHP_AUTH_PW'], Config['password']
+ */
+function verify_admin_password() : \TF\Effect {
+    $effect = \TF\Effect::new();
+    if (!isset($_SERVER['PHP_AUTH_PW']) ||
+        (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
+        (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
+
+        $effect->header('WWW-Authenticate', 'Basic realm="BitFire", charset="UTF-8"')
+            ->response_code(401)
+            ->exit(true);
+    }
+    return $effect;
+}
 
 /**
  * 
@@ -300,7 +315,8 @@ class BitFire
     }
 
     /**
-     * handle API calls
+     * handle API calls.
+     * DEPENDS: $_SERVER, $_REQUEST, Config
      */
     protected function api_call() : void {
         if (!isset($_REQUEST[BITFIRE_COMMAND])) {
@@ -311,6 +327,11 @@ class BitFire
         if (!in_array($fn, BITFIRE_API_FN)) {
             exit("unknown function [$fn]");
         }
+
+        // verify admin password.  will exit 401 if failure
+        // TODO: add verify secret here as well
+        verify_admin_password()->run();
+        
 
         $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
 
