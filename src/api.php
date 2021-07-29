@@ -26,19 +26,19 @@ function add_api_exception(\BitFire\Request $r) : string {
     return ($added) ? "success" : "fail";
 }
 
+
+// TODO: refactor as effect
 function download(\BitFire\Request $r) : void {
-	set_time_limit(0);
-	ignore_user_abort(false);
-	ini_set('output_buffering', 0);
-	ini_set('zlib.output_compression', 0);
 
-	$filename = $r->get['filename'];
-	if (strpos($filename, "..") !== false) { die("won't download files outside of root"); }
-	if (\TF\ends_with($filename, "php") === false) { die("won't download non php files"); }
+	$effect = \TF\effect::new();
+	$filename = $r->get['filename']??"";
 
-	if (file_exists($filename)) {
+	if (strpos($filename, "..") !== false || \TF\ends_with($filename, "php") === false) { $effect->}
+	if (!file_exists($filename)) { die("no such file"); }
+
+
+	if (!isset($_GET['direct']) {
 		$base = basename($filename);
-
 		header('Content-Description: File Transfer');
 		header('Content-Type: application/octet-stream');
 		header('Content-Disposition: attachment; filename="' . $base . '"');
@@ -46,10 +46,8 @@ function download(\BitFire\Request $r) : void {
 		header('Cache-Control: must-revalidate');
 		header('Pragma: public');
 		header('Content-Length: ' . filesize($filename));
-		readfile($filename);
-	} else {
-		die("no such file");
 	}
+	readfile($filename);
 }
 
 
