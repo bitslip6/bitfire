@@ -26,6 +26,32 @@ function add_api_exception(\BitFire\Request $r) : string {
     return ($added) ? "success" : "fail";
 }
 
+function download(\BitFire\Request $r) : void {
+	set_time_limit(0);
+	ignore_user_abort(false);
+	ini_set('output_buffering', 0);
+	ini_set('zlib.output_compression', 0);
+
+	$filename = $r->get['filename'];
+	if (strpos($filename, "..") !== false) { die("won't download files outside of root"); }
+	if (\TF\ends_with($filename, "php") === false) { die("won't download non php files"); }
+
+	if (file_exists($filename)) {
+		$base = basename($filename);
+
+		header('Content-Description: File Transfer');
+		header('Content-Type: application/octet-stream');
+		header('Content-Disposition: attachment; filename="' . $base . '"');
+		header('Expires: 0');
+		header('Cache-Control: must-revalidate');
+		header('Pragma: public');
+		header('Content-Length: ' . filesize($filename));
+		readfile($filename);
+	} else {
+		die("no such file");
+	}
+}
+
 
 /**
  * get 24 hour block sums
@@ -263,73 +289,6 @@ function toggle_config_value(\BitFire\Request $request) {
 }
 
 
-function dump_hashes(\BitFire\Request $request) {
-    require_once WAF_DIR . "/src/server.php";
-    \TF\debug("search roots: "  . \TF\en_json($_SERVER['DOCUMENT_ROOT']));
-    $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
-    \TF\debug("found roots: " . \TF\en_json($roots));
-/*
-    $roots = array_filter($roots, function ($x) { 
-        $is_old = (stripos($x, "/old") !== false);
-        \TF\debug("check root $x [$is_old]");
-        return !$is_old;
-    });
-    \TF\debug("found roots: "  . \TF\en_json($roots));
-*/
-
-    // save ref to hashes and match with response...
-    $hashes = array_map('\BitFireSvr\get_wordpress_hashes', $roots);
-    $hashes = array_filter($hashes, function ($x) { 
-        if (count($x['files']) > 1) {
-            \TF\debug("num files: " . count($x['files']));
-            return true;
-        }
-        return false;
-    });
-    //file_put_contents("/tmp/hash.txt", json_encode($hashes, JSON_PRETTY_PRINT));
-    //exit(\TF\en_json($hashes));
-    //\TF\bit_http_request("POST", "http://bitfire.co/hash.php", "[{'ver':1,'files':[[0,1,2,3,4]}]");
-    
-/*
-    foreach ($hashes as $root)
-        $offset = 0;
-        while ($offset < count($root['files'])) {
-*/
-    $result = \TF\bit_http_request("POST", "http://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
-    //\TF\dbg($result);
-
-    //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
-    $decoded = \TF\un_json($result);
-
-//        }
-//    }
-
-
-
-    $fix_files = array();
-    if ($decoded && count($decoded) > 0) {
-        \TF\debug("hash result len " . count($decoded));
-        foreach ($decoded as $root) {
-            if (is_array($root)) {
-                foreach ($root as $file) {
-                    print_r($file);
-                    $path = "http://develop.svn.wordpress.org/tags" . $file[0];
-                    $parts = explode("/", $file[0]);
-                    $out = $file[4] . "/" . join("/", array_slice($parts, 3));
-                    $fix_files[] = array('url' => $path, 'out' => $out);
-                }
-            } else {
-                \TF\debug("unknown root!");
-            }
-        }
-    } else {
-        \TF\debug("hash result len 0");
-    }
-
-    file_put_contents(WAF_DIR . "cache/file_fix.json", \TF\en_json($fix_files));
-
-    exit(\TF\en_json($fix_files));
-}
 
 function diff_text_lines(array $new, array $old) : array {
     $result = array();
