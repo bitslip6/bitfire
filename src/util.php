@@ -892,18 +892,17 @@ function debugF(string $fmt, ...$args) : bool {
  * NOT PURE
  */
 function debug(string $fmt, ...$args) : void {
-    static $idx = 0;
     if (!class_exists('\BitFire\Config')) { return; }
+
+    static $idx = 0;
     if (CFG::enabled("debug_file")) {
         file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
     } else if (CFG::enabled("debug_header") && !headers_sent()) {
         $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), substr(sprintf($fmt, ...$args), 0, 128));
-        if (function_exists('untaint')) { untaint($tmp); }
         header("x-bitfire-$idx: $tmp");
         $idx++;
-    } else if (CFG::enabled("debug_echo")) {
-        printf("$fmt\n", ...$args);
     }
+    //else if (CFG::enabled("debug_echo")) { printf("$fmt\n", ...$args); }
 }
 
 
