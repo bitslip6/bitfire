@@ -23,7 +23,7 @@ function header_report(\BitFire\Request $request) : void {
  * add the security headers from config
  */
 function send_security_headers(\BitFire\Request $request) : void {
-    if (!$request || headers_sent()) { return; }
+    if (!$request) { return; }
 
     $path = $request->host . $request->path . "?" . \BitFire\BITFIRE_INTERNAL_PARAM . "=report";
     core_headers($path);
@@ -48,13 +48,14 @@ function core_headers(string $path) : void {
     header_remove('X-Powered-By');
     header_remove('Server');
 
-    header("X-Frame-Options: deny");
-    header("X-Content-Type-Options: nosniff");
-    header("X-XSS-Protection: 1; mode=block");
-    header("Referrer-Policy: strict-origin-when-cross-origin");
+    @header("X-Frame-Options: deny");
+    @header("X-Content-Type-Options: nosniff");
+    @header("X-XSS-Protection: 1; mode=block");
+    @header("Referrer-Policy: strict-origin-when-cross-origin");
 }
 
 function force_ssl_with_sts() : void {
+	if (headers_sent()) { return; }
     header("Strict-Transport-Security: max-age=31536000; preload");
     if (($_SERVER['REQUEST_SCHEME']??'https') === 'http') {
          header("Location: https://". $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']);
