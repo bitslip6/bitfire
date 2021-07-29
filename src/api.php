@@ -30,24 +30,24 @@ function add_api_exception(\BitFire\Request $r) : string {
 // TODO: refactor as effect
 function download(\BitFire\Request $r) : void {
 
-	$effect = \TF\effect::new();
+	$effect = \TF\Effect::new();
 	$filename = $r->get['filename']??"";
 
-	if (strpos($filename, "..") !== false || \TF\ends_with($filename, "php") === false) { $effect->}
-	if (!file_exists($filename)) { die("no such file"); }
+	if (strpos($filename, "..") !== false || \TF\ends_with($filename, "php") == false) { $effect->out("invalid file."); }
+	else if (!file_exists($filename)) { $effect->out("file does not exist."); }
 
-
-	if (!isset($_GET['direct']) {
+	else if (!isset($_GET['direct'])) {
 		$base = basename($filename);
-		header('Content-Description: File Transfer');
-		header('Content-Type: application/octet-stream');
-		header('Content-Disposition: attachment; filename="' . $base . '"');
-		header('Expires: 0');
-		header('Cache-Control: must-revalidate');
-		header('Pragma: public');
-		header('Content-Length: ' . filesize($filename));
+        $effect->header("content-description", "File Transfer")
+		->header('Content-Type', 'application/octet-stream')
+		->header('Content-Disposition', 'attachment; filename="' . $base . '"')
+		->header('Expires', '0')
+		->header('Cache-Control', 'must-revalidate')
+		->header('Pragma', 'private')
+		->header('Content-Length', filesize($filename));
 	}
-	readfile($filename);
+	$effect->out(file_get_contents($filename));
+    $effect->run();
 }
 
 
