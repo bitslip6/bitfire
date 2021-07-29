@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
     -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
+    <script src="https://bitfire.co/assets/js/diff.min.js" type="text/javascript"></script>
 
     <style>
       .right { float: right; }
@@ -706,12 +707,12 @@
 
                         <!-- Text -->
                         <p class="card-text small text-muted mb-1">
-                          <span style="margin-right:50px;">PHP file.  Expected / Actual: </span><?php echo \BitFire\bytes_to_kb($file['size2']) . " / " . \BitFire\bytes_to_kb($file['size1']); ?>
+                          <span style="margin-right:50px;">PHP file.  Expected / Actual: </span><span class="text-info"><?php echo \BitFire\bytes_to_kb($file['size2']) . "</span> / <span class='text-primary'>" . \BitFire\bytes_to_kb($file['size1']) . "</span>"; ?>
                         </p>
 
                         <!-- Time -->
                         <p class="card-text small text-muted">
-                          Modified server-time on <time datetime="<?php \BitFire\machine_date($file['mtime']); ?>"><?php echo \BitFire\human_date($file['mtime']);?></time>
+                          Modified on <time class="text-primary" datetime="<?php \BitFire\machine_date($file['mtime']); ?>"><?php echo \BitFire\human_date($file['mtime']);?></time> <small class="text-muted"> (server time) </small>
                         </p>
 
                       </div>
@@ -719,21 +720,25 @@
 
                         <!-- Button -->
                         <a href="<?php echo $self.'?filename='.$file['out'].'&BITFIRE_API=download&_bitfire_p='.\BitFire\Config::str("secret");?>" class="btn btn-white d-none d-md-inline-block">
+                          <span class="fe fe-download"></span>
                           Download
+                        </a>
+                        
+                        <a href="#" role="button" title="show diff for file" onclick="showdiff('diff<?php echo $file['actual'];?>')" class="btn btn-white d-none d-md-inline-block">
+                          <span class="fe fe-copy"></span>
+                          Diff
                         </a>
 
                       </div>
+                      <!--
                       <div class="col-auto">
 
-                        <!-- Dropdown -->
                         <div class="dropdown">
 
-                          <!-- Toggle -->
                           <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                             <i class="fe fe-file"></i>
                           </a>
 
-                          <!-- Menu -->
                           <div class="dropdown-menu dropdown-menu-end">
                             <a href="#" onclick="diff(<?php echo $file['actual'];?>)" data-url="<?php echo $file['url'];?>" data-out="<?php echo $file['out'];?>" class="btn btn-sm btn-white d-none d-md-inline-block">
                               Diff
@@ -749,7 +754,10 @@
                         </div>
 
                       </div>
-                    </div> <!-- / .row -->
+                      -->
+                    </div>
+                    <div class="row diffrow" >
+                    </div>
                   </li>
                   <?php } ?>
                   </ul>
