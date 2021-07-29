@@ -1,4 +1,5 @@
 <?php
+
 namespace BitFire;
 
 use \BitFire\Config as CFG;
@@ -27,51 +28,137 @@ foreach ($roots as $root) {
 \TF\dbg($result);
 */
 
-function country_enricher(array $country_info) : callable {
+function country_enricher(array $country_info): callable
+{
     return function (?array $input) use ($country_info): ?array {
-		if (!empty($input)) {
-			$code = \TF\ip_to_country($input['request']['ip']??$input['ip']??'');
-			$input['country'] = $country_info[$code];
-		}
+        if (!empty($input)) {
+            $code = \TF\ip_to_country($input['request']['ip'] ?? $input['ip'] ?? '');
+            $input['country'] = $country_info[$code];
+        }
         return $input;
     };
 }
 
-function add_country($data) {
-    if (!is_array($data) || count($data) < 1) { return $data; }
+function add_country($data)
+{
+    if (!is_array($data) || count($data) < 1) {
+        return $data;
+    }
     $map = \TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"));
     $result = array();
     foreach ($data as $report) {
         $code = \TF\ip_to_country($report['ip'] ?? '');
         $report['country'] = $map[$code];
-        $result[] = $report; 
+        $result[] = $report;
     }
     return $result;
 }
 
-function isdis() {
-    $result = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR."config.ini.php");
+function isdis()
+{
+    static $result = NULL;
+    if ($result === NULL) {
+        $result = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR . "config.ini.php");
+    }
     return ($result) ? " " : "disabled ";
 }
 
-function is_locked() : bool {
+function is_locked(): bool
+{
     $ctr = 0;
-    file_recurse($_SERVER['DOCUMENT_ROOT'], function($file) use (&$ctr) {
-        if (is_writeable($file)) { $ctr++; if ($ctr < 5) { \TF\debug("writeable [$file]"); }}
+    file_recurse($_SERVER['DOCUMENT_ROOT'], function ($file) use (&$ctr) {
+        if (is_writeable($file)) {
+            $ctr++;
+            if ($ctr < 5) {
+                \TF\debug("writeable [$file]");
+            }
+        }
     }, "/.php$/");
     \TF\debug("lock ctr: [$ctr]");
     return ($ctr <= 1);
 }
 
-function url_to_path($url) {
+function url_to_path($url)
+{
     $idx = strpos($url, "/");
     return substr($url, $idx);
 }
 
-/**
- * TODO: split this up into multiple functions
- */
-function serve_dashboard(string $dashboard_path) {
+function dump_hashes()
+{
+    require_once WAF_DIR . "/src/server.php";
+    \TF\debug("search roots: "  . \TF\en_json($_SERVER['DOCUMENT_ROOT']));
+    $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+    \TF\debug("found roots: " . \TF\en_json($roots));
+
+    if (count($roots) < 1) { return array(); }
+    
+    // save ref to hashes and match with response...
+    $hashes = array_map('\BitFireSvr\get_wordpress_hashes', $roots);
+    $hashes = array_filter($hashes, function ($x) {
+        if (count($x['files']) > 1) {
+            \TF\debug("num files: " . count($x['files']));
+            return true;
+        }
+    return false;
+    });
+    //file_put_contents("/tmp/hash.txt", json_encode($hashes, JSON_PRETTY_PRINT));
+    //exit(\TF\en_json($hashes));
+    //\TF\bit_http_request("POST", "http://bitfire.co/hash.php", "[{'ver':1,'files':[[0,1,2,3,4]}]");
+
+    /*
+    foreach ($hashes as $root)
+        $offset = 0;
+        while ($offset < count($root['files'])) {
+*/
+    $result = \TF\bit_http_request("POST", "http://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+    //\TF\dbg($result);
+
+    //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
+    $decoded = \TF\un_json($result);
+
+    //        }
+    //    }
+
+
+
+    $fix_files = array('ver' => $hashes[0]['ver'], 'root' => $ha, 'files' => array());
+    if ($decoded && count($decoded) > 0) {
+        \TF\debug("hash result len " . count($decoded));
+        
+        for ($i=0,$m=count($decoded);$i<$m; $i++) {
+            $root = $decoded[$i];
+            $ver = $hashes[$i]['ver'];
+            $base = $hashes[$i]['root'];
+            if (is_array($root)) {
+                foreach ($root as $file) {
+                    $filename = trim(str_replace($base, "", $file[4]), '/');
+                    $path = "http://core.svn.wordpress.org/tags/{$ver}/$filename";
+                    $parts = explode("/", $file[0]);
+                    $out = $file[4] . "/" . join("/", array_slice($parts, 3));
+                    $out = rtrim($out, "/");
+                    $fix_files['files'][] = array('info' => $file[5], 'url' => $path, 'expected' => $file[2], 'actual' => $file[3], 'size1' => $file[1], 'size2' => $file[6], 'mtime' => filemtime($out), 'out' => $out);
+                }
+            } else {
+                \TF\debug("unknown root!");
+            }
+        }
+    } else {
+        \TF\debug("hash result len 0");
+    }
+
+    //file_put_contents(WAF_DIR . "cache/file_fix.json", \TF\en_json($fix_files));
+    //exit(\TF\en_json($fix_files));
+    return $fix_files;
+}
+
+function bytes_to_kb($bytes) : string {
+    return round((int)$bytes / 1024, 1) . "Kb";
+
+}
+
+function serve_malware(string $dashboard_path)
+{
     if (!isset($_SERVER['PHP_AUTH_PW']) ||
         (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
         (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
@@ -81,17 +168,61 @@ function serve_dashboard(string $dashboard_path) {
         exit;
     }
 
-    if ($_GET['_infoz']??'' === 'show') { phpinfo(); die(); }
-    $page = intval($_GET['page']??0);
+    header("Cache-Control: no-store, private, no-cache, max-age=0");
+    header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', 100000));
+    http_response_code(203);
 
-       
+    $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR . "config.ini.php");
+    $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
+    $config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
+    $config_orig = Config::$_options;
+
+
+    $is_free = (strlen(Config::str('pro_key')) < 20);
+    error_reporting(E_ERROR | E_PARSE);
+
+	$reg = "#[\?&]".CFG::str("dashboard_path")."=[^\?&]+#";
+	$s1 = preg_replace("#[\?&]".CFG::str("dashboard_path")."=[^\?&]+#", "", $_SERVER['REQUEST_URI']);//."&_bitfire_p=".CFG::str("secret");
+	$self = preg_replace("#[\?&]BITFIRE_API=[^\?&]+#", "", $s1);
+    $file_list = dump_hashes();
+    exit(require WAF_DIR . "views/hashes.html");
+}
+
+function machine_date($time) : string {
+    return date("Y-m-d", (int)$time);
+}
+function human_date($time) : string {
+    return date("D M j Y, h:i:s A P", (int)$time);
+}
+
+/**
+ * TODO: split this up into multiple functions
+ */
+function serve_dashboard(string $dashboard_path)
+{
+    if (!isset($_SERVER['PHP_AUTH_PW']) ||
+        (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
+        (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
+
+        header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
+        header('HTTP/1.0 401 Unauthorized');
+        exit;
+    }
+
+    if ($_GET['_infoz'] ?? '' === 'show') {
+        phpinfo();
+        die();
+    }
+    $page = intval($_GET['page'] ?? 0);
+
+
     // try to prevent proxy caching for this page
     header("Cache-Control: no-store, private, no-cache, max-age=0");
-    header('Expires: '.gmdate('D, d M Y H:i:s \G\M\T', 100000));
+    header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', 100000));
     http_response_code(203);
     require_once WAF_DIR . "src/botfilter.php";
 
-    $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR."config.ini.php");
+    $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR . "config.ini.php");
     $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
     $config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
     $config_orig = Config::$_options;
@@ -102,19 +233,19 @@ function serve_dashboard(string $dashboard_path) {
     $report_file = \TF\FileData::new(CFG::file(CONFIG_REPORT_FILE))
         ->read()
         ->apply(\TF\partial_right('\TF\remove_lines', 400))
-        ->apply_ln(\TF\partial_right('array_slice', $page*PAGE_SZ, PAGE_SZ, false))
+        ->apply_ln(\TF\partial_right('array_slice', $page * PAGE_SZ, PAGE_SZ, false))
         ->map('\TF\un_json')
         ->map(country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))));
     $report_count = $report_file->num_lines;
 
 
-    
+
 
     //$report_count = count(file(Config::file(CONFIG_REPORT_FILE)));
     $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500)));
     $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
 
-	/*
+    /*
     for($i=0,$m=count($reporting); $i<$m; $i++) {
         //$cl = intval($reporting[$i]['block']['code']/1000)*1000;
         $cl = \BitFire\code_class($reporting[$i]['block']['code']);
@@ -138,29 +269,34 @@ function serve_dashboard(string $dashboard_path) {
         }
     }
 	 */
-    
+
     $locked = is_locked();
     $lock_action = ($locked) ? "unlock" : "lock";
-    
+
     $block = \TF\remove_lines(\TF\file_data(Config::file(CONFIG_BLOCK_FILE)), 400);
     $all_blocks = array_reverse(array_map(
         country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))),
-        array_map('\TF\un_json', $block->lines)));
+        array_map('\TF\un_json', $block->lines)
+    ));
     $block_count = $block->num_lines;
-    $all_blocks = array_filter($all_blocks, function ($x) { return !empty($x) && isset($x['ts']) && isset($x['eventid']); });
+    $all_blocks = array_filter($all_blocks, function ($x) {
+        return !empty($x) && isset($x['ts']) && isset($x['eventid']);
+    });
 
 
-    $check_day = time() - \TF\DAY;// - \TF\DAY;
-    $block_24 = array_filter($all_blocks, function ($x) use ($check_day) { return isset($x['ts']) && $x['ts'] > $check_day; });
+    $check_day = time() - \TF\DAY; // - \TF\DAY;
+    $block_24 = array_filter($all_blocks, function ($x) use ($check_day) {
+        return isset($x['ts']) && $x['ts'] > $check_day;
+    });
     $block_count_24 = count($block_24);
-    $blocks = array_slice($all_blocks, $page*PAGE_SZ, PAGE_SZ);
+    $blocks = array_slice($all_blocks, $page * PAGE_SZ, PAGE_SZ);
 
     // calculate hr data
     $hr_data = array_reduce($block_24, function ($carry, $x) {
         $hr = (int)date('H', (int)$x['ts']);
         $carry[$hr]++;
         return $carry;
-    }, array(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0));
+    }, array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
 
     // calculate country data
     $country_data = array_reduce($block_24, function ($carry, $x) {
@@ -178,7 +314,7 @@ function serve_dashboard(string $dashboard_path) {
 
 
 
-    for($i=0,$m=count($blocks); $i<$m; $i++) {
+    for ($i = 0, $m = count($blocks); $i < $m; $i++) {
         //$cl = intval($blocks[$i]['block']['code']/1000)*1000;
         $cl = \BitFire\code_class($blocks[$i]['eventid']);
         $test_exception = new \BitFire\Exception($blocks[$i]['eventid'], 'x', NULL, url_to_path($blocks[$i]['url']));
@@ -193,16 +329,18 @@ function serve_dashboard(string $dashboard_path) {
         $blocks[$i]['exception_class'] = ($has_exception) ? "grey_blue" : "orange";
         $blocks[$i]['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
         $blocks[$i]['exception_title'] = ($has_exception) ?
-        "exception already added for this block" :
-        "add exception for " . MESSAGE_CLASS[$cl]??'unknown' . ' url: ' . $parts['path'];
+            "exception already added for this block" :
+            "add exception for " . MESSAGE_CLASS[$cl] ?? 'unknown' . ' url: ' . $parts['path'];
 
 
 
         $blocks[$i]['type_img'] = CODE_CLASS[$blocks[$i]['classId']];
         $browser = \BitFireBot\parse_agent($blocks[$i]['ua']);
-        if (!$browser->bot && !$browser->browser) { $browser->browser = "chrome"; }
+        if (!$browser->bot && !$browser->browser) {
+            $browser->browser = "chrome";
+        }
         $blocks[$i]['browser'] = $browser;
-        $blocks[$i]['agent_img'] = ($browser->bot)?'robot.svg':($browser->browser.".png");
+        $blocks[$i]['agent_img'] = ($browser->bot) ? 'robot.svg' : ($browser->browser . ".png");
         $blocks[$i]['country_img'] = strtolower($blocks[$i]['country']) . ".svg";
         if ($blocks[$i]['country_img'] == "-.svg") {
             $blocks[$i]['country_img'] = "us.svg";
@@ -213,5 +351,3 @@ function serve_dashboard(string $dashboard_path) {
     $is_free = (strlen(Config::str('pro_key')) < 20);
     exit(require WAF_DIR . "views/dashboard.html");
 }
-
-
