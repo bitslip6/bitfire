@@ -192,6 +192,10 @@ class Config {
         return (string) $default;
     }
 
+    public static function str_up(string $name, string $default = '') : string {
+        return strtoupper(Config::str($name, $default));
+    }
+
     // get an integer value with a default
     public static function int(string $name, int $default = 0) : int {
         return intval(Config::$_options[$name] ?? $default);
@@ -438,11 +442,17 @@ class BitFire
         }
 
         // dashboard requests, TODO: MOVE TO api.php
+        if (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND] === "MALWARESCAN") {
+            require_once WAF_DIR."src/dashboard.php";
+            serve_malware($this->_request->path);
+        }
+
+
+        // dashboard requests, TODO: MOVE TO api.php
         if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
             require_once WAF_DIR."src/dashboard.php";
             serve_dashboard($this->_request->path);
         }
-
 
         // WordPress admin, TODO: move to a function
         // Do we have a logged in word press cookie? don't block.
