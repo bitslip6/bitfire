@@ -13,16 +13,15 @@ We have closed our discord chanel in light of recent wallstreetbets censorship. 
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://github.com/bitslip6/bitfire">
+  <a href="https://bitfire.co/">
     <img src="views/bitslip.png" alt="Logo" width="80" height="80">
-  </a>
+  <h3 align="center">BitFire</h3> </a>
 
-  <h3 align="center">BitFire</h3>
 
   <p align="center">
 enterprise class security for everyone
     <br />
-    <a href="https://github.com/bitslip6/bitfire/wiki"><strong>Explore the docs »</strong></a>
+    <a href="https://bitfire.co/bitfire-install"><strong>BitFire Install Guide »</strong></a>
     <br />
     <br /><!--
     <a href="https://github.com/othneildrew/Best-README-Template">View Demo</a>
@@ -67,7 +66,7 @@ enterprise class security for everyone
 <!-- ABOUT THE PROJECT -->
 ## About BitFire
 
-![BitFire Screen Shot](https://www.bitfire.co/bitfire-dashboard.jpeg)
+![BitFire Screen Shot](https://bitfire.co/assets/img/dash_1.webp)
 
 There are many choices for PHP firewalls to protect your webservers, most can be easily bypassed.
 
