@@ -715,6 +715,7 @@
               </div>
               <div class="col-auto">
 
+                <a href="<?php echo $opt_link?>" class="btn btn-primary lift" id="opt_link"><?php echo $opt_name;?></a>
                 <a href="#!" class="btn btn-secondary lift" id="upgrade_link">Upgrade</a>
                 <!-- Button -->
                 <a href="https://github.com/bitslip6/bitfire/issues" target="_blank" class="btn btn-success lift" id="dwn_link">Support</a>
@@ -1196,13 +1197,17 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
 
       function toggle_features() {
         var elms = document.getElementsByClassName("feature");
+        console.log("toggle features", elms);
 
-        for (let element of elms) {
+        Array.prototype.forEach.call(elms, function (element) {
+          console.log("element", element.innerText);
           if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
+            console.log("warn");
             element.classList.remove("btn-success");
             element.classList.remove("btn-secondary");
             element.classList.add("btn-warning");
-          } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim == "on") {
+          } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim() == "on") {
+            console.log("success");
             element.classList.remove("btn-warning");
             element.classList.remove("btn-secondary");
             element.classList.add("btn-success");
@@ -1210,8 +1215,9 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
             element.classList.remove("btn-success");
             element.classList.remove("btn-warning");
             element.classList.add("btn-secondary");
+            console.log("second");
           }
-        }
+        });
       }
 
       toggle_features();
