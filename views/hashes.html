@@ -18,13 +18,41 @@
     <!-- Theme CSS -->
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.bundle.css" id="stylesheetLight">
+    <link rel="stylesheet" href="https://www.bitfire.co/assets/css/prism.css" id="stylesheetLight">
     <!--
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
     -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
-    <script src="https://bitfire.co/assets/js/diff.min.js" type="text/javascript"></script>
+    <script src="https://bitfire.co/assets/js/difflib.js" type="text/javascript"></script>
+    <script src="https://bitfire.co/assets/js/prism.js" data-manual type="text/javascript"></script>
 
     <style>
+.lds-dual-ring {
+  display: inline-block;
+  width: 64px;
+  height: 64px;
+  margin-top:-48px;
+  margin-right:128px;
+}
+.lds-dual-ring:after {
+  content: " ";
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 8px;
+  border-radius: 50%;
+  border: 6px solid #fff;
+  border-color: #1657af transparent #1657af transparent;
+  animation: lds-dual-ring 1.2s linear infinite;
+}
+@keyframes lds-dual-ring {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
       .right { float: right; }
       .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding: .4rem 0 0 0!important; }
       /*
@@ -626,7 +654,7 @@
               </div>
               <div class="col-auto">
 
-                <a href="#!" class="btn btn-secondary lift" id="upgrade_link">Upgrade</a>
+                <a href="<?php echo $opt_link?>" class="btn btn-primary lift" id="opt_link"><?php echo $opt_name;?></a>
                 <!-- Button -->
                 <a href="https://github.com/bitslip6/bitfire/issues" target="_blank" class="btn btn-success lift" id="dwn_link">Support</a>
 
@@ -669,10 +697,11 @@
               <div class="card-header">
 
                 <h4 class="card-header-title">
-                  Wordpress <?php echo $file_list['ver'] . " - (".count($file_list['files']).") "; ?> Changed Files
+                  Wordpress <?php echo $file_list['ver'] . ' - <span id="num_files" class="text-muted">('.count($file_list['files']).") "; ?> Changed Files </span>
                 </h4>
 
-                <!-- Form -->
+                <div id="spinner" class="lds-dual-ring"></div>
+               <!-- Form -->
                 <!--form>
                   <div class="input-group input-group-flush input-group-merge input-group-reverse">
 
@@ -691,12 +720,11 @@
                 <!-- List -->
                 <ul class="list-group list-group-lg list-group-flush list my-n4">
                   <?php foreach($file_list['files'] as $file) { ?>
-                  <li class="list-group-item" id="file<?php echo $file['actual'];?>">
+                  <li class="list-group-item collapse" id="file<?php echo $file['actual'];?>">
                     <div class="row align-items-center">
                       <div class="col-auto">
                         <!-- ICON HERE -->
-                        <i class="fe fe-file"></i>
-
+                        <img id="icon<?php echo $file['actual']?>" src="https://bitfire.co/assets/php-file.png" width="32" height="32" />
                       </div>
                       <div class="col ms-n2">
 
@@ -707,7 +735,7 @@
 
                         <!-- Text -->
                         <p class="card-text small text-muted mb-1">
-                          <span style="margin-right:50px;">PHP file.  Expected / Actual: </span><span class="text-info"><?php echo \BitFire\bytes_to_kb($file['size2']) . "</span> / <span class='text-primary'>" . \BitFire\bytes_to_kb($file['size1']) . "</span>"; ?>
+                          <span style="margin-right:50px;">PHP file.  Expected / Actual: </span><span class="text-info"><?php echo \BitFire\bytes_to_kb($file['size2']) . "</span> / <span class='text-primary'>" . \BitFire\bytes_to_kb($file['size1']) . "</span>";?>
                         </p>
 
                         <!-- Time -->
@@ -716,17 +744,24 @@
                         </p>
 
                       </div>
-                      <div class="col-auto">
-
+                      <div class="col-auto" id="action_list<?php echo $file['actual'];?>">
                         <!-- Button -->
-                        <a href="<?php echo $self.'?filename='.$file['out'].'&BITFIRE_API=download&_bitfire_p='.\BitFire\Config::str("secret");?>" class="btn btn-white d-none d-md-inline-block">
+                        <a href="#diff<?php echo $file['actual']?>" onclick="postData('<?php echo $self.'?BITFIRE_API=repair'. "', {'filename':'{$file['out']}','_bitfire_p':'".\BitFire\Config::str("secret")."','url':'{$file['url']}', 'id':'{$file['actual']}'}";?>, repaired);" class="btn btn-white d-none d-md-inline-block" title="replace this file with the master copy from wordpress.org">
+                          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"></path><path d="M17.071 7.343L15.657 5.93 12.12 9.464l1.415 1.415 3.535-3.536zm2.121.707L5.05 22.192a1 1 0 01-1.414 0L.808 19.364a1 1 0 010-1.414L14.95 3.808a1 1 0 011.414 0l2.828 2.828a1 1 0 010 1.414z" fill="#283e59"></path><path d="M17.5 12h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5zm3-3h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5zm1 4h1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-1a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5z" fill="#335EEA" opacity=".3"></path></g></svg>
+                          Repair
+                        </a>
+
+                        <a href="<?php echo $self.'?filename='.$file['out'].'&BITFIRE_API=download&_bitfire_p='.\BitFire\Config::str("secret");?>" class="btn btn-white d-none d-md-inline-block" title="download this file">
                           <span class="fe fe-download"></span>
                           Download
                         </a>
                         
-                        <a href="#" role="button" title="show diff for file" onclick="showdiff('<?php echo $file['out'];?>', '<?php echo $file['url'];?>', 'diff<?php echo $file['actual'];?>)" class="btn btn-white d-none d-md-inline-block">
+                        <a href="#diff<?php echo $file['actual']?>" role="button" title="show diff for file" onclick="showdiff('<?php echo $file['out'];?>', '<?php echo $file['url'];?>', '<?php echo $file['actual'];?>', true)" class="btn btn-white d-none d-md-inline-block">
                           <span class="fe fe-copy"></span>
                           Diff
+                        </a>
+                        <a href="#diff<?php echo $file['actual']?>" role="button" title="delete this file" onclick="del('<?php echo $file['out'];?>', '<?php echo $file['url'];?>', <?php echo $file['actual'] .',' . $file['size2'];?>)" class="btn btn-white d-none d-md-inline-block">
+                          <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"></path><path d="M6 8h12l-.893 11.615A1.5 1.5 0 0115.61 21H8.389a1.5 1.5 0 01-1.496-1.385L6 8zm2 2l.454 4.09 7.098-.056L16 10H8z" fill="#283e59"></path><path d="M14 4.5v-1a.5.5 0 00-.5-.5h-3a.5.5 0 00-.5.5v1H5.5A.5.5 0 005 5v.5a.5.5 0 00.5.5h13a.5.5 0 00.5-.5V5a.5.5 0 00-.5-.5H14z" fill="#283e59" opacity=".3"></path></g></svg>
                         </a>
 
                       </div>
@@ -740,7 +775,7 @@
                           </a>
 
                           <div class="dropdown-menu dropdown-menu-end">
-                            <a href="#" onclick="diff(<?php echo $file['actual'];?>)" data-url="<?php echo $file['url'];?>" data-out="<?php echo $file['out'];?>" class="btn btn-sm btn-white d-none d-md-inline-block">
+                            <a href="#diff<?php echo $file['actual']?>" onclick="diff(<?php echo $file['actual'];?>)" data-url="<?php echo $file['url'];?>" data-out="<?php echo $file['out'];?>" class="btn btn-sm btn-white d-none d-md-inline-block">
                               Diff
                             </a>
                             <a href="#!" class="dropdown-item">
@@ -757,10 +792,9 @@
                       -->
                     </div>
                     <div class="row diffrow collapse" id="diff_cont<?php echo $file['actual'];?>">
-                      <svg onclick="" class=""width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x=
-"11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><r
-ect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g></svg>
-                      <div id="diff_data<?php echo $file['actual'];?>">default diff</div>
+                      <a name="#anchor<?php echo $file['actual']?>"></a>
+                      <svg style="float:right;cursor:pointer;" onclick="classtoggle('collapse', 'diff_cont<?php echo $file['actual'];?>')" class=""width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x="11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><rect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g></svg>
+                      <pre id="diff_data<?php echo $file['actual'];?>" class="mb-0" style="background-color:#eee;"></pre>
                     </div>
                   </li>
                   <?php } ?>
@@ -828,67 +862,144 @@ ect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g></
         </div>
       </div>
     <script>
-console.log("script running!");
 
-function doRequest(meth, url, data) {
-  // Default options are marked with *
-  const response = await fetch(url, {
-    method: meth,
-    mode: 'cors',
-    cache: 'no-cache',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    redirect: 'follow',
-    referrerPolicy: 'same-origin',
-    body: JSON.stringify(data)
-  });
-  return response.text(); // parses JSON response into native JavaScript objects
-}
-
-async function getData(url, data = {}) { return doRequest("GET", url, data); }
-async function postData(url, data = {}) { return doRequest("POST", url, data); }
+    function repaired (response, data) { 
+      console.log(response);
+      console.log(data);
+      if (response.success) { 
+        let e = document.getElementById("action_list"+data.id);
+        e.innerHTML = "<h3 class='text-primary btn'>File Repaired</h3>"
+        e = document.getElementById("diff_cont"+data.id).classList.add("collapse");
+        document.getElementById("icon"+data.id).src="https://bitfire.co/assets/php-file.png";
+      } else { 
+        alert("unable to repair file: "+ response.error);
+      }
+    };
 
 
 
-function showdiff(url, path, id) { 
-  const out = document.getElementById(id);
-  if (out.classList.contains("done")) { return; }
-
-  getData(url).then(data => {
-    console.log(data);
-    console.log(path);
-    console.log(id);
-    var elm = document.getElementById(id);
-    if (elm) {
-      elm.classList.remove("collapse");
+    // Example POST method implementation:
+    async function postData(url = '', data = {}, fn) {
+      // Default options are marked with *
+      fetch(url, {
+        method: 'POST',
+        mode: 'cors',
+        cache: 'no-cache',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        redirect: 'follow',
+        referrerPolicy: 'same-origin',
+        body: JSON.stringify(data)
+      })
+      .then(r => { return r.json() })
+      .then(result => { 
+        fn(result, data);
+      });
     }
-  });
+
+
+var file_list = [];
+<?php foreach($file_list['files'] as $file) { 
+  echo "file_list.push({'path':'{$file['out']}', 'url':'{$file['url']}', 'actual':'{$file['actual']}'});\n";
+}?>
+
+
+
+function showdiff(path, url, id, do_toggle=false) { 
+  const out = document.getElementById("diff_cont"+id);
+  if (do_toggle) { out.classList.toggle("collapse"); }
+  //if (!out.classList.contains("collapse")) { console.log("no rediff"); return; }
+  
+  let ans = function(data) {
+
+    let t1 = atob(data.orig);
+    let t2 = atob(data.local);
+    
+    let l1 = difflib.stringAsLines(t1);
+    let l2 = difflib.stringAsLines(t2);
+    let sm = new difflib.SequenceMatcher(l1, l2);
+    let ops = sm.get_opcodes();
+    let e = document.getElementById("diff_data"+id);
+    let html = ""
+    let has_diff = false;
+    let is_evil = false;
+    for (i=0;i<ops.length;i++) {
+      if (ops[i][0] == "insert") {
+        num_replace = 0;
+        has_diff = true;
+        html += "// Local File ADDS Lines: " + ops[i][3] + " - " + ops[i][4] + "\n";
+        for(j=ops[i][3]; j<ops[i][4]; j++) {
+          if (num_replace++ < 100) { html += l2[j] + "\n"; }
+          is_evil |= evil(l2[j]);
+        }
+        if (num_replace >= 100) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; }
+        html += "\n";
+      }
+      else if (ops[i][0] == "replace") {
+        has_diff = true;
+        num_replace = 0;
+        html += "// ORIGINAL LINES: " + ops[i][3] + " - " + ops[i][4] + "\n";
+        for(j=ops[i][1]; j<ops[i][2] && num_replace++ < 10; j++) {
+          html += l1[j] + "\n";
+        }
+        if (num_replace >= 10) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; }
+
+        num_replace = 0;
+        html += "// REPLACED LINES: " + ops[i][1] + " - " + ops[i][2] + "\n";
+        for(j=ops[i][3]; j<ops[i][4]; j++) {
+          if (num_replace++ < 100) { html += l2[j] + "\n"; }
+          is_evil |= evil(l2[j]);
+        }
+        if (num_replace >= 100) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; }
+
+        html += "\n";
+      }
+    }
+    if (has_diff) {
+      e.innerHTML = Prism.highlight(html, Prism.languages.php, 'php');
+      if (is_evil) { document.getElementById("icon"+id).src="https://bitfire.co/assets/malware.png"; if (!do_toggle) { document.getElementById("diff_cont"+id).classList.remove("collapse"); } }
+    } else {
+      document.getElementById("file"+id).classList.add("collapse");
+      num_files--;
+      document.getElementById("num_files").innerText = "(" + num_files + ") Changed Files"
+    }
+  }
+
+  postData("<?php echo $self?>?BITFIRE_API=diff",
+    {"BITFIRE_API":"diff",
+      "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
+      "url": url,
+      "out": path}, ans);
   return;
-  // TODO: do actual fetch here
-
-  fetch("https://"+url)
-    .then(response => response.text())
-    .then((orig) => {
-
-    });
-  fetch("https://"+<?php echo $self;?>+"&BITFIRE_API=download&direct=true&filename="+url);
-
-  const theDiff = Diff.diffLines(orig_text, new_text, {ignoreWhitespace: true});
-
-  const frag = document.createDocumentFragment();
-
-  // TODO: verify actual html output
-  theDiff.forEach((part) => {
-    if (part.added) {
-      let li = document.createElement('li');
-      li.appendChild(document.createTextNode(part.value));
-      frag.appendChild(li);
-    }
-  });
-
-  out.appendChild(frag);
 }
-    </script>
+
+function evil(line) { 
+  let result = false
+  if (line.length>128) { let nfunc = line.split(';').length; if (nfunc > 5) { result = true; } }
+  let funcs = ['die(','exit(','base64_decode(', 'uudecode(', 'ord(', 'chr(', 'eval(', 'exec(', 'system(', 'passthru(', 'shell_exec(', 'uploaded_file(']
+  funcs.forEach(e => { if (line.includes(e)) { result = true; } });
+  var r = /\$[a-zA-Z0-9_]\s*\(/; if (r.exec(line)) { result = true; }
+  return result;
+}
+
+function del(path, url, actual, size) {
+  if (size > 2) { alert("This is a wordpress file.  Please repair it instead."); return; }
+  let result = confirm("are you sure you want to delete " + path);
+  if (result) { console.log("delete"); document.getElementById("file"+actual).classList.add("collapse"); }
+}
+
+function classtoggle(classname, id) {
+  document.getElementById(id).classList.toggle(classname);
+}
+
+file_list.forEach(elm => {
+  showdiff(elm['path'], elm['url'], elm['actual']);
+  document.getElementById("file"+elm['actual']).classList.remove("collapse");
+});
+num_files = file_list.length;
+document.getElementById("spinner").classList.add("collapse");
+
+  </script>
 
   </body>
 </html>

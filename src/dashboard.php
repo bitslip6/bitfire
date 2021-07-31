@@ -28,6 +28,12 @@ foreach ($roots as $root) {
 \TF\dbg($result);
 */
 
+function str_replace_first($from, $to, $content)
+{
+    $from = '/'.preg_quote($from, '/').'/';
+    return preg_replace($from, $to, $content, 1);
+}
+
 function country_enricher(array $country_info): callable
 {
     return function (?array $input) use ($country_info): ?array {
@@ -112,7 +118,6 @@ function dump_hashes()
         while ($offset < count($root['files'])) {
 */
     $result = \TF\bit_http_request("POST", "http://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
-    //\TF\dbg($result);
 
     //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
     $decoded = \TF\un_json($result);
@@ -184,6 +189,12 @@ function serve_malware(string $dashboard_path)
 	$reg = "#[\?&]".CFG::str("dashboard_path")."=[^\?&]+#";
 	$s1 = preg_replace("#[\?&]".CFG::str("dashboard_path")."=[^\?&]+#", "", $_SERVER['REQUEST_URI']);//."&_bitfire_p=".CFG::str("secret");
 	$self = preg_replace("#[\?&]BITFIRE_API=[^\?&]+#", "", $s1);
+    $self = preg_replace("#[\?&].*#", "", $self);
+    //$first = strpos($self,'&'); if ($first) { $self = str_replace('&', '?', $self, 1); }
+
+    $opt_name = "Dashboard";
+    $opt_link = $self . ((strpos($self,"?")>0) ? '&' : '?') . "BITFIRE_API=DASHBOARD";
+
     $file_list = dump_hashes();
     exit(require WAF_DIR . "views/hashes.html");
 }
@@ -222,9 +233,9 @@ function serve_dashboard(string $dashboard_path)
     http_response_code(203);
     require_once WAF_DIR . "src/botfilter.php";
 
-    $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR . "config.ini.php");
+    $config_writeable = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR . "config.ini.php");
     $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
-    $config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
+    //$config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
     $config_orig = Config::$_options;
     $exceptions = \BitFire\load_exceptions();
 
@@ -347,6 +358,14 @@ function serve_dashboard(string $dashboard_path)
         }
     }
 
+	$s1 = preg_replace("#[\?&]".CFG::str("dashboard_path")."=[^\?&]+#", "", $_SERVER['REQUEST_URI']);//."&_bitfire_p=".CFG::str("secret");
+	$self = preg_replace("#[\?&]BITFIRE_API=[^\?&]+#", "", $s1);
+    $self = preg_replace("#[\?&].*#", "", $self);
+    //$self = str_replace_first('&', '?', $self);
+    //$first = strpos($self,'&'); if ($first) { $self = str_replace('&', '?', $self, 1); }
+    $opt_name = "Malware Scan";
+    $opt_link = $self . ((strpos($self,"?")>0) ? '&' : '?') . "BITFIRE_API=MALWARESCAN";
+//die($opt_link);
     $password_reset = (Config::str('password') === 'default');
     $is_free = (strlen(Config::str('pro_key')) < 20);
     exit(require WAF_DIR . "views/dashboard.html");

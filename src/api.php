@@ -50,6 +50,37 @@ function download(\BitFire\Request $r) : void {
     $effect->run();
 }
 
+function diff(\BitFire\Request $request) : void {
+    \TF\debug(print_r($request->post, true));
+    $orig = \TF\bit_http_request("GET", $request->post['url'], "");
+    $local = file_get_contents($request->post['out']);
+    $success = strlen($orig) > 0 && strlen($local) > 0;
+    $effect = \TF\effect::new()->out(json_encode(array("success" => $success, "orig" => base64_encode($orig), "local" => base64_encode($local))));
+    $effect->run();
+}
+
+// TODO: only allow fetching from wordpress.org, only allow wordpress file to overwrite
+function repair(\BitFire\Request $request) : void {
+    \TF\debug(print_r($request->post, true));
+    $effect = \TF\effect::new();
+    $orig = \TF\bit_http_request("GET", $request->post['url'], "");
+    if (strlen($orig) > 1) {
+        $local = file_get_contents($request->post['filename']);
+        $out1 = $request->post['filename'].".".mt_rand(1000,9999).".bak";
+        $out2 = $request->post['filename'];
+        if (is_writeable(dirname($out2)) && is_writable($out2)) {
+            file_put_contents($out1, $local);
+            file_put_contents($out2, $orig, LOCK_EX);
+            $effect->out(json_encode(array("success" => true, "orig_size" => strlen($local), "new_size" => strlen($orig))));
+        } else {
+            $effect->out(json_encode(array("success" => false, "error" => "write permissions error '$out2'")));
+        }
+    } else {
+        $effect->out(json_encode(array("success" => false, "error" => "unable to read original file from wordpress.org")));
+    }
+    $effect->run();
+}
+
 
 /**
  * get 24 hour block sums
