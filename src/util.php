@@ -98,8 +98,8 @@ function find_regex_reduced($value) : callable { return function($initial, $argu
 function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
 function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
-function un_json(string $data) { return json_decode($data, true, 6); }
-function en_json($data) : string { return json_encode($data); }
+function un_json(string $data) : array { $j = json_decode($data, true, 6); return (!$j) ? array() : $j; }
+function en_json($data) : string { $j = json_encode($data); return ($j == false) ? "" : $j; }
 function un_json_array(array $data) { return \TF\un_json('['. join(",", $data) . ']'); }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
@@ -151,11 +151,13 @@ function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL
                 $result = file_recurse($path, $fn, $regex_filter, $result);
 			} else if ($regex_filter != NULL) {
 				// echo "REGEX FILTER: $regex_filter\n";
-				if (preg_match($regex_filter, $path)) {
-                	$result[] = $fn($path);
+                if (preg_match($regex_filter, $path)) {
+                    $x = $fn($path);
+                    if (!empty($x)) { $result[] = $x; }
 				}
             } else {
-                $result[] = $fn($path);
+                $x = $fn($path);
+                if (!empty($x)) { $result[] = $x; }
             }
         }
         \closedir($dh);
@@ -231,10 +233,9 @@ function memoize(callable $fn, string $key, int $ttl) : callable {
  * assert_eq($times3(9), 27, "partial app of *3 failed");
  */
 function partial(callable $fn, ...$args) : callable {
-    return function(...$x) use ($fn, $args) {
-        return $fn(...array_merge($args, $x));
-    };
+    return function(...$x) use ($fn, $args) { return $fn(...array_merge($args, $x)); };
 }
+
 
 /**
  * same as partial, but reverse argument order
