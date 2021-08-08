@@ -264,6 +264,7 @@ class BotFilter {
         $block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
 
 
+
         // bot tracking cookie
         $maybe_botcookie = \TF\decrypt_tracking_cookie(
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
@@ -404,7 +405,7 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $
         $effect->update(bot_metric_inc('valid'))
             ->status(STATUS_OK)
             // set the response valid cookie
-            ->cookie(\TF\en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 3600, 'wp' => $wp_admin)))
+            ->cookie(\TF\en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 86400, 'wp' => $wp_admin)))
             // update the ip_data valid state for 60 minutes, TODO: make this real func, not anon-func
             ->update(new CacheItem('BITFIRE_IP_'.$request->ip, function ($data) {
                         $ip_data = unpack_ip_data($data); $ip_data['valid'] = 2; return pack_ip_data($ip_data);
@@ -775,7 +776,7 @@ post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).
  */
 function make_challenge_cookie($answer, string $ip, string $agent) : array {
     $d = array(
-            'et' => time() + 60*10,
+            'et' => time() + 86400,
             'v' => 1,
             'a' => $answer,
             'ua' => crc32($agent),
