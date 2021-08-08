@@ -246,6 +246,7 @@ function getIP(string $remote_addr = '127.0.0.2') : string {
     $parts = explode(",", $remote_addr);
     return trim($parts[0]??$remote_addr);
     
+/*
     // Known prefix
     $v4mapped_prefix_bin = hex2bin('00000000000000000000ffff');
 
@@ -263,6 +264,7 @@ function getIP(string $remote_addr = '127.0.0.2') : string {
     // Convert back to printable address in canonical form
     $x = inet_ntop($addr_bin);
     return ($x == "::1") ? '127.0.0.1' : $x;
+*/
 }
 
 // return true if  request[path] contains url_match
@@ -379,7 +381,7 @@ function make_post_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_da
         "params" => \BitFire\Pure\param_to_str($request->get, Config::arr("filtered_logging")),
         "post" => \BitFire\Pure\param_to_str($request->post, Config::arr("filtered_logging")),
         "verb" => $request->method,
-        "ts" => \TF\utc_microtime(true),
+        "ts" => \TF\utc_microtime(),
         "tv" => \TF\utc_date("D H:i:s ") . \TF\utc_date('P'),
         "referer" => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
         "eventid" => $block->code,
