@@ -33,7 +33,7 @@ try {
         if (file_exists($blockfile) && filemtime($blockfile) > time()) { 
             $m1 = microtime(true);
             \TF\debug("ip block: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT");
-            exit(include \BitFire\Config::file("block_page"));
+            exit(include WAF_DIR."views/block.php");
         }
     }
 
