@@ -36,14 +36,21 @@ function quote($input) : ?string {
 function where_clause(array $data) : string { 
     $result = " WHERE ";
     foreach ($data as $key => $value) {
-        $result .= " `{$key}` = " . quote($value) . ",";
+        if ($key[0] == '!') {
+            $t = substr($key, 1);
+            $result .= " `{$t}` = {$value} , ";
+        } else {
+            $result .= " `{$key}` = " . quote($value) . ",";
+        }
     }
-    return trim($result, ",");
+    $x = trim($result, ",");
+    return $x;
 }
 
 
 class DB {
     protected $_db;
+    public $_errors;
 
     protected function __construct(?\mysqli $db) { $this->_db = $db; $this->_errors = array(); }
 
@@ -79,6 +86,7 @@ class DB {
             return $result;
         }, $sql);
 
+        //echo "SQL [$new_sql]\n";
         $result = mysqli_query($this->_db, $new_sql);
         if ($result !== false) {
             return SQL::from(mysqli_fetch_all($result, MYSQLI_ASSOC), $sql);
@@ -88,23 +96,29 @@ class DB {
 
     public function insert(string $table, array $kvp) {
         $sql = "INSERT INTO $table (" . join(",", array_keys($kvp)) . ") VALUES (" . join(",", array_map('\DB\quote', array_values($kvp))) . ")";
-        echo "$sql\n";
-        return (bool) mysqli_query($this->_db, $sql); 
+        //echo "SQL [$sql]\n";
+        $r = mysqli_query($this->_db, $sql); 
+        if (!$r) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+        return (bool) $r;
     }
 
     public function insert_fn(string $table) : callable { 
         $db = $this->_db;
         return function(array $data) use ($table, $db) {
             $sql = "INSERT INTO $table (" . join(",", array_keys($data)) . ") VALUES (" . join(",", array_map('\DB\quote', array_values($data))) . ")";
-            // echo "INS [$sql]\n";
-            return (bool) mysqli_query($db, $sql); 
+            //echo "SQL [$sql]\n";
+            $r = mysqli_query($db, $sql); 
+            if (!$r) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+            return (bool) $r;
         };
     }
 
     public function update(string $table, array $data, array $where) {
         $sql = "UPDATE $table set " . glue(" = ", $data, ", ") .  where_clause($where);
-        //echo "UPDATE [$sql]\n";
-        return (bool) mysqli_query($this->_db, $sql); 
+        //echo "SQL [$sql]\n";
+        $r = mysqli_query($this->_db, $sql); 
+        if (!$r) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+        return (bool) $r;
     }
 
     /**
@@ -117,7 +131,9 @@ class DB {
         $name_list = array_reduce($props, function($carry, $item) { return $carry . ", " . $item->getName(); });
         $value_list = array_reduce($props, function($carry, $item) use ($data) { $name = $item->getName(); return $carry . ", " . $data->$name; });
         $sql = "INSERT INTO $table (" . trim($name_list, ", ") . ") VALUES (" . trim($value_list, ", ") . ")";
-        return (bool) mysqli_query($this->_db, $sql); 
+        $r = mysqli_query($this->_db, $sql); 
+        if (!$r) $this->_errors[] = mysqli_error($this->_db);
+        return (bool) $r;
     }
 
     public function close() : void {
