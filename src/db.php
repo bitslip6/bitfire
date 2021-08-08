@@ -149,7 +149,7 @@ class SQL {
     protected $_sql;
     protected $_len;
 
-    public static function from(?array $x, string $sql="") : SQL { $sql = new SQL(); $sql->_x = $x; $sql->_len < (is_array($x)) ? count($x) : 0; $sql->_sql = $sql; return $sql; }
+    public static function from(?array $x, string $sql_stmt="") : SQL { $sql = new SQL(); $sql->_x = $x; $sql->_len < (is_array($x)) ? count($x) : 0; $sql->_sql = $sql_stmt; return $sql; }
     
     /**
      * set internal dataset to value of $name at current row index 
