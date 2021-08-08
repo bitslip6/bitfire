@@ -154,6 +154,7 @@ function dump_hashes()
 
     //file_put_contents(WAF_DIR . "cache/file_fix.json", \TF\en_json($fix_files));
     //exit(\TF\en_json($fix_files));
+    \TF\debug("fix file len: " . count($fix_files));
     return $fix_files;
 }
 
@@ -196,7 +197,10 @@ function serve_malware(string $dashboard_path)
     $opt_link = $self . ((strpos($self,"?")>0) ? '&' : '?') . "BITFIRE_API=DASHBOARD";
 
     $file_list = dump_hashes();
-    exit(require WAF_DIR . "views/hashes.html");
+    $llang = "en-US";
+    $file =  WAF_DIR . "views/";
+    $file .= (!$is_free && file_exists(WAF_DIR . "views/hashes-pro.html")) ? "hashes-pro.html" : "hashes.html";
+    exit(require $file);
 }
 
 function machine_date($time) : string {
@@ -205,6 +209,14 @@ function machine_date($time) : string {
 function human_date($time) : string {
     return date("D M j Y, h:i:s A P", (int)$time);
 }
+function human_date2($time) : string {
+    return 
+    "<span class='text-primary'>".date("D M j", (int)$time).", </span>".
+    "<span class='text-muted'>".date("Y", (int)$time)."</span> ".
+    "<span class='text-info'>".date("h:i:s A", (int)$time)."</span> ".
+    "<span class='text-muted'>".date("P", (int)$time)."</span> ";
+}
+
 
 /**
  * TODO: split this up into multiple functions
@@ -368,5 +380,6 @@ function serve_dashboard(string $dashboard_path)
 //die($opt_link);
     $password_reset = (Config::str('password') === 'default');
     $is_free = (strlen(Config::str('pro_key')) < 20);
+    $llang = "en-US";
     exit(require WAF_DIR . "views/dashboard.html");
 }
