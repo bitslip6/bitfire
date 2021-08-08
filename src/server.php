@@ -145,11 +145,16 @@ function hash_file(string $filename, string $plugin_id) : ?array {
 
     //$result['e'] = $i['extension'];
     //$t = "/{$sym_ver}/{$shortname}";
-	$result['crc_path'] = crc32(join('', array_map('trim', file($filename))));
-    $result['crc_trim'] = crc32($shortname);
+    $input = file($filename);
+	$result['crc_trim'] = crc32(join('', array_map('trim', $input)));
+    $result['crc_path'] = crc32($shortname);
     $result['name'] = $shortname;
     $result['plugin_id'] = $plugin_id;
     $result['size'] = filesize($filename);
+
+    if (function_exists('find_malware')) {
+        $result['malware'] = find_malware($input);
+    }
 
     return $result;
 }
@@ -183,8 +188,9 @@ function get_wordpress_hashes(string $root_dir) : array {
     $version = get_wordpress_version($root_dir);
     if (version_compare($version, "5.0.0") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
 
-    $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : array {
+    $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : ?array {
 
+        if (strpos($file, 'wp-content/upgrade') !== false) { return NULL; }
         $path = str_replace($root_dir, "/$version/src", $file);
         $nospace_data = join('', array_map('trim', file($file)));
         // is plugin
