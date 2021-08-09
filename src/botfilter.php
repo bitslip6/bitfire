@@ -636,7 +636,7 @@ function whitelist_inspection(string $agent, string $ip, ?array $whitelist) : \T
     // configured to only allow whitelisted bots, so we can block here 
     // handle whitelisting (the most restrictive)
     // return true(pass) if the agent is in the list of whitelist bots
-    if (empty($whitelist)) {
+    if (!empty($whitelist)) {
         $r = agent_in_list($agent, $ip, $whitelist);
         if ($r < 0) { return BitFire::new_block(FAIL_MISS_WHITELIST, "user_agent", $agent, "user agent whitelist", BLOCK_SHORT); }
         if ($r == 0) { return BitFire::new_block(FAIL_FAKE_WHITELIST, "user_agent", $agent, "user agent whitelist", BLOCK_SHORT); }
