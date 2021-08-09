@@ -70,7 +70,7 @@ function cuckoo_key(string $key): array {
  * and search for the first free memory chunk...
  * the memory should look for a random slot in the chunk of available memory
  */
-function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array {
+function cuckoo_find_free_mem($ctx, $size): array {
     // can't attempt to store values beyond the max size
     if ($size > CUCKOO_MAX_SIZE) {
         return [null, null];
@@ -87,13 +87,13 @@ function cuckoo_find_free_mem($ctx, $size, $priority = 0 | CUCKOO_LOW): array {
 
         // if we have a location (not full and defrag successful), update pointer location
         if ($ptr !== null) {
-            $mem = unpack("nitems/nsize/Lfree", shmop_read($ctx['rid'], ($ctx['mem_end']), 8));
+            //$mem = unpack("nitems/nsize/Lfree", shmop_read($ctx['rid'], ($ctx['mem_end']), 8));
             shmop_write($ctx['rid'], pack("nnL", $ctx['slots'], $ctx['chunk_size'], $ptr + $block_size), $ctx['mem_end']);
         }
 
         // unlock memory, really, this should never fail...
-        $r = until(10, function() use ($ctx) { return set_lock($ctx, 0); });
-        //var_dump($r);
+        until(10, function() use ($ctx) { return set_lock($ctx, 0); });
+        //var_dump($until_result);
 
         return [$ptr, $block_size];
     }
@@ -168,7 +168,7 @@ function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item): bool {
     // we can't store this much data in the cache...
     if ($size > CUCKOO_MAX_SIZE) { return false; }
 
-    $mem = ($header['len'] < $size) ? cuckoo_find_free_mem($ctx, $size, CUCKOO_LOW) : [$header['offset'], $header['len']];
+    $mem = ($header['len'] < $size) ? cuckoo_find_free_mem($ctx, $size) : [$header['offset'], $header['len']];
     if ($mem[0] === null) { return false; }
 
     // clear permissions...
