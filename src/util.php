@@ -213,12 +213,13 @@ function memoize(callable $fn, string $key, int $ttl) : callable {
             $r = \BitFire\BitFire::get_instance()->_request;
             $maybe_cookie = \BitFireBot\get_tracking_cookie($r->ip, $r->agent);
             $result = $maybe_cookie->extract($key);
-            if ($result) { return $result; }
-            $cookie = $maybe_cookie() || array();
+            if (!$result->empty()) { return $result(); }
+            $cookie = ($maybe_cookie->empty()) ? array() : $maybe_cookie->value('array');
             $cookie[$key] = $fn(...$args);
-            $cookie_data = \TF\encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), $this->cookie);
+            $cookie_data = \TF\encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), \TF\en_json($cookie));
             $_COOKIE[CFG::str(CONFIG_USER_TRACK_COOKIE)] = $cookie_data;
             \TF\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), $cookie_data, DAY); 
+            return $cookie[$key];
         } else {
             \TF\debug("unable to memoize $fn");
             return $fn(...$args);
@@ -437,7 +438,7 @@ class MaybeA implements MaybeI {
                 $result = intval($this->_x);
                 break;
             case 'array':
-                $result = is_array($this->_x) ? $this->_x : array($this->_x);
+                $result = is_array($this->_x) ? $this->_x : (empty($this->_x)) ? array() : array($this->_x);
                 break;
         }
         return $result;
