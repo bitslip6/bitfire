@@ -190,6 +190,15 @@ function test_memoization_verify_bot_as() : void {
 
     $result = \BitFireBot\fast_verify_bot_as("129.134.27.1", "AS32934");
     assert_true($result, "FAST facebook as match");
+    
+    \BitFire\Config::set_value(\BitFire\CONFIG_CACHE_TYPE, 'shmop');
+    
+    $result = \BitFireBot\fast_verify_bot_as("129.134.27.1", "AS32934");
+    assert_true($result, "facebook as match");
+
+    $result = \BitFireBot\fast_verify_bot_as("129.134.27.1", "AS32934");
+    assert_true($result, "FAST facebook as match");
+
 }
 
 /**

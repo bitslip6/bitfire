@@ -174,9 +174,9 @@ function test_whitelist_inspection() : void {
     //$result = BitFireBot\whitelist_inspection("Mozilla/5.0 googlebot/1.0", "66.249.66.123", array('googlebot' => 'google(bot?).com'));
     //assert_true($result->empty(), "did not correctly hit whitelist googlebot");
     $result = BitFireBot\whitelist_inspection("Mozilla/5.0 googlebot/1.0", "66.249.66.123", array('googlebot' => 'gooogle(bot?).com'));
-    assert_false($result->empty(), "did not correctly miss whitelist goo(o)glebot");
+    assert_false($result->empty(), "did not correctly miss whitelist goo(o)glebot 1");
     $result = BitFireBot\whitelist_inspection("Mozilla/5.0 goooglebot/1.0", "66.249.66.123", array('googlebot' => 'google(bot?).com'));
-    assert_false($result->empty(), "did not correctly miss whitelist goo(o)glebot");
+    assert_false($result->empty(), "did not correctly miss whitelist goo(o)glebot 2");
     $result = BitFireBot\whitelist_inspection("", "66.249.66.123", array('googlebot' => 'google(bot?).com'));
     assert_false($result->empty(), "did not correctly miss empty UA");
     $result = BitFireBot\whitelist_inspection("Mozilla/5.0 googlebot/1.0", "54.213.205.144", array('googlebot' => 'google(bot?).com'));
@@ -206,10 +206,11 @@ function test_blacklist_inspection2() : void {
 
 function test_basic_request_passes() : void {
     $bf = newbotfilter();
+    Config::set_value("require_full_browser", false);
 
     $_SERVER = array();
     $_SERVER['REQUEST_URI'] = 'https://localhost:8080/foobar/something?param1=value1';
-    $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3';
+    $_SERVER['HTTP_USER_AGENT'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/80.2 AppleWebKit/537.3';
     $_SERVER['HTTP_HOST'] = 'localhost:8080';
     $_SERVER['REQUEST_SCHEME'] = 'http';
     $_SERVER['REQUEST_METHOD'] = 'GET';

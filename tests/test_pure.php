@@ -19,7 +19,7 @@ function test_ip_block() : void {
     $block_time = 600;
     $response_code = 200;
 
-    $effect = \BitFire\Pure\ip_block($block, $request, $block_time, $response_code);
+    $effect = \BitFire\Pure\ip_block($block, $request, $block_time);
     assert_eq(count($effect->read_files()), 1, "ip block did not set any ip block files");
     assert_eq($effect->read_files()[0]->filename, "/tmp/blocks/127.0.0.1", "ip block did not set correct path");
     assert_eq($effect->read_files()[0]->modtime, time() + 600, "ip block did not set correct expiration time");

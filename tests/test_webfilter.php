@@ -24,10 +24,28 @@ function xss_test_list3() : iterable {
 
 function run_xss_filter1(string $data) : void {
     Config::set_value(CONFIG_WEB_FILTER_ENABLED, true);
-    $filter = new WebFilter();
+    static $filter = NULL;
+    if ($filter === NULL) { $filter = new WebFilter(); }
+
     $request = setup($data);
     $block = $filter->inspect($request);
     assert_false($block->empty(), "did not block [$data]");
+
+    $v2 = preg_replace_callback("|\\\\x([a-fA-F0-9]{2})|", function ($matches) {
+        return chr(hexdec($matches[1]));
+    }, $data);
+    if ($v2 !== $data) {
+        $request = setup($v2);
+        $block = $filter->inspect($request);
+        assert_false($block->empty(), "did not block [$data]");
+    }
+
+    $v3 = urldecode($data);
+    if ($v3 !== $data) {
+        $request = setup($v3);
+        $block = $filter->inspect($request);
+        assert_false($block->empty(), "did not block [$data]");
+    }
 }
 
 
@@ -36,7 +54,14 @@ function run_xss_filter1(string $data) : void {
  * @type biglist
  */
 function test_xss_list1(string $data) : void {
+    $v1 = $data;
+    $v2 = preg_replace_callback("|\\\\x([a-fA-F0-9]{2})|", function ($matches) {
+        return chr(hexdec($matches[1]));
+    }, $data);
     run_xss_filter1($data);
+    if ($v2 !== $data) {
+        run_xss_filter1($v2);
+    }
 }
 /**
  * @dataprovider xss_test_list2
@@ -99,24 +124,24 @@ function setup(string $data) : \BitFire\Request {
 }
 
 function run_xss_pass(string $data) : void {
-    $data = "a parameter with just placeholder data";
-    $req = setup($data);
+    $static = "a parameter with just placeholder data";
+    $req = setup($static);
     $filter = new WebFilter();
     Config::set_value(CONFIG_WEB_FILTER_ENABLED, true);
     Config::set_value(CONFIG_SPAM_FILTER, false);
     Config::set_value(CONFIG_SQL_FILTER, false);
     $maybe_error = $filter->inspect($req);
-    assert_true($maybe_error->empty(), "false positive xss [$data]");
+    assert_true($maybe_error->empty(), "false positive xss [$static]");
 }
 
 function run_xss_block(string $data) : void {
-    $data = "<script>alert(1)</script>";
-    $req = setup($data);
+    $static = "<script>alert(1)</script>";
+    $req = setup($static);
     //$filter = $GLOBALS['f'];
     $filter = new WebFilter();
     Config::set_value(CONFIG_WEB_FILTER_ENABLED, true);
     Config::set_value(CONFIG_SPAM_FILTER, false);
     Config::set_value(CONFIG_SQL_FILTER, false);
     $maybe_error = $filter->inspect($req);
-    assert_false($maybe_error->empty(), "false negative xss [$data]");
+    assert_false($maybe_error->empty(), "false negative xss [$static]");
 }
