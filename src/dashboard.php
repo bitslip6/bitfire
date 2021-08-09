@@ -117,7 +117,7 @@ function dump_hashes()
         $offset = 0;
         while ($offset < count($root['files'])) {
 */
-    $result = \TF\bit_http_request("POST", "http://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+    $result = \TF\bit_http_request("POST", "https://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
 
     //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
     $decoded = \TF\un_json($result);
@@ -138,7 +138,7 @@ function dump_hashes()
             if (is_array($root)) {
                 foreach ($root as $file) {
                     $filename = trim(str_replace($base, "", $file[4]), '/');
-                    $path = "http://core.svn.wordpress.org/tags/{$ver}/$filename";
+                    $path = "https://core.svn.wordpress.org/tags/{$ver}/$filename";
                     $parts = explode("/", $file[0]);
                     $out = $file[4] . "/" . join("/", array_slice($parts, 3));
                     $out = rtrim($out, "/");
