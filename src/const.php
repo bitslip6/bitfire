@@ -13,7 +13,7 @@ const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\repair', '\\B
 const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
 const BITFIRE_VER = 169;
 const BITFIRE_SYM_VER = "1.6.9";
-const BITFIRE_DOMAIN = "http://api.bitslip6.com";
+const BITFIRE_DOMAIN = "http://api.bitfire.com";
 const BITFIRE_INTERNAL_PARAM = '_bitfire_p';
 const BITFIRE_COMMAND = "BITFIRE_API";
 
