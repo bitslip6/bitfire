@@ -340,7 +340,7 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
         // connect failed, we probably have an old mem segment that is not large enough
         $id = @shmop_open($token, 'w', 0, 0);
         if ($id) { shmop_delete($id); }
-        $id = shmop_open($token, 'c', 0660, $size_in_bytes);
+        $id = @shmop_open($token, 'c', 0660, $size_in_bytes);
         if ($id === false) {
             debug("shmop: unable to allocate $size_in_bytes shared memory\n");
         }
