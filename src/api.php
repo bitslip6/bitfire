@@ -15,6 +15,8 @@ ini_set('display_errors', "on");
 ini_set('display_startup_errors', "on");
 error_reporting(E_ALL);
 
+const WAF_INI = WAF_DIR . "config.ini";
+
 class Metric {
     /** @var array $data */
     public $data = array();
@@ -35,7 +37,7 @@ function download(\BitFire\Request $r) : void {
 	$effect = \TF\Effect::new();
 	$filename = $r->get['filename']??"";
 
-	if (strpos($filename, "..") !== false || \TF\ends_with($filename, "php") == false) { $effect->out("invalid file."); }
+	if (strpos($filename, "..") !== false || ! \TF\ends_with($filename, "php")) { $effect->out("invalid file."); }
 	else if (!file_exists($filename)) { $effect->out("file does not exist."); }
 
 	else if (!isset($_GET['direct'])) {
@@ -207,7 +209,7 @@ function get_valid_data(\BitFire\Request $request) : void {
     exit(\TF\en_json($response));
 }
 
-function make_code(\BitFire\Request $request) : void {
+function make_code(\BitFire\Request $request) : string {
     $s = Config::str(CONFIG_SECRET, 'bitfiresekret');
     $iv = \TF\random_str(12);
     $hash = base64_encode(hash_hmac("sha1", $iv, $s, true));
@@ -224,57 +226,49 @@ function is_quoted(string $data) : bool {
     return ($data === "true" || $data === "false" || ctype_digit($data)) ? true : false;
 }
 
+
+
 function upgrade(\BitFire\Request $request) : void {
     $v = htmlentities($_GET['ver']);
-    if (\version_compare($v, BITFIRE_SYM_VER, '>=')) {
-
-        // ensure that all files are witeable
-        \TF\file_recurse(WAF_DIR, function ($x) use ($v) {
-            if (is_file($x) 
-                && stripos($x, "ini") === false
-                && stripos($x, "/.") === false) {
-                if (!is_writeable($x)) { exit ("unable to upgrade: $x is not writeable"); }
-            }
-        });
-
-
-        // download the archive TODO: check checksum
-        $dest = WAF_DIR."cache/{$v}.tar.gz";
-        $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/{$v}.tar.gz";
-        $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
-        $content->then(\TF\partial('\file_put_contents', $dest));
-
-        if ($content->value('int') < 50000) {
-            \TF\debug("unable to download $dest");
-            exit("error writing file $dest");
-        }
-        
-        $cwd = getcwd();
-        $f = __FILE__;
-
-        //  extract archive
-        $target = WAF_DIR . "cache";
-        require_once WAF_DIR."src/tar.php";
-        $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
-        
-        // replace files
-        \TF\file_recurse(WAF_DIR."cache/bitfire-{$v}", function (string $x) use ($v) {
-            if (is_file($x) && stripos($x, "ini") === false) {
-                $base = basename($x);
-                $path = dirname($x);
-                $root = str_replace(WAF_DIR."cache/bitfire-{$v}/", "", $x);
-                //echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
-				if (!rename($x, WAF_DIR . $root)) {
-                    // exit("upgrade failed");
-                }
-            }
-        });//, "/.*.php/");
-
-        exit("[$success] [$dest] $cwd [$f]");
-    } else {
-        \TF\debug("cowardly refusing to download same or older release");
+    if (\version_compare($v, BITFIRE_SYM_VER, '<')) { 
+        \TF\debug("version not current $v");
+        exit("version is not current $v");
     }
-    exit("version too old");
+
+    // ensure that all files are witeable
+    \TF\file_recurse(WAF_DIR, function ($x) {
+        if (!is_writeable($x)) { exit ("unable to upgrade: $x is not writeable"); }
+    });
+
+
+    // download the archive TODO: check checksum
+    $dest = WAF_DIR."cache/{$v}.tar.gz";
+    $link = "https://github.com/bitslip6/bitfire/archive/refs/tags/{$v}.tar.gz";
+    $content = \TF\Maybe::of(bit_http_request("GET", $link, ""));
+    $content->then(\TF\partial('\file_put_contents', $dest));
+
+    if ($content->value('int') < 50000) {
+        \TF\debug("unable to download $dest");
+        exit("error writing file $dest");
+    }
+    
+    $cwd = getcwd();
+
+    //  extract archive
+    $target = WAF_DIR . "cache";
+    require_once WAF_DIR."src/tar.php";
+    $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
+    
+    // replace files
+    \TF\file_recurse(WAF_DIR."cache/bitfire-{$v}", function (string $x) use ($v) {
+        if (is_file($x) && stripos($x, "ini") === false) {
+            $root = str_replace(WAF_DIR."cache/bitfire-{$v}/", "", $x);
+            //echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
+            if (!rename($x, WAF_DIR . $root)) { \TF\debug("unable to rename [$x] $root"); }
+        }
+    });
+
+    exit("[$success] [$dest] $cwd");
 }
 
 function set_pass(\BitFire\Request $request) : void {
@@ -285,16 +279,16 @@ function set_pass(\BitFire\Request $request) : void {
     }
     $p1 = sha1($_GET['pass1']??'');
     \TF\debug("pass sha1 %s ", $p1);
-    $wrote = \TF\file_replace(WAF_DIR."config.ini", "password = 'default'", "password = '$p1'");
-    exit(($wrote) ? "success" : "unable to write to: " . WAF_DIR."config.ini");
+    $wrote = \TF\file_replace(WAF_INI, "password = 'default'", "password = '$p1'");
+    exit(($wrote) ? "success" : "unable to write to: " . WAF_INI);
 }
 
 function toggle_config_value(\BitFire\Request $request) : void {
-    if (!is_writable(WAF_DIR."config.ini")) {
+    if (!is_writable(WAF_INI)) {
         exit("fail");
     }
 
-    $input = file_get_contents(WAF_DIR."config.ini");
+    $input = file_get_contents(WAF_INI);
     $param = htmlentities(strtolower($_GET['param']));
     $value = htmlentities(strtolower($_GET['value']));
     if ($value === "off" || $value === "false") {
@@ -311,7 +305,7 @@ function toggle_config_value(\BitFire\Request $request) : void {
 
     // don't accidently 0 the config
     if (strlen($output) + 20 > strlen($input)) {
-        file_put_contents(WAF_DIR."config.ini", $output);
+        file_put_contents(WAF_INI, $output);
         exit("success");
     } else {
         exit("fail");
@@ -320,10 +314,10 @@ function toggle_config_value(\BitFire\Request $request) : void {
 
 
 
+/*
 function diff_text_lines(array $new, array $old) : array {
     $result = array();
 
-    $src_line = 0;
     $max_search = 50;
 
     $max_new_lines = count($new);
@@ -341,8 +335,6 @@ function diff_text_lines(array $new, array $old) : array {
         }
 
         if ($ctr>95) { $result[] = "$n <<< {$new[$n]}\n"; }
-
-        //if (!isset($result[$n])) { $result[$n] = -1; }
     }
 
     for($i=0; $i<$max_old_lines; $i++) {
@@ -351,6 +343,7 @@ function diff_text_lines(array $new, array $old) : array {
 
     return $result;
 }
+*/
 
 
 /**
