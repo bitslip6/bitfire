@@ -1,0 +1,20 @@
+<html>
+<body>
+<h1>this site can only be accessed from a full web browser.  Please check that you have JavaScript and cookies enabled.</h1>
+<br>
+<p>If you reached this page in error, please reload the web page, or click <a href="#" id="reload">here</a>.</p>
+<script>
+    <?php // the _rqw param clears the cookie which is not accessible via JavaScript ?>
+    function doreload() {
+        if(!window.location.hash) {
+            let op = (window.location.indexOf('?') > 0) ? '?' : '&'; 
+            let w2 = window.location + op + '_rqw=xpr#reloaded';
+            window.location = w2;
+        } else if (window.location.hash == "#reloaded") {
+            alert("having trouble verifying your web browser.  please clear your cache and revisit");
+        }
+    }
+    document.getElementById("reload").addEventListener("click", doreload);
+</script>
+</body>
+</html>

@@ -61,8 +61,13 @@ function test_read_enc_speed() : void {
  * @type speed
  */
 function test_recache_speed() : void {
-    $p1 = TF\recache_file(WAF_DIR."cache/keys.raw");
-    $p2 = TF\recache_file(WAF_DIR."cache/values.raw");
+    $t1 = microtime(true);
+    $p1 = TF\recache2_file(WAF_DIR."cache/keys.raw");
+    $t2 = microtime(true);
+    $p2 = TF\recache2_file(WAF_DIR."cache/values.raw");
+    $t3 = microtime(true);
+    assert_lt(($t2-$t1), 0.00001, "key decomplie time too slow");
+    assert_lt(($t3-$t2), 0.00001, "value decomplie time too slow");
 }
 
 function test_can_encrypt_ssl() : void {
@@ -202,6 +207,7 @@ function test_ip_to_country() : void {
  * @type tar
  */
 function test_untar() : void {
-    tar_extract(WAF_DIR."tests/bitfire-1.4.6.tar.gz", "/tmp");
-    assert_true(file_exists("/tmp/bitfire-1.4.6"), "unable to extract test file");
+    tar_extract(WAF_DIR."tests/bitfire-1.6.3.tar.gz", "/tmp");
+    assert_true(file_exists("/tmp/bitfire-1.6.3"), "unable to extract test file");
+    assert_gt(system("find /tmp/bitfire-1.6.3 | wc -l"), 90, "not all files extracted");
 }

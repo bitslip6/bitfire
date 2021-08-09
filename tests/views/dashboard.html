@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="BitFire Dashboard" />
+
+    <!-- Libs CSS -->
+    <!--
+    <link rel="stylesheet" href="https://bitfire.co/dash/flatpicker.min.css" />
+    <link rel="stylesheet" href="https://bitfire.co/dash/feather.css" />
+    <link rel="stylesheet" href="https://bitfire.co/dash/quill.core.css" />
+    -->
+
+	<link rel="shortcut icon" href="https://www.bitslip6.com/img/shield64.png">
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/vs2015.css" />
+
+    <!-- Theme CSS -->
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.bundle.css" id="stylesheetLight">
+    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
+
+    <style>
+      .right { float: right; }
+      .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding: .4rem 0 0 0!important; }
+      /*
+      .lnum { float: right; }
+      */
+      .pr1 { margin-top: 20px; }
+      .card-body { padding: 0.5rem !important; }
+      .center { text-align: center; }
+
+      .zn1 { z-index: -1;}
+      image.type { fill: #e63757; }
+
+      svg { fill: #977; }
+      .blue { fill: #30b7e5; color: #30b7e5; }
+      svg.green { fill: #21d97e; }
+      svg.yellow { fill: #f6c343; }
+      svg.red { fill: #e63757; }
+      img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
+      img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
+      img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+
+
+      .oh { overflow: auto; }
+      .wrap { white-space: break-spaces; line-break: anywhere; }
+      .nowrap { white-space: nowrap; }
+      
+      .hidden { display: none; }
+      
+      .country { float: right; display: block; }
+
+      .btn-sm {
+        padding: 0.1rem .5rem !important;
+        font-size: .4rem !important;
+        font-weight: bold;
+      }
+      .btn-group-tiny>.btn {
+        padding: .075rem .25rem;
+        font-size: .4rem;
+        line-height: 1.0;
+        border-radius: .25rem;
+      }
+      .dropdown-toggle {
+        width: 65px;
+      }
+      
+      .nav-sm .nav-link {
+        font-size: .6125rem;
+      }
+
+      .navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
+        padding-left: .5rem;
+        padding-right: 0rem;
+      }
+      
+      /*
+      ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
+      */
+      /*
+      .dropdown-menu { margin-top: -20px; }
+      */
+      .chilabel { margin-left: 1rem; }
+      
+      thead.details th, th { font-size: 12px; }
+      
+      .popover { max-width: 30rem; }
+      .underline { text-decoration: underline; margin-bottom: 1rem; }
+      .table-sm td { padding: .25rem; }
+      .tbalt {
+        color: #333;
+		    overflow: hidden;
+        background-color: #EFEFEF;
+        font-family: monospace;
+      }
+      .tbalt td {
+        border-bottom: 1px solid #CCC;
+      }
+      .table-sm th { padding: .5rem .25rem; }
+
+      span.method { padding: .45rem .75rem; font-weight: bold; color #111; }
+      tr.inforow td {
+        background-image: linear-gradient(to bottom, rgba(240,240,240,0),92%, rgba(240,240,240,1)100%);
+      }
+    </style>
+    
+    <!-- Title -->
+    <title>BitFire : Control Panel</title>
+
+    <script>
+        window.ERROR = [];
+        
+        function url_to_path(url) {
+          console.log(url);
+          let s = url.indexOf("/");
+          return url.substr(s);
+        }
+
+        function add_exception(ex) {
+          console.log("path: ", url_to_path(ex.getAttribute("data-ex-url")));
+          console.log("code: ", ex.getAttribute("data-ex-code"));
+          postData("<?php echo $dashboard_path?>?BITFIRE_API=add_api_exception",
+          {"BITFIRE_API":"add_api_exception",
+            "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
+            "code": ex.getAttribute("data-ex-code"),
+            "path": url_to_path(ex.getAttribute("data-ex-url"))})
+            .then(data => {
+              console.log(data);
+              if (data == "success") { alert("exception added"); }
+              else { alert("unable to add exception"); }
+
+            });
+        }
+        
+        // Example POST method implementation:
+        async function postData(url = '', data = {}) {
+          // Default options are marked with *
+          const response = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            redirect: 'follow',
+            referrerPolicy: 'same-origin',
+            body: JSON.stringify(data)
+          });
+          return response.text(); // parses JSON response into native JavaScript objects
+        }
+
+        function cc_to_flag(cc) {
+          if (cc.length != 2) { return ""; }
+          const OFFSET = 127397;
+          const codePoints = [...cc.toUpperCase()].map(c => c.codePointAt() + OFFSET);
+          return String.fromCodePoint(...codePoints);
+        }
+
+        
+        const VERSION = <?php echo \BitFire\BITFIRE_VER; ?>;
+        const VERSION_STR = "<?php echo \BitFire\BITFIRE_SYM_VER; ?>";
+        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
+        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
+        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
+        
+        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
+
+        function min(numbers) { return numbers.reduce(min_reducer); }
+        function max(numbers) { return numbers.reduce(max_reducer); }
+        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+
+
+        function update_challenge(data) {
+          if (GBI("check")) { 
+            console.log(data);
+            GBI("check").innerText = data.challenge;
+            GBI("pass").innerText = data.valid;
+          }
+        }
+
+        function toggle(elm, type) {
+          var e = GBI(elm);
+          console.log(e);
+          e.innerText = cap(type);
+          fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
+          if (type == "block" || type == "on" || type == "true") {
+            e.classList.remove("btn-warning");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-success");
+          } else if (type == "report" || type == "alert") {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-warning");
+          } else {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-warning");
+            e.classList.add("btn-secondary");
+          }
+        }
+
+        function mode(numbers) {
+            // as result can be bimodal or multi-modal,
+            // the returned result is provided as an array
+            // mode of [3, 5, 4, 4, 1, 1, 2, 3] = [1, 3, 4]
+            var modes = [], count = [], i, number, maxIndex = 0;
+         
+            for (i = 0; i < numbers.length; i += 1) {
+                number = numbers[i];
+                count[number] = (count[number] || 0) + 1;
+                if (count[number] > maxIndex) {
+                    maxIndex = count[number];
+                }
+            }
+         
+            for (i in count)
+                if (count.hasOwnProperty(i)) {
+                    if (count[i] === maxIndex) {
+                        modes.push(Number(i));
+                    }
+                }
+         
+            return modes.pop();
+        }
+
+
+               
+       
+        /**
+         * @param string type  primary, secondary, success, danger, warning, info
+         * @param string message a value with the error content (can include HTML markup)
+         */
+        function add_info(type, message) {
+          let msg = {"type": type, "message": message};
+          if (window.ERROR.length > 5) {
+              window.ERROR.pop();
+          }
+          window.ERROR.unshift(msg);
+          
+
+          GBI("error").innerHTML = window.ERROR.reduce((accumulator, value) =>
+          accumulator + "<div class='alert alert-"+value.type+"' role='alert'>" + value.message + "</div>", '');
+        }
+
+        function GBI(name) { return document.getElementById(name); }
+        function avg_click(e) {
+            window.CHITON_AVG = !window.CHITON_AVG;
+        }
+
+    </script>
+  </head>
+
+  <body>
+
+
+    <!-- NAVIGATION
+    ================================================== -->
+    
+    
+    <nav class="navbar navbar-vertical fixed-left navbar-expand-md " id="sidebar" style="background-color: #FFF;">
+      <div class="container-fluid">
+
+        <!-- Toggler -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#sidebarCollapse" aria-controls="sidebarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Brand -->
+        <a class="navbar-brand" href="/bitfire">
+          <img src="https://bitslip6.com/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
+        </a>
+ 
+        <h6 class="navbar-heading"> Site <?php echo ($locked) ? "Is LOCKED" : "is UNLOCKED"?> </h6>
+        <span class="left">
+          <div id="unlock_div" <?php if (!$locked) { echo 'class="hidden"'; }?>>
+          <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          <button id="unlock" type="button" class="btn btn-danger lift">UNLOCK SITE</button>
+          </div>
+          <div id="lock_div" <?php if ($locked) { echo 'class="hidden"'; }?>>
+          <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg>
+          <button id="lock" type="button" class="btn btn-success lift">LOCK SITE</button>
+          </div>
+        </span>
+        <br />
+
+
+
+        <h6 class="navbar-heading"> 24 Hour Totals </h6>
+
+        <!-- Collapse -->
+        <div class="collapse navbar-collapse" id="sidebarCollapse">
+
+          <!-- Navigation -->
+          <ul class="navbar-nav">
+            <li class="nav-item">
+                <span class="chilabel left">
+                  <svg viewBox="0 0 24 24" fill="black" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                  Alerts: </span> <span class="lnum" id="alerts">(<?php echo $report_count; ?>)</span>
+            </li>
+            <li class="nav-item">
+                <span class="chilabel">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/></svg>
+                  Blocks: </span> <span class="lnum" id="blocks">(<?php echo $block_count ?>)</span>
+            </li>
+
+            <?php if (\BitFire\Config::str("cache_type", "nop") != "nop") { echo \BitFire\Config::str("cache_type"); ?>
+            <li class="nav-item">
+                <span class="chilabel">
+                  <svg xmlns="http://www.w3.org/20 00/svg" enable-background="new 0 0 24 24" height="24" viewBox="0 0 24 24" width="24"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M17,11c0.34,0,0.67,0.04,1,0.09V6.27L10.5,3L3,6.27v4.91c0,4.54,3.2,8.79,7.5,9.82c0.55-0.13,1.08-0.32,1.6-0.55 C11.41,19.47,11,18.28,11,17C11,13.69,13.69,11,17,11z"/><path d="M17,13c-2.21,0-4,1.79-4,4c0,2.21,1.79,4,4,4s4-1.79,4-4C21,14.79,19.21,13,17,13z M17,14.38c0.62,0,1.12,0.51,1.12,1.12 s-0.51,1.12-1.12,1.12s-1.12-0.51-1.12-1.12S16.38,14.38,17,14.38z M17,19.75c-0.93,0-1.74-0.46-2.24-1.17 c0.05-0.72,1.51-1.08,2.24-1.08s2.19,0.36,2.24,1.08C18.74,19.29,17.93,19.75,17,19.75z"/></g></g></svg>
+                  Check: </span> <span class="lnum" id="check"></span>
+            </li>
+            <li class="nav-item">
+                <span class="chilabel">
+                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none" fill-rule="evenodd"/><g fill-rule="evenodd"><path d="M9 17l3-2.94c-.39-.04-.68-.06-1-.06-2.67 0-8 1.34-8 4v2h9l-3-3zm2-5c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4"/><path d="M15.47 20.5L12 17l1.4-1.41 2.07 2.08 5.13-5.17 1.4 1.41z"/></g></svg>
+                  Pass: </span> <span class="lnum" id="pass"></span>
+            </li>
+            <?php } ?>
+
+
+          </ul>
+          <br />
+
+          <!-- Divider -->
+          <hr class="navbar-divider my-3">
+
+          <!-- Heading -->
+          <h6 class="navbar-heading">
+            Settings
+          </h6>
+          <?php if (!$config_writeable) { ?>
+          <h6 class="navbar-heading btn-warning center">
+            config.ini not writeable
+          </h6>
+          <?php } ?>
+
+          <!-- Navigation -->
+          <ul class="navbar-nav mb-md-4">
+
+            
+            <li class="nav-item">
+              <a class="nav-link" href="#sidebarWebFilter" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarWebFilter">
+                <!--
+                <svg data-name="tune" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>
+                -->
+                <svg height="24" viewBox="0 0 24 24" width="24"><path d="M4.5 11h-2V9H1v6h1.5v-2.5h2V15H6V9H4.5v2zm2.5-.5h1.5V15H10v-4.5h1.5V9H7v1.5zm5.5 0H14V15h1.5v-4.5H17V9h-4.5v1.5zm9-1.5H18v6h1.5v-2h2c.8 0 1.5-.7 1.5-1.5v-1c0-.8-.7-1.5-1.5-1.5zm0 2.5h-2v-1h2v1z"/><path d="M24 24H0V0h24v24z" fill="none"/></svg>
+                &nbsp;Web 
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 7 ) </span>
+              </a>
+              <div class="collapse " id="sidebarWebFilter">
+                <ul class="nav nav-sm flex-column">
+                  
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Security Headers
+                    </span>
+
+
+                  <div class="dropdown">
+                    <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                      <button id="security_headers_enabled" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['security_headers_enabled']; ?> </button>
+                    </a>
+                  
+                    <div class="dropdown-menu dropdown-menu-right">
+                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'true')">Enabled</a>
+                      <a href="#!" class="dropdown-item" onclick="toggle('security_headers_enabled', 'false')">Disabled</a>
+                    </div>
+                  </div>
+
+
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Force SSL
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="enforce_ssl_1year" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['enforce_ssl_1year']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('enforce_ssl_1year', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('enforce_ssl_1year', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('enforce_ssl_1year', 'off')">Off</a>
+                      </div>
+                    </div>
+                  </li>
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      SQL Filter
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="sql_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['sql_block']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('sql_block', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('sql_block', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('sql_block', 'off')">Off</a>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Web Filter
+                    </span>
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="web_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['web_block']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('web_block', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('web_block', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('web_block', 'off')">Off</a>
+                      </div>
+                    </div>
+
+                 </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Upload Filter
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="file_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['file_block']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('file_block', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('file_block', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('file_block', 'off')">Off</a>
+                      </div>
+                    </div>
+                  </li>
+
+                </ul>
+              </div>
+            </li>
+            
+
+            <li class="nav-item">
+              <a class="nav-link" href="#sidebarBots" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarBots">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM10 17l-3.5-3.5 1.41-1.41L10 14.17 15.18 9l1.41 1.41L10 17z"/></svg>
+                &nbsp;Bots
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 3 ) </span>
+              </a>
+              <div class="collapse " id="sidebarBots">
+                <ul class="nav nav-sm flex-column">
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Require Browser
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="require_full_browser" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['require_full_browser']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('require_full_browser', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('require_full_browser', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('require_full_browser', 'off')">Off</a>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                     Whitelist Bots 
+                    </span>
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="whitelist_enable" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['whitelist_enable']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('whitelist_enable', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('whitelist_enable', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('whitelist_enable', 'off')">Off</a>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                     Blacklist Bots 
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="blacklist_enable" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['whitelist_enable']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('blacklist_enable', 'alert')">Alert</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('blacklist_enable', 'block')">Block</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('blacklist_enable', 'off')">Off</a>
+                      </div>
+                    </div>
+                  </li>
+
+                </ul>
+              </div>
+
+
+
+
+            <li class="nav-item">
+              <a class="nav-link" href="#sidebarSettings" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm7-7H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-1.75 9c0 .23-.02.46-.05.68l1.48 1.16c.13.11.17.3.08.45l-1.4 2.42c-.09.15-.27.21-.43.15l-1.74-.7c-.36.28-.76.51-1.18.69l-.26 1.85c-.03.17-.18.3-.35.3h-2.8c-.17 0-.32-.13-.35-.29l-.26-1.85c-.43-.18-.82-.41-1.18-.69l-1.74.7c-.16.06-.34 0-.43-.15l-1.4-2.42c-.09-.15-.05-.34.08-.45l1.48-1.16c-.03-.23-.05-.46-.05-.69 0-.23.02-.46.05-.68l-1.48-1.16c-.13-.11-.17-.3-.08-.45l1.4-2.42c.09-.15.27-.21.43-.15l1.74.7c.36-.28.76-.51 1.18-.69l.26-1.85c.03-.17.18-.3.35-.3h2.8c.17 0 .32.13.35.29l.26 1.85c.43.18.82.41 1.18.69l1.74-.7c.16-.06.34 0 .43.15l1.4 2.42c.09.15.05.34-.08.45l-1.48 1.16c.03.23.05.46.05.69z"/></svg>
+                &nbsp;Settings
+                &nbsp;<span style="color:#999;font-size:12px;"> ( 6 ) </span>
+              </a>
+              <div class="collapse " id="sidebarSettings">
+                <ul class="nav nav-sm flex-column">
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Allow IP Block
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="allow_ip_block" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['allow_ip_block']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('allow_ip_block', 'true')">Allow</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('allow_ip_block', 'false')">Disallow</a>
+                      </div>
+                    </div>
+                  </li>
+                  
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Cache Type
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="cache_type" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config_orig['cache_type']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'nop')">None</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'apc')">APC</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'shmop')">Shmop</a>
+                        <a href="#" class="dropdown-item" onclick="toggle('cache_type', 'shm')">Shm</a>
+                      </div>
+                    </div>
+                  </li>
+                  
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Cookie Support
+                    </span>
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="cookies_enabled" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['cookies_enabled']; ?> </button>
+                      </a>
+                      
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#!" class="dropdown-item" onclick="toggle('cookies_enabled', 'true')">Enabled</a>
+                        <a href="#!" class="dropdown-item" onclick="toggle('cookies_enabled', 'false')">Disabled</a>
+                      </div>
+                    </div>
+                  </li>
+
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      DNS Service
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="dns_service" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config_orig['dns_service']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" title="local system DNS" href="#" onclick="toggle('dns_service', 'localhost')">localhost</a>
+                        <a class="dropdown-item" title="cloudflair DNS over HTTPS 1.1.1.1 " href="#" onclick="toggle('dns_service', '1.1.1.1')">CloudFlair</a>
+                      </div>
+                    </div>
+                  </li>
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      IP Header
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="ip_header" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config_orig['ip_header']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" title="Use remote IP address" href="#" onclick="toggle('ip_header', 'REMOTE_ADDR')">Remote IP</a>
+                        <a class="dropdown-item" title="Use depricated X-FORWARDED-FOR header " href="#" onclick="toggle('ip_header', 'X-FORWARDED-FOR')">X-Forwarded-For</a>
+                        <a class="dropdown-item" title="Use new FORWARDED header " href="#" onclick="toggle('ip_header', 'FORWARDED')">Forwarded</a>
+                      </div>
+                    </div>
+                  </li>
+
+
+
+
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Response Code
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="response_code" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config_orig['response_code']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 200)">200</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 204)">204</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 400)">400</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 401)">401</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 403)">403</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 404)">404</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 406)">406</a>
+                        <a class="dropdown-item" href="#" onclick="toggle('response_code', 500)">500</a>
+                      </div>
+                    </div>
+                  </li>
+                  
+                  <li class="nav-item ">
+                    <span href="#" class="nav-link chilabel" style="float: left;">
+                      Debug Header
+                    </span>
+
+                    <div class="dropdown">
+                      <a href="#" class="dropdown-ellipses dropdown-toggle" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button id="debug_header" type="button" <?php echo \BitFire\isdis(); ?> class="btn btn-sm feature btn-secondary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"> <?php echo $config['debug_header']; ?> </button>
+                      </a>
+                    
+                      <div class="dropdown-menu dropdown-menu-right">
+                        <a href="#!" class="dropdown-item" onclick="toggle('debug_header', 'true')">Enabled</a>
+                        <a href="#!" class="dropdown-item" onclick="toggle('debug_header', 'false')">Disabled</a>
+                      </div>
+                    </div>
+                  </li>
+
+                </ul>
+              </div>
+            </li>
+          </ul>
+          <br />
+          <br />
+          <br />
+          <!-- Push content down -->
+          <div class="mt-auto"></div>
+
+          
+          <!-- Customize -->
+          <!--
+          <div id="popoverDemo" data-toggle="popover" data-trigger="manual" title="Make Dashkit Your Own!" data-content="Switch the demo to Dark Mode or adjust the navigation layout, icons, and colors!">
+            <a href="#modalDemo" class="btn btn-block btn-success mb-4" data-toggle="modal">
+              <i class="fe fe-sliders mr-2"></i> Customize
+            </a>
+          </div>
+        -->
+        <button type="button" class="btn btn-primary" id="password_btn" data-toggle="modal" data-target="#password_set">
+         Set Dashboard Password 
+        </button>
+        
+
+         
+        </div> <!-- / .navbar-collapse -->
+
+      </div>
+    </nav>
+
+    
+       
+
+    <!-- MAIN CONTENT
+    ================================================== -->
+    <div class="main-content">
+      
+
+      <!-- HEADER -->
+      <div class="header">
+        <div class="container-fluid">
+
+          <!-- Body -->
+          <div class="header-body">
+            <div class="row align-items-end">
+              <div class="col">
+                <!-- Pretitle -->
+                <h6 class="header-pretitle">
+                  BitFire <?php echo ($is_free) ? "FREE" : "PRO" ?> : Release <?php echo \BitFire\BITFIRE_SYM_VER?>
+                </h6>
+                <p style="font-size:.75rem;color:#666;">
+                <?php if ($is_free) { ?>
+                  Upgrade to <span class="blue font-weight-bold">PRO</span> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
+                <?php } ?>
+
+                <!-- Title -->
+                <h1 class="header-title">
+                  BitFire Dashboard 
+                </h1>
+
+              </div>
+              <div class="col-auto">
+
+                <a href="<?php echo $opt_link?>" class="btn btn-primary lift" id="opt_link"><?php echo $opt_name;?></a>
+                <a href="#!" class="btn btn-secondary lift" id="upgrade_link">Upgrade</a>
+                <!-- Button -->
+                <a href="https://github.com/bitslip6/bitfire/issues" target="_blank" class="btn btn-success lift" id="dwn_link">Support</a>
+
+              </div>
+            </div> <!-- / .row -->
+          </div> <!-- / .header-body -->
+
+        </div>
+      </div> <!-- / .header -->
+
+      <!-- CARDS -->
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-12 col-lg-4">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>24 Hour Blocks By Type
+                <span class="text-secondary" id="block_total">(<?php echo $block_count_24; ?>)</span>
+                </h4>
+              </div>
+              <div class="card-body">
+
+
+                <div class="chart chart-appended">
+                  <canvas class="chart-canvas" id="classChart" data-toggle="legend" data-target="#classChartLegend"></canvas>
+                </div>
+                <!--
+                <div class="chart-legend" id="classChartLegend"></div>
+                -->
+
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-12 col-lg-4">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>24 Hour Blocks By Country
+                <span class="text-secondary" id="ip_total">()</span>
+                </h4>
+              </div>
+              <div class="card-body">
+
+                <div class="chart chart-appended">
+                  <canvas class="chart-canvas" id="classChart2" data-toggle="legend" data-target="#classChart2Legend"></canvas>
+                </div>
+                <!--
+                <div class="chart-legend" id="classChart2Legend"></div>
+                -->
+
+              </div>
+            </div>
+          </div>
+
+          
+          <div class="col-12 col-lg-4">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>Blocking By Hour
+                <span class="text-secondary" id="block_sum_total">()</span>
+                </h4>
+              </div>
+              <div class="card-body">
+                <div class="chart">
+                  <canvas class="chart-canvas" id="hrChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <div class="row">
+          <div class="col-12 col-lg-12">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>Alerts</h4>
+              </div>
+              <div class="card-body">
+
+       
+<table class="table table-sm" style="width:100%">
+  <thead class="details">
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Time</th>
+      <th scope="col">IP</th>
+      <th scope="col">URL / Agent</th>
+    </tr>
+  </thead>
+  <tbody style="font-size:10px;width:100%">
+    <?php if (isset($reporting[0])) { foreach ($reporting as $line) { if (!isset($line['time'])) { echo "<!-- "; print_r($line); echo " -->\n"; continue; } ?>
+    <?php //echo "<pre>"; print_r($line['request']); echo "</pre>\n"; ?>
+    <tr class="inforow" width="100%">
+      <td class="nowrap" scope="row">
+      <div class="avatar-group">
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/<?php echo $line['exception_img']?>" alt="exception" width="24" 
+          title="<?php echo $line['exception_title'];?>"
+          class="avatag-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['request']['path']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img type rounded-circle red" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+        </div>
+      </div>
+      </td>
+      <td class="nowrap"><?php $t=time(); echo date('M d, H:i:s', strtotime($line['tv']??$t));?></td>
+      <td class="nowrap" style="min-width:100px;"><?php echo "<strong>" . $line['request']['ip'] . '</strong>'?></td>
+      <td class="nowrap">
+        <div style="float:left"><?php echo "<strong>" . $line['request']['method'] . "&nbsp;&nbsp;&nbsp;" . $line['request']['scheme'] . "://" . $line['request']['host'] . $line['request']['path']?></strong></div>
+        <div style="float:right"><?php echo $line['request']['agent']?></div>
+      </td>
+    </tr>
+
+
+    <tr class="tbalt inforow">
+      <td class="nowrap"><?php $code = $line['block']['code']; $cl = intval($code/1000)*1000; echo $code . ':' . MESSAGE_CLASS[$cl]; ?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['block']['parameter'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars(substr($line['block']['value'], 0, 80))?></td>
+      <td class="nowrap">
+        <?php echo htmlspecialchars(substr($line['block']['pattern'], 0, 50))?>
+        <?php echo \BitFire\to_meta($line); ?></td>
+    </tr>
+    <!--tr>
+      <td colspan="8" class="tbalt nowrap">
+        <?php if ($line['browser']['valid'] >= 2) { ?>
+          <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg> 
+        <?php } else if ($line['browser']['whitelist']??false) { ?>
+          <svg class="blue" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+        <?php } else if ($line['browser']['valid']??-1 > -1){ ?>
+          <svg class="red" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M21,15v-2h-3.07c-0.05-0.39-0.12-0.77-0.22-1.14l2.58-1.49l-1-1.73L16.92,10c-0.28-0.48-0.62-0.91-0.99-1.29 C15.97,8.48,16,8.25,16,8c0-0.8-0.24-1.55-0.65-2.18L17,4.17l-1.41-1.41l-1.72,1.72c-1.68-0.89-3.1-0.33-3.73,0L8.41,2.76L7,4.17 l1.65,1.65C8.24,6.45,8,7.2,8,8c0,0.25,0.03,0.48,0.07,0.72C7.7,9.1,7.36,9.53,7.08,10L4.71,8.63l-1,1.73l2.58,1.49 c-0.1,0.37-0.17,0.75-0.22,1.14H3v2h3.07c0.05,0.39,0.12,0.77,0.22,1.14l-2.58,1.49l1,1.73L7.08,18c1.08,1.81,2.88,3,4.92,3 s3.84-1.19,4.92-3l2.37,1.37l1-1.73l-2.58-1.49c0.1-0.37,0.17-0.75,0.22-1.14H21z M13,17h-2v-6h2V17z"/></g></g></svg>
+        <?php } else { ?>
+          <svg class="yellow" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14zM12 6.72c-1.96 0-3.5 1.52-3.5 3.47h1.75c0-.93.82-1.75 1.75-1.75s1.75.82 1.75 1.75c0 1.75-2.63 1.57-2.63 4.45h1.76c0-1.96 2.62-2.19 2.62-4.45 0-1.96-1.54-3.47-3.5-3.47zm-.88 8.8h1.76v1.76h-1.76z"/></svg>
+        <?php } ?>
+        <span class="method"><?php
+        echo htmlspecialchars($line['request']['method']) . '</span>' . htmlspecialchars($line['request']['scheme'] . "://" . $line['request']['host'] . $line['request']['path'] .
+          '?' . urldecode(http_build_query($line['request']['get'])));
+        // if ($line['browser']['bot']) { echo "&nbsp;&nbsp;AGENT:&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 64)); }
+        echo "<div  class='right'>&nbsp;&nbsp;<b>AGENT:</b>&nbsp;" . htmlspecialchars(substr($line['request']['agent'], 0, 88)) . "</div>";
+      ?></td>
+    </tr-->
+    <?php } } ?>
+  </tbody>
+</table>
+              </div>
+            </div>
+          </div>
+      </div>
+      
+      <div class="row">
+           <div class="col-12 col-lg-12">
+            <div class="card card-fill">
+              <div class="card-header">
+                <h4>Blocks</h4>
+              </div>
+              <div class="card-body">
+
+<table class="table table-sm" style="width:100%">
+  <thead class="details">
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Time</th>
+      <th scope="col">IP</thtfi>
+      <th scope="col">URL / Agent</th>
+    </tr>
+  </thead>
+  <tbody style="font-size:10px;width:100%">
+
+    <?php if (isset($blocks[0])) { foreach ($blocks as $line) { ?>
+    <tr class="inforow" width="100%">
+      <td class="nowrap" scope="row">
+      <div class="avatar-group">
+        <div class="avatar avatar-xs">
+        <!--
+          <img src="https://www.bitfire.co/assets/fix.svg" alt="exception" width="24" 
+          title="add exception for <?php echo MESSAGE_CLASS[$line['classId']] . ' parameter: ' . $line['item']?>"
+          class="avatag-img rounded-circle grey_blue" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+        -->
+
+          <img src="https://www.bitfire.co/assets/<?php echo $line['exception_img']?>" alt="exception" width="24" 
+          title="<?php echo $line['exception_title'];?>"
+          class="avatag-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['item']?>" data-ex-code="<?php echo $line['eventid']?>" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle red" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" title="browser: <?php echo $line['browser']->browser??'?' . ' ver: ' . $line['browser']->ver??'?'; ?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+        </div>
+        <div class="avatar avatar-xs">
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" title="Origin Country: <?php echo $line['country'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+        </div>
+      </div>
+      </td>
+      <td class="nowrap"><?php $t=time(); echo date('M d, H:i:s', intval(\TF\trim_off($line['ts']??$t, '.')));?></td>
+      <td class="nowrap" style="min-width:100px;"><?php echo "<strong>" . $line['ip'] . '</strong>'?></td>
+      <td class="nowrap">
+        <div style="float:left"><?php echo "<strong>" . $line['verb'] . "&nbsp;&nbsp;&nbsp;" . $line['scheme'] . "://" . $line['url']?></strong></div>
+        <div style="float:right"><?php echo $line['ua']?></div>
+      </td>
+    </tr>
+
+
+    <tr class="tbalt inforow">
+      <td class="nowrap"><?php echo $line['eventid'] . ':' . MESSAGE_CLASS[$line['classId']]; ?></td>
+      <td class="wrap"><?php echo htmlspecialchars($line['params'])?></td>
+      <td class="wrap"><?php echo htmlspecialchars(substr($line['match'], 0, 80))?></td>
+      <td class="nowrap">
+        <?php echo htmlspecialchars(substr($line['name'], 0, 50))?>
+    </tr>
+  <?php } } ?>
+  </tbody>
+</table>
+ 
+
+              </div>
+            </div>
+          </div>
+
+      </div>
+
+     
+
+
+
+    </div><!-- / .main-content -->
+
+    <!-- JAVASCRIPT
+    ================================================== -->
+    <!-- Libs JS -->
+    <script src="https://www.bitfire.co/dash/bootstrap.bundle.min.js"></script>
+    <script src="https://www.bitfire.co/dash/chart.min.js"></script>
+    <!--
+    <script src="https://bitfire.co/dash/flatpicker.min.js"></script>
+    <script src="https://bitfire.co/dash/dropzone.min.js"></script>
+    <script src="https://bitfire.co/dash/autosize.min.js"></script>
+    <script src="https://bitfire.co/dash/highlight.pack.min.js"></script>
+    <script src="https://bitfire.co/dash/quill.min.js"></script>
+    -->
+    <script src="https://www.bitfire.co/dash/jquery.mask.min.js"></script>
+    <script src="https://www.bitfire.co/dash/list.min.js"></script>
+    <script src="https://www.bitfire.co/dash/select2.min.js"></script>
+    <script src="https://www.bitfire.co/dash/Chart.extension.js"></script>
+
+    <script>
+      
+      
+      function show_bars(chart_id, hr_set) {
+        let total = 0;
+        console.log("chart id", chart_id, hr_set);
+        for (var i=0;i<hr_set.data.length;i++) {
+          //console.log("show bars: ", i, hr_set.data[i]);
+          total += hr_set.data[i];
+        }
+        console.log("total: ", total);
+
+        GBI("block_sum_total").innerText = "(" + total + ")";
+        
+        //console.log(hr_set);
+        new Chart(chart_id, {
+    type: 'bar',
+    options: {
+      scales: {
+        yAxes: [{
+          ticks: {
+            callback: function(value) {
+              return value;
+            }
+          }
+        }]
+      }
+    },
+    data: {
+      labels: [...Array(24).keys()],
+      datasets: [{
+        label: 'Block per Hour',
+        data: hr_set.data,
+        backgroundColor: [
+          '#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289',
+          '#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289'
+        ]
+      }]
+    }
+  });
+      }
+
+
+      function save_pass() {
+        let p1 = GBI("pass1").value;
+        let p2 = GBI("pass2").value;
+        if (p1 != p2) { alert("password does not match"); return; }
+        if (p1.length < 8) { alert("password must be at least 8 characters"); return; }
+        console.log(p1);
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=set_pass&pass1='+encodeURIComponent(p1)+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+          .then(response => response.text())
+          .then(response => {
+            console.log(response);
+            if (response == "success") {
+              alert("password updated successfully");
+              $("#password_set").modal("hide");
+            }
+          });
+      }
+      
+      
+      function show_pie(id, data, label_fn) {
+        //console.log("show pie", id, data.counts);
+        //console.log(Chart.defaults.doughnut);
+        //console.log("data ", data);
+        
+        //data.counts.sort((a, b) => { console.log(a, b); return 1; });
+
+
+        let data_labels = [];
+        let data_per = [];
+        for (const [key, value] of Object.entries(data.data)) {
+          console.log(key, value);
+          data_labels.push(label_fn(key, value));
+          data_per.push(value);
+        }
+        console.log(data_labels);
+        console.log(data_per);
+        
+        var opts = {
+          type: 'doughnut',
+          options: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              boxWidth: 10,
+              padding: 5,
+              usePointStyle: true,
+              labels: {
+                fontSize: 9,
+                padding: 5,
+                boxWidth: 15
+              }
+            },
+            tooltips: {
+              callbacks: {
+                afterLabel: function() {
+                  return ''
+                }
+              }
+            },
+            weight: true,
+            cutoutPercentage: 80, 
+            defaultFontSize: 15,
+            defaultLineHeight: .6
+          },
+          data: {
+            labels: data_labels,
+            datasets: [{
+              data: data_per,
+              backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
+            }]
+          }
+        };
+       
+        console.log(opts);
+
+        new Chart(id, opts);
+       
+
+            }
+
+
+      var codex = {
+        0: "wrong domain",
+        10000: "XSS",
+        11000: "XXE",
+        12000: "RCE",
+        13000: "format",
+        14000: "SQLi",
+        15000: "LFI",
+        16000: "web shell",
+        17000: "dot dot",
+        18000: "spam",
+        20000: "wrong domain",
+        21000: "file upload",
+        22000: "general web",
+        23000: "wrong domain",
+        24000: "bot whitelist",
+        25000: "malicious agent",
+        26000: "request rate",
+        31000: "Unknown File",
+        32000: "Redirect",
+        70000: "malware"
+      };
+
+      function label_type(key, value) { return codex[key]; }
+      function label_value(key, value) { return key; }
+
+      //show_pie("classChart", {"percent": [50, 50], "counts": [100, 100]});
+
+fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
+  .then(response => response.json())
+  .then(response => {
+    console.log(response);
+    var behind = 0;
+    var latest_str = VERSION_STR;
+    var latest = VERSION;
+    for (const r in response) {
+      //console.log("version!", r);
+      if(response[r][0] > VERSION) { 
+        if (response[r][0] > latest) {
+          latest = response[r][0];
+          latest_str = r;
+          behind++;
+        }
+      }
+    }
+    window.LATEST = latest_str;
+    
+    if (behind == 0) {
+      GBI("upgrade_link").innerText = "Software Up To Date";
+      GBI("upgrade_link").setAttribute("disabled", "disabled");
+      GBI("upgrade_link").classList.remove("lift");
+    } else {
+      GBI("upgrade_link").innerText = "Upgrade to " + latest_str;
+      GBI("upgrade_link").classList.remove("btn-secondary");
+      GBI("upgrade_link").classList.add("btn-warning");
+      GBI("upgrade_link").addEventListener("click", upgrade);
+    }
+  });
+
+      const request = async () => {
+        //const response2 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_hr_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        //const response3 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_ip_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+        const response4 = await fetch('<?php echo $dashboard_path?>?BITFIRE_API=get_valid_data&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now());
+
+        //console.log("fetched");
+        
+        //const data2 = await response2.json();
+        const data2 = {"total":<?php echo count($hr_data)?>, "data":<?php echo json_encode($hr_data); ?>};
+        const data3 = {"total":<?php echo count($country_data)?>, "data":<?php echo json_encode($country_data); ?>};
+        const data5 = {"total":<?php echo count($type_data)?>, "data":<?php echo json_encode($type_data); ?>};
+        console.log("data5", data5);
+
+        //const data3 = await response3.json();
+        const data4 = await response4.json();
+
+
+        let sp = GBI("save_pass");
+        sp.addEventListener("click", save_pass);
+        update_challenge(data4);
+        
+        //console.log("data4", data4);
+
+        show_pie('classChart', data5, label_type);
+
+        show_pie('classChart2', data3, label_value);
+        GBI("ip_total").innerText = "(" + data3.total + ")";
+        show_bars('hrChart', data2);
+        
+        window.setTimeout(function() {
+          let scr = document.createElement('script');
+          scr.setAttribute('src','https://www.bitfire.co/dash/theme.min.js');
+          document.body.appendChild(scr);
+        }, 100);
+      }
+      request();
+
+      function upgrade() {
+        console.log("upgrade!");
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=upgrade&ver='+window.LATEST+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+          .then(response => response.text())
+          .then(response => {
+            alert(response);
+          });
+      }
+
+      function toggle_features() {
+        var elms = document.getElementsByClassName("feature");
+
+        for (let element of elms) {
+          if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
+            element.classList.remove("btn-success");
+            element.classList.remove("btn-secondary");
+            element.classList.add("btn-warning");
+          } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim == "on") {
+            element.classList.remove("btn-warning");
+            element.classList.remove("btn-secondary");
+            element.classList.add("btn-success");
+          } else {
+            element.classList.remove("btn-success");
+            element.classList.remove("btn-warning");
+            element.classList.add("btn-secondary");
+          }
+        }
+      }
+
+      toggle_features();
+
+      var elms = document.getElementsByClassName("country");
+      for (let element of elms) {
+        let t = element.innerText;
+        element.innerHTML = "["+t+"]" + cc_to_flag(t);
+      }
+
+      GBI("lock").addEventListener("click", function() {
+        <?php if ($is_free) {
+        echo "alert('Site Lock only available in PRO');\nreturn;"; } ?>
+        GBI("lock").innerText = "locking...";
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        .then(response => {
+          console.log(response); 
+          GBI("lock").innerText = "LOCK SITE";
+          GBI("unlock_div").classList.remove("hidden");
+          GBI("lock_div").classList.add("hidden");
+        });
+      });     
+
+      GBI("unlock").addEventListener("click", function() {
+        GBI("unlock").innerText = "unlocking...";
+        fetch('<?php echo $dashboard_path?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
+        .then(response => {
+          console.log(response); 
+          GBI("unlock").innerText = "UNLOCK SITE";
+          GBI("lock_div").classList.remove("hidden");
+          GBI("unlock_div").classList.add("hidden");
+        });
+      });  
+    </script>
+
+    <!-- Theme JS -->
+    <script src="https://www.bitfire.co/dash/dashkit.min.js"></script>
+
+
+    
+      <div class="modal fade" id="password_set" role="dialog" data-backdrop="static" data-keyboard="false" tabindex="-1">
+        <div class="modal-dialog" role="document" id="password_set2">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="pass_title">Set BitFire Password</h5>
+              <!--
+              <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+              -->
+            </div>
+            <div class="modal-body">
+              <p>BitFire password is required to access the dashboard.  If you forget the password, change the "password" configuration item in config.ini to "default" to relaunch this modal or set it to the SHA1 value of your password</p>
+              <label style="width:150px;">Password:</label>
+              <input id="pass1" type="password" name="pass1" /><br />
+              <label style="width:150px;">Repeat Password:</label>
+              <input id="pass2" type="password" name="pass1" />
+            </div>
+            <div class="modal-footer">
+              <button id="password_close" type="button" class="btn btn-secondary hidden" data-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary" id="save_pass">Save Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    <script>
+      GBI("password_btn").addEventListener("click", function() {
+        GBI('password_close').classList.remove("hidden");
+      });
+    <?php if ($password_reset) { echo "$('password_set').modal('show');\n"; } ?>
+    </script>
+
+  </body>
+</html>
