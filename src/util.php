@@ -253,7 +253,6 @@ function partial_right(callable $fn, ...$args) : callable {
  * NOT PURE!
  */
 function header_send(string $key, string $value) : void {
-    
     \TF\debug("header_send [$key] = [$value]");
     header("$key: $value");
 }
@@ -328,7 +327,9 @@ class Effect {
         if (CFG::enabled(CONFIG_COOKIES) && $this->cookie != '') {
             \TF\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), \TF\encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), $this->cookie), DAY); 
         }
-        do_for_all_key_value($this->headers, '\TF\header_send');
+        if (!headers_sent()) {
+            do_for_all_key_value($this->headers, '\TF\header_send');
+        }
         do_for_all_key_value($this->cache, function($nop, \TF\CacheItem $item) {
             CacheStorage::get_instance()->update_data($item->key, $item->fn, $item->init, $item->ttl);
         });
@@ -950,6 +951,7 @@ function remove_lines(FileData $file, int $num_lines) : FileData {
  */
 function cookie(string $name, string $value, int $exp) : void {
     if (!CFG::enabled("cookies_enabled")) { \TF\debug("wont set cookie, disabled"); return; }
+    if (headers_sent()) { \TF\debug("unable to set cookie, headers already sent"); return; }
     if (PHP_VERSION_ID < 70300) { 
         setcookie($name, $value, time() + $exp, '/; samesite=strict', '', false, true);
     } else {
