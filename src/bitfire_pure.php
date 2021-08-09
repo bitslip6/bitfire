@@ -168,11 +168,11 @@ function freq_map(array $inputs) : array {
     return $r;
 }
 
-function process_request2(array $get, array $post, array $server, array $cookie = array()) : Request {
+function process_request2(array $get, array $post, array $server, array $cookies = array()) : Request {
     $request = process_server2($server);
     $request->get = \TF\map_mapvalue($get, '\\BitFire\\each_input_param');
     $request->post = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
-    $request->cookies = \TF\map_mapvalue($cookie, '\\BitFire\\each_input_param', false);
+    $request->cookies = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
     $request->get_freq = freq_map($request->get);
     $request->post_freq = freq_map($request->post);
     $request->post_raw = ($server['REQUEST_METHOD']??'GET' == "POST") ? file_get_contents("php://input") : "";
