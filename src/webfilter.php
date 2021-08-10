@@ -199,7 +199,6 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
  * this could be way more functional, but it would be slower, choices...
  */
 function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBlock {
-
     // block union select - super basic
     $find = function(string $search) use ($value) : callable {
         return function(int $offset) use ($value, $search) : int {
@@ -207,8 +206,8 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
         };
     };
 
-    $maybe_found = \TF\MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
-    if ($maybe_found->value('int') > 1) {
+    $maybe_found = \TF\MaybeA::of($value)->then($find("union"))->then($find("select"))->then($find("from"));
+    if ($maybe_found->value('int') > 10) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
 
