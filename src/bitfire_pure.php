@@ -192,7 +192,7 @@ function each_input_param($in, bool $block_profanity = true) : ?string {
     if ($block_profanity && Config::enabled("block_profanity")) {
         $value = \BitFire\replace_profanity($value);
     }
-    return (Config::enabled('decode_html')) ? html_entity_decode($value) : strval($value);
+    return html_entity_decode($value);
 }
 
 
@@ -311,9 +311,7 @@ function filter_bulky_headers(array $headers) : array {
  * side effect of logging blocks
  */
 function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : void {
-    //@file_put_contents("/tmp/log.txt", "POST REQUEST: " .var_export($block, true). "\n" . var_export($ip_data, true) ."\n\n", FILE_APPEND);
     $response_code = http_response_code();
-    if ($block === null && $response_code <= 302) { return; } 
 
     // add browser data if available
     $bot = $whitelist = false;
@@ -324,9 +322,12 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $valid = $bot_filter->browser->valid??'';
         $whitelist = $bot_filter->browser->whitelist ?? false;
     }
+    if ($block === null) {
+        if (!$bot && $response_code <= 302) { return; } 
+        if ($bot && $whitelist) { return; }
+    }
 
-    //if ($block === null && !$whitelist) { $block = new Block(31000, "n/a", "unknown bot, ALLOWED", $request->agent, 0); }
-    if ($block === null) { $block = new Block(31002, "return code, ALLOWED", strval($response_code), $request->agent, 0); }
+    if ($block === null) { $block = BitFire::new_block(31002, "return code, NOTICE", strval($response_code), $request->agent, 0); }
 
 
     $class = code_class($block->code);
@@ -341,11 +342,8 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $data["rhead"] = \getallheaders();
     }
     
-    // cache the last 25 blocks in memory if block file is disabled
     $cache = \TF\CacheStorage::get_instance();
-    if (Config::disabled(CONFIG_BLOCK_FILE)) {
-        $cache->rotate_data("log_data", $data, 15);
-    }
+    
     $ip = ip2long($request->ip);
     $cache->update_data("metrics-".\TF\utc_date('G'), function ($metrics) use ($class, $ip) {
         $metrics[$class] = ($metrics[$class]??0) + 1;
@@ -353,17 +351,24 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $metrics[$ip] = ($metrics[$ip]??0) + 1;
         return $metrics;
     }, function() { return \BitFire\BITFIRE_METRICS_INIT; } , \TF\DAY);
-
+    /* 
+    // cache the last 25 blocks in memory if block file is disabled
+    if (Config::disabled(CONFIG_BLOCK_FILE)) { $cache->rotate_data("log_data", $data, 15); }
+    */
 
     $content = json_encode($data)."\n";
-    if (Config::enabled('report_file') && ($data["pass"] === true)) {
-        $file = Config::file('report_file');
-        file_put_contents($file, $content, FILE_APPEND);
-    }  else if (Config::enabled(CONFIG_BLOCK_FILE)) {
-        file_put_contents(Config::file(CONFIG_BLOCK_FILE), $content, FILE_APPEND);
+    \TF\bit_http_request("POST", "https://www.bitfire.co/blocks.php", $content, array("Content-Type" => "application/json"));
+
+    if ($block != NULL && $block->code != 31002) {
+        unset($data['headers']);
+        unset($data['rhead']);
+        if (Config::enabled('report_file') && ($data["pass"] === true)) {
+            $file = Config::file('report_file');
+            file_put_contents($file, $content, FILE_APPEND);
+        }  else if (Config::enabled(CONFIG_BLOCK_FILE)) {
+            file_put_contents(Config::file(CONFIG_BLOCK_FILE), $content, FILE_APPEND);
+        }
     }
-    \TF\bit_http_request("POST", "https://www.bitfire.co/blocks.php",
-    $content, array("Content-Type" => "application/json"));
 }
 
 /**
