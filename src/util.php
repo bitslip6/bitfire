@@ -24,7 +24,7 @@ const MINUTE=60;
 class FileData {
     public $filename;
     public $num_lines;
-    public $lines;
+    public $lines = array();
     public $exists = false;
 
     public static function new(string $filename) {
@@ -39,6 +39,7 @@ class FileData {
         if ($this->exists) {
             $this->lines = file($this->filename);
             $this->num_lines = count($this->lines);
+            if ($this->num_lines < 1) { $this->lines = array(); }
         }
         return $this;
     }
@@ -57,6 +58,10 @@ class FileData {
             $this->filename = $tmp->filename;
             $this->exists = $tmp->exists;
         }
+        return $this;
+    }
+    public function filter(callable $fn) : FileData {
+        $this->lines = array_filter($this->lines, $fn);
         return $this;
     }
     public function map(callable $fn) : FileData {
@@ -98,9 +103,9 @@ function find_regex_reduced($value) : callable { return function($initial, $argu
 function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
 function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
-function un_json(string $data) : array { $j = json_decode($data, true, 6); return (!$j) ? array() : $j; }
+function un_json(string $data) : array { $j = json_decode($data, true, 6); return (empty($j)) ? array() : $j; }
 function en_json($data) : string { $j = json_encode($data); return ($j == false) ? "" : $j; }
-function un_json_array(array $data) { return \TF\un_json('['. join(",", $data) . ']'); }
+function un_json_array(array $data) { $data = array_map(partial_right("trim", ","), $data); return \TF\un_json('['. join(",", $data) . ']'); }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
@@ -1103,7 +1108,7 @@ function utc_time() : int {
 }
 
 function utc_microtime() : float {
-    return microtime(true) + date('z');
+    return time();
 }
 
 function array_shuffle(array $in) : array {
