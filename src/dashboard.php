@@ -276,7 +276,7 @@ function serve_dashboard(string $dashboard_path)
 
 
     for($i=0,$m=count($reporting); $i<$m; $i++) {
-        //$cl = intval($reporting[$i]['block']['code']/1000)*1000;
+        if (!isset($reporting[$i]['block'])) { continue; }
         $cl = \BitFire\code_class($reporting[$i]['block']['code']);
         $test_exception = new \BitFire\Exception($reporting[$i]['block']['code'], 'x', NULL, $reporting[$i]['request']['path']);
 
