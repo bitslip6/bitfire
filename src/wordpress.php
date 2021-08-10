@@ -29,7 +29,7 @@ class Parts {
     }
 }
 
-// concatinate all data with a concat glue
+// concatenate all data with a concat glue
 function concat_fn(string $bind_char) : callable {
     return function(...$concat) use ($bind_char) : string {
         $result = "";
