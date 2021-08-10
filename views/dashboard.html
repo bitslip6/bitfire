@@ -19,9 +19,6 @@
     <!-- Theme CSS -->
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
     <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.bundle.css" id="stylesheetLight">
-    <!--
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
-    -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
 
     <style>
@@ -800,6 +797,10 @@
             <div class="card card-fill">
               <div class="card-header">
                 <h4>Alerts</h4>
+                <span>Page: </span>
+                <?php for ($i=0; $i<$max_pages1; $i++) { 
+                echo "<a style='margin: 0 10px;' class='btn btn-secondary lift' href='{$self}?BITFIRE_API=DASHBOARD&page={$i}'> $i </a>\n";
+                } ?>
               </div>
               <div class="card-body">
 
@@ -822,16 +823,16 @@
         <div class="avatar avatar-xs">
           <img src="https://www.bitfire.co/assets/<?php echo $line['exception_img']?>" alt="exception" width="24" 
           title="<?php echo $line['exception_title'];?>"
-          class="avatag-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['request']['path']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+          class="avatar-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['request']['path']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img type rounded-circle red" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatar-img type rounded-circle red" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" alt="agent" width="24" class="avatar-img rounded-circle" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" alt="country" width="24" class="avatar-img rounded-circle" />
         </div>
       </div>
       </td>
@@ -850,15 +851,14 @@
       <td class="wrap"><?php echo htmlspecialchars(substr($line['block']['value'], 0, 80))?></td>
       <td class="nowrap">
         <?php echo htmlspecialchars(substr($line['block']['pattern'], 0, 50))?>
-        <?php echo \BitFire\to_meta($line); ?></td>
     </tr>
     <!--tr>
       <td colspan="8" class="tbalt nowrap">
-        <?php if ($line['browser']['valid'] >= 2) { ?>
+        <?php if ($line['browser']->valid >= 2) { ?>
           <svg class="green" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><path d="M23,12l-2.44-2.79l0.34-3.69l-3.61-0.82L15.4,1.5L12,2.96L8.6,1.5L6.71,4.69L3.1,5.5L3.44,9.2L1,12l2.44,2.79l-0.34,3.7 l3.61,0.82L8.6,22.5l3.4-1.47l3.4,1.46l1.89-3.19l3.61-0.82l-0.34-3.69L23,12z M10.09,16.72l-3.8-3.81l1.48-1.48l2.32,2.33 l5.85-5.87l1.48,1.48L10.09,16.72z"/></g></svg> 
-        <?php } else if ($line['browser']['whitelist']??false) { ?>
+        <?php } else if ($line['browser']->whitelist) { ?>
           <svg class="blue" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
-        <?php } else if ($line['browser']['valid']??-1 > -1){ ?>
+        <?php } else if ($line['browser']->valid > -1){ ?>
           <svg class="red" enable-background="new 0 0 24 24" height="16" viewBox="0 0 24 24" width="16"><g><rect fill="none" height="24" width="24"/></g><g><g><path d="M21,15v-2h-3.07c-0.05-0.39-0.12-0.77-0.22-1.14l2.58-1.49l-1-1.73L16.92,10c-0.28-0.48-0.62-0.91-0.99-1.29 C15.97,8.48,16,8.25,16,8c0-0.8-0.24-1.55-0.65-2.18L17,4.17l-1.41-1.41l-1.72,1.72c-1.68-0.89-3.1-0.33-3.73,0L8.41,2.76L7,4.17 l1.65,1.65C8.24,6.45,8,7.2,8,8c0,0.25,0.03,0.48,0.07,0.72C7.7,9.1,7.36,9.53,7.08,10L4.71,8.63l-1,1.73l2.58,1.49 c-0.1,0.37-0.17,0.75-0.22,1.14H3v2h3.07c0.05,0.39,0.12,0.77,0.22,1.14l-2.58,1.49l1,1.73L7.08,18c1.08,1.81,2.88,3,4.92,3 s3.84-1.19,4.92-3l2.37,1.37l1-1.73l-2.58-1.49c0.1-0.37,0.17-0.75,0.22-1.14H21z M13,17h-2v-6h2V17z"/></g></g></svg>
         <?php } else { ?>
           <svg class="yellow" height="16" viewBox="0 0 24 24" width="16"><path d="M0 0h24v24H0z" fill="none"/><path d="M17 1H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 18H7V5h10v14zM12 6.72c-1.96 0-3.5 1.52-3.5 3.47h1.75c0-.93.82-1.75 1.75-1.75s1.75.82 1.75 1.75c0 1.75-2.63 1.57-2.63 4.45h1.76c0-1.96 2.62-2.19 2.62-4.45 0-1.96-1.54-3.47-3.5-3.47zm-.88 8.8h1.76v1.76h-1.76z"/></svg>
@@ -883,6 +883,11 @@
             <div class="card card-fill">
               <div class="card-header">
                 <h4>Blocks</h4>
+                <span>Page: </span>
+                <?php for ($i=0; $i<$max_pages2; $i++) { 
+                echo "<a style='margin: 0 10px;' class='btn btn-secondary lift' href='{$self}?BITFIRE_API=DASHBOARD&page={$i}'> $i </a>\n";
+                } ?>
+
               </div>
               <div class="card-body">
 
@@ -905,21 +910,21 @@
         <!--
           <img src="https://www.bitfire.co/assets/fix.svg" alt="exception" width="24" 
           title="add exception for <?php echo MESSAGE_CLASS[$line['classId']] . ' parameter: ' . $line['item']?>"
-          class="avatag-img rounded-circle grey_blue" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
+          class="avatar-img rounded-circle grey_blue" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['block']['parameter']?>" data-ex-code="<?php echo $line['block']['code']?>" />
         -->
 
           <img src="https://www.bitfire.co/assets/<?php echo $line['exception_img']?>" alt="exception" width="24" 
           title="<?php echo $line['exception_title'];?>"
-          class="avatag-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['item']?>" data-ex-code="<?php echo $line['eventid']?>" />
+          class="avatar-img rounded-circle <?php echo $line['exception_class']?>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-url="<?php echo $line['url']?>" data-ex-param="<?php echo $line['item']?>" data-ex-code="<?php echo $line['eventid']?>" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatag-img rounded-circle red" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['type_img'];?>" alt="type" width="24" class="avatar-img rounded-circle red" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" title="browser: <?php echo $line['browser']->browser??'?' . ' ver: ' . $line['browser']->ver??'?'; ?>" alt="agent" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/<?php echo $line['agent_img'];?>" title="browser: <?php echo $line['browser']->browser??'?' . ' ver: ' . $line['browser']->ver??'?'; ?>" alt="agent" width="24" class="avatar-img rounded-circle" />
         </div>
         <div class="avatar avatar-xs">
-          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" title="Origin Country: <?php echo $line['country'];?>" alt="country" width="24" class="avatag-img rounded-circle" />
+          <img src="https://www.bitfire.co/assets/flags/<?php echo $line['country_img'];?>" title="Origin Country: <?php echo $line['country'];?>" alt="country" width="24" class="avatar-img rounded-circle" />
         </div>
       </div>
       </td>
