@@ -82,7 +82,7 @@ class DB {
         // replace {} with named values from $data, or $this->_x
         $new_sql = preg_replace_callback("/{\w+}/", function ($x) use ($data) {
             $param = str_replace(array('{', '}'), '', $x[0]);
-            $result = "'{$data[$param]}'";
+            $result = quote($data[$param]);
             return $result;
         }, $sql);
 
