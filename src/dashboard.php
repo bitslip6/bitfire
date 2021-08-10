@@ -255,24 +255,45 @@ function serve_dashboard(string $dashboard_path)
 
     $report_file = \TF\FileData::new(CFG::file(CONFIG_REPORT_FILE))
         ->read()
-        ->apply(\TF\partial_right('\TF\remove_lines', 400))
-        ->apply_ln(\TF\partial_right('array_slice', $page * PAGE_SZ, PAGE_SZ, false))
+        ->apply(\TF\partial_right('\TF\remove_lines', 400));
+    $report_count = $report_file->num_lines;
+        // ->filter(function ($x) { echo "[$x]\n"; return strlen($x) > 10; })
+        $report_file->apply_ln(\TF\partial_right('array_slice', $page * PAGE_SZ, PAGE_SZ, false))
         ->map('\TF\un_json')
         ->map(country_enricher(\TF\un_json(file_get_contents(WAF_DIR . "cache/country.json"))));
-    $report_count = $report_file->num_lines;
+    $reporting = $report_file->lines;
+
+    $max_pages1 = $report_count / PAGE_SZ;
 
 
 
 
     //$report_count = count(file(Config::file(CONFIG_REPORT_FILE)));
-    $tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500)));
-    $reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
+    //$tmp = add_country(\TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500)));
+//$t2 = \TF\un_json_array(\TF\read_last_lines(Config::file(CONFIG_REPORT_FILE), 20, 2500));
+    //$reporting = (isset($tmp[0])) ? array_reverse($tmp, true) : array();
 
-    /*
+
+
     for($i=0,$m=count($reporting); $i<$m; $i++) {
         //$cl = intval($reporting[$i]['block']['code']/1000)*1000;
         $cl = \BitFire\code_class($reporting[$i]['block']['code']);
         $test_exception = new \BitFire\Exception($reporting[$i]['block']['code'], 'x', NULL, $reporting[$i]['request']['path']);
+
+        $reporting[$i]['type_img'] = CODE_CLASS[$cl];
+        $browser = \BitFireBot\parse_agent($reporting[$i]['request']['agent']);
+        if (!$browser->bot && !$browser->browser) {
+            $browser->browser = "chrome";
+        }
+        $reporting[$i]['browser'] = $browser;
+        $reporting[$i]['agent_img'] = ($browser->bot) ? 'robot.svg' : ($browser->browser . ".png");
+        $reporting[$i]['country_img'] = strtolower($reporting[$i]['country']) . ".svg";
+        if ($reporting[$i]['country_img'] == "-.svg") {
+            $reporting[$i]['country_img'] = "us.svg";
+        }
+
+
+
 
         // filter out the "would be" exception for this alert, and compare if we removed the exception
         $filtered_list = array_filter($exceptions, \TF\compose("\TF\\not", \TF\partial_right("\BitFire\match_exception", $test_exception)));
@@ -283,15 +304,7 @@ function serve_dashboard(string $dashboard_path)
         "exception already added for this block" :
         "add exception for " . MESSAGE_CLASS[$cl] . ' url: ' . $reporting[$i]['request']['path'];
 
-        $reporting[$i]['type_img'] = CODE_CLASS[$cl];
-        $reporting[$i]['agent_img'] = $reporting[$i]['browser']['browser']??'chrome' . ".png";
-        $reporting[$i]['country_img'] = strtolower($reporting[$i]['country']);
-        $reporting[$i]['country_img'] .= ".svg";
-        if ($reporting[$i]['country_img'] == "-.svg") {
-            $reporting[$i]['country_img'] = "us.svg";
-        }
     }
-	 */
 
     $locked = is_locked();
     $lock_action = ($locked) ? "unlock" : "lock";
@@ -305,6 +318,7 @@ function serve_dashboard(string $dashboard_path)
     $all_blocks = array_filter($all_blocks, function ($x) {
         return !empty($x) && isset($x['ts']) && isset($x['eventid']);
     });
+    $max_pages2 = $block_count / PAGE_SZ;
 
 
     $check_day = time() - \TF\DAY; // - \TF\DAY;

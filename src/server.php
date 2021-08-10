@@ -68,7 +68,7 @@ function update_config(string $ini_src) {
             \TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
         }
         $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
-        $info["domain"] = $domain;
+        $info["domain"] = join(".", array_slice(explode(".", $domain), -2));
         \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
         \TF\file_replace($ini_src, "configured = false", "configured = true");
 
@@ -79,6 +79,7 @@ function update_config(string $ini_src) {
             \TF\file_replace($robot_file, $robot_content, "");
             file_put_contents($robot_file, $robot_content, FILE_APPEND);
         }
+        \BitFire\update_raw(WAF_DIR."cache/keys2.raw", WAF_DIR."cache/values2.raw");
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
     } else if (mt_rand(1,30) == 2) {
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
