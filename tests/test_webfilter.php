@@ -101,12 +101,14 @@ function test_xss_list5() : void {
 function test_sql_list1(string $data) : void {
     if (strlen(trim($data)) < 2) { return; }
 
+    $data = "and (select substring(@@version,3,1))='X'";
     $req = setup($data);
     $filter = new WebFilter();
     Config::set_value(CONFIG_WEB_FILTER_ENABLED, false);
     Config::set_value(CONFIG_SPAM_FILTER, false);
     Config::set_value(CONFIG_SQL_FILTER, true);
     $maybe_error = $filter->inspect($req);
+    // TODO: TEST UNION/*1*/SELECT/*2*/2/*3*/FROM x
     assert_false($maybe_error->empty(), "failed to find sql [$data]");
 }
 
@@ -134,14 +136,25 @@ function run_xss_pass(string $data) : void {
     assert_true($maybe_error->empty(), "false positive xss [$static]");
 }
 
-function run_xss_block(string $data) : void {
-    $static = "<script>alert(1)</script>";
+function test_sql_pass() : void {
+    $static = "marriage is a union of two people. when i select a thing from the bin it stops. when i select another thing from someplace else it is fine";
     $req = setup($static);
+    $filter = new WebFilter();
+    Config::set_value(CONFIG_WEB_FILTER_ENABLED, true);
+    Config::set_value(CONFIG_SPAM_FILTER, false);
+    Config::set_value(CONFIG_SQL_FILTER, true);
+    $maybe_error = $filter->inspect($req);
+    assert_true($maybe_error->empty(), "false positive sqli [$static]");
+}
+
+
+function run_xss_block(string $data) : void {
+    $req = setup($data);
     //$filter = $GLOBALS['f'];
     $filter = new WebFilter();
     Config::set_value(CONFIG_WEB_FILTER_ENABLED, true);
     Config::set_value(CONFIG_SPAM_FILTER, false);
     Config::set_value(CONFIG_SQL_FILTER, false);
     $maybe_error = $filter->inspect($req);
-    assert_false($maybe_error->empty(), "false negative xss [$static]");
+    assert_false($maybe_error->empty(), "false negative xss [$data]");
 }
