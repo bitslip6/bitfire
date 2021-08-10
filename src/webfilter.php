@@ -20,8 +20,8 @@ const FAIL_SQL_SELECT=14001;
 const FAIL_SQL_UNION=14002;
 const FAIL_SQL_FOUND=14004;
 const FAIL_SQL_OR=14005;
+const FAIL_SQL_BENCHMARK=14007;
 const FAIL_SQL_ORDER=14006;
-const FAIL_SQL_COMMENT=14007;
 
 
 
@@ -48,7 +48,8 @@ class WebFilter {
 
     public function __construct() {
     }
-
+    
+    
     public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
         $block = \TF\MaybeBlock::$FALSE;
         if ((count($request->get) + count($request->post)) == 0) {
@@ -62,11 +63,8 @@ class WebFilter {
             // update keys and values
             $keyfile = WAF_DIR."cache/keys2.raw";
             $valuefile = WAF_DIR."cache/values2.raw";
-            if (!file_exists($keyfile) || filemtime($keyfile) < time()-\TF\DAY) {
-                $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 0, "md5"=>md5(CFG::str("encryption_key")))));
-                $data->then(\TF\partial('\file_put_contents', $keyfile));
-                $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 1, "md5"=>md5(CFG::str("encryption_key")))));
-                $data->then(\TF\partial('\file_put_contents', $valuefile));
+            if (!file_exists($keyfile) || filemtime($keyfile) < time()-\TF\DAY || filemtime($keyfile) < filemtime(WAF_DIR."config.ini")) {
+                update_raw($keyfile, $valuefile);
             }
 
             // the parameter reducer
@@ -182,6 +180,15 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
     if (preg_match('/select\s+(all|distinct|distinctrow|high_priority|straight_join|sql_small_result|sql_big_result|sql_buffer_result|sql_no_cache|sql_calc_found_rows)*\s*[^\s]+\s+(into|from)/sm', $value)) {
         return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
+    if (preg_match('/benchmark\s*\([^,]+\,[^\)]+\)/sm', $value) || preg_match('/waitfor\s+delay\s+[\'"]/sm', $value) || preg_match('/sleep\s*\(\d+\)/sm', $value)) {
+        return BitFire::get_instance()->new_block(FAIL_SQL_BENCHMARK, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    }
+    if (preg_match('/union[\sal]+select\s+([\'\"0-9]|null|user|subs)/sm', $value)) {
+        return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
+    }
+    if (preg_match('/\s+select\s+substr(ing)?\s+/', $value)) {
+        return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    }
 
     return \TF\Maybe::$FALSE;
 }
@@ -201,12 +208,12 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
     };
 
     $maybe_found = \TF\MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
-
-    if ($maybe_found->value('int') > 10) {
+    if ($maybe_found->value('int') > 1) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
 
-    if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
+    //if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
+    if (preg_match('/(select\s+[\@\*])/sm', $value, $matches)) {
         return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
 
@@ -214,6 +221,10 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
     $total_control = sum_sql_control_chars($counts);
 
     $stripped_comments = strip_comments($value);
+
+    if (preg_match('/(select\s+[\@\*])/sm', $stripped_comments->value, $matches) || preg_match('/(select[^a-zA-Z0-9]+(from|if))/sm', $stripped_comments->value, $matches)) {
+        return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    }
         
     $block = \TF\Maybe::$FALSE;
     // look for the short injection types
@@ -231,6 +242,7 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
  */
 function check_removed_sql(StringResult $stripped_comments, int $total_control, string $name, string $value) : \TF\MaybeBlock {
  
+
     $sql_removed = str_replace(SQL_WORDS, "", $stripped_comments->value);
     $sql_removed_len = strlen($sql_removed);
 
@@ -344,5 +356,12 @@ function static_match(int $key, string $needle, string $value, string $name) : \
  */
 function sum_sql_control_chars(array $counts) : int {
     return array_sum(array_intersect_key($counts, SQL_CONTROL_CHARS));
+}
+
+function update_raw(string $keyfile, string $valuefile) : void {
+    $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 0, "md5"=>md5(CFG::str("encryption_key")))));
+    $data->then(\TF\partial('\file_put_contents', $keyfile));
+    $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 1, "md5"=>md5(CFG::str("encryption_key")))));
+    $data->then(\TF\partial('\file_put_contents', $valuefile));
 }
 
