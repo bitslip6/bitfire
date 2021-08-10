@@ -829,7 +829,6 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
     if ($method === "POST") {
         $params['http']['content'] = $content;
         $optional_headers['Content-Length'] = strlen($content);
-	    \TF\debug("header len  - " . strlen($content));
     } else { $url .= "?" . $content; }
     $url = trim($url, "?&");
 
@@ -845,8 +844,6 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
 
     $ctx = stream_context_create($params);
 
-    debug("http_req [$method] [$url] len [" . strlen($content) . "]");
-    debug("http_header [%s]", $params['http']['header']);
     $response = @file_get_contents($url, false, $ctx);
     if ($response === false) {
         debug("http_resp fail");
