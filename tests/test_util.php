@@ -15,7 +15,11 @@ function somefunc($a1, $a2, $a3, $a4 = "foobar") {
 
 function test_wp() : void {
     require_once WAF_DIR . "src/wordpress.php";
-    $creds = \BitFireWP\wp_parse_credentials("/home/wp-hashes/fullwp/develop.svn.wordpress.org/trunk");
+    $creds = \BitFireWP\wp_parse_credentials("/var/www/wordpress");
+    assert_gt(strlen($creds->password), 4, "unable to parse wp-config");
+    assert_gt(strlen($creds->host), 4, "unable to parse wp-config");
+    assert_gt(strlen($creds->prefix), 1, "unable to parse wp-config");
+    assert_gt(strlen($creds->username), 3, "unable to parse wp-config");
 } 
 
 
