@@ -333,18 +333,23 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
  */
 function cuckoo_open_mem(int $size_in_bytes, string $key) {
     $token = ftok(__FILE__, $key);
+    $GLOBALS['bf_err_skip'] = true;
     $id = @shmop_open($token, 'c', 0660, $size_in_bytes);
 
-    // unable to attach created memory segment, recreate it...
+    // unable to attach/created memory segment, recreate it...
     if ($id === false) {
+        $e = error_get_last();
+        if (!empty($e) && stripos("ermission denied", $e['message']) !== false) { $token = ftok(__FILE__, "z"); }
         // connect failed, we probably have an old mem segment that is not large enough
         $id = @shmop_open($token, 'w', 0, 0);
-        if ($id) { shmop_delete($id); }
+        if ($id) { @shmop_delete($id); }
+        $GLOBALS['bf_err_skip'] = false;
         $id = @shmop_open($token, 'c', 0660, $size_in_bytes);
         if ($id === false) {
-            debug("shmop: unable to allocate $size_in_bytes shared memory\n");
+            debug("shmop: unable to allocate $size_in_bytes shared memory token:[".dechex($token)."] size:[$size_in_bytes]\n");
         }
     }
+    $GLOBALS['bf_err_skip'] = false;
     return $id;
 }
 

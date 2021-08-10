@@ -1,6 +1,8 @@
 <?php
 namespace BitFire;
 
+if (defined("WAF_DIR")) { header("bitfire-x: inc 2x"); return; }
+
 if (PHP_VERSION_ID < 70000) {
     header("x-bitfire: requires php 7.0");
     return;
@@ -12,18 +14,38 @@ if (!function_exists('\BitFire\at')) {
 		return $default;
 	}
 }
-else if (defined("WAF_DIR")) { header("bitfire-x: inc 2x"); return; }
-
 
 //tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU);
 
 // system root paths and timing
 $GLOBALS['start_time'] = \microtime(true);
+$GLOBALS['bf_err_skip'] = false;
 const DS = DIRECTORY_SEPARATOR;
 define("WAF_DIR", realpath(__DIR__) . DS); 
 define("BLOCK_DIR", WAF_DIR . DS . "blocks");
 
 include WAF_DIR."src/bitfire.php";
+
+function onerr($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
+    if ($GLOBALS['bf_err_skip']) { return true; }
+    $data = array("errno" => $errno, "errstr" => $errstr, "errfile" => $errfile, "errline" => $errline);
+    $known = \TF\un_json(file_get_contents(WAF_DIR."cache/errors.json"));
+    $have_err = false;
+    foreach ($known as $err) {
+        if ($err['errno'] == $data['errno'] && 
+            ($err['errline'] == $data['errline']) &&
+                $err['errfile'] == $data['errfile']) { $have_err = true; }
+    } 
+    if (!$have_err) { $known[] = $data; file_put_contents(WAF_DIR."cache/errors.json", \TF\en_json($known)); }
+
+    $data['info'] = $_SERVER;
+    \TF\bit_http_request("POST", "https://bitfire.co/err.php", base64_encode(json_encode($data)));
+    return false;
+}
+
+$error_handler = set_error_handler("\BitFire\onerr");
+
+
 try {
     \TF\parse_ini(WAF_DIR."config.ini");
     \TF\debug("begin " . BITFIRE_SYM_VER);
@@ -60,12 +82,16 @@ try {
     \TF\debug("end");
 }
 catch (\Exception $e) {
+    \BitFire\onerr($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
 }
 
 $m1 = microtime(true);
 \TF\debug("time: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT");
-//echo "<!-- time: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT -->";
-
 //$data = array_filter(\tideways_disable(), function($elm) { return ($elm['ct'] > 2 || $elm['wt'] > 9 || $elm['cpu'] > 9); }); 
 //uasort($data, '\TF\prof_sort');
 //file_put_contents("/tmp/prof.pass.json", json_encode($data, JSON_PRETTY_PRINT));
+
+
+restore_error_handler();
+
+trigger_error("foo message", E_USER_NOTICE);
