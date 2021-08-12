@@ -9,10 +9,10 @@ const STATUS_FAIL = -2;
 const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 31000 => 'whitelist_enable', 50000 => 'web_block');
 const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg', 16000 => 'php.svg', 17000 => 'fire.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg', 26000 => 'speed.svg', 31000 => 'badbot.svg', 50000 => 'rule.svg');
 
-const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\repair', '\\BitFire\\diff', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\repair_files', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code', '\\BitFire\\download');
+const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\repair_files', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code', '\\BitFire\\download');
 const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 171;
-const BITFIRE_SYM_VER = "1.7.1";
+const BITFIRE_VER = 172;
+const BITFIRE_SYM_VER = "1.7.2";
 const BITFIRE_DOMAIN = "http://api.bitfire.com";
 const BITFIRE_INTERNAL_PARAM = '_bitfire_p';
 const BITFIRE_COMMAND = "BITFIRE_API";
