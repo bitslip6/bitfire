@@ -79,6 +79,7 @@ function update_config(string $ini_src) {
             \TF\file_replace($robot_file, $robot_content, "");
             file_put_contents($robot_file, $robot_content, FILE_APPEND);
         }
+        require_once WAF_DIR."src/bitfire.php";
         \BitFire\update_raw(WAF_DIR."cache/keys2.raw", WAF_DIR."cache/values2.raw");
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
     } else if (mt_rand(1,30) == 2) {
@@ -192,6 +193,7 @@ function get_wordpress_hashes(string $root_dir) : array {
     $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : ?array {
 
         if (strpos($file, 'wp-content/upgrade') !== false) { return NULL; }
+        if (strpos($file, '/bitfire/') !== false) { return NULL; }
         $path = str_replace($root_dir, "/$version/src", $file);
         $nospace_data = join('', array_map('trim', file($file)));
         // is plugin
@@ -414,5 +416,12 @@ function process_batch(array $lines) {
     }, array());
 
     return $exceptions;
+}
+
+function update_raw(string $keyfile, string $valuefile) : void {
+    $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 0, "md5"=>md5(CFG::str("encryption_key")))));
+    $data->then(\TF\partial('\file_put_contents', $keyfile));
+    $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 1, "md5"=>md5(CFG::str("encryption_key")))));
+    $data->then(\TF\partial('\file_put_contents', $valuefile));
 }
 
