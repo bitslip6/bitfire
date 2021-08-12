@@ -2,7 +2,7 @@
 namespace BitFire;
 
 
-
+if (defined("BITFIRE_CONFIG")) { return; }
 define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
 require_once WAF_DIR."src/bitfire_pure.php";
 require_once WAF_DIR."src/const.php";
