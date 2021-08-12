@@ -91,7 +91,4 @@ $m1 = microtime(true);
 //uasort($data, '\TF\prof_sort');
 //file_put_contents("/tmp/prof.pass.json", json_encode($data, JSON_PRETTY_PRINT));
 
-
 restore_error_handler();
-
-trigger_error("foo message", E_USER_NOTICE);
