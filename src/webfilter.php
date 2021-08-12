@@ -201,13 +201,13 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
 function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBlock {
     // block union select - super basic
     $find = function(string $search) use ($value) : callable {
-        return function(int $offset) use ($value, $search) : int {
+        return function($offset) use ($value, $search) : int {
             return strpos($value, $search, $offset);
         };
     };
 
-    $maybe_found = \TF\MaybeA::of($value)->then($find("union"))->then($find("select"))->then($find("from"));
-    if ($maybe_found->value('int') > 10) {
+    $maybe_found = \TF\MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
+    if ($maybe_found->value('int') > 12) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
 
