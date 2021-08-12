@@ -145,6 +145,7 @@
         const VERSION_STR = "<?php echo \BitFire\BITFIRE_SYM_VER; ?>";
         const LLANG = "<?php echo $llang ?>";
         function GBI(name) { return document.getElementById(name); }
+
       /*
         window.ERROR = [];
         
@@ -621,6 +622,18 @@
                 </ul>
               </div>
             </li>
+            <?php if ($is_free) { ?>
+            <li class="nav-item">
+              <a class="nav-link" href="#license" data-toggle="collapse" role="button" aria-expanded="false" aria-controls="license">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 0 24 24" width="24px"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M22 19h-6v-4h-2.68c-1.14 2.42-3.6 4-6.32 4-3.86 0-7-3.14-7-7s3.14-7 7-7c2.72 0 5.17 1.58 6.32 4H24v6h-2v4zm-4-2h2v-4h2v-2H11.94l-.23-.67C11.01 8.34 9.11 7 7 7c-2.76 0-5 2.24-5 5s2.24 5 5 5c2.11 0 4.01-1.34 4.71-3.33l.23-.67H18v4zM7 15c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3zm0-4c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/></svg>
+                &nbsp;License Key
+              </a>
+            </li>
+            <div class="collapse " id="license">
+                <input type="text" name="value" id="license" style="margin: 3%; width: 95%" />
+                <input type="submit" style="margin:3%" class="btn right btn-success lift" value="Go Pro!" onclick="return toggle_id('pro_key', 'license');" />
+            </div>
+            <?php } ?>
           </ul>
           <br />
           <br />
@@ -687,7 +700,7 @@
               The free version of BitFire can only detect modified files and potential malware.  
               </p>
               <p>
-              View these files and automatically repair them, <a href="https://bitfire.co/pricing">please upgrade to BitFire PRO.</a>
+              View these files and automatically repair them, <a href="https://bitfire.co/pricing" target="_blank">please upgrade to BitFire PRO.</a>
               </p>
           </div>
       </div>
@@ -969,14 +982,46 @@ function evil(line) {
 function del(path, url, actual, size) {
   if (size > 2) { alert("This is a wordpress file.  Please repair it instead."); return; }
   let result = confirm("are you sure you want to delete " + path);
-  if (result) { console.log("delete"); document.getElementById("file"+actual).classList.add("collapse"); }
+  if (result) { console.log("delete: " + path); document.getElementById("file"+actual).classList.add("collapse"); 
+    fetch('<?php echo $dashboard_path?>?value='+path+'&BITFIRE_API=delete&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => data.json()).then(e => { console.log(e); alert("file " + e.result); });
+  }
 }
 
 function classtoggle(classname, id) {
   document.getElementById(id).classList.toggle(classname);
 }
 
-GBI("lock").addEventListener("click", function() {
+function toggle_id(param, value_id) {
+    let e = GBI(value_id);
+    fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+e.value+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
+    return false;
+}
+
+function toggle(elm, type) {
+    var e = GBI(elm);
+    console.log(e);
+    e.innerText = cap(type);
+    fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
+    if (type == "block" || type == "on" || type == "true") {
+        e.classList.remove("btn-warning");
+        e.classList.remove("btn-secondary");
+        e.classList.add("btn-success");
+    } else if (type == "report" || type == "alert") {
+        e.classList.remove("btn-success");
+        e.classList.remove("btn-secondary");
+        e.classList.add("btn-warning");
+    } else {
+        e.classList.remove("btn-success");
+        e.classList.remove("btn-warning");
+        e.classList.add("btn-secondary");
+    }
+}
+
+
+
+
+
+    GBI("lock").addEventListener("click", function() {
         <?php if ($is_free) {
         echo "alert('Site Lock only available in PRO');\nreturn;"; } ?>
         GBI("lock").innerText = "locking...";
