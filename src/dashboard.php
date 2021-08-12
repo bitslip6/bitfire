@@ -391,8 +391,8 @@ function serve_dashboard(string $dashboard_path)
     //$first = strpos($self,'&'); if ($first) { $self = str_replace('&', '?', $self, 1); }
     $opt_name = "Malware Scan";
     $opt_link = $self . ((strpos($self,"?")>0) ? '&' : '?') . "BITFIRE_API=MALWARESCAN";
-//die($opt_link);
-    $password_reset = (Config::str('password') === 'default');
+
+    $password_reset = (Config::str('password') === 'default') || (Config::str('password') === 'bitfire!');
     $is_free = (strlen(Config::str('pro_key')) < 20);
     $llang = "en-US";
     exit(require WAF_DIR . "views/dashboard.html");
