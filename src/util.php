@@ -1036,7 +1036,7 @@ function parse_ini(string $ini_src) : void {
 
 function check_pro_ver(string $pro_key) {
     // pro key and no pro files, download them UGLY, clean this!
-    if (strlen($pro_key) > 20 && !file_exists(WAF_DIR. "src/proapi.php")) {
+    if (strlen($pro_key) > 20 && !file_exists(WAF_DIR. "src/proapi.php") || filesize(WAF_DIR."src/proapi.php") < 20) {
         $out = WAF_DIR."src/pro.php";
         $content = \TF\bit_http_request("POST", "https://bitfire.co/getpro.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "pro.php"));
         \TF\debug("downloaded pro code [%d]", strlen($content));
