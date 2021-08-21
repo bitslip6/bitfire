@@ -109,6 +109,7 @@ function un_json_array(array $data) { $data = array_map(partial_right("trim", ",
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
+function contains(string $haystack, $needle) : bool { if(is_array($needle)) { foreach ($needle as $n) { if (strpos($haystack, $n) !== false) { return true; } } return false; } else { return strpos($haystack, $needle) !== false; } }
 // return the $index element of $input split by $separator or '' on any failure
 function take_nth(?string $input, string $separator, int $index) : string { if (empty($input)) { return ''; } $parts = explode($separator, $input); return (isset($parts[$index])) ? $parts[$index] : ''; }
 function read_stream($stream) { $data = ""; if($stream) { while (!feof($stream)) { $data .= fread($stream , 2048); } } return $data; }
@@ -121,49 +122,27 @@ function remove(string $chars, string $in) { return str_replace(str_split($chars
 function trim_off(string $input, string $trim_char) : string { $idx = strpos($input, $trim_char); $x = substr($input, 0, ($idx) ? $idx : strlen($input)); return $x; }
 function url_compare(string $haystack, string $needle) : bool { return (ends_with(trim($haystack, "/"), trim($needle, "/"))); } 
 
-/**
- * recursively perform a function over directory traversal.
- */
-function file_recurse1(string $dirname, callable $fn, string $regex_filter = NULL) : array {
-    $dir_iterator = new \RecursiveDirectoryIterator($dirname);
-    $recurse_iterator = new \RecursiveIteratorIterator($dir_iterator);
-    $iterator = $recurse_iterator;
-    if ($regex_filter !== NULL) {
-        $iterator = new \RegexIterator($recurse_iterator, $regex_filter);
-        $iterator->setFlags(\RegexIterator::USE_KEY);
-    }
-    $result = array();
-    foreach ($iterator as $file) {
-        $item = $fn($file->getPathname());
-        if (!empty($item)) { $result[] = $item; }
-    }
-
-    return $result;
-}
 
 /**
  * recursively perform a function over directory traversal.
  */
 function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL, array $result = array()) : array {
-    $maxfiles = 1000;
+    $maxfiles = 5000;
     if ($dh = \opendir($dirname)) {
         while(($file = \readdir($dh)) !== false && $maxfiles-- > 0) {
             $path = $dirname . '/' . $file;
-			// echo " regex [$regex_filter]\n";
-            if (!$file || $file === '.' || $file === '..' || is_link($file)) {
+            if (!$file || $file === '.' || $file === '..') {
                 continue;
-            } if (is_dir($path)) {
-                $result = file_recurse($path, $fn, $regex_filter, $result);
-			} else if ($regex_filter != NULL) {
-				// echo "REGEX FILTER: $regex_filter\n";
-                if (preg_match($regex_filter, $path)) {
-                    $x = $fn($path);
-                    if (!empty($x)) { $result[] = $x; }
-				}
-            } else {
+            }
+            if (($regex_filter != NULL && preg_match($regex_filter, $path)) || $regex_filter == NULL) {
                 $x = $fn($path);
                 if (!empty($x)) { $result[] = $x; }
             }
+            if (is_dir($path) && !is_link($path)) {
+                if (!preg_match("#\/uploads\/?$#", $path)) {
+                    $result = file_recurse($path, $fn, $regex_filter, $result);
+                }
+			}
         }
         \closedir($dh);
     }
@@ -267,9 +246,9 @@ function header_send(string $key, string $value) : void {
 class FileMod {
     public $filename;
     public $content;
-    public $write_mode;
+    public $write_mode = 0664;
     public $modtime;
-    public function __construct(string $filename, string $content, int $write_mode, int $modtime = 0) {
+    public function __construct(string $filename, string $content, int $write_mode = 0664, int $modtime = 0) {
         $this->filename = $filename;
         $this->content = $content;
         $this->write_mode = $write_mode;
@@ -349,6 +328,7 @@ class Effect {
         foreach ($this->file_outs as $file) {
             file_put_contents($file->filename, $file->content, $file->write_mode);
             if ($file->modtime > 0) { \touch($file->filename, $file->modtime); }
+            @chmod($file->filename, $file->write_mode);
         }
     }
 }
@@ -443,7 +423,7 @@ class MaybeA implements MaybeI {
                 $result = intval($this->_x);
                 break;
             case 'array':
-                $result = is_array($this->_x) ? $this->_x : (empty($this->_x)) ? array() : array($this->_x);
+                $result = is_array($this->_x) ? $this->_x : ((empty($this->_x)) ? array() : array($this->_x));
                 break;
         }
         return $result;
@@ -486,42 +466,6 @@ function func_name(callable $fn) : string {
 }
 
 
-/**
- * define getallheaders if it does not exist (phpfpm)
- */
-if (!function_exists('getallheaders')) {
-    function getallheaders() {
-        $headers = array();
-        foreach ($_SERVER as $name => $value) {
-            if (substr($name, 0, 5) === 'HTTP_' && $name !== "HTTP_COOKIE") {
-                $headers[str_replace(' ', '-', strtoupper(str_replace('_', ' ', substr($name, 5))))] = $value;
-            }
-        }
-        return $headers;
-    }
-}
-
-
-/**
- * double time
- * PURE
- */
-function recache(array $lines) : array {
-    $z = lookahead(trim($lines[0]), '');
-    $a = array();
-    $block="";
-    for ($i=1,$m=count($lines);$i<$m;$i++) {
-        $id = @hexdec(substr($lines[$i], 0, 4));
-        if (between($id, 10000, 90000)) {
-            $a[$id]=trim($block);
-            $block="";
-        } else {
-            $block .= lookbehind($lines[$i], $z);
-        }
-    }
-    return $a;
-}
-
 function recache2(string $in) : array {
     $path = explode("\n", decrypt_ssl(md5(CFG::str("encryption_key")), $in)());
     $idx = 0;
@@ -539,26 +483,6 @@ function recache2_file(string $filename) : array {
     return recache2(file_get_contents($filename));
 }
 
-/**
- * recache file
- * NOT PURE
- */
-function recache_file(string $filename) {
-    return recache(file($filename, FILE_IGNORE_NEW_LINES));
-}
-
-/**
- * call the bitfire api (get params)
- */
-function apidata($method, $params) {
-
-    $url = array_reduce(array_keys($params), function($c, $key) use ($params) {
-        return $c . "&$key=" . $params[$key];
-    }, "http://www.bitslip6.com:9090/waf/$method?apikey=__KEY__");
-
-    $data = @\file_get_contents($url, false, stream_context_create(array('http'=> array('timeout' => 3))));
-    return ($data !== false) ? \TF\un_json($data) : array("status" => 0);
-}
 
 
 /**
@@ -568,11 +492,9 @@ function apidata($method, $params) {
  * @return string message.iv
  */
 function encrypt_ssl(string $password, string $text) : string {
-    assert(between(strlen($password), 12, 32), "cipher password length is out of bounds (12/32): [$password]");
+    if (!between(strlen($password), 12, 99)) { return ""; }
     $iv = random_str(16);
     $e = openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
-    //$d = decrypt_ssl($password, $e);
-    //\TF\debug("decrypted: [%s] / [%s]", $e, $d);
     return $e;
 }
 
@@ -581,9 +503,7 @@ function encrypt_ssl(string $password, string $text) : string {
  * PURE
  */ 
 function raw_decrypt(string $cipher, string $iv, string $password) {
-    //\TF\debug("cipher [%s] iv [%s] pass [%s]", $cipher, $iv, $password);
     $decrypt =  openssl_decrypt($cipher, "AES-128-CBC", $password, 0, $iv);
-    //\TF\debug("decrypt [%s]", $decrypt);
     return $decrypt;
 }
 
@@ -605,12 +525,10 @@ function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
         return MaybeStr::of(NULL);
     }
 
-
-    $exploder = partial("explode", ".");
     $decrypt = partial_right("TF\\raw_decrypt", $password);
 
     $a = MaybeStr::of($cipher)
-        ->then($exploder)
+        ->then(partial("explode", "."))
         ->if(function($x) { return is_array($x) && count($x) === 2; })
         ->then($decrypt, true);
     return $a;
@@ -673,7 +591,6 @@ function is_ipv6(string $addr) : bool {
 function ip_to_file(int $ip_num) {
     $n = floor($ip_num/100000000);
 	$file = "cache/ip.$n.bin";
-    debug("ip [%d] -> [%s]", $ip_num, $file);
     return $file;
 }
 
@@ -713,24 +630,23 @@ function str_reduce(string $string, callable $fn, string $prefix = "", string $s
  * reverse ip lookup, takes ipv4 and ipv6 addresses, 
  */
 function reverse_ip_lookup(string $ip) : MaybeStr {
-    if (CFG::str('dns_service', 'localhost')) {
-        debug("gethostbyaddr %s", $ip);
-        return MaybeStr::of(gethostbyaddr($ip));
-    }
+    if (CFG::str('dns_service', 'localhost') == "1.1.1.1") {
+        $lookup_addr = ""; 
+        if (is_ipv6($ip)) {
+            // remove : and reverse the address
+            $ip = strrev(str_replace(":", "", $ip));
+            // insert a "." after each reversed char and suffix with ip6.arpa
+            $lookup_addr = str_reduce($ip, function($chr) { return $chr . "."; }, "", "ip6.arpa");
+        } else {
+            $parts = explode('.', $ip);
+            assert((count($parts) === 4), "invalid ipv4 address [$ip]");
+            $lookup_addr = "{$parts[3]}.{$parts[2]}.{$parts[1]}.{$parts[0]}.in-addr.arpa";
+        }
 
-    $lookup_addr = ""; 
-    if (is_ipv6($ip)) {
-        // remove : and reverse the address
-        $ip = strrev(str_replace(":", "", $ip));
-        // insert a "." after each reversed char and suffix with ip6.arpa
-        $lookup_addr = str_reduce($ip, function($chr) { return $chr . "."; }, "", "ip6.arpa");
-    } else {
-        $parts = explode('.', $ip);
-        assert((count($parts) === 4), "invalid ipv4 address [$ip]");
-        $lookup_addr = "{$parts[3]}.{$parts[2]}.{$parts[1]}.{$parts[0]}.in-addr.arpa";
+        return fast_ip_lookup($lookup_addr, 'PTR');
     }
-
-    return fast_ip_lookup($lookup_addr, 'PTR');
+    debug("gethostbyaddr %s", $ip);
+    return MaybeStr::of(gethostbyaddr($ip));
 }
 
 /**
@@ -790,16 +706,9 @@ function bit_curl(string $method, string $url, $data, array $optional_headers = 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     
     $server_output = curl_exec($ch);
-    if ($server_output) {
+    if (!empty($server_output)) {
         \TF\debug("curl returned: " . strlen($server_output));
-    } else {
-        \TF\debug("curl returned: " . var_export($server_output, true));
-        $tmp_file = WAF_DIR . "cache/temp_file.txt";
-        @\file_put_contents($tmp_file, $content);
-        $result = @system("curl -X$method -d @$tmp_file $url", $code);
-        \TF\debug("curl system command returned [$code]");
-        return $result;
-    }
+    }    
     curl_close($ch);
     
     return $server_output;
@@ -852,7 +761,7 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
         }
         return "";
     } else {
-        debug("http_resp len " . strlen($response));
+        debug("http_resp [$url] len " . strlen($response));
     }
     return $response;
 }
@@ -1036,7 +945,8 @@ function parse_ini(string $ini_src) : void {
 
 function check_pro_ver(string $pro_key) {
     // pro key and no pro files, download them UGLY, clean this!
-    if (strlen($pro_key) > 20 && !file_exists(WAF_DIR. "src/proapi.php") || filesize(WAF_DIR."src/proapi.php") < 20) {
+    $profile = WAF_DIR . "src/proapi.php";
+    if (strlen($pro_key) > 20 && !file_exists($profile) || (file_exists($profile) && @filesize(WAF_DIR."src/proapi.php") < 20)) {
         $out = WAF_DIR."src/pro.php";
         $content = \TF\bit_http_request("POST", "https://bitfire.co/getpro.php", array("release" => \BitFire\BITFIRE_VER, "key" => CFG::str("pro_key"), "file" => "pro.php"));
         \TF\debug("downloaded pro code [%d]", strlen($content));
@@ -1128,7 +1038,7 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
         $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
             ->then("TF\\un_json")
             ->if(function($cookie) use ($src_ip, $agent) {
-                if (!isset($cookie['wp']) && !isset($cookie['ip'])) {
+                if (!isset($cookie['wp']) && !isset($cookie['ip']) && !isset($cookie['lck'])) {
                     \TF\debug("invalid decrypted cookie [%s] ", var_export($cookie, true));
                     return false;
                 } else if (isset($cookie['ip'])) {
