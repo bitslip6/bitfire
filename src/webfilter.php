@@ -201,7 +201,7 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
 function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBlock {
     // block union select - super basic
     $find = function(string $search) use ($value) : callable {
-        return function($offset) use ($value, $search) : int {
+        return function(?int $offset) use ($value, $search) : int {
             return strpos($value, $search, $offset);
         };
     };

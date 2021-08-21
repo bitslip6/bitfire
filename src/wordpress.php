@@ -125,3 +125,54 @@ function wp_get_login_cookie(array $cookies) : string {
     if (count($wp) < 1) { return ""; }
     return array_values($wp)[0];
 }
+
+
+function wp_handle_admin(\BitFire\Request $request, \TF\MaybeA $cookie) {
+    \TF\debug("wp_handle_admin");
+    $root = \BitFire\Config::str("wp_root");
+    if (empty($root)) { \TF\debug("no wp_root"); return; }
+    if (strpos($request->path, "/wp-admin/") === false) { \TF\debug("no wp-admin"); return; }
+    if ($request->post['action']??'' === "heartbeat") { return; }
+    \TF\debug("wp admin req %s", $request->path);
+
+
+    // upgrade requested, or plugin stuff happening.  unlock for 1 hour.
+    if (\TF\contains($request->path, array("/plugins.php", "/upgrade.php")) || (isset($request->post['action']) && $request->post['action'] == "update-plugin")) {
+        if (!file_exists(WAF_DIR . "cache/unlock")) {
+            if (function_exists('\BitFire\file_site_dir')) {
+                touch(WAF_DIR . "cache/unlock", time() + 120);
+                \BitFire\file_site_dir($root, false);
+            }
+        }
+    }
+
+/*
+    // site admin on wp-admin
+    // allow editing htaccess and wp-config
+    @chmod("$root/.htaccess", 0644);
+    @chmod("$root/wp-config.php", 0644);
+    register_shutdown_function(function() use ($root) {
+        @chmod("$root/.htaccess", 0444);
+        @chmod("$root/wp-config", 0444);
+    });
+
+    if (!isset($request->post['slug']) || !isset($request->post['action'])) { \TF\debug("slug"); return; }
+
+    if ($request->post['action']??'' === 'update-plugin' && isset($request->post['slug'])) {
+        \TF\debug("update  plugin");
+        $plugin = $request->post['slug'];
+        if (function_exists("\BitFire\lock_site_dir")) {
+            \BitFire\lock_site_dir($request, $plugin, false);
+            register_shutdown_function(function() use($request, $plugin) {
+                \TF\debug("shutdown called [$plugin]");
+                \BitFire\lock_site_dir($request, $plugin, true);
+            });
+            //die("LOCK $plugin\n");
+        }
+        else { \TF\debug("no lock site dir"); }
+        //die("no func lock!\n");
+    }
+    else { \TF\debug("no slug or action"); }
+    //\TF\dbg($request);
+*/
+}
