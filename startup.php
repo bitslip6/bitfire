@@ -8,11 +8,9 @@ if (PHP_VERSION_ID < 70000) {
     return;
 }
 
-if (!function_exists('\BitFire\at')) {
-	function at(array $elm, $idx, $default) {
-		if($elm && isset($elm[$idx])) { return $elm[$idx]; }
-		return $default;
-	}
+function at(array $elm, $idx, $default) {
+    if($elm && isset($elm[$idx])) { return $elm[$idx]; }
+    return $default;
 }
 
 //tideways_enable(TIDEWAYS_FLAGS_MEMORY | TIDEWAYS_FLAGS_CPU);
@@ -60,7 +58,7 @@ try {
     }
 
     // todo: clean up
-    if (Config::str('pro_key') && file_exists(WAF_DIR . "src/pro.php") ) { include WAF_DIR . "src/pro.php"; }
+    if (strlen(Config::str('pro_key')>20) && file_exists(WAF_DIR."src/pro.php") ) { @include_once WAF_DIR . "src/pro.php"; @include_once WAF_DIR . "src/proapi.php"; }
     $bitfire = \Bitfire\BitFire::get_instance(); 
     $bitfire->inspect()
         ->then(function (\BitFire\Block $block) use ($bitfire) {
