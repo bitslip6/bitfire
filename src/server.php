@@ -41,6 +41,16 @@ function update_config(string $ini_src) {
         replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
         replace_if_config("browser_cookie", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
 
+        // configure wordpress root path
+        $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+        if (!empty($roots)) {
+            $root = $roots[0]??'luiashdf';
+            if (file_exists($root)) {
+                $info['wp_root'] = $root;
+                \TF\file_replace($ini_src, "wp_root = ''", "wp_root = '$root'");
+            }
+        }
+
         if (CFG::str("cache_type") === "nop") {
             if (function_exists('shmop_open')) {
                 $info["cache_type"] = "shmop";
@@ -68,7 +78,9 @@ function update_config(string $ini_src) {
             \TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
         }
         $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
-        $info["domain"] = join(".", array_slice(explode(".", $domain), -2));
+        $info["domain"] = $domain;
+        $domain = join(".", array_slice(explode(".", $domain), -2));
+
         \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
         \TF\file_replace($ini_src, "configured = false", "configured = true");
 
@@ -134,23 +146,31 @@ function strip_root(string $file) : string {
 
 
 // run the hash functions on a file
-function hash_file(string $filename, string $plugin_id) : ?array {
+function hash_file(string $root_dir, string $filename, string $plugin_id, string $plugin_name) : ?array {
+    if (is_dir($filename)) { return null; }
     $filename = str_replace("//", "/", $filename);
     $i = pathinfo($filename);
-    if ($i['extension'] !== "php") { return null; }
-    $result = array();
-    $shortname = preg_replace("/.*\/tags\/.*\/(.*)/", "$1", $filename);
-    if (!$shortname || $shortname == $filename) {
-        $shortname = preg_replace("/.*\/$name\/.*\/(.*)/", "$1", $filename);
-    }
-    
+    if (!isset($i['extension']) || $i['extension'] !== "php") { return null; }
 
-    //$result['e'] = $i['extension'];
-    //$t = "/{$sym_ver}/{$shortname}";
+    if (strpos($filename, "wp-content/")) {
+        if (strpos($filename, "/plugins/") !== false) {
+            $shortname = preg_replace("#$root_dir/wp-content/plugins#", "", $filename);
+        } else if (strpos($filename, "/themes/") !== false) {
+            $shortname = preg_replace("#$root_dir/wp-content/themes#", "", $filename);
+        } else {
+            return null;
+        }
+    } else {
+        $shortname = preg_replace("#$root_dir#", "", $filename);
+    }
+
+    $result = array();
+
     $input = file($filename);
 	$result['crc_trim'] = crc32(join('', array_map('trim', $input)));
     $result['crc_path'] = crc32($shortname);
-    $result['name'] = $shortname;
+    $result['path'] = substr($shortname, 0, 255);
+    $result['name'] = $plugin_name;
     $result['plugin_id'] = $plugin_id;
     $result['size'] = filesize($filename);
 
@@ -188,12 +208,20 @@ function get_wordpress_version(string $root_dir) : string {
 function get_wordpress_hashes(string $root_dir) : array {
 
     $version = get_wordpress_version($root_dir);
-    if (version_compare($version, "5.0.0") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
+    if (version_compare($version, "4.1") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
 
     $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : ?array {
 
-        if (strpos($file, 'wp-content/upgrade') !== false) { return NULL; }
-        if (strpos($file, '/bitfire/') !== false) { return NULL; }
+        if (is_link($file)) { return NULL; }
+        if (strpos($file, "wp-content") !== false) {
+            if (preg_match('/wp-content\/(plugins|themes)\/([^\/]+)/', $file, $matches)) {
+                return hash_file($root_dir, $file, 0, $matches[2]);
+            }
+            return NULL;
+        }
+        return hash_file($root_dir, $file, 0, "");
+
+
         $path = str_replace($root_dir, "/$version/src", $file);
         $nospace_data = join('', array_map('trim', file($file)));
         // is plugin
@@ -201,11 +229,22 @@ function get_wordpress_hashes(string $root_dir) : array {
             if (preg_match("/\/plugins\/(\w+)/", $path, $matches)) {
                 $plugin = $matches[1];
                 $path = str_replace("/$version/src/wp-content/plugins/$plugin", "", $path);
-                return array($plugin, filesize($file), crc32($path), crc32($nospace_data), $file);
+                return array($plugin, filesize($file), crc32($path), crc32($nospace_data), $file, "plugin");
             }
         }
-        if ($file == "$root_dir/index.php") { $path = str_replace("index.php", "_index.php", $path); \TF\debug("INDEX: %s", $file); }
-        if ($file == "$root_dir/wp-admin/index.php") { $path = str_replace("index.php", "_index.php", $path); \TF\debug("INDEX: %s", $file); }
+        // is theme
+        else if (stripos($path, "/wp-content/themes/") !== false) {
+            if (preg_match("/\/themes\/(\w+)/", $path, $matches)) {
+                $theme = $matches[1];
+                $path = str_replace("/$version/src/wp-content/theme/$theme", "", $path);
+                return array($theme, filesize($file), crc32($path), crc32($nospace_data), $file, "theme");
+            }
+        }
+
+
+        
+        if ($file == "$root_dir/index.php") { $path = str_replace("index.php", "_index.php", $path); }
+        if ($file == "$root_dir/wp-admin/index.php") { $path = str_replace("index.php", "_index.php", $path); }
         return array('', filesize($file), crc32($path), crc32($nospace_data), $file);
     }, "/.*\.php$/");
 
