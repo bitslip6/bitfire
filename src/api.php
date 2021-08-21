@@ -24,7 +24,7 @@ class Metric {
     public $total = 0;
 }
 
-function add_api_exception(\BitFire\Request $r) : string {
+function add_api_exception(\BitFire\Request $r, \TF\MaybeA $cookie) : string {
     $ex = new \BitFire\Exception((int)$r->post['code'], \TF\random_str(8), NULL, $r->post['path']);
     $added = \BitFire\add_exception($ex);
     return ($added) ? "success" : "fail";
@@ -32,7 +32,7 @@ function add_api_exception(\BitFire\Request $r) : string {
 
 
 // TODO: refactor as effect
-function download(\BitFire\Request $r) : void {
+function download(\BitFire\Request $r, \TF\MaybeA $cookie) : void {
 
 	$effect = \TF\Effect::new();
 	$filename = $r->get['filename']??"";
@@ -54,7 +54,7 @@ function download(\BitFire\Request $r) : void {
     $effect->run();
 }
 
-function diff(\BitFire\Request $request) : void {
+function diff(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     \TF\debug(print_r($request->post, true));
     $orig = \TF\bit_http_request("GET", $request->post['url'], "");
     $local = file_get_contents($request->post['out']);
@@ -64,7 +64,7 @@ function diff(\BitFire\Request $request) : void {
 }
 
 // TODO: only allow fetching from wordpress.org, only allow wordpress file to overwrite
-function repair(\BitFire\Request $request) : void {
+function repair(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     \TF\debug(print_r($request->post, true));
     $effect = \TF\Effect::new();
     $orig = \TF\bit_http_request("GET", $request->post['url'], "");
@@ -74,7 +74,9 @@ function repair(\BitFire\Request $request) : void {
         $out1 = $request->post['filename'].".bak.".mt_rand(10000,99999);
         $out2 = $request->post['filename'];
         if (is_writeable(dirname($out2)) && is_writable($out2)) {
-            file_put_contents($out1, $local);
+            $quarantine_path = str_replace($_SERVER['DOCUMENT_ROOT'], WAF_DIR."quarantine/", $out1);
+            mkdir(dirname($quarantine_path), 0755, true);
+            file_put_contents($quarantine_path, $local);
             file_put_contents($out2, $orig, LOCK_EX);
             $effect->out(json_encode(array("success" => true, "orig_size" => strlen($local), "new_size" => strlen($orig))));
         } else {
@@ -182,20 +184,20 @@ function send_metrics(Metric $metrics) :string {
 /**
  * 
  */
-function get_block_types(\BitFire\Request $request) : void {
+function get_block_types(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     exit(send_metrics(get_block_24groups()));
 }
 
-function get_hr_data(\BitFire\Request $request) : ?string {
+function get_hr_data(\BitFire\Request $request, \TF\MaybeA $cookie) : ?string {
     $metrics = get_block_24sum();
     return \TF\en_json($metrics);
 }
 
-function get_ip_data(\BitFire\Request $request) : void {
+function get_ip_data(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     exit(send_metrics(get_ip_24groups()));
 }
 
-function get_valid_data(\BitFire\Request $request) : void {
+function get_valid_data(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     $cache = CacheStorage::get_instance();
     $response = array('challenge' => 0, 'valid' => 0);
     for($i=0; $i<25; $i++) {
@@ -210,7 +212,7 @@ function get_valid_data(\BitFire\Request $request) : void {
     exit(\TF\en_json($response));
 }
 
-function make_code(\BitFire\Request $request) : string {
+function make_code(\BitFire\Request $request, \TF\MaybeA $cookie) : string {
     $s = Config::str(CONFIG_SECRET, 'bitfiresekret');
     $iv = \TF\random_str(12);
     $hash = base64_encode(hash_hmac("sha1", $iv, $s, true));
@@ -229,7 +231,7 @@ function is_quoted(string $data) : bool {
 
 
 
-function upgrade(\BitFire\Request $request) : void {
+function upgrade(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     $v = htmlentities($_GET['ver']);
     if (\version_compare($v, BITFIRE_SYM_VER, '<')) { 
         \TF\debug("version not current $v");
@@ -260,11 +262,11 @@ function upgrade(\BitFire\Request $request) : void {
     require_once WAF_DIR."src/tar.php";
     $success = \TF\tar_extract($dest, $target) ? "success" : "failure";
     
+
     // replace files
     \TF\file_recurse(WAF_DIR."cache/bitfire-{$v}", function (string $x) use ($v) {
         if (is_file($x) && stripos($x, "ini") === false) {
             $root = str_replace(WAF_DIR."cache/bitfire-{$v}/", "", $x);
-            //echo "base [$base] path [$path]  - [" . WAF_DIR . $root . "]\n";
             if (!rename($x, WAF_DIR . $root)) { \TF\debug("unable to rename [$x] $root"); }
         }
     });
@@ -272,7 +274,7 @@ function upgrade(\BitFire\Request $request) : void {
     exit("[$success] [$dest] $cwd");
 }
 
-function delete(\BitFire\Request $request) {
+function delete(\BitFire\Request $request, \TF\MaybeA $cookie) {
     $f = $_REQUEST['value'];
     if (\TF\ends_with($f, ".php") && file_exists($f)) {
         $t = "$f.bak.".mt_rand(10000, 99999);
@@ -286,7 +288,7 @@ function delete(\BitFire\Request $request) {
 }
 
 
-function set_pass(\BitFire\Request $request) : void {
+function set_pass(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     \TF\debug("save pass");
     if (strlen($_GET['pass1']??'') < 8) {
         \TF\debug("pass short %s - %s", $_GET['pass1']??'');
@@ -298,7 +300,7 @@ function set_pass(\BitFire\Request $request) : void {
     exit(($wrote) ? "success" : "unable to write to: " . WAF_INI);
 }
 
-function toggle_config_value(\BitFire\Request $request) : void {
+function toggle_config_value(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     if (!is_writable(WAF_INI)) {
         exit("fail, config.ini not writeable");
     }
@@ -364,7 +366,7 @@ function diff_text_lines(array $new, array $old) : array {
 /**
  * @DEAD_CODE - see const.php
  */
-function hash_diffs(\BitFire\Request $request) : void {
+function hash_diffs(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     $files = \TF\un_json(file_get_contents(WAF_DIR . "/cache/file_fix.json"));
 
     foreach ($files as $file) {
@@ -393,7 +395,7 @@ function hash_diffs(\BitFire\Request $request) : void {
     }
 }
 
-function repair_files(\BitFire\Request $request) : void {
+function repair_files(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     $repair_list = \TF\un_json(file_get_contents("php://input"));
 
 
@@ -411,13 +413,8 @@ function repair_files(\BitFire\Request $request) : void {
 }
 
 
-function clear_cache(\BitFire\Request $request) : void {
+function clear_cache(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     \TF\CacheStorage::get_instance()->clear_cache();
     \TF\cache_bust();
     die("cache cleared\n");
 }
-
-if (file_exists(WAF_DIR . "src/proapi.php")) {
-    require WAF_DIR . "src/proapi.php";
-}
-

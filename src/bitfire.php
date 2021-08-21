@@ -336,8 +336,15 @@ class BitFire
         $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
 
         if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??$_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET, "no_such_value")) {
+            // Do we have a logged in word press cookie? don't block.
+            $maybe_botcookie = \TF\decrypt_tracking_cookie(
+                $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
+                Config::str(CONFIG_ENCRYPT_KEY),
+                $this->_request->ip, $this->_request->agent);
+
+
             require_once WAF_DIR."src/api.php";
-            exit($fn($this->_request));
+            exit($fn($this->_request, $maybe_botcookie));
         }
     }
 
@@ -461,27 +468,29 @@ class BitFire
         if ($this->_request === NULL || Config::disabled(CONFIG_ENABLED)) {
             return \TF\MaybeBlock::of(NULL);
         }
+        // Do we have a logged in word press cookie? don't block.
+        $maybe_botcookie = \TF\decrypt_tracking_cookie(
+            $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
+            Config::str(CONFIG_ENCRYPT_KEY),
+            $this->_request->ip, $this->_request->agent);
+
 
         // dashboard requests, TODO: MOVE TO api.php
         if (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND] === "MALWARESCAN") {
             require_once WAF_DIR."src/dashboard.php";
-            serve_malware($this->_request->path);
+            serve_malware($this->_request->path, $maybe_botcookie);
         }
 
 
         // dashboard requests, TODO: MOVE TO api.php
         if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
             require_once WAF_DIR."src/dashboard.php";
-            serve_dashboard($this->_request->path);
+            serve_dashboard($this->_request->path, $maybe_botcookie);
         }
 
         // WordPress admin, TODO: move to a function
-        // Do we have a logged in word press cookie? don't block.
-        $maybe_botcookie = \TF\decrypt_tracking_cookie(
-            $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
-            Config::str(CONFIG_ENCRYPT_KEY),
-            $this->_request->ip, $this->_request->agent);
         if ($maybe_botcookie->extract("wp")() > 0) { 
+            \BitFireWP\wp_handle_admin($this->_request, $maybe_botcookie);
             return \TF\Maybe::$FALSE;
         }
 
