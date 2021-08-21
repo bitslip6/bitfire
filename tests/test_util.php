@@ -13,6 +13,42 @@ function somefunc($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
 }
 
+function test_effects() : void {
+    $e = \TF\Effect::new();
+    $e->cookie("boobaz");
+    assert_eq($e->read_cookie(), "boobaz", "cookie set failed");
+    $e->exit(true);
+    assert_eq($e->read_exit(), true, "exit set failed");
+    $f = new \TF\FileMod("/tmp/test.txt", "boobaz", 0444, 1628874000);
+    $f2 = new \TF\FileMod("/tmp/test2.txt", "foobar", 0444, 1628874000);
+    $e->file($f);
+    $e->file($f2);
+    assert_eq($e->read_files()[1], $f2, "file set failed");
+    $e->header("x-bitfire", "foobar");
+    $e->header("x-bitfire", "boobaz");
+    assert_eq($e->read_headers()["x-bitfire"], "boobaz", "header set failed");
+    //$e->out("line1");
+    //$e->out("line2");
+    //assert_eq($e->read_out(), "line1line2", "stdout set failed");
+    $e->response_code(404);
+    assert_eq($e->read_code(), 404, "set response code failed");
+    $ci = new \TF\CacheItem("foobar", function($x) { return $x."boobaz"; }, function() { return "nill";}, 800);
+    $e->update($ci);
+    assert_eq($e->read_cache()["foobar"], $ci, "unable to set cache item");
+    $e->status(99);
+    assert_eq($e->read_status(), 99, "unable to set effect status");
+    $e->exit(false);
+    $e->run();
+    assert_true(file_exists("/tmp/test.txt"), "effect did not create /tmp/test.txt");
+    assert_true(file_get_contents("/tmp/test.txt") === "boobaz", "effect did not create /tmp/test.txt");
+}
+
+function test_func_name() {
+    assert_eq(\TF\func_name("strtolower"), "strtolower", "unable to get simple function name");
+    assert_eq(\TF\func_name("\TF\\func_name"), "\TF\\func_name", "unable to get namespace function name");
+    assert_eq(\TF\func_name(array("\TF\Effect", "cookie")), "\TF\Effect::cookie", "unable to get object function name");
+}
+
 function test_wp() : void {
     require_once WAF_DIR . "src/wordpress.php";
     $creds = \BitFireWP\wp_parse_credentials("/var/www/wordpress");
@@ -33,14 +69,41 @@ function test_ends_with() : void {
     //assert_true(\TF\endsWith($haystack, $needle), "1x constains string ends with incorrectly");
 }
 
-/**
- * @type external
- */
-function dead_can_ping_api() : void {
-    $id = uniqid();
-    $response = TF\apidata("ping", array("id" => $id));
-    $pong = $response['response']['pong'] ?? '';
-    assert_eq($pong, $id, "pong response invalid");
+
+function test_encryption() : void {
+    $pass = "passwordpasswordpassword";
+    $message = "a secret message";
+
+    $enc = \TF\encrypt_ssl("short", $message);
+    assert_true(empty($enc), "short key allows encryption");
+    
+    $enc = \TF\encrypt_ssl($pass, $message);
+    assert_neq($enc, $message, "unable to encrypt");
+    $dec = \TF\decrypt_ssl($pass, $enc);
+    assert_eq($dec(), $message, "unable to decrypt");
+    assert_false($dec->empty(), "empty decrypted message");
+
+    $dec = \TF\decrypt_ssl("p", $enc);
+    assert_true($dec->empty(), "bad key produced decrypted message");
+    $dec = \TF\decrypt_ssl($pass, "");
+    assert_true($dec->empty(), "bad key produced decrypted message");
+    
+}
+
+function test_map_reduce() : void {
+    
+    $test = array("key" => "value", 12 => "number value", "anything" => "else");
+    $result = \TF\map_reduce($test, function ($k, $v, $c) {
+        return (is_int($k)) ? true : $c;
+    }, false);
+    assert_eq($result, true, "map reduce seems to not work");
+
+    unset($test[12]);
+    $result = \TF\map_reduce($test, function ($k, $v, $c) {
+        return (is_int($k)) ? true : $c;
+    }, false);
+    assert_eq($result, false, "map reduce seems to not work");
+
 }
 
 /**
@@ -121,23 +184,19 @@ function test_can_ip_lookup(array $data) : void {
     $ipaddr = $data[0];
     $dnsname = $data[1];
     $lookup = TF\reverse_ip_lookup($ipaddr);
-    //$v = $lookup->empty() ? '' : $lookup();
+    assert_icontains($lookup(), $dnsname, "reverse ip lookup of $ipaddr ($dnsname)");
+
+    \BitFire\Config::set_value("dns_service", "1.1.1.1");
+    $lookup = TF\reverse_ip_lookup($ipaddr);
     assert_icontains($lookup(), $dnsname, "reverse ip lookup of $ipaddr ($dnsname)");
 }
 
 function ip_to_domain() : array {
     return array(
-        "google reverse lookup" => array("2607:f8b0:4005:808::200e", "1e100.net"),
+        //"google reverse lookup" => array("2607:f8b0:4005:808::200e", "1e100.net"),
+        "google reverse lookup" => array("4.2.2.2", "level3.net"),
         "facebook reverse lookup" => array("157.240.3.35", "facebook.com")
     );
-}
-
-/**
- * @type integration
- */
-function test_get_remote_list() : void {
-    $result = TF\apidata("getlist", ["type" => "blacklist"]);
-    //print_r($result);
 }
 
 /**
