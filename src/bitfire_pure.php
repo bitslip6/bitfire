@@ -327,10 +327,9 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         if ($bot && $whitelist) { return; }
     }
 
-    if ($block === null) { $block = BitFire::new_block(31002, "return code, NOTICE", strval($response_code), $request->agent, 0); }
+    if ($block === null) { $block = BitFire::new_block(31002, "return code, NOTICE", strval($response_code), $request->agent, 0)(); }
 
-
-    $class = code_class($block->code);
+    $class = code_class((int)$block->code);
     $data = make_post_data($request, $block, $ip_data);
     $data["bot"] = $bot;
     $data["response"] = $response_code;
