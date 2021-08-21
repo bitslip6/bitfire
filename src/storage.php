@@ -83,7 +83,7 @@ class CacheStorage implements Storage {
                 \apcu_store("_bitfire:$key_name", $data, $seconds);
                 return;
             case "opcache":
-                $s = var_export($data);
+                $s = var_export($data, true);
                 $exp = time() + $seconds; 
                 file_put_contents($this->key2name($key_name), "<?php \$value = $s; \$success = (time() < $exp);", LOCK_EX);
                 return;
