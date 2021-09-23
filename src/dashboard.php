@@ -71,16 +71,22 @@ function isdis()
 
 function is_locked(): bool
 {
+    $lockfile = WAF_DIR . "/cache/locked.txt";
+    if (file_exists($lockfile)) {
+        $r = file_get_contents($lockfile);
+        return ($r == "1") ? true : false;
+    }
+
     $ctr = 0;
     file_recurse($_SERVER['DOCUMENT_ROOT'], function ($file) use (&$ctr) {
         if (is_writeable($file)) {
             $ctr++;
-            if ($ctr < 5) {
-                \TF\debug("writeable [$file]");
-            }
+			return $file;
         }
-    }, "/.php$/");
-    \TF\debug("lock ctr: [$ctr]");
+    }, "/.php$/", array(), 2);
+
+    \TF\debug("lock ctr 3: [$ctr]");
+    file_put_contents($lockfile, ($ctr <= 1) ? "1" : "0");
     return ($ctr <= 1);
 }
 
@@ -121,15 +127,17 @@ function dump_hashes()
 
     //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
     $decoded = \TF\un_json($result);
+    //\TF\dbg($result);
 
     //        }
     //    }
 
 
 
-    $fix_files = array('ver' => $hashes[0]['ver'], 'root' => $ha, 'files' => array());
+    $fix_files = array('ver' => $hashes[0]['ver'], 'root' => $roots[0], 'files' => array());
     if ($decoded && count($decoded) > 0) {
         \TF\debug("hash result len " . count($decoded));
+        //print_r($decoded);
         
         for ($i=0,$m=count($decoded);$i<$m; $i++) {
             $root = $decoded[$i];
@@ -137,12 +145,15 @@ function dump_hashes()
             $base = $hashes[$i]['root'];
             if (is_array($root)) {
                 foreach ($root as $file) {
-                    $filename = trim(str_replace($base, "", $file[4]), '/');
+                    $filename = trim(str_replace($base, "", $file['path']), '/');
                     $path = "https://core.svn.wordpress.org/tags/{$ver}/$filename";
+                    /*
                     $parts = explode("/", $file[0]);
                     $out = $file[4] . "/" . join("/", array_slice($parts, 3));
                     $out = rtrim($out, "/");
-                    $fix_files['files'][] = array('info' => $file[5], 'url' => $path, 'expected' => $file[2], 'actual' => $file[3], 'size1' => $file[1], 'size2' => $file[6], 'mtime' => filemtime($out), 'out' => $out);
+                    */
+                    $out = $_SERVER['DOCUMENT_ROOT'] . "/$filename";
+                    $fix_files['files'][] = array('info' => $file['r'], 'url' => $path, 'expected' => $file['crc_expected'], 'actual' => $file['crc_trim'], 'size1' => $file['size'], 'size2' => $file['size2'], 'mtime' => filemtime($out), 'out' => $out);
                 }
             } else {
                 \TF\debug("unknown root!");
@@ -151,6 +162,8 @@ function dump_hashes()
     } else {
         \TF\debug("hash result len 0");
     }
+
+    //\Tf\dbg($fix_files);
 
     //file_put_contents(WAF_DIR . "cache/file_fix.json", \TF\en_json($fix_files));
     //exit(\TF\en_json($fix_files));
@@ -177,6 +190,9 @@ function serve_malware(string $dashboard_path)
     header("Cache-Control: no-store, private, no-cache, max-age=0");
     header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', 100000));
     http_response_code(203);
+
+    $locked = is_locked();
+    $lock_action = ($locked) ? "unlock" : "lock";
 
     $config_writeable = is_writeable(WAF_DIR . "config.ini") | is_writeable(WAF_DIR . "config.ini.php");
     $config = \TF\map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
@@ -223,6 +239,7 @@ function human_date2($time) : string {
  */
 function serve_dashboard(string $dashboard_path)
 {
+    //\TF\dbg($_SERVER);
     if (!isset($_SERVER['PHP_AUTH_PW']) ||
         (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
         (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
