@@ -72,18 +72,19 @@ class CacheStorage implements Storage {
      */
     public function save_data(string $key_name, $data, int $seconds) {
         assert(self::$_type !== null, "must call set_type before using cache");
+        $storage = array($key_name, $data);
         switch (self::$_type) {
             case "shm":
-                $this->_shm->write($key_name, $seconds, $data);
+                $this->_shm->write($key_name, $seconds, $storage);
                 return;
             case "shmop":
-                $this->_shmop->write($key_name, $seconds, $data);
+                $this->_shmop->write($key_name, $seconds, $storage);
                 return;
             case "apcu":
-                \apcu_store("_bitfire:$key_name", $data, $seconds);
+                \apcu_store("_bitfire:$key_name", $storage, $seconds);
                 return;
             case "opcache":
-                $s = var_export($data, true);
+                $s = var_export($storage, true);
                 $exp = time() + $seconds; 
                 file_put_contents($this->key2name($key_name), "<?php \$value = $s; \$success = (time() < $exp);", LOCK_EX);
                 return;
@@ -161,8 +162,10 @@ class CacheStorage implements Storage {
                 break;
         }
 
-        // force failure to return null
-        return ($success) ? $value : $init;
+        if ($success && $value[0] == $key_name) {
+            return $value[1];
+        }
+        return $init;
     }
 
     /**
