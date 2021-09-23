@@ -1,5 +1,5 @@
 .*
-.*
+src/internal/*
 test.php
 lcov.info
 callgrind.*

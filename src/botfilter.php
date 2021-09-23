@@ -309,12 +309,13 @@ class BotFilter {
         if (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop') {
             $this->verify_browser($request, $maybe_botcookie); 
         }
+
         return $block;
     }
 
     protected function verify_browser(\BitFire\Request $request, \TF\MaybeStr $maybe_botcookie) {
         // javascript browser challenges
-        if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
+        if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER) && strpos($request->path, "trackerly") === false) {
             \TF\debug("verify browser");
             if (isset($_POST['_bfxa'])) {
                 $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
