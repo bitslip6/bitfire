@@ -122,6 +122,9 @@ function remove(string $chars, string $in) { return str_replace(str_split($chars
 function trim_off(string $input, string $trim_char) : string { $idx = strpos($input, $trim_char); $x = substr($input, 0, ($idx) ? $idx : strlen($input)); return $x; }
 function url_compare(string $haystack, string $needle) : bool { return (ends_with(trim($haystack, "/"), trim($needle, "/"))); } 
 
+// find an element that matches !empty($fn(x)) or NULL
+function find(array $list, callable $fn) { foreach ($list as $item) { $x = $fn($item); if (!empty($x)) { return $x; }} return NULL; }
+function rename_key(array $data, string $src, string $dst) { $data[$dst] = $data[$src]; unset($data[$src]); return $data; }
 
 /**
  * recursively perform a function over directory traversal.
@@ -220,7 +223,6 @@ function memoize(callable $fn, string $key, int $ttl) : callable {
 function partial(callable $fn, ...$args) : callable {
     return function(...$x) use ($fn, $args) { return $fn(...array_merge($args, $x)); };
 }
-
 
 /**
  * same as partial, but reverse argument order
@@ -564,7 +566,7 @@ function map_whilenot(array $map, callable $fn, $input) {
  * allows passing optional initial $carry, defaults to empty string
  * PURE as $fn
  */
-function map_mapvalue(?array $map = null, callable $fn) : array {
+function map_mapvalue(?array $map, callable $fn) : array {
     $result = array();
     foreach($map as $key => $value) {
         $tmp = $fn($value);
@@ -745,7 +747,7 @@ function bit_http_request(string $method, string $url, $data, array $optional_he
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
-		$optional_headers['User-Agent'] = "BitFire WAF https://bitslip6.com/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
+		$optional_headers['User-Agent'] = "BitFire WAF https://bitfire.co/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
     }
 
     
