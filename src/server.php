@@ -92,7 +92,7 @@ function update_config(string $ini_src) {
             file_put_contents($robot_file, $robot_content, FILE_APPEND);
         }
         require_once WAF_DIR."src/bitfire.php";
-        \BitFire\update_raw(WAF_DIR."cache/keys2.raw", WAF_DIR."cache/values2.raw");
+        update_raw(WAF_DIR."cache/keys2.raw", WAF_DIR."cache/values2.raw");
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
     } else if (mt_rand(1,30) == 2) {
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
@@ -150,23 +150,27 @@ function hash_file(string $root_dir, string $filename, string $plugin_id, string
     if (is_dir($filename)) { return null; }
     $filename = str_replace("//", "/", $filename);
     $i = pathinfo($filename);
-    if (!isset($i['extension']) || $i['extension'] !== "php") { return null; }
+    $input = @file($filename);
+    if (!isset($i['extension']) || $i['extension'] !== "php" || empty($input)) { return null; }
 
     if (strpos($filename, "wp-content/")) {
         if (strpos($filename, "/plugins/") !== false) {
-            $shortname = preg_replace("#$root_dir/wp-content/plugins#", "", $filename);
+            //$shortname = preg_replace("#$root_dir/wp-content/plugins#", "", $filename);
+            $shortname = str_replace("$root_dir/wp-content/plugins", "", $filename);
         } else if (strpos($filename, "/themes/") !== false) {
-            $shortname = preg_replace("#$root_dir/wp-content/themes#", "", $filename);
+            //$shortname = preg_replace("#$root_dir/wp-content/themes#", "", $filename);
+            $shortname = str_replace("$root_dir/wp-content/themes", "", $filename);
         } else {
             return null;
         }
     } else {
-        $shortname = preg_replace("#$root_dir#", "", $filename);
+        //$shortname = preg_replace("#$root_dir#", "", $filename);
+        $shortname = str_replace($root_dir, "", $filename);
     }
 
-    $result = array();
+    if (strpos($shortname, "/home/wp-hashes") !== false) { file_put_contents("/tmp/path_err.log", print_r(array($root_dir, $filename, $plugin_id, $plugin_name), true), FILE_APPEND); }
 
-    $input = file($filename);
+    $result = array();
 	$result['crc_trim'] = crc32(join('', array_map('trim', $input)));
     $result['crc_path'] = crc32($shortname);
     $result['path'] = substr($shortname, 0, 255);
@@ -205,7 +209,7 @@ function get_wordpress_version(string $root_dir) : string {
 /**
  * return an array of ('filename', size, crc32(path), crc32(space_trim_content))
  */
-function get_wordpress_hashes(string $root_dir) : array {
+function get_wordpress_hashes(string $root_dir) : ?array {
 
     $version = get_wordpress_version($root_dir);
     if (version_compare($version, "4.1") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
@@ -214,8 +218,9 @@ function get_wordpress_hashes(string $root_dir) : array {
 
         if (is_link($file)) { return NULL; }
         if (strpos($file, "wp-content") !== false) {
-            if (preg_match('/wp-content\/(plugins|themes)\/([^\/]+)/', $file, $matches)) {
-                return hash_file($root_dir, $file, 0, $matches[2]);
+            if (preg_match('#wp-content/(plugins|themes)/([^\/]+)#', $file, $matches)) {
+                $type = strpos($file, '/plugins/') !== false ? 1 : 2;
+                return hash_file($root_dir, $file, $type, $matches[2]);
             }
             return NULL;
         }
@@ -226,7 +231,7 @@ function get_wordpress_hashes(string $root_dir) : array {
         $nospace_data = join('', array_map('trim', file($file)));
         // is plugin
         if (stripos($path, "/wp-content/plugins/") !== false) {
-            if (preg_match("/\/plugins\/(\w+)/", $path, $matches)) {
+            if (preg_match("#/plugins/(\w+)#", $path, $matches)) {
                 $plugin = $matches[1];
                 $path = str_replace("/$version/src/wp-content/plugins/$plugin", "", $path);
                 return array($plugin, filesize($file), crc32($path), crc32($nospace_data), $file, "plugin");
@@ -234,7 +239,7 @@ function get_wordpress_hashes(string $root_dir) : array {
         }
         // is theme
         else if (stripos($path, "/wp-content/themes/") !== false) {
-            if (preg_match("/\/themes\/(\w+)/", $path, $matches)) {
+            if (preg_match("#/themes/(\w+)#", $path, $matches)) {
                 $theme = $matches[1];
                 $path = str_replace("/$version/src/wp-content/theme/$theme", "", $path);
                 return array($theme, filesize($file), crc32($path), crc32($nospace_data), $file, "theme");
