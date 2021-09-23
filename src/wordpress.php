@@ -80,7 +80,9 @@ function wp_parse_define(string $root) : array {
     if (count($defines) < 1) {
         $config_file = "$root/wp-config.php";
         $data = file($config_file);
-        $defines = array_reduce($data, '\BitFireWP\define_to_array', array());
+        if (!empty($data)) {
+            $defines = array_reduce($data, '\BitFireWP\define_to_array', array());
+        }
     }
 	return $defines;
 }
@@ -103,13 +105,30 @@ function wp_validate_cookie(string $cookie, string $root) : bool {
     if ($sql->empty()) { \TF\debug("wp-auth failed to load db user data"); return false; }
     $key_src = concat_fn("|")($data->at("username"), $sql->col("pass"), $data->at("exp"), $data->at("token"));
 
+    // first try to auth with data from the config file
     $key_list = array("auth", "secure_auth", "logged_in");
     foreach ($key_list as $name) {
         $key = hash_hmac('md5', $key_src, wp_fetch_salt($root, $name));
         $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
-        if (hash_equals($hash, $data->at("hmac"))) { \TF\debug("wp match [%s]", $name); return true; }
+        if (hash_equals($hash, $data->at("hmac"))) { \TF\debug("config key wp match [%s]", $name); return true; }
     }
+
+    // that failed, lets try the db salt and key (may need to try logged_in_key/salt also)
+    $db_salt = $db->fetch("SELECT option_value FROM " . $creds->prefix . "options where option_name = 'auth_salt'");
+    if (!$db_salt->empty()) {
+        $db_key = $db->fetch("SELECT option_value FROM " . $creds->prefix . "options where option_name = 'auth_key'");
+        if (!$db_salt->empty()) {
+            $salt = $db_salt->col('option_value')();
+            $key = $db_key->col('option_value')();
+            $full_key = $key . $salt;
+            $key = hash_hmac('md5', $key_src, $full_key);
+            $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
+            if (hash_equals($hash, $data->at("hmac"))) { \TF\debug("db key wp match [%s]", $name); return true; }
+        }
+    }
+
     \TF\debug("wp auth failed");
+    return false;
 }
 
 // return the wp cookie value
