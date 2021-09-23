@@ -2,6 +2,13 @@
 
 namespace DB;
 
+use Exception;
+use mysqli_result;
+
+#ini_set("mysqli.default_socket", "/var/run/mysqld/mysqld.sock");
+#phpinfo();
+#die();
+
 class Creds {
     public $username;
     public $password;
@@ -28,8 +35,10 @@ function glue(string $join, array $data, string $append_str = "") : string {
 }
 
 function quote($input) : ?string {
+    if (is_null($input)) { return 'null'; }
     if (is_numeric($input)) { return strval($input); }
     if (is_string($input)) { return "'".addslashes($input)."'"; }
+    if (is_bool($input)) { return $input ? 1 : 0; }
     return $input;
 }
 
@@ -51,11 +60,19 @@ function where_clause(array $data) : string {
 class DB {
     protected $_db;
     public $_errors;
+    public $logs;
+    protected $_log_enabled = false;
+    protected $_err_filter_fn;
 
     protected function __construct(?\mysqli $db) { $this->_db = $db; $this->_errors = array(); }
 
     public static function from(?\mysqli $mysqli) : DB { 
         return new DB($mysqli);
+    }
+
+    public function enable_log(bool $enable) : DB {
+        $this->_log_enabled = $enable;
+        return $this;
     }
 
     public static function cred_connect(?Creds $creds) : DB {
@@ -72,6 +89,31 @@ class DB {
         return DB::from(NULL);
     }
 
+    protected function _qb(string $sql) : bool {
+        $r = false;
+        try {
+            if ($this->_log_enabled) { $this->logs[] = $sql; }
+            $r = mysqli_query($this->_db, $sql); 
+        }
+        catch (Exception $e) { }
+        if ($r === false) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+        return (bool)$r;
+    }
+
+    protected function _qr(string $sql) : SQL {
+        $r = NULL;
+        try {
+            if ($this->_log_enabled) { $this->logs[] = $sql; }
+            $r = mysqli_query($this->_db, $sql); 
+        }
+        // silently swallow exceptions, will catch them in next line
+        catch (Exception $e) { }
+        if (!$r || !$r instanceof mysqli_result) {
+            $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+            return SQL::from(NULL, $sql);
+        }
+        return SQL::from(mysqli_fetch_all($r, MYSQLI_ASSOC), $sql);
+    }
 
     /**
      * build sql replacing {name} with values from $data[name] = value
@@ -86,39 +128,32 @@ class DB {
             return $result;
         }, $sql);
 
-        //echo "SQL [$new_sql]\n";
-        $result = mysqli_query($this->_db, $new_sql);
-        if ($result !== false) {
-            return SQL::from(mysqli_fetch_all($result, MYSQLI_ASSOC), $sql);
-        }
-        return SQL::from(NULL, $sql);
+        return $this->_qr($new_sql);
     }
 
-    public function insert(string $table, array $kvp) {
+
+    public function delete(string $table, array $where) : bool {
+        $sql = "DELETE FROM $table " . where_clause($where);
+        return $this->_qb($sql);
+    }
+
+    public function insert(string $table, array $kvp) : bool {
         $sql = "INSERT INTO $table (" . join(",", array_keys($kvp)) . ") VALUES (" . join(",", array_map('\DB\quote', array_values($kvp))) . ")";
-        //echo "SQL [$sql]\n";
-        $r = mysqli_query($this->_db, $sql); 
-        if (!$r) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
-        return (bool) $r;
+        return $this->_qb($sql);
     }
 
     public function insert_fn(string $table) : callable { 
-        $db = $this->_db;
-        return function(array $data) use ($table, $db) {
+        $t = $this;
+        return function(array $data) use ($table, $t) : bool {
             $sql = "INSERT INTO $table (" . join(",", array_keys($data)) . ") VALUES (" . join(",", array_map('\DB\quote', array_values($data))) . ")";
-            //echo "SQL [$sql]\n";
-            $r = mysqli_query($db, $sql); 
-            if (!$r) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
-            return (bool) $r;
+            // echo "$sql\n";
+            return $t->_qb($sql);
         };
     }
 
-    public function update(string $table, array $data, array $where) {
+    public function update(string $table, array $data, array $where) : bool {
         $sql = "UPDATE $table set " . glue(" = ", $data, ", ") .  where_clause($where);
-        //echo "SQL [$sql]\n";
-        $r = mysqli_query($this->_db, $sql); 
-        if (!$r) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
-        return (bool) $r;
+        return $this->_qb($sql);
     }
 
     /**
@@ -131,13 +166,12 @@ class DB {
         $name_list = array_reduce($props, function($carry, $item) { return $carry . ", " . $item->getName(); });
         $value_list = array_reduce($props, function($carry, $item) use ($data) { $name = $item->getName(); return $carry . ", " . $data->$name; });
         $sql = "INSERT INTO $table (" . trim($name_list, ", ") . ") VALUES (" . trim($value_list, ", ") . ")";
-        $r = mysqli_query($this->_db, $sql); 
-        if (!$r) $this->_errors[] = mysqli_error($this->_db);
-        return (bool) $r;
+        return $this->_qb($sql);
     }
 
     public function close() : void {
         if ($this->_db) { mysqli_close($this->_db); }
+        if (count($this->_errors) > 0) { file_put_contents("/tmp/php_db_errors.txt", print_r($this->_errors, true), FILE_APPEND); }
     }
 }
 
@@ -149,7 +183,7 @@ class SQL {
     protected $_sql;
     protected $_len;
 
-    public static function from(?array $x, string $sql_stmt="") : SQL { $sql = new SQL(); $sql->_x = $x; $sql->_len < (is_array($x)) ? count($x) : 0; $sql->_sql = $sql_stmt; return $sql; }
+    public static function from(?array $x, string $sql="") : SQL { $sql = new SQL(); $sql->_x = $x; $sql->_len < (is_array($x)) ? count($x) : 0; $sql->_sql = $sql; return $sql; }
     
     /**
      * set internal dataset to value of $name at current row index 
