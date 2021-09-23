@@ -36,7 +36,7 @@ function until(int $max, callable $f): bool {
 }
 
 // ghetto FP search
-function find(array $items, callable $f) {
+function search(array $items, callable $f) {
     for($i=0,$m=count($items);$i<$m;$i++) {
         $r = $f($items[$i], $i);
         if ($r !== null) {
@@ -224,7 +224,7 @@ function cuckoo_write_header(array $ctx, array $header): bool {
 function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
     $key_hashes = cuckoo_key($key);
  
-    return find($key_hashes, function(int $hash, int $index) use ($ctx) {
+    return search($key_hashes, function(int $hash, int $index) use ($ctx) {
         return cuckoo_read_header($ctx, $hash, function(array $header) use ($hash, $index, $ctx) {
             // return  empty headers, expired headers, or matching headers
             return ($header['expires'] > $ctx['now'] && $header['hash'] === $hash)
@@ -251,7 +251,7 @@ function set_flag_priority(int $flag, int $flag_priority): int {
 function cuckoo_find_header_for_write(array $ctx, string $key, int $priority): ?array {
     $key_hashes = cuckoo_key($key);
 
-    return find($key_hashes, function(int $hash, int $index) use ($ctx, $priority) {
+    return search($key_hashes, function(int $hash, int $index) use ($ctx, $priority) {
         return cuckoo_read_header($ctx, $hash, function($header) use ($hash, $priority, $index, $ctx) {
             // key matches, or is expired, or the priority is lower
             if ($header['hash'] === $hash || $header['expires'] < $ctx['now'] || 
