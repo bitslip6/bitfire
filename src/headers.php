@@ -45,6 +45,7 @@ function send_security_headers(\BitFire\Request $request) : void {
 }
 
 function core_headers(string $path) : void {
+	if (headers_sent()) { return; }
     header_remove('X-Powered-By');
     header_remove('Server');
 
