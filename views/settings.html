@@ -778,9 +778,13 @@
     <span class="visually-hidden">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">
+    <?php if ($has['shmop']) { ?>
     <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'shmop')" href="#">SHMOP</span></li>
+    <?php } if ($has['apcu']) { ?>
     <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'apcu')"  href="#">APCU</span></li>
+    <?php } if ($has['shm']) { ?>
     <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'shm')"  href="#">SHM</span></li>
+    <?php } ?>
     <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'nop')"  href="#">none</span></li>
   </ul>
 </div>
@@ -895,7 +899,7 @@
 
             <h4 class="card-header-title">
               Optional Settings
-              <small class="text-muted">
+              <small class="text-muted ml-4">
                 <a href="https://bitfire.co/system_settings">Learn about BitFire System Settings</a>
               </small>
             </h4>
@@ -961,9 +965,40 @@
                 </div>
               </div>
 
-             </div>
             </div>
           </div>
+        </div>
+
+        <hr class="my-5">
+
+        <div class="card">
+          <div class="card-header">
+
+            <h4 class="card-header-title">
+              PRO / PREMIUM licensing 
+              <small class="text-muted ml-4">
+                <a href="https://bitfire.co/pricing">Register for PRO / PREMIUM license</a>
+              </small>
+            </h4>
+
+          </div>
+          <div class="card-body">
+            <div class="row">
+
+              <div class="col-12 col-md-6">
+
+                <div class="form-group">
+                  <label class="form-label">
+                    BitFire PRO License
+                  </label>
+                  <small class="form-text text-muted">Receive your license via email after purchase</small>
+                  <?php echo \BitFire\text_input('pro_key'); ?>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
 
 
 

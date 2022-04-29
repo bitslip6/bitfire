@@ -23,7 +23,7 @@ const ACCESS_URL_URI = 13;
  * call replace function $fn if config $param = $value.  replace with $new_value
  */
 function replace_if_config(string $param, string $value, callable $fn, string $new_value) : bool {
-    if (CFG::str($param) == $value) { return $fn("$param = '$value'", "$param = '$new_value'"); }
+    if (CFG::str($param) == $value) { return $fn("/$param\s*=\s*['\"]?$value['\"]?/", "$param = \"$new_value\""); }
     return false;
 }
 

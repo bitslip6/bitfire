@@ -46,16 +46,19 @@ $error_handler = set_error_handler("\BitFire\onerr");
 
 try {
     \TF\parse_ini(WAF_DIR."config.ini");
-    \TF\debug("begin " . BITFIRE_SYM_VER);
+    \TF\debug("bitfire ver " . BITFIRE_SYM_VER);
     
+    // handle IP level blocks, requires single stat call for test
     if (\BitFire\Config::enabled("allow_ip_block", false)) {
         $blockfile = BLOCK_DIR . DS . at($_SERVER, Config::str_up('ip_header', 'REMOTE_ADDR'), '127.0.0.1');
         if (file_exists($blockfile) && filemtime($blockfile) > time()) { 
             $m1 = microtime(true);
+            $block = array("blocked IP address");
             \TF\debug("ip block: [" . round((($m1-$GLOBALS['start_time'])*1000),3) . "ms] time: " . \TF\utc_date("m/d @H.i.s") . " GMT");
             exit(include WAF_DIR."views/block.php");
         }
     }
+
 
     // todo: clean up
     if (strlen(Config::str('pro_key')>20) && file_exists(WAF_DIR."src/pro.php") ) { @include_once WAF_DIR . "src/pro.php"; @include_once WAF_DIR . "src/proapi.php"; }
@@ -77,7 +80,7 @@ try {
         ->doifnot(array($bitfire, 'cache_behind'));
 
     register_shutdown_function('\BitFire\post_request', $bitfire->_request, null, null);
-    \TF\debug("end");
+    \TF\debug("bitfire end");
 }
 catch (\Exception $e) {
     \BitFire\onerr($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
@@ -90,3 +93,7 @@ $m1 = microtime(true);
 //file_put_contents("/tmp/prof.pass.json", json_encode($data, JSON_PRETTY_PRINT));
 
 restore_error_handler();
+
+// add support for startup chaining 
+$autoload = Config::str("auto_prepend_file");
+if ($autoload !== "") { @include $autoload; }

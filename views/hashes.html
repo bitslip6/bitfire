@@ -573,7 +573,7 @@ function add_core_url(ver, data) {
 var diffed = {};
 var self_url = '<?php echo $self;?>';
 var file_list = <?php echo json_encode($file_list['files']); ?>;
-var num_files = file_list.length;
+var num_files = 0;
 
 var content = GBI("hash_template");
 var hash_renderer = _.template(content.innerText);
@@ -682,13 +682,16 @@ function showdiff(path, url, id, do_toggle=false) {
         // html += "// Local File ADDS Lines: " + ops[i][3] + " - " + last_line + "<br />\n";
         html2 = "";
         for(j=ops[i][3]; j<ops[i][4]; j++) {
-          let evil_line = evil(l2[j]);
-          if (num_replace++ < 100) {
-            line_nums += j + "\n";
-            let markup = Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n";
-            html2 += (evil_line) ? "<div class='evil'>" + markup + "</div>": markup;
+          if (l2[j].includes("/bitfire/startup.php")) { has_diff = false; } // ignore our bitfire include
+          else {
+            let evil_line = evil(l2[j]);
+            if (num_replace++ < 100) {
+              line_nums += j + "\n";
+              let markup = Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n";
+              html2 += (evil_line) ? "<div class='evil'>" + markup + "</div>": markup;
+            }
+            is_evil |= evil_line;
           }
-          is_evil |= evil_line;
         }
         if (is_evil)
         if (num_replace >= 100) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
@@ -724,7 +727,6 @@ function showdiff(path, url, id, do_toggle=false) {
     // console.log(has_diff, html);
     if (has_diff) {
       num_files++;
-      //console.log("HAS DIFF!", num_files);
       if (is_evil) {
           document.getElementById("icon"+id).src="https://bitfire.co/assets/malware.png";
           if (!do_toggle) {

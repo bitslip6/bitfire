@@ -142,7 +142,7 @@ function process_server2(array $server) : Request {
 
 
 function process_ip(array $server) : string {
-    $header_name = strtoupper(Config::str_up('ip_header', 'REMOTE_ADDR'));
+    $header_name = Config::str_up('ip_header', 'REMOTE_ADDR');
     $ip = "n/a";
     switch ($header_name) {
         case "FORWARDED":

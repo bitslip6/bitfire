@@ -201,15 +201,16 @@ function package_to_ver($path) : string {
  
 function dump_dirs() : array {
     $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
-    $ver = \BitFireSvr\get_wordpress_version($root);
+    $rootver = \BitFireSvr\get_wordpress_version($root);
     if ($root == NULL) { return NULL; }
 
     $d1 = "$root/wp-content/plugins";
     $d2 = "$root/wp-content/themes";
-    $all_paths = array_merge(get_subdirs($d1), get_subdirs($d2), get_subdirs("$root/wp-includes"), get_subdirs("$root/wp-admin"));
+    $all_paths = array_merge(get_subdirs($d1), get_subdirs($d2), ["$root/wp-includes", "$root/wp-admin"]);
     $all_subs = array();
     foreach ($all_paths as $full) {
         $path = str_replace($root, "", $full);
+        $ver = $rootver;
         if (file_exists("{$full}/package.json")) {
             $ver = package_to_ver("{$full}/package.json");
         }
@@ -377,7 +378,14 @@ function serve_settings(string $dashboard_path) {
     // authentication guard
     validate_auth($_SERVER['PHP_AUTH_PW']??'')->run();
 
-    render_view("settings.html", "BitFire Settings", array("dashboard_path" => $dashboard_path));
+    render_view("settings.html", "BitFire Settings", array(
+        "dashboard_path" => $dashboard_path,
+        "has" => array(
+            "shmop" => function_exists("shmop_open"),
+            "apcu" => function_exists("apcu_store"),
+            "shm" => function_exists("shm_put_var")
+        )
+    ));
 }
 
 

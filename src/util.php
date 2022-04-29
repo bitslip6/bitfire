@@ -888,7 +888,7 @@ function remove_lines(FileData $file, int $num_lines) : FileData {
 function persist_data(string $key, string $value) : \TF\Effect {
     $effect = Effect::new();
     if (CFG::enabled(CONFIG_COOKIES)) {
-        $maybe_cookie = \TF\decrypt_tracking_cookie($_COOKIE[CFG::str(CONFIG_USER_TRACK_COOKIE)] ?? '', CFG::str(CONFIG_ENCRYPT_KEY), $_SERVER[CFG::str("ip_header")], $_SERVER['HTTP_USER_AGENT']);
+        $maybe_cookie = \TF\decrypt_tracking_cookie($_COOKIE[CFG::str(CONFIG_USER_TRACK_COOKIE)] ?? '', CFG::str(CONFIG_ENCRYPT_KEY), $_SERVER[CFG::str_up("ip_header")], $_SERVER['HTTP_USER_AGENT']);
         if (!$maybe_cookie->empty()) {
             $maybe_cookie->set_if_empty();
         }
@@ -944,7 +944,7 @@ function prof_sort(array $a, array $b) : int {
 
 
 /**
- * replace file contents inline
+ * replace file contents inline, $find can be a regex or string
  */
 function file_replace(string $filename, string $find, string $replace) : bool {
     if (!file_exists($filename)) { 
@@ -952,7 +952,14 @@ function file_replace(string $filename, string $find, string $replace) : bool {
     }
     $in = file_get_contents($filename);
     \TF\debug("file replace [%s] [%s] in len [%d] ",$filename, $replace, strlen($in));
-    $out = str_replace($find, $replace, $in);
+    // regex
+    if ($find[0] == "/") {
+        $out = preg_replace($find, $replace, $in);
+    }
+    // standard replace
+    else {
+        $out = str_replace($find, $replace, $in);
+    }
     \TF\debug("file replace out len: " . strlen($out));
     return file_write($filename, $out);
 }
