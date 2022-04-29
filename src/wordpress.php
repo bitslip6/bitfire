@@ -1,9 +1,21 @@
 <?php
 namespace BitFireWP;
 
+use BitFire\Request;
+use TF\MaybeA;
+
+use const BitFire\DS;
+
+use function TF\PANIC_IFNOT;
 use function \TF\partial_right AS CAPR;
 require_once WAF_DIR . "src/db.php";
 
+
+function list_of_root_wordpress_files() : array {
+ return [
+"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php", "wp-config.php", "wp-config-sample.php", "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php", "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"
+];
+}
 
 class Parts {
     private $_x;
@@ -145,53 +157,99 @@ function wp_get_login_cookie(array $cookies) : string {
     return array_values($wp)[0];
 }
 
+function machine_date($time) : string {
+    return date("Y-m-d", (int)$time);
+}
 
+
+function bytes_to_kb($bytes) : string {
+    return round((int)$bytes / 1024, 1) . "Kb";
+}
+
+
+function wp_enrich_wordpress_hash_diffs(string $ver, string $doc_root, array $hash): array
+{
+    if (!isset($hash['path'])) { return $hash; }
+    $paths = explode('/', $hash['path']);
+    $out = '/' . trim($doc_root, '/') . ($hash['path'][0] != \TF\DS) ? \TF\DS : '' . $hash['path'];
+    $path = "https://core.svn.wordpress.org/tags/{$ver}{$hash['path']}";
+    if (strpos($doc_root, '/plugins') !== false) {
+        $path = "https://plugins.svn.wordpress.org/{$hash['name']}/tags/{$ver}/{$hash['path']}";
+        $hash['out'] = '/wp-content/plugins/' . $hash['name'] . $hash['path'];
+    } else if (strpos($doc_root, '/themes') !== false) {
+        $path = "https://themes.svn.wordpress.org/{$hash['name']}/{$ver}/{$hash['path']}";
+        $hash['out'] = '/wp-content/themes/' . $hash['name'] . $hash['path'];
+    } else {
+        $hash['out'] = $hash['path'];
+    }
+
+    $hash['mtime'] = filemtime($out);
+    $hash['url'] = $path;
+    $hash['ver'] = $ver;
+    $hash['doc_root'] = $doc_root;
+    $hash['machine_date'] = machine_date($hash['mtime']);
+    $hash['type'] = ($hash['size2']??$hash['size'] > 0) ? "WordPress file" : "Unknown file";
+    $hash['kb1'] = bytes_to_kb($hash['size']);
+    $hash['kb2'] = bytes_to_kb($hash['size2']??$hash['size']);
+    $hash['bgclass'] = ($hash['size2']??$hash['size'] > 0) ? "bg-success-soft" : "bg-danger-soft";
+    $hash['icon'] = ($hash['size2']??$hash['size'] > 0) ? "fe-check" : "fe-x";
+
+    return $hash;
+}
+
+/**
+ * unlock core / themes or plugins and relock after this request
+ * @param string $content_path relative path under wp-root
+ */
+function temp_lock_dir(string $content_path) {
+    \TF\debug("update wp");
+    if (function_exists("\BitFire\lock_site_dir")) {
+        \BitFire\lock_site_dir($content_path, false);
+        register_shutdown_function(function() use($content_path) {
+            \TF\debug("shutdown called re-lock: [$content_path]");
+            \BitFire\lock_site_dir($content_path, true);
+        });
+    }
+    else { \TF\debug("no lock site dir"); }
+
+}
+
+/**
+ * 
+ * @param Request $request 
+ * @param MaybeA $cookie 
+ * @return void 
+ */
 function wp_handle_admin(\BitFire\Request $request, \TF\MaybeA $cookie) {
     \TF\debug("wp_handle_admin");
     $root = \BitFire\Config::str("wp_root");
     if (empty($root)) { \TF\debug("no wp_root"); return; }
     if (strpos($request->path, "/wp-admin/") === false) { \TF\debug("no wp-admin"); return; }
     if ($request->post['action']??'' === "heartbeat") { return; }
-    \TF\debug("wp admin req %s", $request->path);
+    \TF\debug("wp admin request %s", $request->path);
 
-
-    // upgrade requested, or plugin stuff happening.  unlock for 1 hour.
-    if (\TF\contains($request->path, array("/plugins.php", "/upgrade.php")) || (isset($request->post['action']) && $request->post['action'] == "update-plugin")) {
-        if (!file_exists(WAF_DIR . "cache/unlock")) {
-            if (function_exists('\BitFire\file_site_dir')) {
-                touch(WAF_DIR . "cache/unlock", time() + 120);
-                \BitFire\file_site_dir($root, false);
-            }
-        }
-    }
-
-/*
-    // site admin on wp-admin
-    // allow editing htaccess and wp-config
     @chmod("$root/.htaccess", 0644);
     @chmod("$root/wp-config.php", 0644);
     register_shutdown_function(function() use ($root) {
         @chmod("$root/.htaccess", 0444);
-        @chmod("$root/wp-config", 0444);
+        @chmod("$root/wp-config.php", 0444);
     });
 
-    if (!isset($request->post['slug']) || !isset($request->post['action'])) { \TF\debug("slug"); return; }
-
-    if ($request->post['action']??'' === 'update-plugin' && isset($request->post['slug'])) {
-        \TF\debug("update  plugin");
-        $plugin = $request->post['slug'];
-        if (function_exists("\BitFire\lock_site_dir")) {
-            \BitFire\lock_site_dir($request, $plugin, false);
-            register_shutdown_function(function() use($request, $plugin) {
-                \TF\debug("shutdown called [$plugin]");
-                \BitFire\lock_site_dir($request, $plugin, true);
-            });
-            //die("LOCK $plugin\n");
-        }
-        else { \TF\debug("no lock site dir"); }
-        //die("no func lock!\n");
+    if (\TF\contains($request->path, array("/upgrade"))) {
+        temp_lock_dir("");
     }
-    else { \TF\debug("no slug or action"); }
-    //\TF\dbg($request);
-*/
+    // upgrade requested, or plugin stuff happening.  unlock for 1 hour.
+    if (\TF\contains($request->path, array("/update"))) {
+        // site admin on wp-admin
+        // allow editing htaccess and wp-config
+        if (\TF\contains($request->post['action']??'', 'update')) {
+            if (\TF\contains($request->post['action'], 'plugin')) {
+                temp_lock_dir("wp-content/plugins");
+            } 
+            else if (\TF\contains($request->post['action'], 'theme')) {
+                temp_lock_dir("wp-content/themes");
+            } 
+        }
+    }
+
 }
