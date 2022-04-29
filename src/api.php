@@ -1,10 +1,12 @@
 <?php
 namespace BitFire;
 
+use Exception;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
 use TF\CacheStorage;
+use TF\MaybeA;
 
 use function TF\bit_http_request;
 use function TF\ends_with;
@@ -31,7 +33,12 @@ function add_api_exception(\BitFire\Request $r, \TF\MaybeA $cookie) : string {
 }
 
 
-// TODO: refactor as effect
+/**
+ * PURE (except for reading the file)
+ * @param Request $r 
+ * @param MaybeA $cookie 
+ * @return void 
+ */
 function download(\BitFire\Request $r, \TF\MaybeA $cookie) : void {
 
 	$effect = \TF\Effect::new();
@@ -55,33 +62,101 @@ function download(\BitFire\Request $r, \TF\MaybeA $cookie) : void {
 }
 
 function diff(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
+    require_once WAF_DIR . "/src/server.php";
+    require_once WAF_DIR . "/src/wordpress.php";
+    $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
     \TF\debug(print_r($request->post, true));
+
     $orig = \TF\bit_http_request("GET", $request->post['url'], "");
-    $local = file_get_contents($request->post['out']);
+    $local = file_get_contents($root . $request->post['out']);
     $success = strlen($orig) > 0 && strlen($local) > 0;
-    $effect = \TF\Effect::new()->out(json_encode(array("success" => $success, "orig" => base64_encode($orig), "local" => base64_encode($local))));
+    $effect = \TF\Effect::new()->out(json_encode(array("success" => $success, "url" => $request->post['url'], "out" => $request->post['out'], "orig" => base64_encode($orig), "local" => base64_encode($local))));
     $effect->run();
 }
 
+// not DRY ripped from dashboard.php
+function dump_hash_dir(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
+    require_once WAF_DIR . "/src/server.php";
+    require_once WAF_DIR . "/src/wordpress.php";
+    $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+
+    $effect = \TF\Effect::new()->out(json_encode(array("success" => false, "data" => base64_encode('[]'))));
+    if (!empty($root) && isset($request->post['dir']) && strlen($request->post['dir']) > 1) { 
+        $ver = trim($request->post['ver'], '/');
+        $dirname = trim($request->post['dir'], '/');
+
+        $file_list = \TF\file_recurse("{$root}/{$dirname}", function($file) use ($root, $dirname) {
+            //$path = "{$root}/{$dirname}/{$file}";
+            $name = basename($file);
+            //return array('path' => $file);
+            return \BitFireSvr\hash_file($file, "{$root}/{$dirname}", 1, basename($dirname));
+        }, '/.*.php/', array());
+        
+
+        $hashes = array("ver" => $ver, "dirname" => $dirname, "int" => \BitFireSvr\text_to_int($ver), "root" => $root, "files" => $file_list);
+
+        //$result = \TF\bit_http_request("POST", "https://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+        $result = \TF\bit_http_request("POST", "https://bitfire.co/hash_compare.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+        $decoded = \TF\un_json($result);
+        /*
+        if ($dirname == "wp-content/plugins/akismet") {
+            echo "<pre>\n";
+            print_r($decoded);
+            \TF\dbg($hashes);
+        }
+        */
+
+        $dir_without_pluginname = dirname("{$root}/{$dirname}");
+
+        // remove files that passed
+        $filtered = array_filter($decoded, function ($file) {
+            return $file['r'] !== "PASS";
+        });
+
+
+        $num_files = count($file_list);
+        $enrich_fn  = \TF\partial('\BitFireWP\wp_enrich_wordpress_hash_diffs', $ver, $dir_without_pluginname);
+        $enriched = array("ver" => $ver, "count" => $num_files, "dirname" => "{$root}/{$dirname}", "int" => \BitFireSvr\text_to_int($ver), "root" => $root, "files" => array_map($enrich_fn, $filtered));
+
+        $effect = \TF\Effect::new()->out(json_encode(array("success" => ($num_files > 0), "data" => base64_encode(json_encode($enriched)))));
+    }
+    $effect->run();
+}
+
+
+
 // TODO: only allow fetching from wordpress.org, only allow wordpress file to overwrite
 function repair(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
+    require_once WAF_DIR . "/src/server.php";
+    require_once WAF_DIR . "/src/wordpress.php";
+    $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+
     \TF\debug(print_r($request->post, true));
     $effect = \TF\Effect::new();
     $orig = \TF\bit_http_request("GET", $request->post['url'], "");
     if (strlen($orig) > 1) {
-        $local = file_get_contents($request->post['filename']);
+        $local = file_get_contents($root . $request->post['filename']);
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode($local));
-        $out1 = $request->post['filename'].".bak.".mt_rand(10000,99999);
-        $out2 = $request->post['filename'];
-        if (is_writeable(dirname($out2)) && is_writable($out2)) {
+        $out1 = $root . $request->post['filename'].".bak.".mt_rand(10000,99999);
+        $out2 = $root . $request->post['filename'];
+        $outdir = dirname($out2);
+        $perm1 = fileperms($out2);
+        \TF\debug($perm1);
+        $perm2 = fileperms($outdir);
+        \TF\debug($perm2);
+        @chmod($out2, 0644);
+        @chmod($outdir, 0755);
+        if (is_writeable($outdir) && is_writable($out2)) {
             $quarantine_path = str_replace($_SERVER['DOCUMENT_ROOT'], WAF_DIR."quarantine/", $out1);
-            mkdir(dirname($quarantine_path), 0755, true);
-            file_put_contents($quarantine_path, $local);
-            file_put_contents($out2, $orig, LOCK_EX);
+            \TF\make_dir($quarantine_path, 0755);
+            @file_put_contents($quarantine_path, $local);
+            @file_put_contents($out2, $orig, LOCK_EX);
             $effect->out(json_encode(array("success" => true, "orig_size" => strlen($local), "new_size" => strlen($orig))));
         } else {
             $effect->out(json_encode(array("success" => false, "error" => "write permissions error '$out2'")));
         }
+        @chmod($out2, $perm1);
+        @chmod($outdir, $perm2);
     } else {
         $effect->out(json_encode(array("success" => false, "error" => "unable to read original file from wordpress.org")));
     }
@@ -275,16 +350,36 @@ function upgrade(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
 }
 
 function delete(\BitFire\Request $request, \TF\MaybeA $cookie) {
+
+    require_once WAF_DIR . "/src/server.php";
+    require_once WAF_DIR . "/src/wordpress.php";
+    $bfroot = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+    $root = empty($bfroot) ? $_SERVER['DOCUMENT_ROOT'] : $bfroot;
+
+    $effect = \TF\Effect::new();
     $f = $_REQUEST['value'];
-    if (\TF\ends_with($f, ".php") && file_exists($f)) {
-        $t = "$f.bak.".mt_rand(10000, 99999);
-        // attempt to make it writeable...
-        chmod($f, 0664);
-        $r = (rename($f, $t)) ? array("result" => "renamed $t") : array("result" => "error renaming $f to $t");
-        echo \TF\en_json($r);
+    if (strlen($f) > 1) {
+        $out1 = $root . $f.".bak.".mt_rand(10000,99999);
+        $src = $root . $f;
+        $srcdir = dirname($src);
+        $perm1 = fileperms($src);
+        $perm2 = fileperms($srcdir);
+        @chmod($src, 0644);
+        @chmod($srcdir, 0755);
+        $quarantine_path = str_replace($root, WAF_DIR."quarantine/", $out1);
+        \TF\make_dir($quarantine_path, 0755);
+        if (is_writeable($quarantine_path) && is_writable($src)) {
+            $r = rename($src, "{$quarantine_path}{$f}");
+            $effect->out(json_encode(array("success" => true, "result" => "renamed {$quarantine_path}{$f}")));
+        } else {
+            $effect->out(json_encode(array("success" => false, "result" => "write permissions error '$src'")));
+        }
+        @chmod($src, $perm1);
+        @chmod($srcdir, $perm2);
     } else {
-        echo \TF\en_json(array("result" => "error renaming $f to $t"));
+        $effect->out(json_encode(array("success" => false, "result" => "no file to delete")));
     }
+    $effect->run();
 }
 
 
@@ -300,9 +395,73 @@ function set_pass(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     exit(($wrote) ? "success" : "unable to write to: " . WAF_INI);
 }
 
+
+function remove_list_elm(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
+    // guards
+    if (!isset($request->post['config_name'])) { exit("missing config parameter"); }
+    if (!isset($request->post['config_value'])) { exit("missing config value parameter"); }
+    if (!isset($request->post['index'])) { exit("missing index parameter"); }
+    $v = $request->post['config_value'];
+    $n = $request->post['config_name'];
+
+    $newlines = array();
+    $lines = file(WAF_INI);
+    $found = false;
+    $replaced = false;
+    foreach ($lines as $line) {
+        if (strstr($line, $n) != false) {
+            $found = true;
+        }
+        if ($found && !$replaced) {
+            if (strstr($line, $v) !== false) {
+                $replaced = true;
+                continue;
+            }
+        }
+        $newlines[] = $line;
+    }
+
+    exit(file_put_contents(WAF_INI, join("", $newlines), LOCK_EX) ? "success" : "unable to write to: " . WAF_INI);
+}
+
+// test this
+function add_list_elm(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
+    // guards
+    if (!isset($request->post['config_name'])) { exit("missing config parameter"); }
+    if (!isset($request->post['config_value'])) { exit("missing config value parameter"); }
+    $v = $request->post['config_value'];
+    $n = $request->post['config_name'];
+
+    $newlines = array();
+    $lines = file(WAF_INI);
+    $found = false;
+    $replaced = false;
+    foreach ($lines as $line) {
+        if (!$found && strstr($line, $n) != false) {
+            $found = true;
+            $newlines[] = "{$n}[] = \"$v\"\n";
+        }
+        $newlines[] = $line;
+    }
+
+    exit(file_put_contents(WAF_INI, join("", $newlines), LOCK_EX) ? "success" : "unable to write to: " . WAF_INI);
+}
+
+
+
+
+/**
+ * 
+ * @param Request $request 'param' is parameter name, 'value' is the value to set to [off|false, alert|report, true|block]
+ * @param MaybeA $cookie 
+ * @return void 
+ */
 function toggle_config_value(\BitFire\Request $request, \TF\MaybeA $cookie) : void {
     if (!is_writable(WAF_INI)) {
-        exit("fail, config.ini not writeable");
+        @chmod(WAF_INI, 0644);
+        if (!is_writable(WAF_INI)) {
+            exit("fail, config.ini not writeable");
+        }
     }
 
     $input = file_get_contents(WAF_INI);
@@ -312,7 +471,7 @@ function toggle_config_value(\BitFire\Request $request, \TF\MaybeA $cookie) : vo
         $value = "false";
     } else if ($value === "alert" || $value === "report") {
         $value = "report";
-    } else if ($value === "true" || $value === "block") {
+    } else if ($value === "true" || $value === "block" ||$value == "on") {
         $value = "true";
     }
 
