@@ -4,6 +4,8 @@ namespace DB;
 
 use Exception;
 use mysqli_result;
+use TF\MaybeA;
+use TF\MaybeStr;
 
 #ini_set("mysqli.default_socket", "/var/run/mysqld/mysqld.sock");
 #phpinfo();
@@ -26,6 +28,7 @@ class Creds {
 
 function glue(string $join, array $data, string $append_str = "") : string {
     $result = "";
+    var_export($data);
     foreach ($data as $key => $value) {
         if ($result != '') { $result .= $append_str; }
         if ($key[0] === '!') { $key = substr($key, 1); $result .= "`{$key}` $join $value"; }
@@ -60,8 +63,9 @@ function where_clause(array $data) : string {
 class DB {
     protected $_db;
     public $_errors;
-    public $logs;
+    public $logs = array();
     protected $_log_enabled = false;
+    protected $_simulation = false;
     protected $_err_filter_fn;
 
     protected function __construct(?\mysqli $db) { $this->_db = $db; $this->_errors = array(); }
@@ -74,6 +78,12 @@ class DB {
         $this->_log_enabled = $enable;
         return $this;
     }
+
+    public function enable_simulation(bool $enable) : DB {
+        $this->_simulation = $enable;
+        return $this;
+    }
+
 
     public static function cred_connect(?Creds $creds) : DB {
         if ($creds == NULL) { return DB::from(NULL); }
@@ -89,27 +99,49 @@ class DB {
         return DB::from(NULL);
     }
 
+    /**
+     * run SQL $sql return result as bool. errors stored tail($this->_errors)
+     */
     protected function _qb(string $sql) : bool {
         $r = false;
         try {
             if ($this->_log_enabled) { $this->logs[] = $sql; }
-            $r = mysqli_query($this->_db, $sql); 
+            if (!$this->_simulation) {
+                $r = mysqli_query($this->_db, $sql); 
+            }
         }
-        catch (Exception $e) { }
-        if ($r === false) $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+        catch (Exception $e) { 
+            echo "EXCEPTION:\n";
+            print_r($e);
+        }
+        if ($r === false) {
+            $errno = mysqli_errno($this->_db);
+            $err = "[$sql] errno($errno) " . mysqli_error($this->_db);
+            if ($errno != 1062) {
+                echo "$err\n";
+            }
+            $this->_errors[] = $err;
+        }
         return (bool)$r;
     }
 
+    /**
+     * run SQL $sql return result as bool. errors stored tail($this->_errors)
+     */
     protected function _qr(string $sql) : SQL {
         $r = NULL;
         try {
             if ($this->_log_enabled) { $this->logs[] = $sql; }
-            $r = mysqli_query($this->_db, $sql); 
+            if (!$this->_simulation) {
+                $r = mysqli_query($this->_db, $sql); 
+            }
         }
         // silently swallow exceptions, will catch them in next line
         catch (Exception $e) { }
         if (!$r || !$r instanceof mysqli_result) {
-            $this->_errors[] = "[$sql] " . mysqli_error($this->_db);
+            $errno = mysqli_errno($this->_db);
+            $err = "[$sql] errno($errno) " . mysqli_error($this->_db);
+            $this->_errors[] = $err;
             return SQL::from(NULL, $sql);
         }
         return SQL::from(mysqli_fetch_all($r, MYSQLI_ASSOC), $sql);
@@ -142,14 +174,39 @@ class DB {
         return $this->_qb($sql);
     }
 
+    /**
+     * return a function that will insert key value pairs into $table.  keys are column names, values are data to insert.
+     * @param string $table the table name
+     * @return callable 
+     */
     public function insert_fn(string $table) : callable { 
         $t = $this;
         return function(array $data) use ($table, $t) : bool {
-            $sql = "INSERT INTO $table (" . join(",", array_keys($data)) . ") VALUES (" . join(",", array_map('\DB\quote', array_values($data))) . ")";
+            $sql = "INSERT INTO $table (" . join(",", array_keys($data)) . 
+                ") VALUES (" . join(",", array_map('\DB\quote', array_values($data))) . ")";
             // echo "$sql\n";
             return $t->_qb($sql);
         };
     }
+    /**
+     * return a function that will insert key value pairs into $table.
+     * @param string $table the table name
+     * @param array $columns coulmn names in (col1, col2) or (col->data) format
+     * @return callable that takes KVP ordered in $columns order. 
+     *         pass null as KVP data to run the bulk query
+     */
+    public function bulk_fn(string $table, array $columns) : callable { 
+        $t = $this;
+        $sql = "INSERT INTO $table (" . join(",", array_keys($columns)) . ") VALUES ";
+        return function(?array $data = null) use (&$sql) : bool {
+            if ($data !== null) {
+                $sql .= join(",", array_map('\DB\quote', array_values($data))) . ")";
+                return false;
+            }
+            return $this->_qb($sql);
+        };
+    }
+
 
     public function update(string $table, array $data, array $where) : bool {
         $sql = "UPDATE $table set " . glue(" = ", $data, ", ") .  where_clause($where);
@@ -207,6 +264,9 @@ class SQL {
         return $this;
     }
 
+    /**
+     * @return MaybeStr of column $name at current row index
+     */
     public function col(string $name) : \TF\MaybeSTR {
         if (isset($this->_x[$this->_idx])) {
             return \TF\MaybeStr::of($this->_x[$this->_idx][$name]??NULL);
@@ -215,7 +275,7 @@ class SQL {
     }
 
     /**
-     * return true if column name has a row with at least one value of $value 
+     * @return bool true if column name has a row with at least one value of $value 
      */
     public function in_set(string $name, string $value) : bool {
         return array_reduce($this->_x, function ($carry, $item) use ($name, $value) {
@@ -223,6 +283,9 @@ class SQL {
         }, false);
     }
 
+    /**
+     * @return MaybeA of result row at $idx or current row indx
+     */
     public function row(?int $idx = NULL) : \TF\MaybeA {
         $idx = ($idx !== NULL) ? $idx : $this->_idx;
         if (isset($this->_x[$idx])) {

@@ -89,7 +89,10 @@ function file_data(string $filename) : FileData {
 /**
  * debug output
  */
-function dbg($x) {echo "<pre>";print_r($x);die("\nFIN"); }
+function PANIC_IFNOT($condition, $msg = "") {
+    if (!$condition) { dbg($msg, "PANIC"); }
+}
+function dbg($x, $msg="") {echo "<pre>\n[$msg]\n";print_r($x);die("\nFIN"); }
 function each_yield_kv(Traversable $data, callable $fn) { $result = array(); foreach ($data as $item) { $y = $fn($item); $result[$y->key()] = $y->current(); } return $result; }
 function do_for_each(array $data, callable $fn) { $r = array(); foreach ($data as $elm) { $r[] = $fn($elm); } return $r; }
 function do_for_all_key_names(array $data, array $keynames, callable $fn) { foreach ($keynames as $item) { $fn($data[$item], $item); } }
@@ -126,29 +129,41 @@ function url_compare(string $haystack, string $needle) : bool { return (ends_wit
 function find(array $list, callable $fn) { foreach ($list as $item) { $x = $fn($item); if (!empty($x)) { return $x; }} return NULL; }
 function rename_key(array $data, string $src, string $dst) { $data[$dst] = $data[$src]; unset($data[$src]); return $data; }
 
+// find the first match (preg_match) of matches in $input, or null
+function find_match(string $input, array $matches) : ?array {
+    return array_reduce($matches, function ($carry, $x) use ($input) {
+        if ($carry == null && preg_match($x, $input, $matches) !== false) { return $matches; }
+        return $carry;
+    }, null);
+}
+
 /**
  * recursively perform a function over directory traversal.
  */
-function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL, array $result = array()) : array {
-    $maxfiles = 5000;
+function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL, array $result = array(), $max_results = 20000) : array {
+    $maxfiles = 20000;
+    $result_count = count($result);
+
     if ($dh = \opendir($dirname)) {
-        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0) {
+        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0 && $result_count < $max_results) {
             $path = $dirname . '/' . $file;
             if (!$file || $file === '.' || $file === '..') {
                 continue;
             }
             if (($regex_filter != NULL && preg_match($regex_filter, $path)) || $regex_filter == NULL) {
                 $x = $fn($path);
-                if (!empty($x)) { $result[] = $x; }
+                if (!empty($x)) { $result[] = $x; $result_count++; }
             }
             if (is_dir($path) && !is_link($path)) {
                 if (!preg_match("#\/uploads\/?$#", $path)) {
-                    $result = file_recurse($path, $fn, $regex_filter, $result);
+                    $result = file_recurse($path, $fn, $regex_filter, $result, $max_results);
+                    $result_count = count($result);
                 }
 			}
         }
         \closedir($dh);
     }
+
     return $result;
 }
 
@@ -239,9 +254,9 @@ function partial_right(callable $fn, ...$args) : callable {
  * Effect helper
  * NOT PURE!
  */
-function header_send(string $key, string $value) : void {
-    \TF\debug("header_send [$key] = [$value]");
-    header("$key: $value");
+function header_send(string $key, ?string $value) : void {
+    $content = ($value != null) ? "$key: $value"  : $key;
+    header($content);
 }
 
 
@@ -276,7 +291,7 @@ class Effect {
     // response content effect
     public function out(string $line) : Effect { $this->out .= $line; return $this; }
     // response header effect
-    public function header(string $name, string $value) : Effect { $this->headers[$name] = $value; return $this; }
+    public function header(string $name, ?string $value) : Effect { $this->headers[$name] = $value; return $this; }
     // response cookie effect
     public function cookie(string $value) : Effect { $this->cookie = $value; return $this; }
     // response code effect
@@ -549,13 +564,19 @@ function map_reduce(array $map, callable $fn, $carry = "") {
 }
 
 /**
- * more of a map_whilenot
+ * more of a map_whilenot, ugly handling of null third parameter - $input
  * PURE as $fn
  */
 function map_whilenot(array $map, callable $fn, $input) {
     $maybe = \TF\Maybe::$FALSE;
-    foreach ($map as $key => $value) {
-        $maybe = $maybe->doifnot($fn($key, $value, $input));
+    if ($input !== null) {
+        foreach ($map as $key => $value) {
+            $maybe = $maybe->doifnot($fn($key, $value, $input));
+        }
+    } else {
+        foreach ($map as $key => $value) {
+            $maybe = $maybe->doifnot($fn($key, $value));
+        }
     }
     return $maybe;
 }
@@ -812,11 +833,13 @@ function debug(string $fmt, ...$args) : void {
 
     static $idx = 0;
     if (CFG::enabled("debug_file")) {
-        file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt $idx\n", ...$args), FILE_APPEND);
-    } else if (CFG::enabled("debug_header") && !headers_sent()) {
-        $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), substr(sprintf($fmt, ...$args), 0, 128));
-        header("x-bitfire-$idx: $tmp");
-        $idx++;
+        file_put_contents(CFG::str("debug_file", "/tmp/bitfire.debug.log"), sprintf("$fmt  .$idx\n", ...$args), FILE_APPEND);
+    } else if (CFG::enabled("debug_header")) {
+        if (!headers_sent()) {
+            $tmp = str_replace(array("\r","\n",":"), array("\t","\t","->"), substr(sprintf($fmt, ...$args), 0, 128));
+            header("x-bitfire-$idx: $tmp");
+            $idx++;
+        }
     }
     //else if (CFG::enabled("debug_echo")) { printf("$fmt\n", ...$args); }
 }
@@ -858,6 +881,24 @@ function remove_lines(FileData $file, int $num_lines) : FileData {
     return $file;
 }
 
+/**
+ * unused 
+ * @date 4/15/22
+ */
+function persist_data(string $key, string $value) : \TF\Effect {
+    $effect = Effect::new();
+    if (CFG::enabled(CONFIG_COOKIES)) {
+        $maybe_cookie = \TF\decrypt_tracking_cookie($_COOKIE[CFG::str(CONFIG_USER_TRACK_COOKIE)] ?? '', CFG::str(CONFIG_ENCRYPT_KEY), $_SERVER[CFG::str("ip_header")], $_SERVER['HTTP_USER_AGENT']);
+        if (!$maybe_cookie->empty()) {
+            $maybe_cookie->set_if_empty();
+        }
+       
+
+    }
+
+    return $effect;
+}
+
 
 /**
  * sets a cookie in a browser in various versions of PHP
@@ -878,6 +919,18 @@ function cookie(string $name, string $value, int $exp) : void {
             'samesite' => 'strict'
         ]);
     }
+}
+
+/**
+ * make $dir_name if it does not exist, mode 0644, 0755, etc
+ * @return bool true if directory was newly created, false if it exists
+ */
+function make_dir(string $dir_name, $mode) : bool {
+    if (!file_exists(dirname($dir_name))) {
+        @mkdir(dirname($dir_name), $mode, true);
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -904,6 +957,11 @@ function file_replace(string $filename, string $find, string $replace) : bool {
     return file_write($filename, $out);
 }
 
+/** boolean to string (true|false) */
+function b2s(bool $input) :string {
+    return ($input) ? "true" : "false";
+}
+
 function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
     $len = strlen($content);
     $result = (@file_put_contents($filename, $content, $opts) === $len);
@@ -928,6 +986,7 @@ function parse_ini(string $ini_src) : void {
     } else {
         $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
         CFG::set($config);
+        @chmod($parsed_file, 0644);
         if (CFG::enabled("cache_ini_files") && is_writable($parsed_file)) {
             if (!file_write($parsed_file, "<?php\n\$config=". var_export($config, true).";\n")) {
                 if (is_writable($ini_src)) {
@@ -940,6 +999,7 @@ function parse_ini(string $ini_src) : void {
             require_once WAF_DIR . "src/server.php";
             \BitFireSvr\update_config($ini_src);
         }
+        @chmod($parsed_file, 0444);
     }
 
     check_pro_ver(CFG::str("pro_key"));
@@ -1034,10 +1094,15 @@ function array_shuffle(array $in) : array {
  * TODO: create test function
  * PURE!
  */
-function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeA {
-    static $r = NULL;
-    if ($r == NULL) {
-        $r = \TF\decrypt_ssl($encrypt_key, $cookie_data)
+function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, string $src_ip, string $agent) : \TF\MaybeStr {
+    static $r = null;
+    // don't bother decrypting if we have no cookie data
+    if (empty($cookie_data)) { return \TF\MaybeStr::of(false); }
+    if ($r === null) { $r = \TF\MaybeStr::of(false); }
+
+    $r->doifnot(function() use ($cookie_data, $encrypt_key, $src_ip, $agent) {
+
+        return \TF\decrypt_ssl($encrypt_key, $cookie_data)
             ->then("TF\\un_json")
             ->if(function($cookie) use ($src_ip, $agent) {
                 if (!isset($cookie['wp']) && !isset($cookie['ip']) && !isset($cookie['lck'])) {
@@ -1054,6 +1119,7 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
                     return ($cookie_match && $time_good && $agent_good);
                 } else { return true; }
             });
-    }
+    });
     return $r;
 }
+

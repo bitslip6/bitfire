@@ -6,6 +6,7 @@ use TF\Effect as Effect;
 
 use function TF\utc_date;
 
+
 /**
  * dashboard view helper
  */
@@ -122,7 +123,7 @@ function process_server2(array $server) : Request {
     $request->agent = strtolower($server['HTTP_USER_AGENT'] ?? '');
     $request->path = ($url['path'] ?? '/');
     $request->method = ($server['REQUEST_METHOD'] ?? 'GET');
-    $request->port = ($server['SERVER_PORT'] ?? 8080);
+    $request->port = intval($server['SERVER_PORT'] ?? 8080);
     $request->scheme = ($server['REQUEST_SCHEME'] ?? 'http');
 
     $headers = new Headers();
@@ -132,7 +133,7 @@ function process_server2(array $server) : Request {
     $headers->accept = ($server['HTTP_ACCEPT'] ?? '');
     $headers->content = ($server['HTTP_CONTENT_TYPE'] ?? '');
     $headers->dnt = ($server['HTTP_DNT'] ?? '');
-    $headers->upgrade_insecure = ($request->scheme === 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? null) : null;
+    $headers->upgrade_insecure = ($request->scheme === 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? '') : '';
     $headers->content_type = ($server['HTTP_CONTENT_TYPE'] ?? 'text/html');
 
     $request->headers = $headers;
@@ -440,7 +441,7 @@ function ip_block(Block $block, Request $request, int $block_time) : Effect {
     $exp = time() + $block_time;
     $block_info = json_encode(array('time' => \TF\utc_time(), "block" => $block, "request" => $request));
     return 
-        Effect::new()->file(new \TF\FileMod($blockfile, $block_info, LOCK_EX, $exp));
+        Effect::new()->file(new \TF\FileMod($blockfile, $block_info, 0664, $exp));
 
 }
 
