@@ -9,13 +9,13 @@
     "authors": [
         {
             "name": "Cory Marsh",
-            "email": "info@bitfire.com",
-            "homepage": "http://bitslip6.com/",
+            "email": "info@bitslip6.com",
+            "homepage": "http://bitfire.co/",
             "role": "Architect"
         }
     ],
     "support": {
-        "email": "info@bitfire.com",
+        "email": "info@bitslip6.com",
         "issues": "https://github.com/bitslip6/bitfire/issues",
         "chat": "https://discord.com/channels/793172132191928341/793172132673880065",
         "wiki": "https://github.com/bitslip6/bitfire/wiki"
