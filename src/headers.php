@@ -24,6 +24,7 @@ function header_report(\BitFire\Request $request) : void {
  */
 function send_security_headers(\BitFire\Request $request) : void {
     if (!$request) { return; }
+	if (headers_sent()) { return; }
 
     $path = $request->host . $request->path . "?" . \BitFire\BITFIRE_INTERNAL_PARAM . "=report";
     core_headers($path);
@@ -45,7 +46,6 @@ function send_security_headers(\BitFire\Request $request) : void {
 }
 
 function core_headers(string $path) : void {
-	if (headers_sent()) { return; }
     header_remove('X-Powered-By');
     header_remove('Server');
 
