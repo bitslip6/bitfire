@@ -3,10 +3,15 @@
 namespace BitFire;
 
 use \BitFire\Config as CFG;
+use FunctionalWP\Effect;
+use TF\Effect as TFEffect;
+
 use function TF\file_recurse;
 
 require_once WAF_DIR . "src/api.php";
 require_once WAF_DIR . "src/const.php";
+require_once WAF_DIR . "src/wordpress.php";
+require_once WAF_DIR . "src/server.php";
 
 const PAGE_SZ = 30;
 
@@ -33,6 +38,69 @@ function str_replace_first($from, $to, $content)
     $from = '/'.preg_quote($from, '/').'/';
     return preg_replace($from, $to, $content, 1);
 }
+
+/**
+ * used in settings.html
+ * @return void 
+ */
+function chked(string $config_name) :void {
+    if (Config::enabled($config_name)) { echo "checked"; }
+}
+
+function text_input(string $config_name, string $styles="", string $type="text") :string {
+    $value = CFG::str($config_name);
+    $str = '
+    <div id="%s_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="visually-hidden">Saving...</span>
+    </div>
+    <input type="%s" class="form-control txtin" id="%s_text" onchange="update_str(\'%s\')" value="%s" style="%s">';
+    return sprintf($str, $config_name, $type, $config_name, $config_name, $value, $styles);
+
+}
+
+
+function toggle_report(string $config_name, string $tooltip = "", bool $onoff = false) :string {
+    $alert = alert_or_block(CFG::str($config_name));
+    $check1 = ($alert == "report") ? "checked" : "";
+    $check2 = ($alert == "on") ? "checked" : "";
+    if (empty($tooltip)) { $tooltip == $config_name; }
+    $tail1 = ($onoff) ? "" : " in alert mode only";
+    $tail2 = ($onoff) ? "" : " in full blocking";
+    $tool1 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="Enable '.$tooltip.$tail1.'"';
+    $tool2 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="Enable '.$tooltip.$tail2.'"';
+    $format = 
+    '<div id="%s_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="visually-hidden">Saving...</span>
+    </div>';
+    $format .= ($onoff == false) ? '<div class="form-check form-switch left">
+        <input class="form-check-input warning" id="%s_report" type="checkbox" onclick="return toggle_report(\'%s\', true)" %s %s>
+    </div>' : '<!-- %s %s %s %s -->';
+
+    $format .= '
+    <div class="form-switch right">
+        <input class="form-check-input success" id="%s_block" type="checkbox" onclick="return toggle_report(\'%s\', false)" %s %s>
+    </div><script type="text/javascript">window.CONFIG_LIST["%s"] = "%s"; </script>';
+    return sprintf($format, $config_name, $config_name, $config_name, $check1, $tool1, $config_name, $config_name, $check2, $tool2, $config_name, $alert);
+}
+
+function list_text_inputs(string $config_name) :void {
+    $list = CFG::arr($config_name);
+    $idx = 0;
+    echo '<script type="text/javascript">window.list_'.$config_name.' = '.json_encode($list).';</script>'."\n";
+    foreach ($list as $element) {
+        $id = $config_name.'-'.$idx;
+        echo '
+        <div style="margin-bottom:5px;" id="item_'.$id.'">
+        <input type="text" disabled id="list_'.$id.'" class="form-control txtin" style="width:80%;float:left;margin-right:10px" value="'.$element.'">
+        <div class="fe fe-trash-2 btn btn-danger" style="cursor:pointer;padding-top:10px;padding-left:10px;" title="remove list element" onclick="remove_list(\''.$config_name.'\', \''.$element.'\', '.$idx.')"></div></div>'; 
+        $idx++;
+    }
+    echo '
+    <div style="margin-bottom:5px;">
+    <input type="text" id="new_'.$config_name.'" class="form-control txtin" style="width:80%;float:left;margin-right:10px" value="" placeholder="new entry">
+    <div class="fe fe-plus btn btn-success" style="cursor:pointer;padding-top:10px;padding-left:10px;" title="add new list element" onclick="add_list(\''.$config_name.'\')"></div></div>'; 
+}
+
 
 function country_enricher(array $country_info): callable
 {
@@ -74,19 +142,19 @@ function is_locked(): bool
     $lockfile = WAF_DIR . "/cache/locked.txt";
     if (file_exists($lockfile)) {
         $r = file_get_contents($lockfile);
-        return ($r == "1") ? true : false;
+        return ($r == "1") ? true : false; 
     }
 
     $ctr = 0;
-    file_recurse($_SERVER['DOCUMENT_ROOT'], function ($file) use (&$ctr) {
+    file_recurse($_SERVER['DOCUMENT_ROOT'], function ($file) use (&$ctr, $lockfile) {
         if (is_writeable($file)) {
             $ctr++;
-			return $file;
+            if ($ctr == 1) {
+                file_put_contents($lockfile, ($ctr <= 1) ? "1" : "0");
+            }
         }
     }, "/.php$/", array(), 2);
-
-    \TF\debug("lock ctr 3: [$ctr]");
-    file_put_contents($lockfile, ($ctr <= 1) ? "1" : "0");
+    \TF\debug("lock ctr: [$ctr]");
     return ($ctr <= 1);
 }
 
@@ -96,45 +164,108 @@ function url_to_path($url)
     return substr($url, $idx);
 }
 
+function get_subdirs(string $dirname) {
+    $dirs = array();
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false) {
+            $path = $dirname . '/' . $file;
+            if (!$file || $file === '.' || $file === '..') {
+                continue;
+            }
+            if (is_dir($path) && !is_link($path)) {
+                $dirs[] = $path;
+			}
+        }
+        \closedir($dh);
+    }
+
+    return $dirs;
+}
+
+/**
+ * return the version number for a package.json or readme.txt file
+ * @param mixed $path 
+ * @return string 
+ */
+function package_to_ver($path) : string {
+    $text = file_get_contents($path);
+    if (preg_match("/stable tag[\'\":\s]+([\d\.]+)/i", $text, $matches)) {
+        return $matches[1];
+    }
+    if (preg_match("/version[\'\":\s]+([\d\.]+)/i", $text, $matches)) {
+        return $matches[1];
+    }
+    return "0";
+}
+
+ 
+function dump_dirs() : array {
+    $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+    $ver = \BitFireSvr\get_wordpress_version($root);
+    if ($root == NULL) { return NULL; }
+
+    $d1 = "$root/wp-content/plugins";
+    $d2 = "$root/wp-content/themes";
+    $all_paths = array_merge(get_subdirs($d1), get_subdirs($d2), get_subdirs("$root/wp-includes"), get_subdirs("$root/wp-admin"));
+    $all_subs = array();
+    foreach ($all_paths as $full) {
+        $path = str_replace($root, "", $full);
+        if (file_exists("{$full}/package.json")) {
+            $ver = package_to_ver("{$full}/package.json");
+        }
+        if (file_exists("{$full}/readme.txt")) {
+            $ver = package_to_ver("{$full}/readme.txt");
+        }
+        $all_subs[$path] = $ver;
+    };
+    return $all_subs;
+}
+
 function dump_hashes()
 {
-    require_once WAF_DIR . "/src/server.php";
-    \TF\debug("search roots: "  . \TF\en_json($_SERVER['DOCUMENT_ROOT']));
-    $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
-    \TF\debug("found roots: " . \TF\en_json($roots));
-
-    if (count($roots) < 1) { return array(); }
+    $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+    if ($root == NULL) { return NULL; }
     
-    // save ref to hashes and match with response...
-    $hashes = array_map('\BitFireSvr\get_wordpress_hashes', $roots);
-    $hashes = array_filter($hashes, function ($x) {
-        if (count($x['files']) > 1) {
-            \TF\debug("num files: " . count($x['files']));
-            return true;
-        }
-    return false;
+    // get all wordpress root files
+    $wp_root_files = array_map(function($x) use ($root) { return "$root/$x"; }, \BitFireWP\list_of_root_wordpress_files());
+    //$wp_root_files = \TF\file_recurse("$root/wp-includes", function ($x) { return $x; }, "/.*.php/", $wp_root_files);
+    //$wp_root_files = \TF\file_recurse("$root/wp-admin", function ($x) { return $x; }, "/.*.php/", $wp_root_files);
+
+
+    // remove config files
+    $wp_root_files = array_filter($wp_root_files, function ($x) { return !\TF\contains($x, "config"); });
+    // function to hash the wp files
+    $hash_fn = \TF\partial_right('\BitFireSvr\hash_file', $root, 0, "");
+    // wordpress version in $root
+    $ver = \BitFireSvr\get_wordpress_version($root);
+    // hash filelist and store in array with root path, and version
+    $hashes = array("ver" => $ver, "int" => \BitFireSvr\text_to_int($ver), "root" => $root, "files" => array_map($hash_fn,  $wp_root_files));
+
+    // send these hashes to the server for checking against the database
+    //$result = \TF\bit_http_request("POST", "https://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+    $result = \TF\bit_http_request("POST", "https://bitfire.co/hash_compare.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
+    // decode the result of the server test
+    $decoded = \TF\un_json($result);
+
+    // remove files that passed check
+    $filtered = array_filter($decoded, function ($file) {
+        return $file['r'] != "PASS";
     });
-    //file_put_contents("/tmp/hash.txt", json_encode($hashes, JSON_PRETTY_PRINT));
-    //exit(\TF\en_json($hashes));
-    //\TF\bit_http_request("POST", "http://bitfire.co/hash.php", "[{'ver':1,'files':[[0,1,2,3,4]}]");
+
+
+    $num_files = count($wp_root_files);
+    $enrich_fn  = \TF\partial('\BitFireWP\wp_enrich_wordpress_hash_diffs', $ver, $root);
+    $enriched = array("ver" => $ver, "count" => $num_files, "int" => \BitFireSvr\text_to_int($ver), "root" => $root, "files" => array_map($enrich_fn, $filtered));
+
+    return $enriched;
 
     /*
-    foreach ($hashes as $root)
-        $offset = 0;
-        while ($offset < count($root['files'])) {
-*/
-    $result = \TF\bit_http_request("POST", "https://bitfire.co/hash.php", \base64_encode(\TF\en_json($hashes)), array("Content-Type" => "application/json"));
-
-    //file_put_contents("/tmp/hash2.txt", json_encode($result, JSON_PRETTY_PRINT));
-    $decoded = \TF\un_json($result);
-    //\TF\dbg($result);
-
-    //        }
-    //    }
 
 
 
-    $fix_files = array('ver' => $hashes[0]['ver'], 'root' => $roots[0], 'files' => array());
+
+
+    $fix_files = array('ver' => $hashes['ver'], 'root' => $root, 'files' => array());
     if ($decoded && count($decoded) > 0) {
         \TF\debug("hash result len " . count($decoded));
         //print_r($decoded);
@@ -147,11 +278,9 @@ function dump_hashes()
                 foreach ($root as $file) {
                     $filename = trim(str_replace($base, "", $file['path']), '/');
                     $path = "https://core.svn.wordpress.org/tags/{$ver}/$filename";
-                    /*
-                    $parts = explode("/", $file[0]);
-                    $out = $file[4] . "/" . join("/", array_slice($parts, 3));
-                    $out = rtrim($out, "/");
-                    */
+                    //$parts = explode("/", $file[0]);
+                    //$out = $file[4] . "/" . join("/", array_slice($parts, 3));
+                    //$out = rtrim($out, "/");
                     $out = $_SERVER['DOCUMENT_ROOT'] . "/$filename";
                     $fix_files['files'][] = array('info' => $file['r'], 'url' => $path, 'expected' => $file['crc_expected'], 'actual' => $file['crc_trim'], 'size1' => $file['size'], 'size2' => $file['size2'], 'mtime' => filemtime($out), 'out' => $out);
                 }
@@ -169,27 +298,13 @@ function dump_hashes()
     //exit(\TF\en_json($fix_files));
     \TF\debug("fix file len: " . count($fix_files));
     return $fix_files;
-}
-
-function bytes_to_kb($bytes) : string {
-    return round((int)$bytes / 1024, 1) . "Kb";
-
+    */
 }
 
 function serve_malware(string $dashboard_path)
 {
-    if (!isset($_SERVER['PHP_AUTH_PW']) ||
-        (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
-        (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
-
-        header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
-        header('HTTP/1.0 401 Unauthorized');
-        exit;
-    }
-
-    header("Cache-Control: no-store, private, no-cache, max-age=0");
-    header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', 100000));
-    http_response_code(203);
+    // authentication guard
+    validate_auth($_SERVER['PHP_AUTH_PW']??'')->run();
 
     $locked = is_locked();
     $lock_action = ($locked) ? "unlock" : "lock";
@@ -213,15 +328,16 @@ function serve_malware(string $dashboard_path)
     $opt_link = $self . ((strpos($self,"?")>0) ? '&' : '?') . "BITFIRE_API=DASHBOARD";
 
     $file_list = dump_hashes();
+    $dir_list = dump_dirs();
+    $page_name = "BitFire Malware Scan";
+
     $llang = "en-US";
     $file =  WAF_DIR . "views/";
     $file .= (!$is_free && file_exists(WAF_DIR . "views/hashes-pro.html")) ? "hashes-pro.html" : "hashes.html";
+    $is_wordpress = !empty(\BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']));
     exit(require $file);
 }
 
-function machine_date($time) : string {
-    return date("Y-m-d", (int)$time);
-}
 function human_date($time) : string {
     return date("D M j Y, h:i:s A P", (int)$time);
 }
@@ -234,32 +350,85 @@ function human_date2($time) : string {
 }
 
 
+function render_view(string $view_filename, string $page_name, ?array $variables = NULL) {
+    if (!empty($variables)) {
+        extract($variables);
+    }
+
+    $locked = is_locked();
+    $lock_action = ($locked) ? "unlock" : "lock";
+
+    $s1 = preg_replace("#[\?&]".CFG::str("dashboard_path")."=[^\?&]+#", "", $_SERVER['REQUEST_URI']);//."&_bitfire_p=".CFG::str("secret");
+	$self = preg_replace("#[\?&]BITFIRE_API=[^\?&]+#", "", $s1);
+    $self = preg_replace("#[\?&].*#", "", $self);
+    $opt_name = $page_name;
+    $opt_link = $self . ((strpos($self,"?")>0) ? '&' : '?') . "BITFIRE_API=MALWARESCAN";
+
+    $password_reset = (Config::str('password') === 'default') || (Config::str('password') === 'bitfire!');
+    $is_free = (strlen(Config::str('pro_key')) < 20);
+    $llang = "en-US";
+    $is_wordpress = !empty(\BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']));
+
+    exit(require WAF_DIR . "views/$view_filename");
+}
+
+
+function serve_settings(string $dashboard_path) {
+    // authentication guard
+    validate_auth($_SERVER['PHP_AUTH_PW']??'')->run();
+
+    render_view("settings.html", "BitFire Settings", array("dashboard_path" => $dashboard_path));
+}
+
+
+/**
+ * @param string $raw_pw the password to validate against Config::password
+ * @return TFEffect validation effect. after run, ensured to be authenticated
+ */
+function validate_auth(string $raw_pw) : \TF\Effect {
+    $effect = new \TF\Effect();
+    // disable caching for auth pages
+    $effect->header("Cache-Control", "no-store, private, no-cache, max-age=0");
+    $effect->header("Expires", gmdate('D, d M Y H:i:s \G\M\T', 100000));
+    $effect->response_code(203);
+    $wp_login_data = \BitFireWP\wp_get_login_cookie($_COOKIE);
+    if (!empty($wp_login_data)) {
+        if (\BitFireWP\wp_validate_cookie($wp_login_data, $_SERVER['DOCUMENT_ROOT']??getcwd())) {
+            return $effect;
+        };
+    }
+
+
+    // if we don't have a password, or the password does not match
+    // create an effect to force authentication and exit
+    if (strlen($raw_pw) < 2 ||
+        (sha1($raw_pw) !== Config::str('password', 'default_password')) &&
+        (sha1($raw_pw) !== sha1(Config::str('password', 'default_password')))) {
+
+        $effect->header("WWW-Authenticate", 'Basic realm="BitFire", charset="UTF-8"');
+        $effect->response_code(401);
+        //$effect->header("HTTP/1.0 401 Unauthorized", NULL);
+        $effect->exit(true);
+    }
+
+    return $effect;
+}
+
+
 /**
  * TODO: split this up into multiple functions
  */
-function serve_dashboard(string $dashboard_path)
+function serve_dashboard(string $dashboard_path) :void
 {
-    //\TF\dbg($_SERVER);
-    if (!isset($_SERVER['PHP_AUTH_PW']) ||
-        (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
-        (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
-
-        header('WWW-Authenticate: Basic realm="BitFire", charset="UTF-8"');
-        header('HTTP/1.0 401 Unauthorized');
-        exit;
-    }
-
+    // authentication guard
+    validate_auth($_SERVER['PHP_AUTH_PW']??'')->run();
+    
     if ($_GET['_infoz'] ?? '' === 'show') {
         phpinfo();
         die();
     }
     $page = intval($_GET['page'] ?? 0);
 
-
-    // try to prevent proxy caching for this page
-    header("Cache-Control: no-store, private, no-cache, max-age=0");
-    header('Expires: ' . gmdate('D, d M Y H:i:s \G\M\T', 100000));
-    http_response_code(203);
     require_once WAF_DIR . "src/botfilter.php";
 
     $config_writeable = is_writeable(WAF_DIR . "config.ini") && is_writeable(WAF_DIR . "config.ini.php");
@@ -319,7 +488,7 @@ function serve_dashboard(string $dashboard_path)
         $reporting[$i]['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
         $reporting[$i]['exception_title'] = ($has_exception) ?
         "exception already added for this block" :
-        "add exception for " . MESSAGE_CLASS[$cl] . ' url: ' . $reporting[$i]['request']['path'];
+        "add exception for [" . MESSAGE_CLASS[$cl] . '] url: [' . $reporting[$i]['request']['path']. ']';
 
     }
 
@@ -384,7 +553,7 @@ function serve_dashboard(string $dashboard_path)
         $blocks[$i]['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
         $blocks[$i]['exception_title'] = ($has_exception) ?
             "exception already added for this block" :
-            "add exception for " . MESSAGE_CLASS[$cl] ?? 'unknown' . ' url: ' . $parts['path'];
+            "add exception for [" . (MESSAGE_CLASS[$cl]??'unknown') . '] to url: [' . $parts['path'] . "]";
 
 
 
@@ -412,5 +581,7 @@ function serve_dashboard(string $dashboard_path)
     $password_reset = (Config::str('password') === 'default') || (Config::str('password') === 'bitfire!');
     $is_free = (strlen(Config::str('pro_key')) < 20);
     $llang = "en-US";
+    $page_name = "BitFire Malware Dashboard";
+    $is_wordpress = !empty(\BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']));
     exit(require WAF_DIR . "views/dashboard.html");
 }
