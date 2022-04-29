@@ -5,7 +5,7 @@ namespace TF;
  * generic storage interface for temp / permenant storage
  */
 interface Storage {
-    public function save_data(string $key_name, $data, int $ttl);
+    public function save_data(string $key_name, $data, int $ttl) : bool;
     public function load_data(string $key_name);
     public function load_or_cache(string $key_name, int $ttl, callable $generator);
     public function update_data(string $key_name, callable $fn, callable $init, int $ttl);
@@ -69,27 +69,25 @@ class CacheStorage implements Storage {
     /**
      * save data to keyname
      * TODO: add flag for not overwitting important data and not writting transient data to opcache 
+     * 32 = CUCKOO_LOW
      */
-    public function save_data(string $key_name, $data, int $seconds) {
+    public function save_data(string $key_name, $data, int $seconds, int $priority = 32) : bool {
         assert(self::$_type !== null, "must call set_type before using cache");
         $storage = array($key_name, $data);
         switch (self::$_type) {
             case "shm":
-                $this->_shm->write($key_name, $seconds, $storage);
-                return;
+                return $this->_shm->write($key_name, $seconds, $storage);
             case "shmop":
-                $this->_shmop->write($key_name, $seconds, $storage);
-                return;
+                return $this->_shmop->write($key_name, $seconds, $storage, $priority);
             case "apcu":
-                \apcu_store("_bitfire:$key_name", $storage, $seconds);
-                return;
+                return \apcu_store("_bitfire:$key_name", $storage, $seconds);
             case "opcache":
                 $s = var_export($storage, true);
                 $exp = time() + $seconds; 
-                file_put_contents($this->key2name($key_name), "<?php \$value = $s; \$success = (time() < $exp);", LOCK_EX);
-                return;
+                $data = "<?php \$value = $s; \$priority = $priority; \$success = (time() < $exp);";
+                return file_put_contents($this->key2name($key_name), $data, LOCK_EX) == strlen($data);
             default:
-                return;
+                return false;
         }
     }
 
@@ -141,6 +139,7 @@ class CacheStorage implements Storage {
 
         $value = null;
         $success = false;
+
         switch (self::$_type) {
             case "shm":
                 $tmp = $this->_shm->read($key_name);
@@ -162,9 +161,16 @@ class CacheStorage implements Storage {
                 break;
         }
 
-        if ($success && $value[0] == $key_name) {
-            return $value[1];
+        if ($success) {
+            // load failed
+            if (is_bool($value)) {
+                return $init;
+            }
+            if ($value[0] == $key_name) {
+                return $value[1];
+            }
         }
+
         return $init;
     }
 
@@ -204,7 +210,7 @@ class FileStorage implements Storage {
     /**
      * returns num bytes written or false
      */
-    public function save_data(string  $key_name, $data, int $ttl) {
+    public function save_data(string  $key_name, $data, int $ttl) : bool {
         return file_put_contents($this->key2name($key_name), json_encode($data), LOCK_EX);
     }
 
