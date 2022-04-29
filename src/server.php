@@ -3,6 +3,7 @@ namespace BitFireSvr;
 
 use BitFire\BitFire;
 use BitFire\Config as CFG;
+use RuntimeException;
 
 use function TF\ends_with;
 
@@ -21,8 +22,9 @@ const ACCESS_URL_URI = 13;
 /**
  * call replace function $fn if config $param = $value.  replace with $new_value
  */
-function replace_if_config(string $param, string $value, callable $fn, string $new_value) {
-    if (CFG::str($param) == $value) { $fn("$param = '$value'", "$param = '$new_value'"); }
+function replace_if_config(string $param, string $value, callable $fn, string $new_value) : bool {
+    if (CFG::str($param) == $value) { return $fn("$param = '$value'", "$param = '$new_value'"); }
+    return false;
 }
 
 /**
@@ -33,68 +35,101 @@ function update_config(string $ini_src) {
     $info["writeable"] = false;
     $info["cookie"] = 0;
     $info["robot"] = false;
+    @chmod($ini_src, 0644);
     if (is_writeable($ini_src)) {
         $info["writeable"] = true;
 
         $replace_fn = \TF\partial('\TF\file_replace', $ini_src);
-        replace_if_config("encryption_key", "default_encryption_key", $replace_fn, \TF\random_str(32));
-        replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
-        replace_if_config("browser_cookie", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
+        $info["encryption"] = replace_if_config("encryption_key", "default_encryption_key", $replace_fn, \TF\random_str(32));
+        $info["secret"] = replace_if_config("secret", "default_secret_value", $replace_fn, \TF\random_str(32));
+        $info["cookie"] = replace_if_config("browser_cookie", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
 
         // configure wordpress root path
-        $roots = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
-        if (!empty($roots)) {
-            $root = $roots[0]??'luiashdf';
-            if (file_exists($root)) {
-                $info['wp_root'] = $root;
-                \TF\file_replace($ini_src, "wp_root = ''", "wp_root = '$root'");
-            }
+        $root = \BitFireSvr\find_wordpress_root($_SERVER['DOCUMENT_ROOT']);
+        if (!empty($root)) {
+            $info["wp_root_path"] = $root;
+            $info["wp_root"] = \TF\file_replace($ini_src, "wp_root = \"\"", "wp_root = \"$root\"");
+            $info["password"] = replace_if_config("password", "_bitfire", $replace_fn, '_' . \TF\random_str(5));
+        } else {
+            $info["wp_root"] = "WordPress not found.";
         }
 
+        // configure caching
         if (CFG::str("cache_type") === "nop") {
             if (function_exists('shmop_open')) {
-                $info["cache_type"] = "shmop";
-                \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shmop'");
+                $info["cache_type"] = "shmop " . \TF\b2s(\TF\file_replace($ini_src, "cache_type = \"nop\"", "cache_type = \"shmop\""));
             }
             else if (function_exists('apcu')) {
-                $info["cache_type"] = "acpu";
-                \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'apcu'");
+                $info["cache_type"] = "acpu " . \TF\b2s(\TF\file_replace($ini_src, "cache_type = \"nop\"", "cache_type = \"apcu\""));
             }
             else if (function_exists('shm_get_var')) {
-                $info["cache_type"] = "shm";
-                \TF\file_replace($ini_src, "cache_type = 'nop'", "cache_type = 'shm'");
+                $info["cache_type"] = "shm " . \TF\b2s(\TF\file_replace($ini_src, "cache_type = \"nop\"", "cache_type = \"shm\""));
             }
+        } 
+        // log what the setting is/was
+        if (!isset($info["cache_type"])) {
+            $info["cache_type"] = CFG::str("cache_type");
         }
+
+
+        // X forwarded for header
         if (isset($_SERVER['X-FORWARDED-FOR'])) {
-            $info["ip"] = "x-forward";
-            \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\"");
+            $info["x-forward"] = \TF\b2s(\TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"X-FORWARDED-FOR\""));
+        } else {
+            $info["x-forward"] = "no";
         }
-        else if (isset($_SERVER['FORWARDED'])) {
-            $info["ip"] = "forwarded";
-            \TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\"");
+
+        // new forwarded for header
+        if (isset($_SERVER['FORWARDED'])) {
+            $info["forward"] = \TF\b2s(\TF\file_replace($ini_src, "ip_header = \"REMOTE_ADDR\"", "ip_header = \"FORWARDED\""));
+        } else {
+            $info["forward"] = "no";
         }
+
+        
+        // are any cookies set?
         if (count($_COOKIE) > 1) {
-            $info["cookie"] = count($_COOKIE);
-            \TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true");
+            $info["cookies"] = count($_COOKIE);
+            $info["cookie"] = \TF\b2s(\TF\file_replace($ini_src, "cookies_enabled = false", "cookies_enabled = true"));
+        } else {
+            $info["cookies"] = "< 2";
         }
+
         $domain = \TF\take_nth($_SERVER['HTTP_HOST'], ":", 0);
-        $info["domain"] = $domain;
+        $info["domain_value"] = $domain;
         $domain = join(".", array_slice(explode(".", $domain), -2));
 
-        \TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\"");
-        \TF\file_replace($ini_src, "configured = false", "configured = true");
+        $info["domain"] = \TF\b2s(\TF\file_replace($ini_src, "valid_domains[] = \"\"", "valid_domains[] = \"$domain\""));
+        $info["configured"] = \TF\b2s(\TF\file_replace($ini_src, "configured = false", "configured = true"));
 
-        $robot_file = $_SERVER['DOCUMENT_ROOT']."/robots.txt";
-        if (file_exists($robot_file) && is_writeable($robot_file)) {
-            $info["robot"] = $robot_file;
-            $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/random_path/contact")."\n";
-            \TF\file_replace($robot_file, $robot_content, "");
-            file_put_contents($robot_file, $robot_content, FILE_APPEND);
+        $url = CFG::str("honeypot_url");
+        if (!empty($url)) {
+            $robot_file = $_SERVER['DOCUMENT_ROOT']."/robots.txt";
+            $robot_content =  "User-agent: *\nDisallow: ".CFG::str("honeypot_url", "/supreme/contact")."\n";
+            if (file_exists($robot_file)) {
+                $info["robot_file"] = "exists";
+                $content = file_get_contents($robot_file);
+                if (strstr($content, CFG::str("honeypot_url")) == false) {
+                    $info["robot"] = file_put_contents($robot_file, $robot_content, FILE_APPEND);
+                } else {
+                    $info["robot"] = "already added";
+                }
+            } else {
+                $info["robot_file"] = "missing";
+                $info["robot"] = file_put_contents($robot_file, $robot_content, FILE_APPEND);
+            }
+        } else {
+            $info["robot"] = "no path";
         }
+
         require_once WAF_DIR."src/bitfire.php";
-        update_raw(WAF_DIR."cache/keys2.raw", WAF_DIR."cache/values2.raw");
+        $info["cache_keys"] = update_raw(WAF_DIR."cache/keys2.raw", WAF_DIR."cache/values2.raw");
+        file_put_contents(WAF_DIR."/cache/install.log", json_encode($info, JSON_PRETTY_PRINT));
+
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
-    } else if (mt_rand(1,30) == 2) {
+    }
+    // ping back home that we are unable to edit config
+    else if (mt_rand(1,30) == 2) {
         \TF\bit_http_request("POST", "https://bitfire.co/zxf.php", base64_encode(json_encode($info))); // save server config info
     }
 }
@@ -146,26 +181,25 @@ function strip_root(string $file) : string {
 
 
 // run the hash functions on a file
-function hash_file(string $root_dir, string $filename, string $plugin_id, string $plugin_name) : ?array {
+function hash_file(string $filename, string $root_dir, string $plugin_id, string $plugin_name) : ?array {
     if (is_dir($filename)) { return null; }
+    if (!is_readable($filename)) { return null; }
     $filename = str_replace("//", "/", $filename);
     $i = pathinfo($filename);
     $input = @file($filename);
     if (!isset($i['extension']) || $i['extension'] !== "php" || empty($input)) { return null; }
 
+    $shortname = str_replace($root_dir, "", $filename);
     if (strpos($filename, "wp-content/")) {
         if (strpos($filename, "/plugins/") !== false) {
             //$shortname = preg_replace("#$root_dir/wp-content/plugins#", "", $filename);
-            $shortname = str_replace("$root_dir/wp-content/plugins", "", $filename);
+            //$shortname = str_replace("$root_dir/wp-content/plugins", "", $filename);
+            $shortname = str_replace("$root_dir", "", $filename);
         } else if (strpos($filename, "/themes/") !== false) {
             //$shortname = preg_replace("#$root_dir/wp-content/themes#", "", $filename);
-            $shortname = str_replace("$root_dir/wp-content/themes", "", $filename);
-        } else {
-            return null;
+            //$shortname = str_replace("$root_dir/wp-content/themes", "", $filename);
+            $shortname = str_replace("$root_dir", "", $filename);
         }
-    } else {
-        //$shortname = preg_replace("#$root_dir#", "", $filename);
-        $shortname = str_replace($root_dir, "", $filename);
     }
 
     if (strpos($shortname, "/home/wp-hashes") !== false) { file_put_contents("/tmp/path_err.log", print_r(array($root_dir, $filename, $plugin_id, $plugin_name), true), FILE_APPEND); }
@@ -185,12 +219,19 @@ function hash_file(string $root_dir, string $filename, string $plugin_id, string
     return $result;
 }
 
-function find_wordpress_root(string $root_dir) : array {
+/**
+ * return the wordpress root directory
+ * @param string $root_dir the path to search for wordpress in
+ * @return null|string absolute path to wordpress root dir or NULL
+ */
+function find_wordpress_root(string $root_dir) : ?string {
+    $cfgpath = CFG::str("wp_root");
+    if (strlen($cfgpath) > 5) { return $cfgpath; }
     $roots = \TF\file_recurse($root_dir, function($file) : string {
-        $d = dirname(realpath($file), 2);
-        return $d;
+        return dirname(realpath($file), 2);
     }, '/wp-includes\/version.php$/');
-    return $roots;
+
+    return (isset($roots[0])) ? $roots[0] : NULL;
 }
 
 /**
@@ -200,9 +241,27 @@ function get_wordpress_version(string $root_dir) : string {
     $full_path = "$root_dir/wp-includes/version.php";
     $wp_version = "0";
     if (file_exists($full_path)) {
-        include_once $full_path;
+        include $full_path;
     }
     return \TF\trim_off($wp_version, "-");
+}
+
+
+function hash_dir(string $dir) : array {
+    return \TF\file_recurse($dir, function($file) use ($dir) : ?array {
+
+        if (is_link($file)) { return NULL; }
+        if (strpos($file, "wp-content") !== false) {
+            if (preg_match('#wp-content/(plugins|themes)/([^\/]+)#', $file, $matches)) {
+                $type = strpos($file, '/plugins/') !== false ? 1 : 2;
+                return hash_file($file, $dir, $type, $matches[2]);
+            }
+            return NULL;
+        }
+
+        return hash_file($file, $dir, 0, "");
+
+    }, "/.*\.php$/");
 }
 
 
@@ -214,44 +273,7 @@ function get_wordpress_hashes(string $root_dir) : ?array {
     $version = get_wordpress_version($root_dir);
     if (version_compare($version, "4.1") < 0) { return array("ver" => $version, "int" => "too low", "files" => array()); }
 
-    $r = \TF\file_recurse($root_dir, function($file) use ($root_dir, $version) : ?array {
-
-        if (is_link($file)) { return NULL; }
-        if (strpos($file, "wp-content") !== false) {
-            if (preg_match('#wp-content/(plugins|themes)/([^\/]+)#', $file, $matches)) {
-                $type = strpos($file, '/plugins/') !== false ? 1 : 2;
-                return hash_file($root_dir, $file, $type, $matches[2]);
-            }
-            return NULL;
-        }
-        return hash_file($root_dir, $file, 0, "");
-
-
-        $path = str_replace($root_dir, "/$version/src", $file);
-        $nospace_data = join('', array_map('trim', file($file)));
-        // is plugin
-        if (stripos($path, "/wp-content/plugins/") !== false) {
-            if (preg_match("#/plugins/(\w+)#", $path, $matches)) {
-                $plugin = $matches[1];
-                $path = str_replace("/$version/src/wp-content/plugins/$plugin", "", $path);
-                return array($plugin, filesize($file), crc32($path), crc32($nospace_data), $file, "plugin");
-            }
-        }
-        // is theme
-        else if (stripos($path, "/wp-content/themes/") !== false) {
-            if (preg_match("#/themes/(\w+)#", $path, $matches)) {
-                $theme = $matches[1];
-                $path = str_replace("/$version/src/wp-content/theme/$theme", "", $path);
-                return array($theme, filesize($file), crc32($path), crc32($nospace_data), $file, "theme");
-            }
-        }
-
-
-        
-        if ($file == "$root_dir/index.php") { $path = str_replace("index.php", "_index.php", $path); }
-        if ($file == "$root_dir/wp-admin/index.php") { $path = str_replace("index.php", "_index.php", $path); }
-        return array('', filesize($file), crc32($path), crc32($nospace_data), $file);
-    }, "/.*\.php$/");
+    $r = hash_dir($root_dir);
 
     return array("ver" => $version, "root" => $root_dir, "int" => text_to_int($version), "files" => $r);//array_splice($r, 0, 1000));
 }
@@ -267,7 +289,7 @@ function if_it(callable $fn, $item) {
 
 
 function get_server_config_file_list() :array {
-    return array(
+    return [
         "/etc/nginx/*.conf", 
         "/usr/local/etc/nginx/*.conf", 
         "/usr/local/nginx/*.conf", 
@@ -279,8 +301,9 @@ function get_server_config_file_list() :array {
         "/usr/local/apache2/*.conf",
         "/usr/local/etc/apache2/*.conf",
         "/usr/local/etc/httpd/*.conf"
-    );
+    ];
 }
+
 
 
 function pattern_to_list_3(array $patterns) : array {
@@ -462,10 +485,14 @@ function process_batch(array $lines) {
     return $exceptions;
 }
 
-function update_raw(string $keyfile, string $valuefile) : void {
+/**
+ * @return bool true on success, false on any failure
+ */
+function update_raw(string $keyfile, string $valuefile) : bool {
     $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 0, "md5"=>md5(CFG::str("encryption_key")))));
     $data->then(\TF\partial('\file_put_contents', $keyfile));
     $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 1, "md5"=>md5(CFG::str("encryption_key")))));
     $data->then(\TF\partial('\file_put_contents', $valuefile));
+    return !$data->empty();
 }
 
