@@ -261,7 +261,6 @@ class BotFilter {
         // block constraints
         // cpu: 52
         $block->doifnot('\TF\map_whilenot', $this->_constraints, "\BitFire\constraint_check", $request);
-        $block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
 
 
 
@@ -290,11 +289,16 @@ class BotFilter {
             }
         }
 
+        // validate request rate, don't check for whitelist bots
+        if (!$this->browser->whitelist) {
+            $block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
+        }
+
         // request has no host header
         if (Config::enabled(CONFIG_CHECK_DOMAIN)) {
             if (!\BitFireBot\validate_host_header(Config::arr(CONFIG_VALID_DOMAIN_LIST), $request->host)) {
                 // allow valid whitelist bots to access the site
-                if (!isset($this->browser->whitelist)) {
+                if (!$this->browser->whitelist) {
                     $maybe = BitFire::new_block(FAIL_INVALID_DOMAIN, "host", $request->host, \TF\en_json(Config::arr(CONFIG_VALID_DOMAIN_LIST)), BLOCK_MEDIUM);
                     if (!$maybe->empty()) { return $maybe; }
                 }
@@ -306,10 +310,10 @@ class BotFilter {
         $this->browser->valid = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
         \TF\debug("x-valid: " . $this->browser->valid . " ip_data_valid [" . $this->ip_data->valid . "]");
 
-        if (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop') {
+        if (CFG::enabled(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
+
             $this->verify_browser($request, $maybe_botcookie); 
         }
-
         return $block;
     }
 
@@ -346,7 +350,7 @@ class BotFilter {
  */
 function bot_metric_inc(string $stat) : \TF\CacheItem {
     return new \TF\CacheItem(
-        'metrics-'.\TF\utc_date('G'), 
+        'metrics-'.\TF\utc_date('G'),
         function($data) use ($stat) { $data[$stat] = ($data[$stat]??0) + 1; return $data; },
         function() { return BITFIRE_METRICS_INIT; },
         \TF\DAY);
@@ -382,9 +386,9 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, \TF\MaybeI $
 
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     $correct_answer = $cookie->extract('a')->extract('ans');
-    \TF\debug("x-valid-answer 1: ($correct_answer)");
+    \TF\debug("x-valid-answer cookie: ($correct_answer) ");
     $correct_answer->set_if_empty($answer->ans);
-    \TF\debug("x-valid-answer 2: ($correct_answer)");
+    \TF\debug("x-valid-answer cache: ({$answer->ans}) post: ({$_POST['_bfa']})");
 
     // unable to read correct answer from ip_data or cookie, increment broken counter, 
     // lets clear as much server state as we can and try to reload the original page
@@ -479,12 +483,14 @@ function ip_to_int(string $ip) : int {
  * NOT PURE! depends in $_SERVER variable
  */
 function is_local_request(\BitFire\Request $request) : bool {
+    /*
     $addr1 = $_SERVER['REMOTE_ADDR']??'127.0.0.1';
 	$addr2 = $_SERVER['SERVER_ADDR']??'127.0.0.2';
     if ($addr1 == $addr2) {
         \TF\debug("127 [%s] [%s]", $addr1, $addr2);
         return true;
     }
+    */
     if (\TF\ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false) {
         \TF\debug("wp-cron || wordpress");
         return true;
@@ -600,6 +606,8 @@ function parse_whois_line(string $line) : string {
 // return false if valid_domains has entries and request['host'] is not in it, true otherwise
 // PURE!
 function validate_host_header(array $valid_domains, string $host) : bool {
+    //echo "host [$host]\n";
+    //\TF\dbg($valid_domains);
     return (!empty($valid_domains)) ?  \TF\in_array_ending($valid_domains, $host) : true;
 }
 
@@ -804,6 +812,7 @@ function send_browser_verification(\BitFire\IPData $ip_data, string $agent) : \T
 
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     \TF\debug("send verify answer: $answer");
+
 
     $effect = \TF\Effect::new()
         ->response_code(303)
