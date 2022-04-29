@@ -13,40 +13,59 @@ require_once WAF_DIR."src/wordpress.php";
 require_once WAF_DIR."src/botfilter.php";
 
 
+/**
+ * http header abstraction 
+ * @package BitFire
+ */
 class Headers
 {
-    public $requested_with = '';
-    public $fetch_mode = '';
-    public $accept;
-    public $content;
-    public $encoding;
-    public $dnt;
-    public $upgrade_insecure;
+    /** @var string $requested_with  set to XMLHttpRequest for xml http request */
+    public string $requested_with = '';
+    /** @var string $fetch_mode set to sec-fetch-mode (cors, navigate, no-cors, same-origin, websocket) */
+    public string $fetch_mode = '';
+    /** @var string $accept http accept header */
+    public string $accept;
+    /** @var string $content http content type */
+    public string $content;
+    /** @var string $encoding http accept encoding */
+    public string $encoding;
+    /** @var string $dnt do not track header */
+    public string $dnt;
+    /** @var srtring $upgrade_insecure upgrade insecure request header */
+    public string $upgrade_insecure;
 }
 
+/**
+ * http request abstraction
+ * @package BitFire
+ */
 class Request
 {
-    public $headers;
-    public $host;
-    public $path;
-    public $ip;
-    public $method;
-    public $port;
-    public $scheme;
+    public \BitFire\Headers $headers;
+    public string $host;
+    public string $path;
+    public string $ip;
+    public string $method;
+    public int $port;
+    public string $scheme;
 
 
-    public $get;
-    public $get_freq = array();
-    public $post;
-    public $post_raw;
-    public $post_freq = array();
-    public $cookies;
+    public array $get;
+    public array $get_freq = array();
+    public array $post;
+    public string $post_raw;
+    public array $post_freq = array();
+    public array $cookies;
 
-    public $agent;
-    public $referer;
+    public string $agent;
+    public string $referer;
 }
 
 
+/**
+ * Match class used for matching mapping request match DATA to Request DATA
+ * @package BitFire
+ */
 class MatchType
 {
     protected $_type;
@@ -71,6 +90,12 @@ class MatchType
         $this->_match_str = '';
     }
 
+    /**
+     * Test if the request matches the MatchType
+     * 
+     * @param Request $request 
+     * @return bool 
+     */
     public function match(\BitFire\Request $request) : bool {
         $key = $this->_key;
         $this->_matched = $request->$key ?? '';
@@ -90,7 +115,8 @@ class MatchType
                             break;
                         }
                     }
-                } else {  $result = strpos($this->_matched, $this->_value) !== false; }
+                }
+                else {  $result = strpos($this->_matched, $this->_value) !== false; }
                 break;
             case MatchType::IN: 
                 $result = in_array($this->_matched, $this->_value);
@@ -464,10 +490,7 @@ class BitFire
             return BitFire::new_block(28001, "_bfblock", "url", $this->_request->get['_bfblock'], 0);
         }
 
-        // if we are disabled, just return
-        if ($this->_request === NULL || Config::disabled(CONFIG_ENABLED)) {
-            return \TF\MaybeBlock::of(NULL);
-        }
+        
         // Do we have a logged in word press cookie? don't block.
         $maybe_botcookie = \TF\decrypt_tracking_cookie(
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
@@ -478,22 +501,31 @@ class BitFire
         // dashboard requests, TODO: MOVE TO api.php
         if (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND] === "MALWARESCAN") {
             require_once WAF_DIR."src/dashboard.php";
-            serve_malware($this->_request->path, $maybe_botcookie);
+            serve_malware($this->_request->path);
+        }
+
+        // settings requests, TODO: MOVE TO api.php
+        if (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND] === "SETTINGS") {
+            require_once WAF_DIR."src/dashboard.php";
+            serve_settings($this->_request->path);
         }
 
 
         // dashboard requests, TODO: MOVE TO api.php
         if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
             require_once WAF_DIR."src/dashboard.php";
-            serve_dashboard($this->_request->path, $maybe_botcookie);
+            serve_dashboard($this->_request->path);
         }
 
-        // WordPress admin, TODO: move to a function
+
+
+        // WordPress admin
         if ($maybe_botcookie->extract("wp")() > 0) { 
             \BitFireWP\wp_handle_admin($this->_request, $maybe_botcookie);
             return \TF\Maybe::$FALSE;
         }
 
+        // store admin status in bitfire cookie for fast retrieval
         $wp_login_data = \BitFireWP\wp_get_login_cookie($_COOKIE);
         if (!empty($wp_login_data)) {
             $data = $maybe_botcookie->value('array');
@@ -503,8 +535,10 @@ class BitFire
             }
         }
 
-        
-        
+        // quick stats occasionally
+        if (random_int(1, 100) == 81) {
+            $f = WAF_DIR."/cache/ip.8.txt";$n = (int)file_get_contents(WAF_DIR."/cache/ip.8.txt");file_put_contents($f, (string)($n+1), LOCK_EX);
+        }
 
         // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
         \TF\Maybe::$FALSE = \TF\MaybeBlock::of(NULL);
