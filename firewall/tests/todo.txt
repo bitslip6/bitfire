@@ -1,0 +1,5 @@
+* install.log is missing data
+* wp-engine theme.css is not being re-written
+* validate pro codes
+* test realpath cache stat performance after updating basedir
+* refactor wp_dirs as cms_dirs and cms_type

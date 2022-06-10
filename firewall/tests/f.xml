@@ -1,0 +1,7 @@
+<?xml_error_string(1); /*version="1.0">
+<tag>
+<![CDATA[
+*/
+echo "php polyglot!\n";
+// ]]></tag>
+
