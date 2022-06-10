@@ -1,0 +1,23 @@
+[
+    {
+        "code": 14000,
+        "parameter": "example",
+        "url": null,
+        "host": null,
+        "uuid": "example_global_parameter_code_class"
+    },
+    {
+        "code": 14003,
+        "parameter": "example",
+        "url": null,
+        "host": null,
+        "uuid": "example_global_parameter_single_code"
+    },
+    {
+        "code": 0,
+        "parameter": "example",
+        "url": null,
+        "host": null,
+        "uuid": "example_global_parameter_all_codes"
+    }
+]
