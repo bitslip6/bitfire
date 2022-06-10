@@ -1,8 +1,13 @@
 .*
-src/internal/*
+*.zip
+*.gz
+*.tgz
+*.bz2
 test.php
 lcov.info
 callgrind.*
 *.xhprof.json
 tests/*.txt
 test2/*
+bin/install_wordpress.sh
+firewall/developer-notes.txt
