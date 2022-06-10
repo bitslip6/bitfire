@@ -8,13 +8,11 @@
 [![PHP Ver](https://img.shields.io/badge/php->=7.1-blue)](https://php)
 [![Slack Chat](https://img.shields.io/badge/slack-3%20online-blue)](https://join.slack.com/t/bitslip6/shared_invite/zt-l7gxmgc3-9T0QFNP6GN4IFPOVtZGJrQ)
  
-We have closed our discord chanel in light of recent wallstreetbets censorship.  BitFire believes strongly in free speech. Please join us on Slack!!
-
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
   <a href="https://bitfire.co/">
-    <img src="views/bitslip.png" alt="Logo" width="80" height="80">
+    <img src="firewall/views/bitslip.png" alt="Logo" width="80" height="80">
   <h3 align="center">BitFire</h3> </a>
 
 
@@ -71,11 +69,11 @@ enterprise class security for everyone
 There are many choices for PHP firewalls to protect your webservers, most can be easily bypassed.
 
 Here's How BitFire is different:
-* ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg) Speed. <1 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
+* ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg) Speed. <2 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
 * ![bot](https://fonts.gstatic.com/s/i/materialicons/dns/v6/24px.svg) Bot authentication. Authenticates good bots like google, facebook, bing, ahrefs, by source network
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparant JavaScript browser verification ensures user's are real
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/policy/v6/24px.svg) Client Integrity. Automatically generate browser policy preventing browser takeover
-* ![browser](https://fonts.gstatic.com/s/i/materialicons/lock/v6/24px.svg) Server Integrity. Prevent atackers from modifying server files with Operating System locks
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/lock/v6/24px.svg) Server Integrity. Authenticated file access prevents server code modification 
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/text_rotation_none/v6/24px.svg) Grammer based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
 
 
@@ -96,7 +94,7 @@ Install Guide: https://bitfire.co/bitfire-install
 
 ### Prerequisites
 
-You will need: a webserver (apache, nginx), PHP >= 7.1, a login, text editor, sudo access to edit php.ini.
+You will need: a webserver (apache, nginx), PHP >= 7.1, a login, and a text editor.
 
 
 ### Installation
@@ -104,28 +102,23 @@ You will need: a webserver (apache, nginx), PHP >= 7.1, a login, text editor, su
 - *Install via GitHub*
    ```sh
    git clone https://github.com/bitslip6/bitfire.git
-   ./bitfire/updatekeys.sh
+   add: auto_prepend_file = "/path/to/bitfire/startup.php" to root .user.ini file
    ```
 - or *Install via Composer*
    ```
    composer require bitslip6/bitfire
-   ./vendor/bin/updatekeys.sh
+   add: auto_prepend_file = "/path/to/bitfire/startup.php" to root .user.ini file
    ```
-- be sure to allow updatekeys to install in your fpm and apache php.ini files when prompted.
-
 - *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini` and see the quickstart in this readme.
    ```ini
    bitfire_enabled = true;
    ```
 - Congratulations! Time for a beer
 
-- You may also install by-hand. set *_config.ini.php_* and *_cache_* to web writeable, update *_encryption_key_* and *_secret_* in config.ini then, 
-in php.ini update auto_prepend_file 
-```ini 
-auto_prepend_file ='/full/path/to/bitfire/startup.php';
-```
 
-Detailed configuration is available on our [Wiki](https://github.com/bitslip6/bitfire/wiki)
+
+Detailed configuration and installation is available on our [Support Center](https://bitfire.co/support-center)
+
 
 
 <!-- SETUP -->
@@ -135,6 +128,19 @@ The default configuration is very conservative and will only block
 bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire
 home directory (your github checkout location, or for composer vendor/bitslip6/bitfire/config.ini)
 
+You can configure blocking by setting the dashboard_path and password ini configuration in config.ini.
+This file is made write only on first page view so you may need to update permission to allow read
+and write.
+
+dashboard = "/bitfire_dashboard";
+password = "aStrongSecurePassword";
+
+Now visit your website at path "your_domain.com/bitfire_dashboard"
+enter the password when prompted, then click on "Settings" and configure the settings you want to use
+
+On first page view BitFire will auto configure itself for your server and rarely needs to be adjusted.
+
+
 #### Feature flags support 3 values:
  - *false*: disable the feature
  - *report*: don't block the traffic but add an entry to the report_file (config.ini setting)
@@ -142,27 +148,8 @@ home directory (your github checkout location, or for composer vendor/bitslip6/b
  we recommend beginning with _report_ and then moving to *block* only after verifying that you would not be blocking good traffic.  https://github.com/bitslip6/bitfire/wiki/block_reporting for details.
  
 
-*1*. First setup your in-memory cache type.  BitFire stores server state in memory for fast response 
-time and supports all PHP in memory caches. We preefeer in order: *shmop*, *apcu*, *shm*.  If you
-are unsure which cache your server supports, see php_info() output.  Look for "shmop", "apcu" and "shm"
-and set *_cache_type_* in `config.ini` to your chosen cache or 'nop' for no cache.
 
-
-*2*. Next configure a browser honey pot.  Set *_honeypot_url*_ in `config.ini` to anything you like, 
-or leave the default.  Malicious bots looking for secure areas of your site will read this, request
-the url and get banned for 24 hours.  Good bots will respect the Disallow and not be effected. Add 
-your url to your robots.txt file:
-```ini
-honeypot_url = '/not_important/contact'
-```
-
-```ini
-User-agent: *
-Disallow: /not_important/contact
-```
-
-
-*3*. Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
+*1*. Require full browser.  If your website uses JavaScript and cookies (99% of all websites) you can
 require all web browers to prove they support both by enabling *require_full_browser*.  Since >95% of
 all exploit scripts and worms do not support JavaScript or cookies this is the single best protection
 you can install to prevent breakins.  This cookie is non user-identifying and so is fully GDPR compliant
@@ -172,13 +159,13 @@ require_full_browser = report | block
 ```
 
 
-*4*. Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
+*2*. Enable bot whitelist.  Futher limit bots by allowing only verified whitelisted robots.  A preconfigured
 list of common bots included with BitFire.  Refer to our wiki for how to add additional bots.
 ```ini
 whitelist_enable = report | block
 ```
 
-*5*. Enable core web filter.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
+*3*. Enable core web filters.  The web filter blocks malicious requets like XSS, LFI, RCE and SQLi as well as many others.
 The entire web filter can be enabled or disabled with the *web_filter_enabled* parameter.  We recommend
 the following configuration:
 ```ini
@@ -189,7 +176,7 @@ file_block = report | block
 sql_block = report | block
 ```
 
-*6*. Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
+*4*. Enable IP blocking.  By default BitFire will not black list IP addresses.  We recommend you enable this feature which allows for the fastest possbile drop of HTTP floods.
 ```ini
 allow_ip_block = true
 ```
@@ -210,7 +197,7 @@ See the [open issues](https://github.com/bitslip6/bitfire/issues) for a list of 
 <!-- CONTRIBUTING -->
 ## Contributing
 
-Additions to the bot whitelist and additional attack signatures or bypasses are **greatly appreciated**.  If your contributions are included you will recieve discounts on comercial licencing for BitFire Pro.
+Additions to the bot whitelist and additional attack signatures or bypasses are greatly appreciated.  If your contributions are included you will recieve discounts on comercial licencing for BitFire Pro.
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
