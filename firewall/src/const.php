@@ -2,19 +2,19 @@
 namespace BitFire;
 
 const STATUS_SERVER_STATE_FAIL = -1;
-const STATUS_OK = 1;
-const STATUS_FAIL = -2;
 
 
-const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_block', 12000 => 'web_block', 13000 => 'web_block', 14000 => 'sql_block', 15000 => 'web_block', 16000 => 'web_block', 17000 => 'web_block', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'web_block', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 31000 => 'whitelist_enable', 50000 => 'web_block');
-const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg', 16000 => 'php.svg', 17000 => 'fire.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg', 26000 => 'speed.svg', 31000 => 'badbot.svg', 50000 => 'rule.svg');
+const RESTRICTED_FILES = ["wp-config", ".."];
+const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_filter_enabled', 12000 => 'web_filter_enabled', 13000 => 'web_filter_enabled', 14000 => 'sql_block', 15000 => 'web_filter_enabled', 16000 => 'web_filter_enabled', 17000 => 'web_filter_enabled', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'check_domain', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 29000 => 'site_lock', 31000 => 'whitelist_enable', 50000 => 'web_filter_enabled');
+const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg', 16000 => 'php.svg', 17000 => 'fire.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg', 26000 => 'speed.svg', 29000 => 'php.svg', 31000 => 'badbot.svg', 50000 => 'rule.svg');
 
-const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff','\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\repair_files', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\add_list_elm', '\\BitFire\\remove_list_elm', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\make_code', '\\BitFire\\dump_hash_dir', '\\BitFire\\download');
-const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 70000 => 0);
-const BITFIRE_VER = 180;
-const BITFIRE_SYM_VER = "1.8.0";
-const BITFIRE_DOMAIN = "http://api.bitfire.com";
-const BITFIRE_INTERNAL_PARAM = '_bitfire_p';
+const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\allow', '\\BitFire\\send_mfa', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff','\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\add_list_elm', '\\BitFire\\remove_list_elm', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\dump_hash_dir','\\BitFire\\install', '\\BitFire\\uninstall', '\\BitFire\\download');
+const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 29000 => 0, 70000 => 0);
+const BITFIRE_VER = 194;
+const BITFIRE_SYM_VER = "1.9.4";
+const APP = "https://bitfire.co/";
+
+const BITFIRE_INTERNAL_PARAM = 'BITFIRE_NONCE';
 const BITFIRE_COMMAND = "BITFIRE_API";
 
 const BITFIRE_MAX_HASH_COUNT = 20;
@@ -59,13 +59,14 @@ const THROTTLE_LOCK_FILE = ".bitfire.lock";
 
 const FAIL_NOT = 0;
 
-const PROFANITY = "anal|anus|arse|ass|asss|bastard|bitch|cock|cocksuck|coon|crap|cunt|cyberfuck|damn|dick|douche|fag|faggot|fuck|fuck\s+you|fuckhole|god damn|gook|homoerotic|hore|lesbian|mother|fucker|motherfuck|motherfucker|negro|nigger|penis|penisfucker|piss|porn|pussy|retard|sex|shit|slut|son\s+of\s+a\s+bitch|tits|viagra|whore";
+const PROFANITY = "anal|anus|arse|ass|asss|bastard|bitch|cock|cocksuck|coon|crap|cunt|cyberfuck|damn|dick|douche|fag|faggot|fuck|fuck\s+you|fuckhole|god damn|gook|homoerotic|hore|lesbian|mother|fucker|motherfuck|motherfucker|negro|nigger|penis|penisfucker|piss|porn|pussy|retard|sex|shit|slut|son\s+of\s\s+a\s+bitch|tits|viagra|whore";
 
 
 const FAIL_HONEYPOT=50001;
 const FAIL_PHPUNIT=50004;
 const FAIL_WP_ENUM=50003;
 const FAIL_THRIVE_KRAKEN=50005;
+const FAIL_EVT_CAL=50006;
 const FAIL_METHOD=50002;
 const FAIL_INVALID_DOMAIN=23001;
 const FAIL_RR_TOO_HIGH=26001;
@@ -76,6 +77,7 @@ const FAIL_HOST_IS_IP=22002;
 const FAIL_FAKE_WHITELIST=24001;
 const FAIL_MISS_WHITELIST=24002;
 const FAIL_IS_BLACKLIST=25001;
+const FAIL_FILE_BLOCK=29001;
 
 const BLOCK_LONG=3;
 const BLOCK_MEDIUM=2;
@@ -101,4 +103,16 @@ const AGENT_WHITELIST = 'whitelist';
 const AGENT_BLACKLIST = 'blacklist';
 
 const FAIL_DURATION = array(FAIL_HONEYPOT => BLOCK_LONG, FAIL_METHOD => BLOCK_SHORT);
+
+const STATUS_FAIL = -1;
+const STATUS_OK = 0;
+const STATUS_ENOENT = 2;
+const STATUS_EACCES = 13;
+const STATUS_EEXIST = 17;
+const STATUS_ECOM = 70;
+
+const FILE_W  = 0200;
+const FILE_R  = 0444;
+const FILE_RW = 0664;
+const FILE_EX = 0775;
 

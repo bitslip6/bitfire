@@ -1,5 +1,8 @@
 <?php
-namespace TF;
+namespace ThreadFin;
+
+use function BitFireSvr\update_ini_value;
+
 const CUCKOO_SLOT_SIZE_BYTES = 19;
 const CUCKOO_EXP_SIZE_BYTES = 6;
 const CUCKOO_MAX_SIZE = 65534;
@@ -48,8 +51,6 @@ function search(array $items, callable $f) {
     return null;
 }
 
-function if_else($truth, callable $is, callable $is_not) { return ($truth) ? $is() : $is_not(); }
-
 // naive power of 2
 function power_of_2(int $n): bool { 
     if ($n === 0) { return false; }
@@ -75,24 +76,24 @@ function cuckoo_key(string $key): array {
 function cuckoo_find_free_mem($ctx, $size): array {
     // can't attempt to store values beyond the max size
     if ($size > CUCKOO_MAX_SIZE) {
-        \TF\debug("cache entry too large %d of max %d", $size, CUCKOO_MAX_SIZE);
+        debug("cache entry too large %d of max %d", $size, CUCKOO_MAX_SIZE);
         return [null, null];
     }
 
     // calculate a reasonable blocksize
     $block_size = intval(ceil($size / $ctx['chunk_size']) * $ctx['chunk_size']);
     
-    // echo "shmop: blocksz [$block_size]\n";
+    // debug("shmop: blocksz [$block_size]\n");
     // lock memory
     if (cuckoo_lock_for_write($ctx, $block_size)) {
         // find a location to allocate at the end of the stack, if full, defrag and return end of stack
-        //\TF\debug("find free: {$ctx['free_mem']} + {$block_size} >= {$ctx['mem_end']}");
+        //debug("find free: {$ctx['free_mem']} + {$block_size} >= {$ctx['mem_end']}");
 
         $ptr = ($ctx['free'] + $block_size >= $ctx['mem_end']) ? cuckoo_mem_defrag($ctx) : $ctx['free'];
         // CONTINUE: add mem-defrag
         //$ptr = ($ctx['free'] + $block_size >= $ctx['mem_end']) ? null : $ctx['free'];
 
-        //\TF\debug("allocate PTR: [$ptr]");
+        //debug("allocate PTR: [$ptr]");
         // if we have a location (not full and defrag successful), update pointer location
         if ($ptr !== null) {
             //$mem = unpack("nitems/nsize/Lfree", shmop_read($ctx['rid'], ($ctx['mem_end']), 8));
@@ -106,7 +107,7 @@ function cuckoo_find_free_mem($ctx, $size): array {
 
         return [$ptr, $block_size];
     } else {
-        \TF\debug("failed to lock memory\n");
+        debug("failed to lock memory\n");
     } 
 
     return [null, null];
@@ -142,7 +143,7 @@ function cuckoo_lock_for_write(array $ctx, $block_size): bool {
 // does NOTHING!
 function cuckoo_mem_defrag(&$ctx): int {
     $final = null;
-    \TF\debug("DEFRAG");
+    debug("DEFRAG");
 
 
     //$slot_num = $key_hash % $ctx['slots'];
@@ -170,7 +171,7 @@ function cuckoo_mem_defrag(&$ctx): int {
         }
     }
 
-    \TF\debug("to keep: " . count($to_keep) . " / " . $ctx['slots']);
+    debug("to keep: " . count($to_keep) . " / " . $ctx['slots']);
 
     $mem_offset = 0;
 
@@ -182,18 +183,18 @@ function cuckoo_mem_defrag(&$ctx): int {
         $mem_offset += $len;
 
         // update the header pointer
-        //echo "hdr offset: @{$header['slot']} off:{$header['offset']} / {$header['len']} -> ";
+        //debug("hdr offset: @{$header['slot']} off:{$header['offset']} / {$header['len']} -> ");
         $header['offset'] = $ctx['mem_start'] + $mem_offset;
         $header['len'] = $len;
         if (($header['offset'] + $header['len']) > $ctx['mem_end']) {
-            \TF\debug("ERROR: header offset[%d] + len[%d] > mem_end[%d], dropping entry", $header['offset'], $header['len'], $ctx['mem_end']);
+            debug("ERROR: header offset[%d] + len[%d] > mem_end[%d], dropping entry", $header['offset'], $header['len'], $ctx['mem_end']);
             continue;
         }
-        //echo "{$header['offset']} / {$header['len']}\n";
+        //debug("{$header['offset']} / {$header['len']}\n");
 
         // write data block to new location
         $wrote = @shmop_write($ctx['rid'], $block, $ctx['mem_start'] + $mem_offset);
-        //\TF\debug("defrag [%d/%d] [%s...%s]", $wrote, $len, substr($block, 0, 48), substr($block, -32));
+        //debug("defrag [%d/%d] [%s...%s]", $wrote, $len, substr($block, 0, 48), substr($block, -32));
         cuckoo_write_header($ctx, $header);
     }
 
@@ -227,22 +228,22 @@ function cuckoo_mem_defrag(&$ctx): int {
  * will overwrite existing keys with a lower priority
  */
 function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priority = CUCKOO_LOW): bool {
-    if (!$ctx['rid']) { return \TF\debugF("ctx rid is false"); }
+    if (!$ctx['rid']) { return debugF("ctx rid is false"); }
     
     $header = cuckoo_find_header_for_write($ctx, $key, $priority);
-    if ($header === null) { return \TF\debugF("unable to find header [%s] pri: [%d]", $key, $priority); }
+    if ($header === null) { return debugF("unable to find header [%s] pri: [%d]", $key, $priority); }
 
     // we have a header we can write cache data to...
-    $data = serialize($item);
+    $data = (function_exists('\msgpack_pack')) ? @\msgpack_pack($item) : json_encode($item);
     $size = strlen($data);
 
-    // echo "shmop: $size:[$data]\n";
+    // debug("shmop: $size:[$data]\n");
     // we can't store this much data in the cache...
-    if ($size > CUCKOO_MAX_SIZE) { return \TF\debugF("cache write failed key [%s] size [%d]", $key, $size); }
+    if ($size > CUCKOO_MAX_SIZE) { return debugF("cache write failed key [%s] size [%d]", $key, $size); }
 
     $mem = ($header['len'] < $size) ? cuckoo_find_free_mem($ctx, $size) : [$header['offset'], $header['len']];
-    if ($mem[0] === null) { return \TF\debugF("unable to find [%d] free bytes in cache key [%s]", $size, $key); }
-    if ($size > $mem[1]) { return \TF\debugF("write allocate memory key [%s] size [%d], allocation %d", $key, $size, $mem[1]); }
+    if ($mem[0] === null) { return debugF("unable to find [%d] free bytes in cache key [%s]", $size, $key); }
+    if ($size > $mem[1]) { return debugF("write allocate memory key [%s] size [%d], allocation %d", $key, $size, $mem[1]); }
 
     // clear permissions...
     $header['flags'] = $priority;//set_flag_priority($header['flags'], CUCKOO_LOW) | CUCKOO_FULL;
@@ -250,19 +251,23 @@ function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priori
     $header['len'] = $size;
     $header['expires'] = $ctx['now'] + $ttl_sec;
 
-    //\TF\debug("writing key [$key] to mem: {$mem[0]} / {$mem[1]}");
-    //\TF\debug("%s", print_r($header, true));
+    //debug("writing key [$key] to mem: {$mem[0]} / {$mem[1]}");
+    //debug("%s", print_r($header, true));
     cuckoo::update_free($ctx['free'] + intval($mem[1]));
 
-    //\TF\debug("write [%d] [%s...%s]", $size, substr($data, 0, 48), substr($data, -32));
+    //debug("write [%d] [%s...%s]", $size, substr($data, 0, 48), substr($data, -32));
 
     // write success
     if (cuckoo_write_header($ctx, $header)) {
         if (shmop_write($ctx['rid'], $data, $mem[0]) === $size) {
+            trace("shmW+ [$size:{$mem[0]}:$key]");
+            // debug("wrote {$ctx['rid']} %d bytes @%d [%s]", $size, $mem[0], print_r($header, true));
+            // debug(print_r($data, true));
             return true;
         }
+        trace("shm W+ [fail]");
     }
-    return \TF\debugF("unable to write header key: [%s] [%d] bytes", $key, $size);
+    return debugF("unable to write header key: [%s] [%d] bytes", $key, $size);
 }
 
 /**
@@ -277,7 +282,7 @@ function cuckoo_read_header(array $ctx, int $key_hash): ?array {
     //$header = unpack("Loffset/Lhash/Lexpires/nlen/Cflags", shmop_read($ctx['rid'], $slot_loc, CUCKOO_SLOT_SIZE_BYTES));
     $header = unpack(CUCKOO_UNPACK, shmop_read($ctx['rid'], $slot_loc, CUCKOO_SLOT_SIZE_BYTES));
     $header['slot_num'] = $slot_num;
-    //\TF\debug("read header @%d off[%d] len[%d]", $slot_num, $header['offset'], $header['len']);
+    // debug("read header @%d off[%d] len[%d]", $slot_num, $header['offset'], $header['len']);
 
     // return the filtering function
     return $header;
@@ -291,7 +296,7 @@ function cuckoo_read_header(array $ctx, int $key_hash): ?array {
  */
 function cuckoo_write_header(array $ctx, array $header): bool {
     $header['flags'] |= CUCKOO_FULL;
-    //\TF\debug("write header @%d   off[%d]  len[%d]", $header['slot_num'], $header['offset'], $header['len']);
+    // debug("write header @%d   off[%d]  len[%d]", $header['slot_num'], $header['offset'], $header['len']);
     return shmop_write($ctx['rid'], 
         pack(CUCKOO_PACK, $header['offset'], $header['hash1'], $header['hash2'], $header['expires'], $header['len'], $header['flags']),
         $header['slot_num'] * CUCKOO_SLOT_SIZE_BYTES) === CUCKOO_SLOT_SIZE_BYTES;
@@ -315,7 +320,7 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
                 return null;
             }
             // cache entry is miss-matched, log it
-            return \TF\debugN("cache keys miss-match [%s] 1:%d/%d, 2:%d/%d", $key, $key_hashes[0], $header['hash1'], $key_hashes[1], $header['hash2']);
+            return debugN("cache keys miss-match [%s] 1:%d/%d, 2:%d/%d", $key, $key_hashes[0], $header['hash1'], $key_hashes[1], $header['hash2']);
         }
     }
 
@@ -393,59 +398,46 @@ function cuckoo_find_header_for_write(array $ctx, string $key, int $priority): ?
  * read a previously stored cache key
  */
 function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn, int $priority = CUCKOO_LOW) {
-    if (!$ctx['rid']) { return \TF\debugF("cache rid is null"); }
+    if (!$ctx['rid']) { return debugF("cache rid is null"); }
     $header = cuckoo_find_header_for_read($ctx, $key);
 
-    return if_else($header !== null, 
-        function() use ($ctx, $header) {
+    return ($header !== null)
+        ? function() use ($ctx, $header) {
             return (shmop_read($ctx['rid'], 
-                $header['offset'], $header['len'])); },
-        function() use ($ctx, $key, $ttl, $fn, $priority) {
+                $header['offset'], $header['len'])); } 
+        : function() use ($ctx, $key, $ttl, $fn, $priority) {
             $data = $fn();
             cuckoo_write($ctx, $key, $ttl, $data, $priority);
             return $data;
-        }
-    );
+        };
 }
 
 function cuckoo_read(array $ctx, string $key) {
-    if (!$ctx['rid']) { return \TF\debugN("cache rid is null"); }
+    if (!$ctx['rid']) { return debugN("cache rid is null"); }
     $header = cuckoo_find_header_for_read($ctx, $key);
 
     if ($header !== null && $header['len'] > 0) {
         $data = shmop_read($ctx['rid'], $header['offset'], $header['len']);
-        // \TF\debug("read1 key:[%s]  /  [%s] - [%s]", $key, print_r(cuckoo_key($key), true), $data);
-        $x = @unserialize($data);
-        if ($x === false) {
-            \TF\debug("unserialize failed [%s]", $data);
-            \TF\debug("header [%s]", print_r($header, true));
+
+        $x = (function_exists('\msgpack_unpack')) ? @\msgpack_unpack($data) : @json_decode($data, true);
+        //$x = @json_decode($data, true);
+        if ($x === false && ! function_exists('\msgpack_unpack')) {
+            $d2 = str_replace('"]', '["', $data);
+            //$x = @json_decode($d2, true);
+            $x = @json_decode($d2, true);
+            if ($x === false) {
+                debug("unserialize failed 2 [%s]", $d2);
+            }
         }
+        trace("HIT:{$key}");
         return $x;
     }
 
-    return null;//\TF\debugN("unable to read key [%s]", $key);
-
-    /*
-    return if_else($header !== null && $header['len'] > 0, 
-        function() use ($ctx, $key, $header) {
-            $data = shmop_read($ctx['rid'], $header['offset'], $header['len']);
-            \TF\debug("read1 key:[%s]  /  [%s] - [%s]", $key, print_r(cuckoo_key($key), true), $data);
-            $x = @unserialize($data);
-            if ($x === false) {
-                \TF\debug("unserialize failed [%s]", $data);
-                \TF\debug("cuckoo header [%s]", print_r($header, true));
-            }
-            $xstr = print_r($x, true);
-            \TF\debug("read2: [$xstr]");
-            return $x;
-
-            //return (unserialize($data));
-        },
-        function() { return null; }
-    ); 
-    */
-    //return ($header === null || $header['len'] < 1) ? null :
-    //    (unserialize(shmop_read($ctx['rid'], $header['offset'], $header['len'])));
+    $x = "E";
+    if ($header == null) { $x = "N"; }
+    else if ($header['len'] < 1) { $x = "0"; }
+    trace("MISS:{$key}[$x]");
+    return null;
 }
 
 
@@ -461,7 +453,7 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
     assert($items <= 100000, "max 100K items in cache");
     assert($chunk_size <= 16384, "max base chunk_size 16K");
     assert(power_of_2($chunk_size));
-    \TF\debug("init memory");
+    debug("init memory");
 
 
     // initial expired memory block (5 bytes)
@@ -487,15 +479,18 @@ function cuckoo_init_memory(array $ctx, int $items, int $chunk_size): void {
 /**
  * helper function to open shared memory
  */
-function cuckoo_open_mem(int $size_in_bytes, string $key) {
-    $token = ftok(__FILE__, $key);
+function cuckoo_open_mem(int $size_in_bytes, $token, bool $reduced = false) {
+    // debug("shmop_open token: $token bytes: $size_in_bytes");
     $GLOBALS['bf_err_skip'] = true;
     $id = @shmop_open($token, 'c', 0666, $size_in_bytes);
 
     // unable to attach/created memory segment, recreate it...
     if ($id === false) {
+        debug("shmop_open fail, retry");
         $e = error_get_last();
-        if (!empty($e) && stripos("ermission denied", $e['message']) !== false) { $token = ftok(__FILE__, "z"); }
+        if (!empty($e) && stripos("to allocate", $e['message']) !== false && $size_in_bytes > 162000) { return cuckoo_open_mem($size_in_bytes-128000, $token, true); }
+        if (!empty($e) && stripos("ermission denied", $e['message']) !== false) { $token = 0x818283ad; }
+
         // connect failed, we probably have an old mem segment that is not large enough
         $id = @shmop_open($token, 'w', 0, 0);
         if ($id) { @shmop_delete($id); }
@@ -504,6 +499,10 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
         if ($id === false) {
             debug("shmop: unable to allocate $size_in_bytes shared memory token:[".dechex($token)."]");
         }
+    }
+    else if ($reduced) {
+        debug("NOTICE: reduced cache size to %d bytes", $size_in_bytes);
+        update_ini_value("cache_size", $size_in_bytes)->run();
     }
     $GLOBALS['bf_err_skip'] = false;
     return $id;
@@ -518,10 +517,12 @@ function cuckoo_open_mem(int $size_in_bytes, string $key) {
  * @param string $key = the shmem "key" = 'a'
  */
 function cuckoo_connect(int $items = 4096, int $chunk_size = 2048, int $mem = 1114112, bool $force_init = false):array {
+    $token = \BitFire\Config::int("cache_token", 1234560);
+    debug("shm open:$token");
     $entry_end = $items * CUCKOO_SLOT_SIZE_BYTES;
     $mem_end = $entry_end + $mem;
 
-    $rid = cuckoo_open_mem($mem_end + 16, 'a');
+    $rid = cuckoo_open_mem($mem_end + 16, $token);
     $ctx = Array(
         'rid' => $rid, 
         'txid' => mt_rand(1, 2147483647),
@@ -557,8 +558,16 @@ class cuckoo {
         self::$ctx['free_mem'] = self::$ctx['mem_end']-$free_pos;
     }
 
+    // fake the current time, to expire all keys on next read
+    // set to num of seconds to skip forward.  if $time is 0,
+    // default to normal time
+    public function fake_time(int $time) {
+        self::$ctx['now'] = time() + $time;
+    }
+
+    // TODO: determine 
     public function __construct() {
-        self::$ctx = cuckoo_connect(29000, 128, 29000*128, false);
+        self::$ctx = cuckoo_connect(20000, 128, 20000*128, false);
     }
 
     public static function read($key) {
@@ -574,7 +583,7 @@ class cuckoo {
     }
 
     public static function clear() {
-        cuckoo_init_memory(self::$ctx, 29000, 128);
+        cuckoo_init_memory(self::$ctx, 20000, 128);
     }
 
     public static function defrag() {

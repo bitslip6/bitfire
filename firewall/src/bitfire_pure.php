@@ -1,20 +1,50 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * helper methods for the BitFire, each method in this file should be pure
+ */
 namespace BitFire;
-use TF\MaybeBlock;
+use Exception;
 use BitFire\Config as CFG;
-use TF\Effect as Effect;
+use ThreadFin\CacheStorage;
+use ThreadFin\MaybeBlock;
+use ThreadFin\Effect as Effect;
+use ThreadFin\FileData;
+use ThreadFin\FileMod;
 
-use function TF\utc_date;
+use const ThreadFin\DAY;
 
+use function ThreadFin\find;
+use function ThreadFin\httpp;
+use function ThreadFin\map_mapvalue;
+use function ThreadFin\partial_right as BINDR;
+use function ThreadFin\random_str;
+use function ThreadFin\set_if_empty;
+use function ThreadFin\utc_date;
+use function ThreadFin\utc_microtime;
+use function ThreadFin\debug;
+use function ThreadFin\trace;
 
 /**
  * dashboard view helper
+ * @depricated
  */
 function to_meta(array $line) {
+    assert(isset($line["rate"]), "missing required field 'rate'");
+    assert(isset($line["rate"]["rr"]), "missing required field ['rate']['rr']");
+    assert(isset($line["browser"]), "missing required field ['browser']");
+    assert(isset($line["valid"]), "missing required field ['browser']['valild']");
     return "rate:".($line['rate']['rr']??0).", valid:".($line['browser']['valid']??0);
 }
 
-function code_class(int $code) : int {
+function code_class($code) : int {
+    assert(!empty($code), "empty code in code_class");
+    assert($code < 100000, "invalid code class >10000");
+    assert($code > 0, "invalid code class <1");
     return intval(floor($code / 1000) * 1000);
 }
 
@@ -23,10 +53,13 @@ function code_class(int $code) : int {
  */
 function is_report(Block $block) : bool {
     $class = code_class($block->code);
-    if (!isset(FEATURE_CLASS[$class])) { return true; } // unknown class, set to report mode. PROGRAMMING ERROR
+    assert(isset(FEATURE_CLASS[$class]), "missing $class from FEATURE_CLASS");
 
     $value = Config::str(FEATURE_CLASS[$class]);
-    return (substr($value, 0, 6) === "report" || substr($value, 0, 5) === "alert");
+    assert($value != "", "missing " . FEATURE_CLASS[$class] . " from config.ini");
+
+    $r = (substr($value, 0, 6) === "report" || substr($value, 0, 5) === "alert");
+    return $r;
 }
 
 
@@ -46,7 +79,7 @@ function map_exception(array $raw) : \BitFire\Exception {
 /**
  * returns $block if it doesn't match the block exception
  */
-function match_block_exception(?Block $block, Exception $exception, string $host, string $url) : ?Block {
+function match_block_exception(?Block $block, \BitFire\Exception $exception, string $host, string $url) : ?Block {
     if ($block == NULL) { return NULL; }
     // make sure that every non default paramater matches
     if ($exception->host !== NULL && $host !== $exception->host) { return $block; }
@@ -60,63 +93,69 @@ function match_block_exception(?Block $block, Exception $exception, string $host
         // handle specific code class
         if ($block->code !== $exception->code) { return $block; }
     }
-    \TF\debug("filtered block exception - code: {$exception->code} param: {$exception->parameter} uuid: {$exception->uuid}");
+    debug("filtered block exception - code: [%d] param [%s], uuid [%s]", $exception->code, $exception->parameter, $exception->uuid);
     return NULL;
 }
 
 
 /**
- * load exceptions from disk
+ * load exceptions from disk, map to object
+ * @return array of \BitrFire\Exception
  */
 function load_exceptions() : array {
-    $decoded = false;
-    if (file_exists(WAF_DIR."cache/exceptions.json")) {
-        $decoded = json_decode(file_get_contents(WAF_DIR."cache/exceptions.json"), true);
-    }
-    $exceptions = (!$decoded) ? array() : $decoded;
-    \TF\debug("loaded exceptions " . count($exceptions));
-
-    return array_map('\BitFire\map_exception', $exceptions);
+    $file = \BitFire\WAF_ROOT."exceptions.json";
+    return FileData::new($file)->read()->unjson()->map('\BitFire\map_exception')();
 }
 
 function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) : bool {
-    if ($ex1->code != $ex2->code) { return false; }
-    if ($ex1->host != $ex2->host) { return false; }
-    if ($ex1->parameter != $ex2->parameter) { return false; }
-    if ($ex1->url != $ex2->url) { return false; }
-    \TF\debug("match exception");
+    if (!empty($ex1->code) && $ex1->code != $ex2->code) { return false; }
+    if (!empty($ex1->host) && $ex1->host != $ex2->host) { return false; }
+    if (!empty($ex1->parameter) && $ex1->parameter != $ex2->parameter) { return false; }
+    if (!empty($ex1->url) && $ex1->url != $ex2->url) { return false; }
     return true;
 }
 
 /**
+ * PURE
  * remove an exception from the list
  */
-function remove_exception(\BitFire\Exception $ex) {
+function remove_exception(\BitFire\Exception $ex) : Effect {
+    $filename = \BitFire\WAF_ROOT."exceptions.json";
     $exceptions = array_filter(load_exceptions(), function(\BitFire\Exception $test) use ($ex) { return ($ex->uuid === $test->uuid) ? false : true; }); 
-    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($exceptions, JSON_PRETTY_PRINT), LOCK_EX);
+    $effect = Effect::new(new FileMod($filename, json_encode($exceptions, JSON_PRETTY_PRINT), FILE_W));
+    return $effect;
 }
 
-// add an exception to the cache/exceptions.json file, return true if successful
-function add_exception(\BitFire\Exception $ex) : bool {
-    $exceptions = load_exceptions();
-    $ex->uuid = ($ex->uuid !== NULL) ? $ex->uuid : \TF\random_str(8);
-    $ex2 = array_filter($exceptions, \TF\compose("\TF\\not", \TF\partial_right("\BitFire\match_exception", $ex)));
-    \TF\debug("filtered exceptions " . count($ex2));
-    $ex2[] = $ex;
-    file_put_contents(WAF_DIR."cache/exceptions.json", json_encode($ex2, JSON_PRETTY_PRINT), LOCK_EX);
-    return count($ex2) >= count($exceptions) ;
+/**
+ * add exception to list.  returns a list containting only 1 $ex 
+ * PURE
+ * @param Exception $ex 
+ * @param array $exceptions 
+ * @return array 
+ */
+function add_exception_to_list(\BitFire\Exception $ex, array $exceptions = []) : array {
+    $ex = set_if_empty($ex, "uuid", random_str(8));
+    $match_exception_fn = BINDR("\BitFire\match_exception", $ex);
+    // exception is not in the list
+    if (!find($exceptions, $match_exception_fn)) {
+        $exceptions[] = $ex;
+    }
+    return $exceptions;
 }
+
+
+
 
 
 /**
  * returns a maybe of the block if no exception exists
  */
 function filter_block_exceptions(Block $block, array $exceptions, \BitFire\Request $request) : MaybeBlock {
-    return MaybeBlock::of(array_reduce($exceptions, \TF\partial_right('\BitFire\match_block_exception', $request->host, $request->path), $block));
+    return MaybeBlock::of(array_reduce($exceptions, BINDR('\BitFire\match_block_exception', $request->host, $request->path), $block));
 }
 
 function process_server2(array $server) : Request {
-    $url = parse_url($server['REQUEST_URI'] ?? '//localhost/');
+    $url = parse_url(filter_input(INPUT_SERVER, 'REQUEST_URI') ?? '//localhost/');
     $request = new Request();
     $request->ip = process_ip($server);
     $request->host = parse_host_header($server['HTTP_HOST'] ?? '');
@@ -124,7 +163,7 @@ function process_server2(array $server) : Request {
     $request->path = ($url['path'] ?? '/');
     $request->method = ($server['REQUEST_METHOD'] ?? 'GET');
     $request->port = intval($server['SERVER_PORT'] ?? 8080);
-    $request->scheme = ($server['REQUEST_SCHEME'] ?? 'http');
+    $request->scheme = ($server['HTTP_X_FORWARDED_PROTO']??$server['REQUEST_SCHEME']??'http');
 
     $headers = new Headers();
     $headers->requested_with = ($server['HTTP_X_REQUESTED_WITH'] ?? '');
@@ -163,34 +202,55 @@ function freq_map(array $inputs) : array {
     $r = array();
     foreach($inputs as $key => $value) {
         $r[$key] = (is_array($value)) ? 
-            array_reduce($value, '\\BitFire\\get_counts_reduce', array()) :
+            array_reduce($value, '\\BitFire\\get_counts_reduce', []) :
             get_counts($value);
     }
     return $r;
 }
 
-function process_request2(array $get, array $post, array $server, array $cookies = array()) : Request {
+function process_request2(array $get, array $post, array $server, array $cookies = []) : Request {
     $request = process_server2($server);
-    $request->get = \TF\map_mapvalue($get, '\\BitFire\\each_input_param');
-    $request->post = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
-    $request->cookies = \TF\map_mapvalue($post, '\\BitFire\\each_input_param');
+    $fn = BINDR('\\BitFire\\each_input_param', CFG::enabled("block_profanity"));
+    $request->get = map_mapvalue($get, $fn);
+    $request->post = map_mapvalue($post, $fn);
+    $request->cookies = map_mapvalue($cookies, $fn);
     $request->get_freq = freq_map($request->get);
     $request->post_freq = freq_map($request->post);
-    $request->post_raw = ($server['REQUEST_METHOD']??'GET' == "POST") ? file_get_contents("php://input") : "";
+    if ($server["REQUEST_METHOD"] === "POST") {
+        $request->post_raw = file_get_contents("php://input");
+    } else {
+        $request->post_raw = "N/A";
+    }
 
     return $request;
 }
 
+function flatten_list($key, $value = "") : string {
+    return (is_array($value)) ? flatten($value) : "^$key:$value";
+}
 
-function each_input_param($in, bool $block_profanity = true) : ?string {
+function flatten($data) : string {
+    if (is_array($data)) {
+        $r = "";
+        foreach ($data as $key => $value) {
+            $r .= flatten_list($key, $value);
+        }
+        return $r;
+    } else {
+        return (string)$data;
+    }
+}
+
+
+function each_input_param($in, bool $block_profanity) : ?string {
     // we don't inspect numeric values because they would pass all tests
     if (is_numeric($in)) { return NULL; }
 
     // flatten arrays
-    if (is_array($in)) { $in = implode("^", $in); }
+    if (is_array($in)) { $in = flatten($in); }
 
     $value = strtolower(urldecode($in));
-    if ($block_profanity && Config::enabled("block_profanity")) {
+    if ($block_profanity) {
         $value = \BitFire\replace_profanity($value);
     }
     return html_entity_decode($value);
@@ -211,7 +271,7 @@ function get_counts(string $input) : array {
     // match any unicode character in the letter or digit category, 
     // and count the remaining characters 
     if (empty($input)) { return array(); }
-    $input2 = \preg_replace('/[\p{L}\d]/iu', '', $input, -1, $count);
+    $input2 = \preg_replace('/[\p{L}\d]/iu', '', $input);
     if (empty($input2)) { return array(); }
     return \count_chars($input2, 1);
 }
@@ -238,34 +298,12 @@ function get_fwd_for(string $header) : string {
     return $header;
 }
 
-// return leftmost forwarded for header
 // converts a remote_addr into an ipv4 address if at all possible
 // handles ipv6 as well 
 // PURE
 function getIP(string $remote_addr = '127.0.0.2') : string {
-    
     $parts = explode(",", $remote_addr);
     return trim($parts[0]??$remote_addr);
-    
-/*
-    // Known prefix
-    $v4mapped_prefix_bin = hex2bin('00000000000000000000ffff');
-
-    // Parse
-    $addr_bin = inet_pton($remote_addr);
-    if ($addr_bin === FALSE ) {
-        return $remote_addr;
-    }
-
-    // Check prefix, and map ipv4 inside ipv6 address
-    if(substr($addr_bin, 0, strlen($v4mapped_prefix_bin)) == $v4mapped_prefix_bin) {
-        $addr_bin = substr($addr_bin, strlen($v4mapped_prefix_bin));
-    }
-
-    // Convert back to printable address in canonical form
-    $x = inet_ntop($addr_bin);
-    return ($x == "::1") ? '127.0.0.1' : $x;
-*/
 }
 
 // return true if  request[path] contains url_match
@@ -274,12 +312,6 @@ function url_contains(\BitFire\Request $request, string $url_match) : bool {
 }
 
 
-
-
-// TODO: add override for additional uniqueness 
-function cache_unique(string $prefix = '') : string {
-    return $prefix . \TF\take_nth($_SERVER['HTTP_ACCEPT_LANGUAGE']??'', ',', 0) . '-' . $_SERVER['SERVER_NAME']??'default';
-}
 
 /**
  * returns filtered profanity 
@@ -310,6 +342,7 @@ function filter_bulky_headers(array $headers) : array {
 
 /**
  * side effect of logging blocks
+ * todo: move out of bitfire_pure
  */
 function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : void {
     $response_code = http_response_code();
@@ -323,43 +356,48 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $valid = $bot_filter->browser->valid??'';
         $whitelist = $bot_filter->browser->whitelist ?? false;
     }
-    if ($block === null) {
+    if (empty($block)) {
         if (!$bot && $response_code <= 302) { return; } 
         if ($bot && $whitelist) { return; }
     }
 
-    if ($block === null) { $block = BitFire::new_block(31002, "return code, NOTICE", strval($response_code), $request->agent, 0)(); }
+    //if ($block === null) { $block = BitFire::new_block(31002, "return code, NOTICE", strval($response_code), $request->agent, 0)(); }
 
-    $class = code_class((int)$block->code);
-    $data = make_post_data($request, $block, $ip_data);
+    $class = (!empty($block)) ? code_class((int)$block->code) : 0; 
+    $data = make_log_data($request, $block, $ip_data);
     $data["bot"] = $bot;
     $data["response"] = $response_code;
     $data["whitelist"] = $whitelist;
     $data["valid"] = $valid;
+    // add debug log if not included in the response headers
+    //if (!CFG::enabled('debug_header')) {
+        $data["debug"] = debug(null);
+    //}
     $data["classId"] = $class;
     $data["headers"] = filter_bulky_headers(headers_list());
     if (function_exists('getallheaders')) {
         $data["rhead"] = \getallheaders();
     }
     
-    $cache = \TF\CacheStorage::get_instance();
+    $cache = CacheStorage::get_instance();
     
     $ip = ip2long($request->ip);
-    $cache->update_data("metrics-".\TF\utc_date('G'), function ($metrics) use ($class, $ip) {
+    $cache->update_data("metrics-".utc_date('G'), function ($metrics) use ($class, $ip) {
         $metrics[$class] = ($metrics[$class]??0) + 1;
         $ip = ($ip < 100000) ? ip2long('127.0.0.1') : $ip; 
         $metrics[$ip] = ($metrics[$ip]??0) + 1;
         return $metrics;
-    }, function() { return \BitFire\BITFIRE_METRICS_INIT; } , \TF\DAY);
+    }, function() { return \BitFire\BITFIRE_METRICS_INIT; } , DAY);
     /* 
     // cache the last 25 blocks in memory if block file is disabled
     if (Config::disabled(CONFIG_BLOCK_FILE)) { $cache->rotate_data("log_data", $data, 15); }
     */
 
     $content = json_encode($data)."\n";
-    \TF\bit_http_request("POST", "https://www.bitfire.co/blocks.php", $content, array("Content-Type" => "application/json"));
+    httpp(APP."blocks.php", $content, array("Content-Type" => "application/json"));
 
-    if ($block != NULL && $block->code != 31002) {
+    /*
+    if ($block != NULL && $block->code != 0) {
         unset($data['headers']);
         unset($data['rhead']);
         if (Config::enabled('report_file') && ($data["pass"] === true)) {
@@ -369,14 +407,15 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
             file_put_contents(Config::file(CONFIG_BLOCK_FILE), $content, FILE_APPEND);
         }
     }
+    */
 }
 
 /**
  * create the base log data
  */
-function make_post_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : array {
+function make_log_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : array {
 
-    if ($block == NULL) { $block = new Block(50000, "n/a", "n/a", "n/a"); }
+    if ($block == NULL) { $block = new Block(0, "n/a", "n/a", "n/a"); }
     
     $data = array(
         "ip" => $request->ip,
@@ -386,17 +425,19 @@ function make_post_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_da
         "params" => \BitFire\Pure\param_to_str($request->get, Config::arr("filtered_logging")),
         "post" => \BitFire\Pure\param_to_str($request->post, Config::arr("filtered_logging")),
         "verb" => $request->method,
-        "ts" => \TF\utc_microtime(),
-        "tv" => \TF\utc_date("D H:i:s ") . \TF\utc_date('P'),
-        "referer" => isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '',
+        "ts" => utc_microtime(),
+        "tv" => utc_date("D H:i:s ") . utc_date('P'),
         "eventid" => $block->code,
         "item" => $block->parameter,
         "name" => $block->pattern,
         "match" => $block->value,
         "ver" => BITFIRE_VER,
         "pass" => $block->code === 0 ? true : false,
-        "offset" => 0
+        "refid" => \BitFire\BitFire::get_instance()->uid
     );
+    if (isset($_SERVER['HTTP_REFERER'])) {
+        $data["referer"] = filter_input(INPUT_SERVER, 'HTTP_REFERER', FILTER_SANITIZE_URL);
+    }
     
     // add ip data to the log
     if ($ip_data != NULL && $ip_data->rr > 0) {
@@ -422,26 +463,32 @@ const BLOCK_MAP = array(1 => 'short_block_time', 2 => 'medium_block_time', 3 => 
 function block_ip(?Block $block, ?Request $req) : Effect {
     if (!CFG::enabled('allow_ip_block') || !$block || $block->block_time < 1) { return new Effect(); }
 
+    debug("add IP block");
     return \BitFire\Pure\ip_block($block, $req, 
         CFG::int(BLOCK_MAP[$block->block_time]??'short_block_time', 600));
 }
 
 namespace BitFire\Pure;
-use \TF\Effect as Effect;
+use \ThreadFin\Effect as Effect;
 use \BitFire\Block as Block;
 use \BitFire\Request as Request;
+use ThreadFin\FileMod;
 
+use const BitFire\FILE_RW;
+
+use function \ThreadFin\partial_right as BINDR;
+use function ThreadFin\utc_time;
 
 /**
  * pure implementation of ip file blocking
  * TEST: test_pure.php:test_ip_block
  */
 function ip_block(Block $block, Request $request, int $block_time) : Effect {
-    $blockfile = BLOCK_DIR . '/' . $request->ip;
+    $blockfile = \BitFire\BLOCKDIR . '/' . $request->ip;
     $exp = time() + $block_time;
-    $block_info = json_encode(array('time' => \TF\utc_time(), "block" => $block, "request" => $request));
+    $block_info = json_encode(array('time' => utc_time(), "block" => $block, "request" => $request));
     return 
-        Effect::new()->file(new \TF\FileMod($blockfile, $block_info, 0664, $exp));
+        Effect::new()->file(new FileMod($blockfile, $block_info, FILE_RW, $exp));
 
 }
 
@@ -459,4 +506,18 @@ function param_to_str(array $params, array $filter) : string {
         $post_params[] = $key.'='.$val;
     }
     return implode('&', $post_params);
+}
+
+
+/**
+ * pure method to json encode $data and append write to $filename 
+ * @param string $filename 
+ * @param mixed $data 
+ * @return Effect 
+ */
+function json_to_file_effect(string $filename, $data) : Effect {
+    $encoder = bindr('json_encode', (strpos($filename, 'pretty') > 0) ? JSON_PRETTY_PRINT : 0);
+    $content = join(",\n", array_map($encoder, $data)) . "\n";
+    $file = new FileMod($filename, $content, FILE_RW, 0, true);
+    return Effect::new()->file($file);
 }

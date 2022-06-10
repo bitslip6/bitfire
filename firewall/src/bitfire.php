@@ -1,16 +1,43 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * main firewall.  holds core data references.
+ */
+
 namespace BitFire;
 
+use BitFire\Config as CFG;
+use ThreadFin\CacheStorage;
+use ThreadFin\Effect;
+use ThreadFin\FileMod;
+use ThreadFin\Maybe;
+use ThreadFin\MaybeBlock;
 
-if (defined("BITFIRE_CONFIG")) { return; }
-define("BITFIRE_CONFIG", dirname(__FILE__) . "/config.ini");
-require_once WAF_DIR."src/bitfire_pure.php";
-require_once WAF_DIR."src/const.php";
-require_once WAF_DIR."src/util.php";
-require_once WAF_DIR."src/storage.php";
-require_once WAF_DIR."src/english.php";
-require_once WAF_DIR."src/wordpress.php";
-require_once WAF_DIR."src/botfilter.php";
+use const ThreadFin\DAY;
+
+use function BitFire\Pure\json_to_file_effect;
+use function ThreadFin\contains;
+use function ThreadFin\decrypt_tracking_cookie;
+use function ThreadFin\en_json;
+use function ThreadFin\httpp;
+use function ThreadFin\random_str;
+use function ThreadFin\trace;
+use function ThreadFin\debug;
+use function ThreadFin\un_json;
+use function ThreadFin\utc_date;
+use function ThreadFin\utc_time;
+
+require_once \BitFire\WAF_SRC."bitfire_pure.php";
+require_once \BitFire\WAF_SRC."const.php";
+require_once \BitFire\WAF_SRC."util.php";
+require_once \BitFire\WAF_SRC."storage.php";
+require_once \BitFire\WAF_SRC."english.php";
+require_once \BitFire\WAF_SRC."botfilter.php";
+require_once \BitFire\WAF_SRC."cms.php";
 
 
 /**
@@ -20,19 +47,19 @@ require_once WAF_DIR."src/botfilter.php";
 class Headers
 {
     /** @var string $requested_with  set to XMLHttpRequest for xml http request */
-    public string $requested_with = '';
+    public $requested_with = '';
     /** @var string $fetch_mode set to sec-fetch-mode (cors, navigate, no-cors, same-origin, websocket) */
-    public string $fetch_mode = '';
+    public $fetch_mode = '';
     /** @var string $accept http accept header */
-    public string $accept;
+    public $accept;
     /** @var string $content http content type */
-    public string $content;
+    public $content;
     /** @var string $encoding http accept encoding */
-    public string $encoding;
+    public $encoding;
     /** @var string $dnt do not track header */
-    public string $dnt;
+    public $dnt;
     /** @var srtring $upgrade_insecure upgrade insecure request header */
-    public string $upgrade_insecure;
+    public $upgrade_insecure;
 }
 
 /**
@@ -41,24 +68,23 @@ class Headers
  */
 class Request
 {
-    public \BitFire\Headers $headers;
-    public string $host;
-    public string $path;
-    public string $ip;
-    public string $method;
-    public int $port;
-    public string $scheme;
+    public $headers;
+    public $host;
+    public $path;
+    public $ip;
+    public $method;
+    public $port;
+    public $scheme;
 
+    public $get;
+    public $get_freq = array();
+    public $post;
+    public $post_raw;
+    public $post_freq = array();
+    public $cookies;
 
-    public array $get;
-    public array $get_freq = array();
-    public array $post;
-    public string $post_raw;
-    public array $post_freq = array();
-    public array $cookies;
-
-    public string $agent;
-    public string $referer;
+    public $agent;
+    public $referer;
 }
 
 
@@ -116,7 +142,7 @@ class MatchType
                         }
                     }
                 }
-                else {  $result = strpos($this->_matched, $this->_value) !== false; }
+                else { $result = strpos($this->_matched, $this->_value) !== false; }
                 break;
             case MatchType::IN: 
                 $result = in_array($this->_matched, $this->_value);
@@ -187,16 +213,21 @@ class Config {
 
     public static function nonce() : string {
         if (self::$_nonce == null) {
-            self::$_nonce = str_replace(array('-','+','/'), "", \TF\random_str(10));
+            self::$_nonce = str_replace(array('-','+','/'), "", random_str(10));
         }
         return self::$_nonce;
     }
 
     // set the full list of configuration options
     public static function set(array $options) : void {
-        Config::$_options = $options;
+        if (empty($options)) {
+            trace("no cfg");
+            CacheStorage::get_instance()->save_data("parse_ini2", null, -86400); 
+        } else {
+            trace("cfg");
+            Config::$_options = $options;
+        }
     }
-
     // execute $fn if option enabled
     public static function if_en(string $option_name, $fn) {
         if (Config::$_options[$option_name]) { $fn(); }
@@ -215,6 +246,21 @@ class Config {
     // get a string value with a default
     public static function str(string $name, string $default = '') : string {
         if (isset(Config::$_options[$name])) { return (string) Config::$_options[$name]; }
+        if ($name == "auto_start") { // UGLY HACK for settings.html
+            $ini = ini_get("auto_prepend_file");
+            $found = false;
+            if (!empty($ini)) {
+                if ($_SERVER['IS_WPE']??false || CFG::enabled("emulate_wordfence")) {
+                    $file = CFG::str("wp_root")."/wordfence-waf.php";
+                    if (file_exists($file)) {
+                        $s = @stat($file); // cant read this file on WPE, check the size
+                        $found = ($s['size']??9999 < 256);
+                    }
+                }
+                else if (contains($ini, "bitfire")) { $found = true; }
+            }
+            return ($found) ? "on" : "";
+        }
         return (string) $default;
     }
 
@@ -244,18 +290,20 @@ class Config {
     public static function file(string $name) : string {
         if (!isset(Config::$_options[$name])) { return ''; }
         if (Config::$_options[$name][0] === '/') { return (string)Config::$_options[$name]; }
-        return WAF_DIR . (string)Config::$_options[$name];
+        return \BitFire\WAF_ROOT . (string)Config::$_options[$name];
     }
 }
 
 /**
- * NOT PURE.  depends on: $_SERVER['PHP_AUTH_PW'], Config['password']
+ * NOT PURE.  depends on: SERVER['PHP_AUTH_PW'], Config['password']
  */
-function verify_admin_password() : \TF\Effect {
-    $effect = \TF\Effect::new();
-    if (!isset($_SERVER['PHP_AUTH_PW']) ||
-        (sha1($_SERVER['PHP_AUTH_PW']) !== Config::str('password', 'default_password')) &&
-        (sha1($_SERVER['PHP_AUTH_PW']) !== sha1(Config::str('password', 'default_password')))) {
+function verify_admin_password() : Effect {
+    $effect = Effect::new();
+
+    $auth = filter_input(INPUT_SERVER, 'PHP_AUTH_PW', FILTER_SANITIZE_URL);
+    if (!$auth ||
+        ((hash("sha3-256", $auth) !== CFG::str('password')) &&
+        (hash("sha3-256", $auth) !== hash('sha3-256', CFG::str('password'))))) {
 
         $effect->header('WWW-Authenticate', 'Basic realm="BitFire", charset="UTF-8"')
             ->response_code(401)
@@ -269,19 +317,18 @@ function verify_admin_password() : \TF\Effect {
  */
 class BitFire
 {
-    const CACHE_PAGE = WAF_DIR . "cache/root";
-
     // data storage
     protected $_ip_key;
 
-    public $cache;
     // request unique id
     public $uid;
     public static $_exceptions = NULL;
     public static $_reporting = array();
+    public static $_blocks = array();
+    /** @var MaybeStr $cookie */
+    public $cookie = NULL;
 
     public static $_fail_reasons = array();
-    protected $_ip_data = null;
 
     public $_request = null;
 
@@ -307,18 +354,18 @@ class BitFire
      */
     protected function __construct() {
 
-        $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE);
+        $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE); // filter out all request data for parsed use
 
-        if ($this->_request->path === "/favicon.ico") { http_response_code(404); die(); }
-        $this->api_call();
-
+       
+        // handle a common case urls we never care about
+        if (in_array($this->_request->path, CFG::arr("urls_not_found"))) {
+            http_response_code(404); die();
+        }
+       
         if (Config::enabled(CONFIG_ENABLED)) {
             $this->uid = substr(\uniqid(), 5, 8);
-            
-            // we will need cache storage and secure cookies
-            $this->cache = \TF\CacheStorage::get_instance();
 
-            if (function_exists('\BitFirePRO\send_pro_headers')) {
+            if (function_exists('\BitFirePRO\send_pro_mfa')) {
                 \BitFirePRO\send_pro_mfa($this->_request);
             }
         }
@@ -328,52 +375,20 @@ class BitFire
      * write report data after script execution 
      */
     public function __destruct() {
-        if (!Config::enabled(CONFIG_REPORT_FILE) || count(self::$_reporting) < 1) { return; }
-        // encoder is json_encode with pretty printing if file has word "pretty" in it
-        $encoder = \TF\partial_right('json_encode', (strpos(Config::str(CONFIG_REPORT_FILE), 'pretty') > 0) ? JSON_PRETTY_PRINT : 0);
-        @file_put_contents(Config::file(CONFIG_REPORT_FILE), join(",\n", array_map($encoder, self::$_reporting)) . "\n", FILE_APPEND);
-        /*
-        $out = "";
-        foreach (self::$_reporting as $report) {
-            $out .= json_encode($report, $opts) . "\n";
+        if (!empty(CFG::enabled(CONFIG_REPORT_FILE)) && count(self::$_reporting) > 0) {
+            $coded = array_map(function (array $x):array { $x['http_code'] = http_response_code(); return $x; }, self::$_reporting);
+            json_to_file_effect(CFG::file(CONFIG_REPORT_FILE), $coded)->run();
         }
-        */
+        if (!empty(CFG::str(CONFIG_BLOCK_FILE)) && count(self::$_blocks) > 0) {
+            $coded = array_map(function (array $x):array { $x['http_code'] = http_response_code(); return $x; }, self::$_blocks);
+            json_to_file_effect(CFG::file(CONFIG_BLOCK_FILE), $coded)->run();
+        }
     }
 
     /**
      * handle API calls.
-     * DEPENDS: $_SERVER, $_REQUEST, Config
      */
-    protected function api_call() : void {
-        if (!isset($_REQUEST[BITFIRE_COMMAND])) {
-            return;
-        }
-
-        $fn = '\\BitFire\\' . htmlentities($_REQUEST[BITFIRE_COMMAND]??'nop');
-        if (!in_array($fn, BITFIRE_API_FN)) {
-            exit("unknown function [$fn]");
-        }
-
-        // verify admin password.  will exit 401 if failure
-        // TODO: add verify secret here as well
-        verify_admin_password()->run();
-        
-
-        $this->_request->post = (strlen($this->_request->post_raw) > 1 && count($this->_request->post) < 1) ? \TF\un_json($this->_request->post_raw) : $this->_request->post;
-
-        if ($this->_request->post[BITFIRE_INTERNAL_PARAM]??$_GET[BITFIRE_INTERNAL_PARAM]??'' === Config::str(CONFIG_SECRET, "no_such_value")) {
-            // Do we have a logged in word press cookie? don't block.
-            $maybe_botcookie = \TF\decrypt_tracking_cookie(
-                $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
-                Config::str(CONFIG_ENCRYPT_KEY),
-                $this->_request->ip, $this->_request->agent);
-
-
-            require_once WAF_DIR."src/api.php";
-            exit($fn($this->_request, $maybe_botcookie));
-        }
-    }
-
+    
     /**
      * append an exception to the list of exceptions
      */
@@ -384,25 +399,35 @@ class BitFire
     /**
      * create a new block, returns a maybe of a block, empty if there is an exception for it
      */
-    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : \TF\MaybeBlock {
-        if ($code === FAIL_NOT) { return \TF\Maybe::$FALSE; }
+    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : MaybeBlock {
+        if ($code === FAIL_NOT) { return Maybe::$FALSE; }
+
+
         $block = new Block($code, $parameter, $value, $pattern, $block_time);
         $req = BitFire::get_instance()->_request;
         if (is_report($block)) {
             self::reporting($block, $req);
-            return \TF\Maybe::$FALSE;
+            return Maybe::$FALSE;
         }
         self::$_exceptions = (self::$_exceptions === NULL) ? load_exceptions() : self::$_exceptions;
-        return filter_block_exceptions($block, self::$_exceptions, $req);
+        $filtered_block = filter_block_exceptions($block, self::$_exceptions, $req);
+
+        // do the logging
+        if (!$filtered_block->empty()) {
+            BitFire::reporting($filtered_block(), BitFire::get_instance()->_request, true);
+        }
+        return $filtered_block;
     }
     
     /**
-     * TODO: format blocks the same way as reports
+     * report a would-be block
      */
-    protected static function reporting(Block $block, \BitFire\Request $request) {
+    protected static function reporting(Block $block, \BitFire\Request $request, bool $report_or_block = false) {
 
-        $data = array('time' => \TF\utc_date('r'), 'tv' => \TF\utc_time(),
-            'exec' => @number_format(microtime(true) - $GLOBALS['start_time']??0, 6). ' sec',
+        $mt = microtime(true);
+        $time_diff = $mt - $GLOBALS['start_time']??($mt-0.001);
+        $data = array('time' => utc_date('r'), 'tv' => utc_time(),
+            'exec' => @number_format($time_diff, 6). ' sec',
             'block' => $block,
             'request' => $request);
         $bf = BitFire::get_instance()->bot_filter;
@@ -411,163 +436,147 @@ class BitFire
             $data['rate'] = $bf->ip_data;
         }
         
-        self::$_reporting[] = $data;
-    }
-    
-
-    
-    /**
-     * TODO: MOVE TO CACHE.php
-     */
-    // update the cache behind page
-    public static function update_cache_behind() {
-        if (strlen($_SERVER['SERVER_NAME']??'') < 1) { return; }
-        $secret = Config::str(CONFIG_SECRET, 'bitfiresekret');
-        $u = $_SERVER['REQUEST_SCHEME'] . "://" . $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI'] . "?" . BITFIRE_INPUT . "=$secret";
-        $d = \TF\bit_http_request("GET", $u, "");
-        file_put_contents(WAF_DIR . '/cache/root:'. cache_unique(), $d);
-    }
-
-
-    // TODO: move this to "pure function"
-    // display the cache behind page
-    // FIX: replace fail reasons here!
-    public function cache_behind() {
-        // don't cache internal requests... (infinate loop)
-        if (isset($_GET[BITFIRE_INPUT])) { return; }
-
-        // if the request is to the homepage with no parameters, it is possible to cache
-        $tracking_cookie = Config::str(CONFIG_USER_TRACK_COOKIE, '_bitf');
-        $site_cookies = array_filter(array_keys($_COOKIE), function($name) use ($tracking_cookie) { return stripos($name, $tracking_cookie) === false; });
-
-        if (Config::int(CONFIG_MAX_CACHE_AGE, 0) > 0 &&
-            $this->_request->path === '/' && 
-            $this->_request->method === "GET" &&
-            count($_GET) === 0 && 
-            count($site_cookies) === 0) {
-                // update the cache after this request
-                register_shutdown_function([$this, 'update_cache_behind']);
-                $page = WAF_DIR . 'cache/root:' . cache_unique();
-                // we have a cached page that is not too old
-                if ($this->cached_page_is_valid($page)) {
-                    header("x-cached: 1");
-                    // add a js challenge if the request is not to a bot
-                    if (Config::enabled(CONFIG_REQUIRE_BROWSER) && $this->bot_filter != null && $this->bot_filter->browser->bot == false) {
-                        \BitFireBot\send_browser_verification($this->bot_filter->ip_data, Config::str(CONFIG_ENCRYPT_KEY))->run();
-                    }
-                    // serve the static page!
-                    echo file_get_contents($page);
-                    echo "<!-- cache -->\n";
-                    exit();
-                }
+        if ($report_or_block) {
+            self::$_blocks[] = $data;
+        } else {
+            self::$_reporting[] = $data;
         }
     }
+    
 
-    /**
-     * test if BitFire::CACHE_PAGE is a valid cached page (exists and is not stale)
-     */
-    public function cached_page_is_valid(string $page) {
-        $stat_data = @stat($page);
-        $exp_time = $stat_data['ctime'] + Config::int(CONFIG_MAX_CACHE_AGE);
-        //echo "<!-- [$page]\n" . time() . "\n$exp_time\n"; print_r($stat_data); echo "-->\n";
-        $cache_valid = ($stat_data != false && $exp_time > time());
-        $h = "x-cache-valid: false";
-        if ($cache_valid) { $h = "x-cache-valid: true"; }
-        header($h);
-        //return false;
-        return $cache_valid;
-    }
+    
+
+    
 
 
     /**
      * inspect a request and block failed requests
      * return false if inspection failed...
      */
-    public function inspect() : \TF\MaybeBlock {
+    public function inspect() : MaybeBlock {
+        trace("ins");
+        // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
+        Maybe::$FALSE = MaybeBlock::of(NULL);
+        $block = MaybeBlock::of(NULL);
+
+        // handle urls that this site does not want to inspect
+        if (in_array($this->_request->path, CFG::arr("urls_ignored"))) {
+            trace("ign");
+            return Maybe::$FALSE;
+        }
+
+        // don't inspect local commands, this will skip command line access in case we are running via auto_prepend
+        if (!isset($_SERVER['REQUEST_URI'])) { trace("local"); return $block; }
 
         // block from the htaccess file
         if (isset($this->_request->get['_bfblock'])) {
+            trace("htaccess");
             return BitFire::new_block(28001, "_bfblock", "url", $this->_request->get['_bfblock'], 0);
         }
 
         
-        // Do we have a logged in word press cookie? don't block.
-        $maybe_botcookie = \TF\decrypt_tracking_cookie(
+        // Do we have a logged in bitfire cookie? don't block.
+        $maybe_botcookie = decrypt_tracking_cookie(
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
             Config::str(CONFIG_ENCRYPT_KEY),
             $this->_request->ip, $this->_request->agent);
+        $this->cookie = $maybe_botcookie;
 
 
-        // dashboard requests, TODO: MOVE TO api.php
-        if (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND] === "MALWARESCAN") {
-            require_once WAF_DIR."src/dashboard.php";
-            serve_malware($this->_request->path);
-        }
+        // if we are not running inside of Wordpress, then we need to load the page here.
+        // if running inside of WordPress, bitfire-admin.php will load the admin pages, so
+        // the check for admin.php will fail here in that case
+        if (isset($this->_request->get['BITFIRE_PAGE'])) {
+                require_once \BitFire\WAF_SRC."dashboard.php";
 
-        // settings requests, TODO: MOVE TO api.php
-        if (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND] === "SETTINGS") {
-            require_once WAF_DIR."src/dashboard.php";
-            serve_settings($this->_request->path);
-        }
-
-
-        // dashboard requests, TODO: MOVE TO api.php
-        if (\TF\url_compare($this->_request->path, Config::str(CONFIG_DASHBOARD_PATH, "no_such_path")) || (isset($_GET[BITFIRE_COMMAND]) && $_GET[BITFIRE_COMMAND]??'' === "DASHBOARD")) {
-            require_once WAF_DIR."src/dashboard.php";
-            serve_dashboard($this->_request->path);
-        }
-
-
-
-        // WordPress admin
-        if ($maybe_botcookie->extract("wp")() > 0) { 
-            \BitFireWP\wp_handle_admin($this->_request, $maybe_botcookie);
-            return \TF\Maybe::$FALSE;
-        }
-
-        // store admin status in bitfire cookie for fast retrieval
-        $wp_login_data = \BitFireWP\wp_get_login_cookie($_COOKIE);
-        if (!empty($wp_login_data)) {
-            $data = $maybe_botcookie->value('array');
-            $data['wp'] = (\BitFireWP\wp_validate_cookie($wp_login_data, $_SERVER['DOCUMENT_ROOT']??getcwd()))?2:0;
-            if ($data['wp']) {
-                \TF\Effect::new()->cookie(json_encode($data))->run();
+            if ($this->_request->get['BITFIRE_PAGE'] === "MALWARESCAN") {
+                serve_malware();
+            }
+            else if ($this->_request->get['BITFIRE_PAGE'] === "SETTINGS") {
+                serve_settings();
+            }
+            else if ($this->_request->get['BITFIRE_PAGE'] === "ADVANCED") {
+                serve_advanced();
+            }
+            else {
+                serve_dashboard($this->_request->path);
             }
         }
 
-        // quick stats occasionally
-        if (random_int(1, 100) == 81) {
-            $f = WAF_DIR."/cache/ip.8.txt";$n = (int)file_get_contents(WAF_DIR."/cache/ip.8.txt");file_put_contents($f, (string)($n+1), LOCK_EX);
+        $wpadmin = ($maybe_botcookie->extract("wp")() > 1);
+        // build A WordPress Profile
+        if (CFG::enabled("wp_root")) {
+            $wp_effect = cms_build_profile($this->_request, $wpadmin);
+            if (!defined("SAVEQUERIES") && CFG::enabled("audit_sql")) { define("SAVEQUERIES", true); } // feature toggle to log WP sql queries and audit
+
+            register_shutdown_function(function() use ($wp_effect) {
+                // if we have wordpress db, and query data
+                if (isset($GLOBALS['wpdb']) && CFG::enabled("audit_sql")) {
+                    $db = $GLOBALS['wpdb'];
+                    if (isset($db->queries) && !empty($db->queries)) {
+                        // only keep the query string
+                        $sql = array_map(function($x){return(isset($x[0]))?$x[0]:"";}, $db->queries);
+                        // append to the sql log file
+                        $wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql.log", json_encode(["url" => $wp_effect->read_out(), "queries" => $sql]), FILE_W, 0, true));
+                    }
+                }
+                $wp_effect->run();
+                if ($wp_effect->num_errors() > 0) {
+                    debug("effect errors [%s]", en_json($wp_effect->read_errors()));
+                }
+            });
         }
 
-        // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
-        \TF\Maybe::$FALSE = \TF\MaybeBlock::of(NULL);
-        $block = \TF\MaybeBlock::of(NULL);
+        // if we have an api command and not running in WP, execute it. we are done!
+        if (isset($request->get[BITFIRE_COMMAND]) && !isset($request->get['plugin'])) {
+            require_once WAF_SRC."api.php";
+            api_call($this->_request)->run();
+        }
 
-        if (!Config::enabled(CONFIG_ENABLED)) { return $block; }
+        
+        // quick aprox stats occationally
+        if (random_int(1, 100) == 81) {
+            trace("stat");
+            $f = \BitFire\WAF_ROOT."/cache/ip.8.txt";$n=un_json(file_get_contents(\BitFire\WAF_ROOT."/cache/ip.8.txt"));
+            if ($n['t'] > time()) { $n['h']=$request->host; httpp(APP."zxf.php", en_json($n)); $n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
+            $n['c']++;file_put_contents($f, en_json($n), LOCK_EX);
+        }
 
-        // don't inspect local commands
-        if (!isset($_SERVER['REQUEST_URI'])) { return $block; }
 
-        // bot filtering
+        // QUICK BAIL OUT IF DISABLED
+        if (!Config::enabled(CONFIG_ENABLED)) { trace("DISABLE"); return $block; }
+
+       
+         // bot filtering
         if ($this->bot_filter_enabled()) {
-            $this->bot_filter = new BotFilter($this->cache);
+            // we will need cache storage and secure cookies
+            $this->bot_filter = new BotFilter(CacheStorage::get_instance());
             $block = $this->bot_filter->inspect($this->_request);
         }
 
-        if (Config::enabled(CONFIG_SECURITY_HEADERS)) {
-            require_once WAF_DIR."src/headers.php";
-			\BitFireHeader\send_security_headers($this->_request);
-		}
+        // send headers first
+        if (Config::enabled(CONFIG_SECURITY_HEADERS) || CFG::enabled("csp_policy_enabled")) {
+            require_once \BitFire\WAF_SRC."headers.php";
+			\BitFireHeader\send_security_headers($this->_request, $maybe_botcookie, $this->bot_filter->browser)->run();
+		} else { trace("NODHR"); }
 
+ 
 
-        // generic filtering
-        if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
-            require_once WAF_DIR . 'src/webfilter.php';
-            $this->_web_filter = new \BitFire\WebFilter();
-            $block = $this->_web_filter->inspect($this->_request);
+        // always return consistent results for wordpress scanner blocks regardless of bot type
+        // we want to fool scanners to think nginx/apache sent this response ...
+        if (CFG::enabled("wp_block_scanners") && function_exists("BitFirePRO\block_plugin_enumeration")) {
+            \BitfirePRO\block_plugin_enumeration($this->_request)->run();
         }
 
+       
+                // generic filtering
+        if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
+            require_once \BitFire\WAF_SRC.'webfilter.php';
+            $web_filter = new \BitFire\WebFilter();
+            $block = $web_filter->inspect($this->_request);
+        }
+
+        
         return $block;
     }
 
@@ -576,7 +585,7 @@ class BitFire
      */
     protected function bot_filter_enabled() : bool {
         // disable bot filtering for internal requests
-        $bf = $_GET[BITFIRE_INPUT] ?? '';
+        $bf = $this->_request->get[BITFIRE_INPUT] ?? '';
         if ($bf === trim(Config::str(CONFIG_SECRET, 'bitfiresekret'))) { return false; }
 
         return (

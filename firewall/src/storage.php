@@ -1,5 +1,6 @@
 <?php
-namespace TF;
+namespace ThreadFin;
+use \BitFire\Config as CFG;
 
 /**
  * generic storage interface for temp / permenant storage
@@ -33,12 +34,24 @@ class CacheStorage implements Storage {
     protected static $_instance = null;
     protected $_shmop = null;
     protected $_shm = null;
+    public $expires = -1;
 
-    public static function get_instance() : CacheStorage {
-        if (self::$_instance === null) {
-            self::$_instance = new CacheStorage(\Bitfire\Config::str('cache_type', 'nop'));
+    public static function get_instance(?string $type = null) : CacheStorage {
+        if (self::$_instance === null || ($type !== null && self::$_type != $type)) {
+            //debug("cache new(%d) me(%s) type(%s)", (self::$_instance == null), self::$_type, $type);
+            $type = (empty($type) ? CFG::str("cache_type", "nop") : $type);
+            self::$_instance = new CacheStorage($type);
         }
         return self::$_instance;
+    }
+
+    // fake the current time, to expire all keys on next read
+    // set to num of seconds to skip forward.  if $time is 0,
+    // default to normal time
+    public function fake_time(int $time) {
+        if (self::$_type == "shmop") {
+            $this->_shmop->fake_time($time);
+        }
     }
 
     /**
@@ -49,12 +62,12 @@ class CacheStorage implements Storage {
             self::$_type = $type;
         }
         else if ($type === "shmop" && function_exists('shmop_open')) {
-            require_once WAF_DIR . "src/cuckoo.php";
+            require_once \BitFire\WAF_SRC . "cuckoo.php";
             $this->_shmop = new cuckoo();
             self::$_type = $type;
         }
         else if ($type === "shm" && function_exists('shm_attach')) {
-            require_once WAF_DIR . "src/shmop.php";
+            require_once \BitFire\WAF_SRC . "shmop.php";
             $this->_shm = new shm();
             self::$_type = $type;
         }
@@ -63,7 +76,7 @@ class CacheStorage implements Storage {
 
     // take a key and return an opcode path
     protected function key2name(string $key) : string {
-        return WAF_DIR . "cache/{$key}.profile";
+        return \BitFire\WAF_ROOT . "cache/{$key}.profile";
     }
 
     /**
@@ -80,7 +93,8 @@ class CacheStorage implements Storage {
             case "shmop":
                 return $this->_shmop->write($key_name, $seconds, $storage, $priority);
             case "apcu":
-                return \apcu_store("_bitfire:$key_name", $storage, $seconds);
+                if ($seconds < 1) { return \apcu_delete("_bitfire:$key_name"); }
+                return (bool)\apcu_store("_bitfire:$key_name", $storage, $seconds);
             case "opcache":
                 $s = var_export($storage, true);
                 $exp = time() + $seconds; 
@@ -123,6 +137,7 @@ class CacheStorage implements Storage {
     /**
      * update cache entry @key_name with result of $fn or $init if it is expired.
      * return the cached item, or if expired, init or $fn
+     * @param $fn($data) called with the original value, saves with returned value
      */
     public function update_data(string $key_name, callable $fn, callable $init, int $ttl) {
         $sem = $this->lock($key_name);
@@ -166,7 +181,7 @@ class CacheStorage implements Storage {
             if (is_bool($value)) {
                 return $init;
             }
-            if ($value[0] == $key_name) {
+            if (isset($value[0]) && $value[0] == $key_name) {
                 return $value[1];
             }
         }
@@ -180,6 +195,12 @@ class CacheStorage implements Storage {
     public function load_or_cache(string $key_name, int $ttl, callable $generator) {
         if (($data = $this->load_data($key_name)) === null) {
             $data = $generator();
+            if (is_array($data)) {
+                $s = count($data) . " elements";
+            } else {
+                $s = (string)$data;
+            }
+            debug("load_or_cache failed to load $key_name [%s]", $s);
             $this->save_data($key_name, $data, $ttl);
         }
         return $data;
@@ -188,114 +209,11 @@ class CacheStorage implements Storage {
     public function clear_cache() : void {
         switch (self::$_type) {
             case "shmop":
+                trace("clear");
+                debug("cache clear");
                 $value = $this->_shmop->clear();
                 break;
         }
     }
 }
 
-/**
- * persistant storage
- */
-class FileStorage implements Storage {
-
-    public function __construct() {
-    }
-
-    // take a key and return an opcode path
-    protected function key2name(string $key) : string {
-        return WAF_DIR . "cache/{$key}.profile";
-    }
-
-    /**
-     * returns num bytes written or false
-     */
-    public function save_data(string  $key_name, $data, int $ttl) : bool {
-        return file_put_contents($this->key2name($key_name), json_encode($data), LOCK_EX);
-    }
-
-    /**
-     * TODO: check stat mtime if the data is still valid...
-     */
-    public function load_data(string $key_name) {
-        $contents = file_get_contents($this->_write_path . "{$key_name}.profile");
-        return ($contents !== false) ? \TF\un_json($contents) : null;
-    }
-
-    public function update_data(string $key_name, callable $fn, callable $init, int $ttl) {
-        $data = $this->load_data($key_name);
-        if ($data === null) { $data = $init; }
-        $this->save_data($key_name, $fn($data), $ttl);
-    }
-
-    /**
-     * load the data from cache, else call $generator
-     */
-    public function load_or_cache(string $key_name, int $ttl, callable $generator) {
-        if (($data = $this->load_data($key_name)) === null) {
-            $data = $generator();
-            $this->save_data($key_name, $data, $ttl);
-        }
-        return $data;
-    }
-}
-
-
-
-
-interface BitInspectStore {
-    public function save_page(array $page);
-    public function load_page(string $page);
-    public function load_page_list();
-    public function save_page_list($list);
-}
-
-class BitInspectFileStore implements BitInspectStore {
-    private $_path;
-
-    public function __construct($path) {
-
-        $cache_path = WAF_DIR . "/cache/pages";
-        $d = is_dir(($cache_path));
-        $w = is_writable(($cache_path));
-
-        if (!is_dir($cache_path) || !is_writable($cache_path)) {
-            $cache_path = sys_get_temp_dir();
-        }
-        $this->_path = realpath($cache_path) . "/";
-    }
-
-    private function request_to_name(array $page) {
-        $path = join('/', $page);
-        if ($path === "") { $path = "/root"; }
-        return "$path.json";
-    }
-
-    public function save_page(array $page) {
-        $data = json_encode($page);
-        $path = $this->_path . $page['name'] . ".json";
-        $d = dirname($path);
-        debug("save page to: ($d) [$path] : " . strlen($data));
-        @mkdir($d, 0750, true);
-        return file_put_contents($path, $data);
-    }
-
-    public function load_page(string $name) {
-        $path = $this->_path . $name . ".json";
-        if (!is_file($path)) { return null; }
-        $data = file_get_contents($path);
-        return ($data !== false) ? \TF\un_json($data) : null;
-    }
-
-    public function load_page_list() {
-        $path = $this->_path . 'bitfire_pagelist.json';
-        if (!is_file($path)) { return null; }
-        $data = file_get_contents($path);
-        return ($data !== false) ? \TF\un_json($data) : null;
-    }
-
-    public function save_page_list($list) {
-        $data = json_encode($list);
-        file_put_contents($this->_path . 'bitfire_pagelist.json', $data);
-    }
-}

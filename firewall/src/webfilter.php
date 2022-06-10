@@ -1,10 +1,21 @@
 <?php
 namespace BitFire;
 
-use TF\CacheStorage;
+use ThreadFin\CacheStorage;
 use BitFire\Config as CFG;
+use ThreadFin\Effect;
+use ThreadFin\FileMod;
+use ThreadFin\Maybe;
+use ThreadFin\MaybeA;
+use ThreadFin\MaybeBlock;
 
-use function TF\map_reduce;
+use const ThreadFin\DAY;
+
+use function ThreadFin\ends_with;
+use function ThreadFin\http2;
+use function ThreadFin\trace;
+use function ThreadFin\debug;
+use function ThreadFin\partial as BINDL;
 
 const MIN_SQL_CHARS=8;
 
@@ -25,7 +36,7 @@ const FAIL_SQL_ORDER=14006;
 
 
 
-const SPAM = "100%\s+free|100%\s+satisfied|50%\s+off|all\s+new|best\s+price|discount|for\s+free|fast\s+cash|for\s+just|for\s+you|for\s+only|free\s+gift|free\s+sample|give\s+away|lowest\s+price|luxury|percent+free|prize|sale|click\s+here|click\s+below|deal|meet\s+single|double\s+your|earn\s+per|make\s+money|blockchain|interested\s+in\s+the\s+latest|einkommen";
+const SPAM = "100%\s+free|100%\s+satisfied|50%\s+off|all\s+new|best\s+price|discount|for\s+free|be\s+your\sown\sboss|fast\s+cash|for\s+just|for\s+you|for\s+only|free\s+gift|free\s+sample|give\s+away|lowest\s+price|luxury|percent+free|prize|sale|click\s+here|click\s+below|deal|meet\s+single|double\s+your|earn\s+per|make\s+money|blockchain|interested\s+in\s+the\s+latest|einkommen";
 
 const FAIL_SPAM = 18000;
 const FAIL_FILE_UPLOAD = 21000;
@@ -50,31 +61,38 @@ class WebFilter {
     }
     
     
-    public function inspect(\BitFire\Request $request) : \TF\MaybeBlock {
-        $block = \TF\MaybeBlock::$FALSE;
+    public function inspect(\BitFire\Request $request) : MaybeBlock {
+        $block = MaybeBlock::$FALSE;
         if ((count($request->get) + count($request->post)) == 0) {
             return $block;
         } 
 
 
         if (Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
+            trace("web");
             $cache = CacheStorage::get_instance();
             
             // update keys and values
-            $keyfile = WAF_DIR."cache/keys2.raw";
-            $valuefile = WAF_DIR."cache/values2.raw";
-            if (!file_exists($keyfile) || filemtime($keyfile) < time()-\TF\DAY || filemtime($keyfile) < filemtime(WAF_DIR."config.ini")) {
-                update_raw($keyfile, $valuefile);
+            $keyfile = \BitFire\WAF_ROOT."cache/keys2.raw";
+            $valuefile = \BitFire\WAF_ROOT."cache/values2.raw";
+            $update = -1; // file does not exist
+            if (file_exists($keyfile)) { 
+                $mtime = filemtime($keyfile);
+                if ($mtime < time()-DAY) { $update = 2; }
+                else if (filesize($keyfile) < 256) { $update = 3; }
+                else { $update = 0; }
             }
+            if ($update != 0) { trace("UP[$update]"); update_raw($keyfile, $valuefile)->run(); }
 
-            // the parameter reducer
-            $reducer = \TF\partial('\\BitFire\\generic_reducer', 
-                $cache->load_or_cache("webkeys4", \TF\DAY, \TF\partial('\TF\recache2_file', $keyfile)),
-                $cache->load_or_cache("webvalues4", \TF\DAY, \TF\partial('\TF\recache2_file', $valuefile)));
+            // the reduction
+            $keys = $cache->load_or_cache("webkeys2", DAY, BINDL('\ThreadFin\recache2_file', $keyfile));
+            $values = $cache->load_or_cache("webvalues2", DAY, BINDL('\ThreadFin\recache2_file', $valuefile));
+            trace("KEY.".count($keys)." VAL.".count($values));
+            $reducer = BINDL('\\BitFire\\generic_reducer', $keys, $values);
 
-            $block->doifnot('\TF\map_whilenot', $request->get, $reducer, NULL);
-            $block->doifnot('\TF\map_whilenot', $request->post, $reducer, NULL);
-            $block->doifnot('\TF\map_whilenot', $request->cookies, $reducer, NULL);
+            $block->doifnot('\ThreadFin\map_whilenot', $request->get, $reducer, NULL);
+            $block->doifnot('\ThreadFin\map_whilenot', $request->post, $reducer, NULL);
+            $block->doifnot('\ThreadFin\map_whilenot', $request->cookies, $reducer, NULL);
         }
 
 
@@ -100,8 +118,8 @@ class WebFilter {
 /**
  * filter for SQL injections
  */
-function sql_filter(\BitFire\Request $request) : \TF\MaybeBlock {
-    //if ($request->path == "/wp-login.php" && $request->method == "POST") { print_r($request); die(); }
+function sql_filter(\BitFire\Request $request) : MaybeBlock {
+    trace("sql");
     foreach ($request->get as $key => $value) {
         $maybe = search_sql($key, $value, $request->get_freq[$key]);
         if (!$maybe->empty()) { return $maybe; }
@@ -110,15 +128,16 @@ function sql_filter(\BitFire\Request $request) : \TF\MaybeBlock {
         $maybe = search_sql($key, $value, $request->post_freq[$key]);
         if (!$maybe->empty()) { return $maybe; }
     }
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 
 /**
  * check file names, extensions and content for php scripts
  */
-function file_filter(array $files) : \TF\MaybeBlock { 
-    $block = \TF\Maybe::$FALSE;
+function file_filter(array $files) : MaybeBlock { 
+    $block = Maybe::$FALSE;
+    trace("file");
     
     foreach ($files as $file) {
         $block->do('check_ext_mime', $file);
@@ -131,46 +150,45 @@ function file_filter(array $files) : \TF\MaybeBlock {
 /**
  * look for php tags in file uploads
  */
-function check_php_tags(array $file) : \TF\MaybeBlock {
-
+function check_php_tags(array $file) : MaybeBlock {
     // check for <?php tags
     $data = file_get_contents($file["tmp_name"]);
     if (stripos($data, "<?php") !== false) {
         if (preg_match('/<\?php\s/i', $data)) {
-            return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_TAG, "file upload", $file["name"], ".php", BLOCK_SHORT));
+            return Maybe::of(BitFire::new_block(FAIL_FILE_PHP_TAG, "file upload", $file["name"], ".php", BLOCK_SHORT));
         }
     }
     // check for phar polyglots (tar)
     if (substr($data, -4) === "GBMB") {
-        return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_POLYGLOT, "file upload", $file["name"], "phar polyglot", BLOCK_SHORT));
+        return Maybe::of(BitFire::new_block(FAIL_FILE_POLYGLOT, "file upload", $file["name"], "phar polyglot", BLOCK_SHORT));
     }
 
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
-function check_ext_mime(array $file) : \TF\MaybeBlock {
+function check_ext_mime(array $file) : MaybeBlock {
      // check file extensions...
     $info = pathinfo($file["tmp_name"]);
-    if (\TF\ends_with(strtolower($file["name"]), "php") ||
-        in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "php9", "phar"))) {
-        return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
+    if (ends_with(strtolower($file["name"]), "php") ||
+        in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
+        return Maybe::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
     }
         
     // check mime types
     $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
     $info = finfo_file($ctx, $file["tmp_name"]);
     if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
-        return \TF\Maybe::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        return Maybe::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
     }
 
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 
 /**
  * find sql injection for short strings
  */
-function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
+function search_short_sql(string $name, string $value) : MaybeBlock {
     if (preg_match('/\s*(or|and)\s+(\d+|true|false|\'\w+\'|)\s*!?=(\d+|true|false|\'\w+\'|)/sm', $value)) {
         return BitFire::get_instance()->new_block(FAIL_SQL_OR, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
@@ -190,7 +208,7 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
         return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
 
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 
@@ -198,7 +216,7 @@ function search_short_sql(string $name, string $value) : \TF\MaybeBlock {
  * find sql looking things...
  * this could be way more functional, but it would be slower, choices...
  */
-function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBlock {
+function search_sql(string $name, string $value, ?array $counts) : MaybeBlock {
     // block union select - super basic
     $find = function(string $search) use ($value) : callable {
         return function(?int $offset) use ($value, $search) : int {
@@ -206,7 +224,7 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
         };
     };
 
-    $maybe_found = \TF\MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
+    $maybe_found = MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
     if ($maybe_found->value('int') > 12) {
         return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
     }
@@ -225,7 +243,7 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
         return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
         
-    $block = \TF\Maybe::$FALSE;
+    $block = Maybe::$FALSE;
     // look for the short injection types
 	if ($total_control > 0) { 
 		$block->doifnot('\BitFire\search_short_sql', $name, $value);
@@ -239,7 +257,7 @@ function search_sql(string $name, string $value, ?array $counts) : \TF\MaybeBloc
 /**
  * check if removed sql was found
  */
-function check_removed_sql(StringResult $stripped_comments, int $total_control, string $name, string $value) : \TF\MaybeBlock {
+function check_removed_sql(StringResult $stripped_comments, int $total_control, string $name, string $value) : MaybeBlock {
  
 
     $sql_removed = str_replace(SQL_WORDS, "", $stripped_comments->value);
@@ -261,7 +279,7 @@ function check_removed_sql(StringResult $stripped_comments, int $total_control, 
         }
     }
     
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 /**
@@ -269,7 +287,6 @@ function check_removed_sql(StringResult $stripped_comments, int $total_control, 
  */
 function strip_strings(string $value) : StringResult {
     $stripped = map_reduce(array("/\s+/sm" => ' ', "/'[^']+$/sm" => '', "/'[^']*'/sm" => '', "/as\s\w+/sm" => ''), function($search, $replace, $carry) {
-        // echo "STRIP: ($search) ($replace) ($carry)\n";
         return preg_replace($search, $replace, $carry);
     }, $value);
     return new StringResult($stripped, strlen($stripped));
@@ -288,66 +305,77 @@ function strip_comments(string $value) {
 /**
  * search for likely spam
  */ 
-function search_spam(string $all_content) : \TF\MaybeBlock {
-    $fail = (preg_match('/[^a-z]('.SPAM.')[^a-z$]/', $all_content, $matches)) ? FAIL_SPAM : FAIL_NOT;
-    return BitFire::get_instance()->new_block($fail, 'GET/POST input parameters', $matches[1][0] ?? '', 'static match');
+function search_spam(string $all_content) : MaybeBlock {
+    trace("spam");
+    if (preg_match('/[^a-z]('.SPAM.')[^a-z$]/', $all_content, $matches)) {
+        return BitFire::get_instance()->new_block(FAIL_SPAM, 'GET/POST input parameters', $matches[1][0] ?? '', 'static match');
+    }
+    return Maybe::$FALSE;
 }
 
 /**
  * reduce key / value with fn
  */
-function trivial_reducer(callable $fn, string $key, string $value, $ignore) : \TF\MaybeBlock {
+function trivial_reducer(callable $fn, string $key, string $value, $ignore) : MaybeBlock {
     if (strlen($value) > 0) {
         return $fn($key, $value);
     }
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 /**
  * reduce key / value with fn
  */
-function generic_reducer(array $keys, array $values, $name, ?string $value) : \TF\MaybeBlock {
+function generic_reducer(array $keys, array $values, $name, ?string $value) : MaybeBlock {
+    //if (count($keys) < 5) { CacheStorage::get_instance()->save_data("webkeys1", [], 5); }
+    //if (count($values) < 5) { CacheStorage::get_instance()->save_data("webvalues1", [], 5); }
+
     if (strlen($value) > 0) {
         return \BitFire\generic((string)$name, $value, $values, $keys);
     }
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 /**
  * generic search function for keys and values
  */
-function generic(string $name, string $value, array $values, array $keys) : \TF\MaybeBlock {
-    $block = \TF\Maybe::$FALSE;
+function generic(string $name, string $value, array $values, array $keys) : MaybeBlock {
+    $block = Maybe::$FALSE;
 
     foreach ($values as $key => $needle) {
+        if (!is_int($key)) { debug("key $key, need $needle"); }
         $block->doifnot('\BitFire\static_match', $key, $needle, $value, $name);
     }
 
     foreach ($keys as $key => $needle) {
         $block->doifnot('\BitFire\dynamic_match', $key, $needle, $value, $name);
     }
-    
+
     return $block;
 }
 
 /**
  * dynamic analysis
  */
-function dynamic_match(int $key, string $needle, string $value, string $name) : \TF\MaybeBlock {
+function dynamic_match($key, string $needle, string $value, string $name) : MaybeBlock {
+    assert(! empty($needle), "generic block list error: needle:[$needle] - code[$key]");
+    assert(! ctype_digit($needle), "generic block list error: needle code swap");
+    assert($needle[0] === "/", "generic block list error: no regex_identifier");
+
     if (empty($needle) == false && preg_match($needle, $value) === 1) {
         return BitFire::new_block($key, $name, $value, 'static match');
     }
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 /**
  * static analysis
  */
-function static_match(int $key, string $needle, string $value, string $name) : \TF\MaybeBlock {
+function static_match($key, $needle, string $value, string $name) : MaybeBlock {
     if (empty($needle) == false && (strpos($value, $needle) !== false || strpos($name, $needle) !== false)) { 
         return BitFire::new_block($key, $name, $value, 'static match');
     }
-    return \TF\Maybe::$FALSE;
+    return Maybe::$FALSE;
 }
 
 /**
@@ -357,10 +385,11 @@ function sum_sql_control_chars(array $counts) : int {
     return array_sum(array_intersect_key($counts, SQL_CONTROL_CHARS));
 }
 
-function update_raw(string $keyfile, string $valuefile) : void {
-    $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 0, "md5"=>md5(CFG::str("encryption_key")))));
-    $data->then(\TF\partial('\file_put_contents', $keyfile));
-    $data = \TF\MaybeStr::of(\TF\bit_http_request("GET", "https://bitfire.co/encode.php", array("v" => 1, "md5"=>md5(CFG::str("encryption_key")))));
-    $data->then(\TF\partial('\file_put_contents', $valuefile));
+function update_raw(string $keyfile, string $valuefile) : Effect {
+    $keydata = (http2("GET", APP."encode.php", array("v" => 0, "md5"=>sha1(CFG::str("encryption_key")))));
+    $valuedata = (http2("GET", APP."encode.php", array("v" => 1, "md5"=>sha1(CFG::str("encryption_key")))));
+    return Effect::new()
+        ->file(new FileMod($keyfile, $keydata["content"]??""))
+        ->file(new FileMod($valuefile, $valuedata["content"]??""));
 }
 
