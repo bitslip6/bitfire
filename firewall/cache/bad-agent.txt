@@ -13,7 +13,6 @@ crimscanner
 datacha
 dirbuster
 dotdotpwn
-scan
 evil
 flood
 secur
