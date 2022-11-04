@@ -18,6 +18,7 @@ use ThreadFin\FileMod;
 
 use const ThreadFin\DAY;
 
+use function ThreadFin\dbg;
 use function ThreadFin\find;
 use function ThreadFin\httpp;
 use function ThreadFin\map_mapvalue;
@@ -28,6 +29,7 @@ use function ThreadFin\utc_date;
 use function ThreadFin\utc_microtime;
 use function ThreadFin\debug;
 use function ThreadFin\trace;
+use function ThreadFin\un_json;
 
 /**
  * dashboard view helper
@@ -67,7 +69,7 @@ function is_report(Block $block) : bool {
  * helper function for api dashboard
  */
 function alert_or_block($config) : string {
-    if ($config === 'report' || $config === 'alert') { return 'report'; }
+    if ($config == 'report' || $config == 'alert') { return 'report'; }
     if (!$config) { return 'off'; }
     return 'on';
 }
@@ -75,6 +77,8 @@ function alert_or_block($config) : string {
 function map_exception(array $raw) : \BitFire\Exception {
     return new \BitFire\Exception($raw['code']??0, $raw['uuid']??'none', $raw['parameter']??null, $raw['url']??null, $raw['host']??null);
 }
+
+
 
 /**
  * returns $block if it doesn't match the block exception
@@ -127,7 +131,7 @@ function remove_exception(\BitFire\Exception $ex) : Effect {
 }
 
 /**
- * add exception to list.  returns a list containting only 1 $ex 
+ * add exception to list.  returns a list containing only 1 $ex 
  * PURE
  * @param Exception $ex 
  * @param array $exceptions 
@@ -138,6 +142,7 @@ function add_exception_to_list(\BitFire\Exception $ex, array $exceptions = []) :
     $match_exception_fn = BINDR("\BitFire\match_exception", $ex);
     // exception is not in the list
     if (!find($exceptions, $match_exception_fn)) {
+        $ex->date_utc = date(DATE_RFC3339);
         $exceptions[] = $ex;
     }
     return $exceptions;
@@ -151,7 +156,9 @@ function add_exception_to_list(\BitFire\Exception $ex, array $exceptions = []) :
  * returns a maybe of the block if no exception exists
  */
 function filter_block_exceptions(Block $block, array $exceptions, \BitFire\Request $request) : MaybeBlock {
-    return MaybeBlock::of(array_reduce($exceptions, BINDR('\BitFire\match_block_exception', $request->host, $request->path), $block));
+    $r = (array_reduce($exceptions, BINDR('\BitFire\match_block_exception', $request->host, $request->path), $block));
+
+    return MaybeBlock::of($r);
 }
 
 function process_server2(array $server) : Request {
@@ -174,6 +181,7 @@ function process_server2(array $server) : Request {
     $headers->dnt = ($server['HTTP_DNT'] ?? '');
     $headers->upgrade_insecure = ($request->scheme === 'http') ? ($server['HTTP_UPGRADE_INSECURE_REQUESTS'] ?? '') : '';
     $headers->content_type = ($server['HTTP_CONTENT_TYPE'] ?? 'text/html');
+    $headers->referer = $_SERVER['HTTP_REFERER'] ?? '';
 
     $request->headers = $headers;
     return $request;
@@ -215,11 +223,22 @@ function process_request2(array $get, array $post, array $server, array $cookies
     $request->post = map_mapvalue($post, $fn);
     $request->cookies = map_mapvalue($cookies, $fn);
     $request->get_freq = freq_map($request->get);
-    $request->post_freq = freq_map($request->post);
+    $request->post_len = $server["CONTENT_LENGTH"] ?? 0;
     if ($server["REQUEST_METHOD"] === "POST") {
         $request->post_raw = file_get_contents("php://input");
+        // handle json encoded post data
+        if ($server["CONTENT_TYPE"] === "application/json") {
+            $x = un_json($request->post_raw);
+            $p = map_mapvalue($x, $fn);
+            $request->post = array_merge($request->post, un_json($request->post_raw));
+        } else {
+            $request->post = map_mapvalue($post, $fn);
+        }
+        $request->post_freq = freq_map($request->post);
     } else {
         $request->post_raw = "N/A";
+        $request->post_freq = [];
+        $request->post = [];
     }
 
     return $request;
@@ -371,7 +390,8 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
     $data["valid"] = $valid;
     // add debug log if not included in the response headers
     //if (!CFG::enabled('debug_header')) {
-        $data["debug"] = debug(null);
+    $data["debug"] = debug(null);
+    $data["trace"] = trace(null);
     //}
     $data["classId"] = $class;
     $data["headers"] = filter_bulky_headers(headers_list());
@@ -436,7 +456,7 @@ function make_log_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_dat
         "refid" => \BitFire\BitFire::get_instance()->uid
     );
     if (isset($_SERVER['HTTP_REFERER'])) {
-        $data["referer"] = filter_input(INPUT_SERVER, 'HTTP_REFERER', FILTER_SANITIZE_URL);
+        $data["referer"] = $_SERVER['HTTP_REFERER'];
     }
     
     // add ip data to the log
@@ -484,7 +504,7 @@ use function ThreadFin\utc_time;
  * TEST: test_pure.php:test_ip_block
  */
 function ip_block(Block $block, Request $request, int $block_time) : Effect {
-    $blockfile = \BitFire\BLOCKDIR . '/' . $request->ip;
+    $blockfile = \BitFire\BLOCK_DIR . '/' . $request->ip;
     $exp = time() + $block_time;
     $block_info = json_encode(array('time' => utc_time(), "block" => $block, "request" => $request));
     return 

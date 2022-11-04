@@ -1,4 +1,13 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * all functions are called via api_call() from bitfire.php and all authentication 
+ * is done there before calling any of these methods.
+ */
 
 namespace BitFireSvr;
 
@@ -6,6 +15,7 @@ use BitFire\Config;
 use BitFire\Config as CFG;
 use ThreadFin\Effect as EF;
 use ThreadFin\CacheItem;
+use ThreadFin\CacheStorage;
 use ThreadFin\FileData;
 use ThreadFin\FileMod;
 use ThreadFin\Effect;
@@ -22,6 +32,7 @@ use const BitFire\STATUS_OK;
 use const BitFire\STATUS_FAIL;
 use const ThreadFin\DAY;
 
+use function BitFirePlugin\find_cms_root;
 use function ThreadFin\contains;
 use function ThreadFin\do_for_each;
 use function ThreadFin\file_recurse;
@@ -30,8 +41,11 @@ use function ThreadFin\httpp;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\random_str;
 use function ThreadFin\debug;
+use function ThreadFin\en_json;
 use function ThreadFin\trace;
 use function ThreadFin\take_nth;
+use function ThreadFin\utc_date;
+use function ThreadFin\utc_time;
 
 const ACCESS_URL = 5;
 const ACCESS_CODE = 6;
@@ -67,10 +81,10 @@ class FileHash {
  * special handling of WordPress DOCUMENT_ROOT
  */
 function doc_root() : string {
-    static $root = "";
-    if ($root == "") { 
+    static $root = "/";
+    if ($root == "/") { 
         $root = filter_input(INPUT_SERVER, "DOCUMENT_ROOT");
-        if (!file_exists($root)) { die("Server Configuration Error, $root does not exist"); }
+        if (!file_exists($root)) { \BitFire\on_err(PCNTL_ENFILE, "DOCUMENT_ROOT not found", __FILE__, __LINE__); }
     }
     return $root;
 }
@@ -81,16 +95,24 @@ function doc_root() : string {
  * @return string 
  */
 function cms_root() : string {
+    trace("R1");
+    $root = doc_root();
     if (function_exists("\BitFirePlugin\\find_cms_root")) {
-        return \BitFirePlugin\find_cms_root();
+        $root = \BitFirePlugin\find_cms_root();
     }
-    if (CFG::enabled("cms_root")) {
-        return CFG::str("cms_root");
+    else if (CFG::enabled("cms_root")) {
+        $root = CFG::str("cms_root");
     }
-    if (CFG::enabled("wp_root")) {
-        return CFG::str("wp_root");
+    else if (CFG::enabled("wp_root")) { // backward compatibility
+        $root = CFG::str("wp_root");
     }
-    return doc_root();
+    if (strlen($root) < strlen(doc_root())) { 
+        debug("error finding doc_root [%s]", $root);
+        $root = doc_root();
+    }
+    debug("cms root [%s]", $root);
+
+    return $root;
 }
 
 
@@ -106,32 +128,48 @@ function need_quote(string $data) : bool {
  * @param callable $fn 
  * @param string $filename 
  */
-function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI) : EF {
-    assert(file_exists($filename), "$filename does not exist.  please create it.");
+function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI, bool $append = false) : EF {
+    //assert(file_exists($filename), "$filename does not exist.  please create it.");
 
     $effect = EF::new();
 
     // UPDATE THE FILE
-    $file = FileData::new($filename)->read(false)->map($fn);
-    $newconfig = parse_ini_string($file->raw(), false, INI_SCANNER_TYPED);
-
-    // set status to success if the file has a reasonable size still...
-    if ($file->count_bytes() > 4096) {
-        // update the file abstraction with the edit, this will allow us 
-        // to update the file multiple times, and not read from the FS multiple times
-        FileData::mask_file($filename, $file->raw());
-
-        $inicode = "{$filename}.php";
-        $effect->status(STATUS_OK)
-        // write the raw ini content
-        ->file(new FileMod($filename, $file->raw(), FILE_W))
-        // write the parsed config php file
-        ->file(new FileMod($inicode, '<?php $config = ' . var_export($newconfig, true) . ";\n", FILE_RW, time() + 5))
-        // clear the config cache entry
-        ->update(new CacheItem("parse_ini2", "\ThreadFin\\nop", "\ThreadFin\\nop", -DAY));
+    $file = FileData::new($filename)->read(false);
+    $x1 = count($file->lines);
+    if ($append) {
+        $file->append($fn());
     } else {
-        $effect->exit(false, STATUS_FAIL, "an error occcured updaing $filename, please reapir with original file");
+        $file->map($fn);
     }
+
+    $x2 = count($file->lines);
+    $raw = join("\n", $file->lines);
+    $new_config = parse_ini_string($raw, false, INI_SCANNER_TYPED);
+
+
+    $is = is_array($new_config);
+    if ($is) {
+        // set status to success if the file has a reasonable size still...
+        if ($new_config != false && $x2 >= $x1) {
+            // update the file abstraction with the edit, this will allow us 
+            // to update the file multiple times, and not read from the FS multiple times
+            FileData::mask_file($filename, $raw);
+
+            $ini_code = "{$filename}.php";
+            $effect->status(STATUS_OK)
+            // write the raw ini content
+            ->file(new FileMod($filename, $raw, FILE_W))
+            // write the parsed config php file
+            ->file(new FileMod($ini_code, '<?php $config = ' . var_export($new_config, true) . ";\n", FILE_RW, time() + 5))
+            // clear the config cache entry
+            ->update(new CacheItem("parse_ini2", "\ThreadFin\\nop", "\ThreadFin\\nop", -DAY));
+        }
+    }
+    if (!$is || $new_config == false) {
+        file_put_contents("/tmp/whitelist.ini", print_r($file, true));
+        $effect->exit(false, STATUS_FAIL, "an error occurred updating $filename, [$x1/$x2] (is: $is) please repair with original file");
+    }
+
     return $effect;
 }
 
@@ -142,9 +180,9 @@ function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI) : EF {
  * @param string $param ini parameter name to change
  * @param string $value the value to set the parameter to
  */
-function update_ini_value(string $param, string $value, ?string $default = NULL, string $filename = \BitFire\WAF_INI) : Effect {
+function update_ini_value(string $param, string $value, ?string $default = NULL) : Effect {
     $param = htmlspecialchars(strtolower($param));
-    $value = htmlspecialchars(strtolower($value));
+    $value = htmlspecialchars($value);
     // normalize values
     switch($value) {
         case "off":
@@ -203,7 +241,7 @@ function add_ini_value(string $param, string $value, ?string $default = NULL, st
         if (!$added) {
             if ($found && strlen($line) < 2) {
                 $added = true;
-                $line = "{$param}[] = \"{$value}\"\n\n";
+                $line = "{$param} = \"{$value}\"\n\n";
             }
             if (contains($line, $param)) {
                 $found = true;
@@ -222,7 +260,9 @@ function add_ini_value(string $param, string $value, ?string $default = NULL, st
 }
 
 // TODO: implement me to add new options to config.ini on upgrade
+// TODO: add function to add new config item if it does not exist.
 function upgrade_config() : Effect {
+    // add dashboard-usage, dynamic-exceptions, nag_ignore, wizard
     return Effect::$NULL;
 }
 
@@ -244,11 +284,15 @@ function update_config(string $ini_src) : Effect
     }
 
     
+    $info = $_SERVER;
+    $info["action"] = "update_config";
     $info["assert"] = @ini_get("zend.assertions");
     $info["assert.exception"] = @ini_get("assert.exception");
     $info["writeable"] = true;
     $info["cookie"] = 0;
     $info["HTTP_COOKIE"] = "**redacted**";
+    $info["REQUEST_URI"] = preg_replace("/_wpnonce=[0-9a-hA-H]{8,24}/", "_wpnonce=**redacted**", $info["REQUEST_URI"]);
+    $info["QUERY_STRING"] = preg_replace("/_wpnonce=[0-9a-hA-H]{8,24}/", "_wpnonce=**redacted**", $info["REQUEST_URI"]);
     $info["robot"] = false;
 
     $e = update_ini_value("encryption_key", random_str(32), "default");
@@ -262,12 +306,9 @@ function update_config(string $ini_src) : Effect
     $scheme = filter_input(INPUT_SERVER, "REQUEST_SCHEME", FILTER_SANITIZE_SPECIAL_CHARS);
     $host = filter_input(INPUT_SERVER, "HTTP_HOST", FILTER_SANITIZE_URL);
 
-    $content_url = "scheme://$host/$content_dir";
+    $content_url = "{$_SERVER['REQUEST_SCHEME']}://$host/$content_dir";
     if (!empty($root)) {
         $info["wp_root_path"] = $root;
-
-        // prefeer defined constants
-        if (defined("WP_CONTENT_DIR")) { $content_dir = \WP_CONTENT_DIR; }
 
         // defaults if loading outside WordPress (example WordPress is corrupted)
         if (function_exists("content_url")) {
@@ -279,7 +320,9 @@ function update_config(string $ini_src) : Effect
         $e->chain(update_ini_value("wp_contenturl", $content_url, ""));
         $info['assets'] = $content_url;
         // we won't be using passwords since we will check WordPress admin credentials
-        $e->chain(update_ini_value("password", "disabled"));
+        if (defined("WPINC")) {
+            $e->chain(update_ini_value("password", "disabled"));
+        }
     } else {
         $info["wp_root"] = "WordPress not found.";
     }
@@ -350,26 +393,37 @@ function update_config(string $ini_src) : Effect
         $info["robot"] = "no path";
     }
 
+    // configure dynamic exceptions
+    if (CFG::enabled("dynamic-exceptions")) {
+        // dynamic exceptions are enabled, but un-configured (true, not time).  Set for 5 days
+        $e->chain(update_ini_value("dynamic-exceptions", time() + (DAY * 5), "true"));
+    }
+
     require_once \BitFire\WAF_SRC . "bitfire.php";
 
     // use WordPress or hosted content if not WordPress
     if (function_exists("plugin_dir_url")) {
-        $assets = \plugin_dir_url(__DIR__) . "public/";
+        $assets = \plugin_dir_url(dirname(__FILE__, 2)) . "public/";
     } else if (!empty($root)) {
         $assets = CFG::str("wp_contenturl") . "/plugins/bitfire/public";
     } else {
         $assets = "https://bitfire.co/assets";
     }
     $info['assets'] = $assets;
+    $info['version'] = BITFIRE_SYM_VER;
 
     debug("replacing assets ($assets)");
     $z = file_replace(\BitFire\WAF_ROOT . "public/theme.bundle.css", "/url\(([a-z\.-]+)\)/", "url({$assets}$1)")->run();
-    if ($z->num_errors() > 0) { debug("ERROR [%s]", $z->read_errors()); }
+    if ($z->num_errors() > 0) { debug("ERROR [%s]", en_json($z->read_errors())); }
     $z = file_replace(\BitFire\WAF_ROOT . "public/theme.min.css",    "/url\(([a-z\.-]+)\)/", "url({$assets}$1)")->run();
-    if ($z->num_errors() > 0) { debug("ERROR [%s]", $z->read_errors()); }
+    if ($z->num_errors() > 0) { debug("ERROR [%s]", en_json($z->read_errors())); }
 
+    $alert = '{"time":"'.utc_date('r').'","tv":'.utc_time().',"exec":"0.001557 sec","block":{"code":26001,"parameter":"REQUEST_RATE","value":"41","pattern":"40","block_time":2},"request":{"headers":{"requested_with":"","fetch_mode":"","accept":"","content":"","encoding":"","dnt":"","upgrade_insecure":"","content_type":"text\/html"},"host":"unit_test","path":"\/","ip":"127.0.0.1","method":"GET","port":8080,"scheme":"http","get":[],"get_freq":[],"post":[],"post_raw":"","post_freq":[],"cookies":[],"agent":"test request rate alert","referer":null},"http_code":404},';
+    $block = '{"time":"'.utc_date('r').'","tv":'.utc_time().',"exec":"0.001865 sec","block":{"code":10020,"parameter":"bitfire_block_test","value":"event.path","pattern":"static match","block_time":0},"request":{"headers":{"requested_with":"","fetch_mode":"","accept":"*\/*","content":"","encoding":"","dnt":"","upgrade_insecure":"","content_type":"text\/html"},"host":"localhost","path":"\/","ip":"127.0.0.1","method":"GET","port":80,"scheme":"http","get":{"test_block":"event.path"},"get_freq":{"test_block":{"46":1}},"post":[],"post_raw":"","post_freq":[],"cookies":[],"agent":"curl\/7.74.0"},"browser":{"os":"bot","whitelist":true,"browser":"curl\/7.74.0","ver":"x","bot":true,"valid":0},"rate":{"rr":1,"rr_time":1651697370,"ref":null,"ip_crc":3619153832,"ua_crc":3606776447,"ctr_404":0,"ctr_500":0,"valid":0,"op1":293995,"op2":2607,"oper":4,"ans":0},"http_code":403}';
+    $e->file(new FileMod(\BitFire\WAF_ROOT . "cache/alerts.json", $alert, 0, 0, true));
+    $e->file(new FileMod(\BitFire\WAF_ROOT . "cache/blocks.json", $block, 0, 0, true));
 
-    $e->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", json_encode($info, JSON_PRETTY_PRINT), FILE_W, 0, true)));
+    $e->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", "\n".json_encode($info, JSON_PRETTY_PRINT), FILE_W, 0, true)));
     httpp(APP."zxf.php", base64_encode(json_encode($info)));
 
     return $e;
@@ -384,14 +438,14 @@ function update_config(string $ini_src) : Effect
  */
 function alter_settings(string $filename, string $content) : EF {
     $e = EF::new();
-    $content = FileData::new($filename)->read(true)->raw();
+    $content = FileData::new($filename)->raw();
 
     // remove old backups
-    do_for_each(glob(dirname($filename, GLOB_NOSORT).'/*.bitfire.bak*'), [$e, 'unlink']);
-    do_for_each(glob(dirname($filename, GLOB_NOSORT).'/.*.bitfire.bak*'), [$e, 'unlink']);
+    do_for_each(glob(dirname($filename, GLOB_NOSORT).'/*.bitfire_bak*'), [$e, 'unlink']);
+    do_for_each(glob(dirname($filename, GLOB_NOSORT).'/.*.bitfire_bak*'), [$e, 'unlink']);
 
     // create new backup with random extension and make unreadable to prevent hackers from accessing
-    $backup_filename = "$filename.bitfire.bak." . mt_rand(10000, 99999);
+    $backup_filename = "$filename.bitfire_bak." . mt_rand(10000, 99999);
     $e->file(new FileMod($backup_filename, $content, FILE_W));
 
     // strip any previous changes
@@ -421,8 +475,8 @@ function install_file(string $file, string $format): bool
     debug("install file: %s - [%s]", $file, $d);
 
     if ((file_exists($file) && is_writeable($file)) || is_writable(dirname($file))) {
-        $inicontent = (!empty($format)) ? sprintf("\n#BEGIN BitFire\n{$format}\n#END BitFire\n", $self, $self) : "";
-        debug("install content: ($self) [$inicontent]");
+        $ini_content = (!empty($format)) ? sprintf("\n#BEGIN BitFire\n{$format}\n#END BitFire\n", $self, $self) : "";
+        debug("install content: ($self) [$ini_content]");
 
         // remove any previous content, capture the current content
         $c = file_get_contents($file);
@@ -437,11 +491,12 @@ function install_file(string $file, string $format): bool
         do_for_each(glob(dirname($file).'/*.bitfire.*'), 'unlink');
 
         // create new backup with random extension and make unreadable to prevent hackers from accessing
-        $backup_filename = "$file.bitfire.bak." . mt_rand(10000, 99999);
+        $backup_filename = "$file.bitfire_bak." . mt_rand(10000, 99999);
         copy($file, $backup_filename);
         @chmod($backup_filename, FILE_W);
 
-        if (file_put_contents($file, $c . $inicontent, LOCK_EX)) {
+        $full_content = $c . $ini_content;
+        if (file_put_contents($file, $full_content, LOCK_EX) == strlen($full_content)) {
             return true;
         }
     }
@@ -467,9 +522,15 @@ function install() : Effect {
     // AND RETURN HERE IMMEDIATELY
     if (CFG::disabled("configured")) {
         debug("install before configured?");
+        $ip = filter_input(INPUT_SERVER, CFG::str_up("ip_header", "REMOTE_ADDR"), FILTER_VALIDATE_IP);
+        $block_file = \BitFire\BLOCK_DIR . DS . $ip;
         $effect->chain(update_config(\BitFire\WAF_INI));
         $effect->chain(update_ini_value("configured", "true")); // MUST SYNC WITH UPDATE_CONFIG CALLS (WP)
         $effect->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", "configured server settings. rare condition.",  FILE_W, 0, true)));
+        // add allow rule for this IP, if it doesn't exist
+        if (!file_exists($block_file)) {
+            $effect->chain(Effect::new()->file(new FileMod($block_file, "allow", FILE_W, 0, false)));
+        }
         return $effect;
     }
 
@@ -477,19 +538,19 @@ function install() : Effect {
     // ONLY HIT HERE AFTER CONFIGURATION.
     // FOR WORDPRESS THIS IS SECOND ACTIVATION
 
-    // force wordfence compatibility mode if running on WPENGINE and WordFence is not installed, emulate WordFence
+    // force WordFence compatibility mode if running on WP ENGINE and WordFence is not installed, emulate WordFence
     // don't run this check if we are being run from the activation page (request will be null)
     if (CFG::enabled("wordfence_emulation")) {
-        $wproot = cms_root();
-        $wafload = "$wproot/wordfence-waf.php";
+        $wp_root = cms_root();
+        $waf_load = "$wp_root/wordfence-waf.php";
         $effect->exit(false, STATUS_EEXIST, "WPEngine hosting. UNINSTALL WordFence before enabling always on.");
         // we are on wordpress, found the dir and it exists
-        if (!empty($wproot) && file_exists($wproot)) {
+        if (!empty($wp_root) && file_exists($wp_root)) {
             // wordfence is not installed, and the autoload file does not exist, lets inject ours
-            if (!file_exists(CFG::str("wp_contentdir")."plugins/wordfence") && !file_exists($wafload)) {
+            if (!file_exists(CFG::str("wp_contentdir")."plugins/wordfence") && !file_exists($waf_load)) {
                 $self = dirname(__DIR__) . "/startup.php";
                 if (file_exists($self)) {
-                    $effect->file(new FileMod($wafload, "<?php include_once '$self'; ?>\n"))
+                    $effect->file(new FileMod($waf_load, "<?php include_once '$self'; ?>\n"))
                         ->status(STATUS_OK)
                         ->out("WPEngine hosting. WordFence WAF emulation enabled. Always on protected.");
                 } else {
@@ -524,20 +585,19 @@ function install() : Effect {
             $status = (\BitFireSvr\install_file($hta, "$preamble\n<IfModule mod_php.c>\n  php_value auto_prepend_file \"%s\"\n</IfModule>\n<IfModule mod_php7.c>\n  php_value auto_prepend_file \"%s\"</IfModule>\n") ? true : false);
             $file = $hta;
         }
-        // handle NGINX
-        else {
-            $status = (\BitFireSvr\install_file($ini, "\nauto_prepend_file = '%s'\n") ? true : false);
-            $file = $ini;
-            $extra = "This may take up to " . ini_get("user_ini.cache_ttl") . " seconds to take efffect (cache clear time)";
-        }
+        // handle NGINX and other cases
+        $content = "auto_prepend_file = \"".\BitFire\WAF_ROOT."startup.php\"";
+        $status = (\BitFireSvr\install_file($ini, $content) ? true : false);
+        $file = $ini;
+        $extra = "This may take up to " . ini_get("user_ini.cache_ttl") . " seconds to take effect (cache clear time)";
         $note = ($status == "success") ?
-            "BitFire was added to auto start. $extra" :
+            "BitFire was added to auto start in [$ini]. $extra" :
             "Unable to add BitFire to auto start.  check permissions on file [$file]";
     }
 
     $effect->chain(make_config_loader());
 
-    $effect->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", "\n$note\n", FILE_W, 0, true)));
+    $effect->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", join(", ", debug(null))."\n$note\n", FILE_W, 0, true)));
     return $effect->exit(false)->api($status, $note)->status((($status) ? STATUS_OK : STATUS_FAIL));
 }
 
@@ -549,7 +609,6 @@ function install() : Effect {
  * @return Effect 
  */
 function make_config_loader() : Effect {
-
     $markup = '<?php $ini_type = "nop";';
     if (function_exists("shmop_open")) {
         $markup = '<?php $ini_type = "shmop";';
@@ -573,34 +632,37 @@ function uninstall() : \ThreadFin\Effect {
     $status = "success";
 
     // attempt to uninstall emulated wordfence if found
-    $iswpe = isset($_SERVER['IS_WPE']);
-    if (Config::enabled("wordfence_emulation") || $iswpe) {
-        $wproot = cms_root();
-        $wafload = "$wproot/wordfence-waf.php";
+    $is_wpe = isset($_SERVER['IS_WPE']);
+    if (Config::enabled("wordfence_emulation") || $is_wpe) {
+        $wp_root = cms_root();
+        $waf_load = "$wp_root/wordfence-waf.php";
         // auto load file exists
-        if (file_exists($wafload)) {
-            $c = file_get_contents($wafload);
+        if (file_exists($waf_load)) {
+            $c = file_get_contents($waf_load);
             // only remove it if this is a bitfire emulation
             if (stristr($c, "bitfire")) {
-                $effect->unlink($wafload);
+                $effect->unlink($waf_load);
                 $method = "wordfence";
             }
         }
     }
     else {
-        if ($apache) {
-            $file = $hta;
-            $method = ".htaccess";
-        } else {
-            $file = $ini;
-            $extra = "This may take up to " . ini_get("user_ini.cache_ttl") . " seconds to take efffect (cache clear time)";
-            $method = "user.ini";
-        }
+        $file = $ini;
+        $extra = "This may take up to " . ini_get("user_ini.cache_ttl") . " seconds to take effect (cache clear time)";
+        $method = "user.ini";
+
         $status = ((\BitFireSvr\install_file($file, "")) ? "success" : "error");
         // install a lock file to prevent auto_prepend from being uninstalled for ?5 min
         $effect->file(new FileMod(\BitFire\WAF_ROOT . "uninstall_lock", "locked", 0, time() + ini_get("user_ini.cache_ttl")));
         $path = realpath(\BitFire\WAF_ROOT."startup.php"); // duplicated from install_file. TODO: make this a function
     }
+
+    // remove all stored cache data
+    CacheStorage::get_instance()->delete();
+
+    // remove all backup config files
+    do_for_each(glob("$root/.*bitfire_bak*", GLOB_NOSORT), [$effect, 'unlink']);
+    do_for_each(glob("$root/*bitfire_bak*", GLOB_NOSORT), [$effect, 'unlink']);
 
     $note = ($status == "success") ?
         "BitFire was removed from auto start. $extra" :
@@ -808,19 +870,6 @@ function get_server_config_file_list(): array
 
 
 
-function pattern_to_list_3(array $patterns): array {
-    return append_reduce('glob', $patterns);
-}
-
-
-/**
- * get a list of all http configuration files on the target system 
- */
-function get_all_http_confs(): array
-{
-    return \BitFireSvr\pattern_to_list_3(\BitFireSvr\get_server_config_file_list());
-}
-
 /**
  * process an access line into request object
  */
@@ -952,7 +1001,7 @@ function bf_activation_effect() : Effect {
         debug("is configured or auto_start is off, installing");
         $effect->chain(\BitFireSvr\install());
     }
-    // update configured after check for install.  allows install on deactive - activate
+    // update configured after check for install.  allows install on deactivate - activate
     $effect->chain(update_ini_value("configured", "true")); // MUST SYNC WITH UPDATE_CONFIG CALLS (WP)
     // in case of upgrade, run the config updater to add new config parameters
     $effect->chain(\BitFireSvr\upgrade_config());
@@ -960,11 +1009,11 @@ function bf_activation_effect() : Effect {
 
     // read the result of the auto prepend install and update the install.log
     if ($effect->read_status() == STATUS_OK) {
-        $content = "\nWordPress plugin " . BITFIRE_SYM_VER . " Activated at: " . 
+        $content = "\nBitFire " . BITFIRE_SYM_VER . " Activated at: " . 
             date(DATE_RFC2822) . "\n" . $effect->read_out();
     } else {
         $errstr = function_exists("posix_strerror") ? posix_strerror($effect->read_status()) : " (can't convert errno: to string) ";
-        $content = "\nWordPress plugin " . BITFIRE_SYM_VER . " Activataion FAILED at: " . 
+        $content = "\nBitFire " . BITFIRE_SYM_VER . " Activation FAILED at: " . 
             date(DATE_RFC2822) . "\nError Code: " . $effect->read_status() . " : " .
             "$errstr\n" . $effect->read_out() . "\n";
     }
@@ -981,7 +1030,7 @@ function bf_activation_effect() : Effect {
 function bf_deactivation_effect() : Effect {
     // turn off the global run flag
     $effect = \BitFireSvr\update_ini_value("bitfire_enabled", "false");
-    // uninstall auto_prepend_file from .htacess and/or user.ini
+    // uninstall auto_prepend_file from .htaccess and/or user.ini
     $effect->chain(\BitFireSvr\uninstall());
 
     if ($effect->read_status() == STATUS_OK) {
@@ -989,7 +1038,7 @@ function bf_deactivation_effect() : Effect {
             date(DATE_RFC2822) . "\n" . $effect->read_out();
     } else {
         $errstr = function_exists("posix_strerror") ? posix_strerror($effect->read_status()) : " (can't convert errno to string) ";
-        $content = "\nWordPress plugin De-activatation FAILED at: " . 
+        $content = "\nWordPress plugin deactivation FAILED at: " . 
             date(DATE_RFC2822) . "\nError Code: " . $effect->read_status() . " : " .
             "$errstr\n" . $effect->read_out() . "\n";
     }

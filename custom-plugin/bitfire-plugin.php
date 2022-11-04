@@ -2,14 +2,14 @@
 /**
  * The BitFire CMS bootstrap file.  This is used to load BitFire
  * from within the CMS system if not using the auto_prepend_file
- * mtethod.  This is not the ideal setup, and does not provied
+ * method.  This is not the ideal setup, and does not provide
  * full protection, but is supported.
  *
  * registers the activation and deactivation functions, and defines a function
  * that starts the plugin if it has not started via auto_prepend_file.
  * 
  * Based on BitFire WordPress plugin uses the BitFire firewall library to 
- * perform allsecurity functions.  This plugin integrates the WordPress admin
+ * perform all security functions.  This plugin integrates the WordPress admin
  * and plugin pages with the library API.  Source available at github, see 
  * link below
  *
@@ -28,6 +28,7 @@ use Exception;
 use RuntimeException;
 use ThreadFin\Effect;
 
+use const BitFire\APP;
 use const BitFire\FILE_W;
 use const BitFire\STATUS_EACCES;
 
@@ -35,6 +36,8 @@ use function ThreadFin\contains;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\en_json;
+use function ThreadFin\httpp;
 
 // If this file is called directly, abort.
 if ( ! defined( "BitFire\WAF_ROOT" ) ) { die(); }
@@ -50,13 +53,13 @@ if ( ! defined( "BitFire\WAF_ROOT" ) ) { die(); }
  * @since 1.9.0 
  */
 function dashboard_url() : string {
-    trace("DURL");
+    trace("dash_url");
     return "/some_admin_page.php?plugin=bitfire-plugin";
     return CFG::str("dashboard_path", "/bitfire_default_admin_page");
 }
 
 /**
- * UNCOMMENT IF YOU HAHVE CMS AUTH INTEGRATION
+ * UNCOMMENT IF YOU HAVE CMS AUTH INTEGRATION
  * 
  * This method will override the default authentication 
  * (basic auth, with sha3 hashed password in config.ini)
@@ -92,7 +95,7 @@ function verify_admin_effect(Request $request) : Effect {
     }
 
     // test the auth data with internal CMS function here
-    if (your_auth_function($_COOKIES['your_auth_token'])) {
+    if (function_exists('your_auth_function') && your_auth_function($_COOKIES['your_auth_token'])) {
         return Effect::$NULL;
     }
 
@@ -129,7 +132,7 @@ function bf_auth_effect() : Effect {
         // update the wp admin status
         $d["wp"] = $value;
         // set the new cookie value
-        $effect->cookie(en_json($d));
+        $effect->cookie(en_json($d, "custom-auth-effect"));
     }
 
     return $effect;
@@ -147,11 +150,21 @@ function find_cms_root() : string {
     // update to use your CMS root here 
     if (defined("MY_CMS_ROOT")) { return \MY_CMS_ROOT; }
     // fall back to config file if we are running in front of WordPress 
-    $cfgpath = CFG::str("cms_root");
-    if (file_exists($cfgpath)) { return $cfgpath; }
+    $config_path = CFG::str("cms_root");
+    if (file_exists($config_path)) { return $config_path; }
 
     return $_SERVER['DOCUMENT_ROOT']??"";
 }
+
+// helper wrapper for wp_enqueue_script
+function add_script_src(string $handle, string $src, string $optional) : string {
+    return "<script type='text/javascript' src='$src' $optional></script>";
+}
+// helper wrapper for wp_add_inline_script
+function add_script_inline(string $handle, string $code) : string {
+    return "<script type='text/javascript'>$code</script>";
+}
+
 
 
 /**
@@ -166,7 +179,7 @@ if (!defined("BitFire\WAF_ROOT")) {
     if (file_exists($f)) {
         include_once $f;
     }
-    trace("wp");
+    trace("cust");
 }
 
 
@@ -185,9 +198,11 @@ function bitfire_dashboard_hit() {
  * The code that runs during BitFire plugin activation.
  * enable the firewall enable option, and install always on protection
  * on second activation (this is by design and based on "configured" flag)
+ * 
+ * TODO: FORKED into server.php
  */
 function activate_bitfire() {
-    trace("ACTIV");
+    trace("ACTIVATE");
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
 
     // install data can be verbose, so redirect to install log
@@ -196,6 +211,8 @@ function activate_bitfire() {
     $effect = \BitfireSvr\bf_activation_effect();
     $effect->hide_output()->run();
     \BitFire\Config::set_value("debug_file", $debug_file);
+    httpp(APP."zxf.php", base64_encode(\ThreadFin\en_json(["activate {$_SERVER['SERVER_NAME']}"])));
+
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
 
@@ -204,7 +221,7 @@ function activate_bitfire() {
  * toggle the firewall enable option, uninstall
  */
 function deactivate_bitfire() {
-    trace("DEACTIV");
+    trace("DEACTIVATE");
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
 
     // install data can be verbose, so redirect to install log
@@ -214,6 +231,8 @@ function deactivate_bitfire() {
     $effect = \BitFireSvr\bf_deactivation_effect();
     $effect->hide_output()->run();
     \BitFire\Config::set_value("debug_file", $debug_file);
+    httpp(APP."zxf.php", \ThreadFin\en_json(["deactivate {$_SERVER['SERVER_NAME']}"]));
+
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
 
@@ -275,9 +294,9 @@ function render_mfa_page($msg = "Please enter the access code just sent to the a
                                 <input type="hidden" name="testcookie" value="1" />
         </p>
     </form>
-    <script type="text/javascript">document.getElementById("bitfire_mfa").focus();</script>
 ';
 
+    wp_add_inline_script("bitfire_mfa_focus", "document.getElementById('bitfire_mfa').focus();");
     echo \login_header("MFA Code Required", "<p class='message'>$msg</p>");
     printf($content, 
         \wp_login_url(filter_input(INPUT_GET, "redirect_to", FILTER_SANITIZE_URL)),
@@ -288,25 +307,6 @@ function render_mfa_page($msg = "Please enter the access code just sent to the a
         ($_REQUEST["rememberme"]??false) ? "checked" : "",
         esc_attr($_POST["redirect_to"]));
     echo \login_footer("bitfire_mfa");
-}
-
-/**
- * render the MFA user interface to add the MFA authentication phone number
- * 
- * This is just an HTML fragment
- */
-function wp_render_user_form($user) : string {
-    $content = <<<EOT
-    <h2>BitFire Multi-Factor Authenticataion</h2>
-    <table class="form-table" role="presentation">
-    <tr class="bitfire-wrap">
-        <th><label for="description">Mobile SMS number</label></th>
-        <td><input type="text" name="wikipedia" id="wikipedia" value="%s" class="regular-text" /></td>
-    </tr>
-    </table>
-EOT;
-    $mfa = load_current_user_data($user, "bitfire_mfa_tel");
-    return sprintf($content, $mfa);
 }
 
 
@@ -334,6 +334,9 @@ function admin_init() {
     else if (strtolower($page) == "malwarescan") {
         \BitFire\serve_malware();
     }
+    else if (strtolower($page) == "exceptions") {
+        \BitFire\serve_exceptions();
+    }
     // default to the basic dashboard
     else {
         \BitFire\serve_dashboard();
@@ -358,6 +361,7 @@ function bitfire_init() {
         // mfa field update on user save here
         add_action("edit_user_profile_update", "\BitFirePlugin\user_edit");
         add_action("personal_options_update", "\BitFirePlugin\user_edit");
+        add_action("user_register", "\BitFirePlugin\user_edit");
     }
 
     // auth verification

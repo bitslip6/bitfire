@@ -1,4 +1,14 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * all functions are called via api_call() from bitfire.php and all authentication 
+ * is done there before calling any of these methods.
+ */
+
 namespace BitFire;
 
 use ThreadFin\CacheStorage;
@@ -15,6 +25,7 @@ use function ThreadFin\ends_with;
 use function ThreadFin\http2;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\map_reduce;
 use function ThreadFin\partial as BINDL;
 
 const MIN_SQL_CHARS=8;
@@ -61,7 +72,7 @@ class WebFilter {
     }
     
     
-    public function inspect(\BitFire\Request $request) : MaybeBlock {
+    public function inspect(\BitFire\Request $request, MaybeA $cookie) : MaybeBlock {
         $block = MaybeBlock::$FALSE;
         if ((count($request->get) + count($request->post)) == 0) {
             return $block;
@@ -87,28 +98,57 @@ class WebFilter {
             // the reduction
             $keys = $cache->load_or_cache("webkeys2", DAY, BINDL('\ThreadFin\recache2_file', $keyfile));
             $values = $cache->load_or_cache("webvalues2", DAY, BINDL('\ThreadFin\recache2_file', $valuefile));
+            $c1 = count($keys); $c2 = count($values);
+
+            if ($c1 <= 1 || $c2 <= 1) { update_raw($keyfile, $valuefile)->run(); }
+            if ($c1 <= 1) {
+                // looks like encryption is broken here ...
+                $keys = \ThreadFin\recache2_file($keyfile);
+                trace("keys: " . count($keys));
+                $cache->save_data("webkeys2", $keys, DAY);
+            }
+            if ($c2 <= 1) {
+                $values = \ThreadFin\recache2_file($valuefile);
+                trace("values: " . count($values));
+                $cache->save_data("webvalues2", $values, DAY);
+            }
             trace("KEY.".count($keys)." VAL.".count($values));
+            // CONTINUE HERE, if keys or values are empty, then clear cache and reload...
             $reducer = BINDL('\\BitFire\\generic_reducer', $keys, $values);
 
-            $block->doifnot('\ThreadFin\map_whilenot', $request->get, $reducer, NULL);
-            $block->doifnot('\ThreadFin\map_whilenot', $request->post, $reducer, NULL);
-            $block->doifnot('\ThreadFin\map_whilenot', $request->cookies, $reducer, NULL);
+            $x = $cookie->extract("x")->value("int");
+            // always check on get params
+            $block->do_if_not('\ThreadFin\map_whilenot', $request->get, $reducer, NULL);
+            // dont check for post if user can
+            if (empty($x) || $x < 2) {
+                $block->do_if_not('\ThreadFin\map_whilenot', $request->post, $reducer, NULL);
+            }
+            $block->do_if_not('\ThreadFin\map_whilenot', $request->cookies, $reducer, NULL);
         }
 
 
         if (Config::enabled(CONFIG_SPAM_FILTER)) {
-            $block = $block->doifnot('\BitFire\search_spam', http_build_query($request->get) . http_build_query($request->post));
+            $block = $block->do_if_not('\BitFire\search_spam', http_build_query($request->get) . http_build_query($request->post));
         }
 
 
         // no easy way to pass these three parameters, a bit ugly for now...
         if (Config::enabled(CONFIG_SQL_FILTER)) {
-            $block = $block->doifnot('\BitFire\sql_filter', $request);
+            $check = true;
+            //if (function_exists("\BitFirePlugin\is_author")) {
+            //    $check = !\BitFirePlugin\is_author();
+            //}
+            if ($check) {
+                $block = $block->do_if_not('\BitFire\sql_filter', $request);
+            }
         }
 
 
         if (Config::enabled(CONFIG_FILE_FILTER)) {
-            $block->doifnot('\\BitFire\\file_filter', $_FILES);
+            $x = $cookie->extract("u")->value("int");
+            if (empty($x) || intval($x) <= 2) {
+                $block->do_if_not('\\BitFire\\file_filter', $_FILES);
+            }
         }
 
         return $block;
@@ -140,8 +180,8 @@ function file_filter(array $files) : MaybeBlock {
     trace("file");
     
     foreach ($files as $file) {
-        $block->do('check_ext_mime', $file);
-        $block->doifnot('check_php_tags', $file);
+        $block->do('\BitFire\check_ext_mime', $file);
+        $block->do_if_not('\BitFire\check_php_tags', $file);
     }
 
     return $block;
@@ -189,23 +229,25 @@ function check_ext_mime(array $file) : MaybeBlock {
  * find sql injection for short strings
  */
 function search_short_sql(string $name, string $value) : MaybeBlock {
-    if (preg_match('/\s*(or|and)\s+(\d+|true|false|\'\w+\'|)\s*!?=(\d+|true|false|\'\w+\'|)/sm', $value)) {
-        return BitFire::get_instance()->new_block(FAIL_SQL_OR, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    if (preg_match('/\s*(or|and)\s+(\d+|true|false|\'\w+\'|)\s*!?=(\d+|true|false|\'\w+\'|)/sm', $value, $matches)) {
+        return BitFire::get_instance()->new_block(FAIL_SQL_OR, $name, $matches[0], ERR_SQL_INJECT, BLOCK_NONE);
     }
+    /*
     if (preg_match('/\'?.*?(or|and|where|order\s+by)\s+[^\s]+(;|--|#|\'|\/\*)/sm', $value)) {
         return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
-    if (preg_match('/select\s+(all|distinct|distinctrow|high_priority|straight_join|sql_small_result|sql_big_result|sql_buffer_result|sql_no_cache|sql_calc_found_rows)*\s*[^\s]+\s+(into|from)/sm', $value)) {
-        return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    */
+    if (preg_match('/select\s+(all|distinct|distinctrow|high_priority|straight_join|sql_small_result|sql_big_result|sql_buffer_result|sql_no_cache|sql_calc_found_rows)*\s*[^\s]+\s+(into|from)/sm', $value, $matches)) {
+        return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $matches[0], ERR_SQL_INJECT, BLOCK_NONE);
     }
-    if (preg_match('/benchmark\s*\([^,]+\,[^\)]+\)/sm', $value) || preg_match('/waitfor\s+delay\s+[\'"]/sm', $value) || preg_match('/sleep\s*\(\d+\)/sm', $value)) {
-        return BitFire::get_instance()->new_block(FAIL_SQL_BENCHMARK, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    if (preg_match('/benchmark\s*\([^,]+\,[^\)]+\)/sm', $value) || preg_match('/waitfor\s+delay\s+[\'"]/sm', $value, $matches) || preg_match('/sleep\s*\(\d+\)/sm', $value, $matches)) {
+        return BitFire::get_instance()->new_block(FAIL_SQL_BENCHMARK, $name, $matches[0], ERR_SQL_INJECT, BLOCK_NONE);
     }
-    if (preg_match('/union[\sal]+select\s+([\'\"0-9]|null|user|subs)/sm', $value)) {
-        return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
+    if (preg_match('/union[\sal]+select\s+([\'\"0-9]|null|user|subs)/sm', $value, $matches)) {
+        return BitFire::new_block(FAIL_SQL_UNION, $name, $matches[0], 'sql identified', 0);
     }
-    if (preg_match('/\s+select\s+substr(ing)?\s+/', $value)) {
-        return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
+    if (preg_match('/\s+select\s+substr(ing)?\s+/', $value, $matches)) {
+        return BitFire::get_instance()->new_block(FAIL_SQL_ORDER, $name, $matches[0], ERR_SQL_INJECT, BLOCK_NONE);
     }
 
     return Maybe::$FALSE;
@@ -246,10 +288,10 @@ function search_sql(string $name, string $value, ?array $counts) : MaybeBlock {
     $block = Maybe::$FALSE;
     // look for the short injection types
 	if ($total_control > 0) { 
-		$block->doifnot('\BitFire\search_short_sql', $name, $value);
-		$block->doifnot('\BitFire\search_short_sql', $name, $stripped_comments->value);
+		$block->do_if_not('\BitFire\search_short_sql', $name, $value);
+		$block->do_if_not('\BitFire\search_short_sql', $name, $stripped_comments->value);
 	}
-    $block->doifnot('\BitFire\check_removed_sql', $stripped_comments, $total_control, $name, $value);
+    $block->do_if_not('\BitFire\check_removed_sql', $stripped_comments, $total_control, $name, $value);
 
     return $block;
 }
@@ -327,13 +369,17 @@ function trivial_reducer(callable $fn, string $key, string $value, $ignore) : Ma
  * reduce key / value with fn
  */
 function generic_reducer(array $keys, array $values, $name, ?string $value) : MaybeBlock {
-    //if (count($keys) < 5) { CacheStorage::get_instance()->save_data("webkeys1", [], 5); }
-    //if (count($values) < 5) { CacheStorage::get_instance()->save_data("webvalues1", [], 5); }
-
-    if (strlen($value) > 0) {
-        return \BitFire\generic((string)$name, $value, $values, $keys);
+    // don't reduce these empty values
+    if (strlen($value) < 4) {
+        return Maybe::$FALSE;
     }
-    return Maybe::$FALSE;
+
+    $c1 = count($keys);
+    $c2 = count($values);
+    assert($c1 > 10, "unable to load keys");
+    assert($c2 > 60, "unable to load values");
+
+    return \BitFire\generic((string)$name, $value, $values, $keys);
 }
 
 /**
@@ -344,11 +390,11 @@ function generic(string $name, string $value, array $values, array $keys) : Mayb
 
     foreach ($values as $key => $needle) {
         if (!is_int($key)) { debug("key $key, need $needle"); }
-        $block->doifnot('\BitFire\static_match', $key, $needle, $value, $name);
+        $block->do_if_not('\BitFire\static_match', $key, $needle, $value, $name);
     }
 
     foreach ($keys as $key => $needle) {
-        $block->doifnot('\BitFire\dynamic_match', $key, $needle, $value, $name);
+        $block->do_if_not('\BitFire\dynamic_match', $key, $needle, $value, $name);
     }
 
     return $block;
@@ -386,6 +432,7 @@ function sum_sql_control_chars(array $counts) : int {
 }
 
 function update_raw(string $keyfile, string $valuefile) : Effect {
+    trace("up_raw");
     $keydata = (http2("GET", APP."encode.php", array("v" => 0, "md5"=>sha1(CFG::str("encryption_key")))));
     $valuedata = (http2("GET", APP."encode.php", array("v" => 1, "md5"=>sha1(CFG::str("encryption_key")))));
     return Effect::new()

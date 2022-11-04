@@ -15,7 +15,7 @@ const ENUMERATION_FILES = ["readme.txt", "license.txt", "package.json", "compose
 
 // list of directories from document root that can be used to determine package versions
 // can be an empty list if no such files exist
-const PLUGIN_DIRS = ["\/plugins\/", "\/themes\/"];
+const PLUGIN_DIRS = ["/plugins/", "/themes/"];
 
 // list of request parameters used for different api actions or page views
 // can be an empty list if no such parameters exist
@@ -76,13 +76,14 @@ function path_to_source(string $rel_path, string $type, string $ver, ?string $na
     $source = "";
     switch($type) {
         case "my_plugin":
-            $source = "https://plugin.svn.mycorp.com/{$name}/tags/{$ver}/{$rel_path}";
+            $source = "plugin.svn.mycorp.com/{$name}/tags/{$ver}/{$rel_path}";
             break;
         case "my_core":
-            $source = "https://core.svn.mycorp.com/tags/{$ver}/{$rel_path}";
+            $source = "core.svn.mycorp.com/tags/{$ver}/{$rel_path}";
             break;
     }
 
+    $source = "https://" . str_replace("//", "/", $source);
     return $source;
 }
 
@@ -130,3 +131,16 @@ function malware_scan_dirs(string $root) : array {
         get_subdirs($plugin_dir),
         ["{$root}includes", "{$root}admin"]);
 }
+
+/**
+ * wrapper function for cms mail implementation
+ * @param string $subject 
+ * @param string $message 
+ * @return void 
+ */
+function mail(string $subject, string $message) {
+    $domain_list = CFG::arr("valid_domains");
+    $domain = end($domain_list);
+    $headers = "From: bitfire@$domain\r\nReply-To: no-reply@$domain\r\nX-Mailer: PHP/".phpversion();
+    mail(CFG::str("email"), $subject, $message, $headers);
+} 

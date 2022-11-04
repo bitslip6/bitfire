@@ -1,9 +1,21 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * all functions are called via api_call() from bitfire.php and all authentication 
+ * is done there before calling any of these methods.
+ */
+
 namespace BitFire;
 
 use ThreadFin\CacheItem;
 
+use function BitFireBot\find_ip_as;
 use function BitFireBot\send_browser_verification;
+use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
 use function ThreadFin\en_json;
 use function ThreadFin\httpg;
@@ -15,6 +27,7 @@ use function ThreadFin\un_json;
 use function ThreadFin\utc_date;
 
 use BitFire\Config AS CFG;
+use RuntimeException;
 use ThreadFin\CacheStorage;
 use ThreadFin\Effect;
 use ThreadFin\Maybe;
@@ -26,6 +39,9 @@ use const ThreadFin\DAY;
 use const ThreadFin\HOUR;
 
 const MAX_HOST_HEADER_LEN = 80;
+const UA_NO_MATCH = -1;
+const UA_NET_FAIL = 0;
+const UA_NET_MATCH = 1;
 
 const AGENT_MATCH = array(
     "brave" => "(brave)/\s*(\d+\.\d+)",
@@ -166,6 +182,7 @@ function constraint_check(int $fail_code, MatchType $type, \BitFire\Request $req
 
 // create a new ip_data local cache entry
 function new_ip_data(string $remote_addr, string $agent) : string {
+    trace("new_ip");
     $answer = new Answer(mt_rand(1000,500000), mt_rand(12,4000), mt_rand(1,4));
     $data = array('ip' => \BitFireBot\ip_to_int($remote_addr), 'ua' => crc32($agent), 'ctr_404' => 0, 'valid' => 0, 
         'ctr_500' => 0, 'rr' => 0, 'rrtime' => 0, 'op1' => $answer->op1, 'op2' => $answer->op2, 'oper' => $answer->oper);
@@ -215,6 +232,10 @@ function is_ipv6(string $addr) : bool {
  * reverse ip lookup, takes ipv4 and ipv6 addresses, 
  */
 function reverse_ip_lookup(string $ip) : MaybeStr {
+    $ip = trim($ip);
+    // handle localhost case
+    if ($ip == "127.0.0.1" || $ip == "::1") { return MaybeStr::of($ip); }
+
     if (CFG::str('dns_service', 'localhost') == "1.1.1.1") {
         $lookup_addr = ""; 
         if (is_ipv6($ip)) {
@@ -230,7 +251,6 @@ function reverse_ip_lookup(string $ip) : MaybeStr {
 
         return fast_ip_lookup($lookup_addr, 'PTR');
     }
-    debug("gethostbyaddr %s", $ip);
     return MaybeStr::of(gethostbyaddr($ip));
 }
 
@@ -287,12 +307,18 @@ function get_server_ip_data(string $remote_addr, string $agent) : IPData {
         $ip_data = unpack_ip_data($data);
 
         // update request rate counter
-        if ($ip_data['rrtime'] < $t) { $ip_data['rr'] = 0; $ip_data['rrtime'] = $t+(60*5); }
+        if ($ip_data['rrtime'] < $t) { 
+            $ip_data['rr'] = 0; 
+            $ip_data['rrtime'] = $t+(60*5);
+            debug("rest rr time: [%s]", $ip_data['rrtime']);
+        }
         $ip_data['rr']++;
 
-        return pack_ip_data($ip_data);
+        $d = pack_ip_data($ip_data);
+        return $d;
     }, function() use ($remote_addr, $agent) { return \BitFire\new_ip_data($remote_addr, $agent); },
-    60*10);
+    60*15);
+
 
     return map_ip_data($data);
 }
@@ -304,6 +330,8 @@ class BotFilter {
 
     public $browser;
     public $cache;
+    public $ua_match;
+    public $ua_check;
 
     public $ip_data = NULL;
 
@@ -313,13 +341,14 @@ class BotFilter {
         $this->cache = $cache;
         $this->_constraints = array(
             FAIL_PHPUNIT => new MatchType(MatchType::CONTAINS, "path", '/phpunit', BLOCK_SHORT),
-            FAIL_THRIVE_KRAKEN => new MatchType(MatchType::REGEX, "post_raw", '/td_optio?n_webhook.*?kraked_url/', BLOCK_MEDIUM),
-            FAIL_EVT_CAL => new MatchType(MatchType::REGEX, "post_raw", '/td_optio?n_webhook.*?kraked_url/', BLOCK_MEDIUM),
+            FAIL_THRIVE_KRAKEN => new MatchType(MatchType::REGEX, "post_raw", '/td_option_webhook.*?kraked_url/', BLOCK_MEDIUM),
+            FAIL_EVT_CAL => new MatchType(MatchType::REGEX, "post_raw", '/td_option_webhook.*?kraked_url/', BLOCK_MEDIUM),
             //FAIL_WP_ENUM => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', 0),
-            FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/nosuchpath'), BLOCK_MEDIUM),
+            FAIL_HONEYPOT => new MatchType(MatchType::EXACT, "path", Config::str(CONFIG_HONEYPOT, '/no_such_path'), BLOCK_MEDIUM),
             FAIL_METHOD => new MatchType(MatchType::NOTIN, "method", Config::arr(CONFIG_METHODS), BLOCK_SHORT)
         );
     }
+
 
     /**
      * inspect the UA, determine human or bot
@@ -329,17 +358,18 @@ class BotFilter {
      * NOT PURE!
      */
     public function inspect(\BitFire\Request $request) : MaybeBlock {
+        trace("bot");
         $block = Maybe::$FALSE;
-        // ignore urls that receive consistant bot access that may be difficult to identify
+        // ignore urls that receive consistent bot access that may be difficult to identify
         if (in_array($request->path, Config::arr("ignore_bot_urls"))) {
             return $block;
         }
-        // handle wp-cron and other self requested pages
-        if (CFG::enabled("skip_local_bots") && (\BitFireBot\is_local_request($request))) {
-            return $block;
-        }
-        trace("browse");
 
+        // 10% update failed challenge bots
+        if (mt_rand(0, 100) < 99) {
+            $bot_file_list = glob(BLOCK_DIR."/*.bot.txt");
+            array_map("\BitFire\bot_to_block", $bot_file_list);
+        }
 
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
@@ -347,45 +377,73 @@ class BotFilter {
         // ugly, impure crap
         $this->ip_data = get_server_ip_data($request->ip, $request->agent);
 
+        // bot tracking cookie
+        $maybe_bot_cookie = BitFire::get_instance()->cookie;
+
+        $this->browser->valid = max($this->ip_data->valid, $maybe_bot_cookie->extract('v', 0)->value('int'));
+        debug("x-valid: %d server_cache_ip_valid [%d]", $this->browser->valid, $this->ip_data->valid);
+
+        // handle wp-cron and other self requested pages
+        if (CFG::enabled("skip_local_bots") && (\BitFireBot\is_local_request($request))) {
+            return $block;
+        }
+
+
         // check host header is not garbage
-        $block->doifnot('\BitFireBot\header_check', $request);
+        $block->do_if_not('\BitFireBot\header_check', $request);
     
         // block constraints
         // cpu: 52
-        $block->doifnot('\ThreadFin\map_whilenot', $this->_constraints, "\BitFire\constraint_check", $request);
-
-
-
-        // bot tracking cookie
-        $maybe_botcookie = decrypt_tracking_cookie(
-            $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
-            Config::str(CONFIG_ENCRYPT_KEY),
-            $request->ip, $request->agent);
+        $block->do_if_not('\ThreadFin\map_whilenot', $this->_constraints, "\BitFire\constraint_check", $request);
 
         // handle bots
-        if ($block->empty() && $this->browser->bot) {
-            trace("bot");
+        $this->browser->whitelist = false;
+        if ($block->empty()) {
             // bot whitelist, TODO: can simplify and move agent parse and block check into a wrapper function
             if (Config::enabled(CONFIG_WHITELIST_ENABLE) && $block->empty()) {
-                $agents = \parse_ini_file(\BitFire\WAF_ROOT."cache/whitelist_agents.ini");
-                $block->doifnot('\BitFireBot\whitelist_inspection',
-                    $request->agent,
-                    $request->ip,
-                    $agents['botwhitelist']);
+                if (\file_exists(\BitFire\WAF_ROOT."cache/whitelist_agents.ini.php")) {
+                    @include \BitFire\WAF_ROOT."cache/whitelist_agents.ini.php";
+                    $agents = $config;
+                } else {
+                    chmod(\BitFire\WAF_ROOT."cache/whitelist_agents.ini", 0664);
+                    $agents = \parse_ini_file(\BitFire\WAF_ROOT."cache/whitelist_agents.ini");
+                }
+                $whitelisted = \BitFireBot\whitelist_inspection($request->agent, $request->ip,
+                    $agents['botwhitelist'], $this->browser->bot);
 
-                // set agent whitelist status
-                $this->browser->whitelist = ($block->empty());
+                // only if the agent IS whitelisted
+                if ($whitelisted == UA_NET_MATCH) {
+                    trace("WHTL");
+                    // set agent whitelist status
+                    $this->browser->whitelist = true;
+                    return $block;
+                }
+                // agent was FAKED!
+                else if ($whitelisted == UA_NET_FAIL) {
+                    $block = BitFire::new_block(FAIL_FAKE_WHITELIST, "user_agent", $this->ua_match, "whitelist user agent network does not match [{$this->ua_check}]", CFG::int("block_short_time", 600));
+                }
+                else if ($whitelisted == UA_NO_MATCH && $this->browser->bot) {
+                    $block = BitFire::new_block(FAIL_MISS_WHITELIST, "user_agent", $request->agent, "whitelist user agent not found", CFG::int("block_short_time", 600));
+                }
             }
+
             // bot blacklist
             if (Config::enabled(CONFIG_BLACKLIST_ENABLE)) {
-                $block->doifnot('\BitFireBot\blacklist_inspection', $request, file(\BitFire\WAF_ROOT.'cache/bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
+                $block->do_if_not('\BitFireBot\blacklist_inspection', $request, file(\BitFire\WAF_ROOT.'cache/bad-agent.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES));  
             }
         }
 
-        // validate request rate, don't check for whitelist bots
+        // validate request rate, don't check for whitelist bots or admins
         if (!$this->browser->whitelist) {
-            if (CFG::enabled("rate_limit") && !$maybe_botcookie->extract("wp")() > 1) {
-                $block->doifnot('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
+            if (CFG::enabled("rate_limit")) {
+                $wp = $maybe_bot_cookie->extract("wp")->value('int');
+                trace("RRCHK[$wp]");
+                if ($wp < 2) {
+                    trace("WP<2");
+                    $block->do_if_not('\BitFireBot\validate_rr', Config::int(CONFIG_RR_5M), $this->ip_data);
+                } else {
+                    trace("WP>1");
+                }
             }
         }
 
@@ -403,21 +461,19 @@ class BotFilter {
 
         // lastly verify, real browsers
         // set browser validity to cookie value or server ip data
-        $this->browser->valid = max($this->ip_data->valid, $maybe_botcookie->extract('v', 0)->value('int'));
-        debug("x-valid: %d server_cache_ip_valid [%d]", $this->browser->valid, $this->ip_data->valid);
-
-        if (!$this->browser->bot && CFG::enabled(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
-            $this->verify_browser($request, $maybe_botcookie); 
+        if (!$this->browser->bot && CFG::is_block(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
+            if (!$this->browser->whitelist) {
+                $this->verify_browser($request, $maybe_bot_cookie);
+            }
         }
         return $block;
     }
 
-    protected function verify_browser(\BitFire\Request $request, MaybeStr $maybe_botcookie) {
+    protected function verify_browser(\BitFire\Request $request, MaybeStr $maybe_bot_cookie) {
         // javascript browser challenges
         if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
-            debug("verify browser");
             if (isset($_POST['_bfxa'])) {
-                $effect = verify_browser($request, $this->ip_data, $maybe_botcookie);
+                $effect = verify_browser_effect($request, $this->ip_data, $maybe_bot_cookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
                 // UGLY, move this to function
                 if ($effect->read_status() == STATUS_OK) {
@@ -426,22 +482,61 @@ class BotFilter {
                     // reset the get, post and request method with the original page request values
                     // this allows us to recreate the original request that we intercepted to verify
                     // the browser runs JavaScript
-                    $_SERVER['REQUEST_METHOD'] = $maybe_botcookie->extract('m', $method)();
-                    $_GET = un_json($maybe_botcookie->extract('g', $_POST['_bfg'])());
-                    $_POST = un_json($maybe_botcookie->extract('p', $_POST['_bfp'])());
+                    $_SERVER['REQUEST_METHOD'] = $maybe_bot_cookie->extract('m', $method)();
+                    $_GET = un_json($maybe_bot_cookie->extract('g', $_POST['_bfg'])());
+                    $_POST = un_json($maybe_bot_cookie->extract('p', $_POST['_bfp'])());
                     // remove any possible cache busting from the browser required reload script
                     unset($_GET['_rqw']);
                     $_SERVER['REQUEST_URI'] = str_replace('_rqw=xpr', '', $uri);
                 }
                 $effect->run();
             } else {
-                send_browser_verification($this->ip_data, $request->agent)->run();
+                send_browser_verification($this->ip_data, $request)->run();
             }
         } else {
             trace("valid");
         }
 
     }
+}
+
+/**
+ * impure, delete old bot files
+ * @param string $file path to bot file
+ * @return void 
+ * @throws RuntimeException 
+ */
+function bot_to_block(string $file) {
+    // TODO: update percent call time, and wait time (99, 1)
+    // if file is older than 60 seconds, delete it  
+    if (filemtime($file) < (time() + 1)) {
+
+        // ugly hack to recreate the original request
+        /** @var Request $request */
+        $tmp = un_json(file_get_contents($file));
+        $request = new Request();
+        $request->agent = $tmp["agent"]??'?';
+        $request->ip = $tmp["ip"]??'?';
+        $request->method = $tmp["method"]??"?";
+        $request->path = $tmp["path"]??'/';
+        $request->host = $tmp["host"]??'';
+        $request->get = $tmp["get"]??[];
+        $request->post = $tmp["post"]??[];
+
+
+        $reverse_ip = \BitFire\reverse_ip_lookup($request->ip);
+        $as = "";
+        if(preg_match("/[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,}$/", $reverse_ip, $matches)) {
+            BitFire::new_block(FAIL_FAKE_BROWSER, $request->agent, "Reverse DNS:[{$matches[0]}]", "did not complete JavaScript challenge", 0, $request);
+        } else {
+            $as = find_ip_as($request->ip);
+            $match = (empty($as)) ? "no whitelist for the agent" : "AS{$as}";
+            BitFire::new_block(FAIL_FAKE_BROWSER, $request->agent, $match, "did not complete JavaScript challenge", 0, $request);
+        }
+        debug("agent: {$request->agent}, ip: {$request->ip}, reverse: $reverse_ip, as: $as");
+        unlink($file);
+    }
+
 }
 
 /**
@@ -463,8 +558,8 @@ function bot_metric_inc(string $stat) : CacheItem {
  */
 function browser_clear(\BitFire\Request $request) : Effect {
     $key = "BITFIRE_IP_".$request->ip;
-    debug("browser clear");
-    return Effect::new()->cookie('')
+    trace("BRCLR");
+    return Effect::new()->cookie('', "browser_clear")
     ->update(new CacheItem($key, function($x) { return ''; }, function() { return ''; }, -DAY))
     ->update(bot_metric_inc('broken'))
     ->header("Clear-Site-Data", "\"cookies\", \"executionContexts\"")
@@ -478,17 +573,19 @@ function browser_clear(\BitFire\Request $request) : Effect {
  * @test test_verify_browser
  * PURE! 
  */
-function verify_browser(\BitFire\Request $request, IPData $ip_data, MaybeI $cookie) : Effect {
+function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, MaybeStr $cookie) : Effect {
 
     $effect = Effect::new();
     // user manually refreshed the page, lets clear as much server state as we can and try to reload the original page
     if ($request->get['_rqw']??'' === 'xpr') {
+        trace("CLR");
         return browser_clear($request);
     }
 
+    trace("VRFY");
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     $correct_answer = $cookie->extract('a')->extract('ans');
-    debug("x-valid-answer cookie: (%s)", $correct_answer());
+    debug("x-valid-answer cookie: (%s) server: (%s)", $correct_answer(), $answer->ans);
     $correct_answer->set_if_empty($answer->ans);
     if (isset($request->post["_bfa"])) {
         $bfa = $request->post["_bfa"];
@@ -513,10 +610,12 @@ function verify_browser(\BitFire\Request $request, IPData $ip_data, MaybeI $cook
         $effect->update(bot_metric_inc('valid'))
             ->status(STATUS_OK)
             // set the response valid cookie
-            ->cookie(en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 86400, 'wp' => $cookie->extract('wp')->value('int'))))
+            ->cookie(en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 86400, 'wp' => $cookie->extract('wp')->value('int'))), "botfilter_verify")
             // update the ip_data valid state for 60 minutes, TODO: make this real func, not anon-func
             ->update(new CacheItem('BITFIRE_IP_'.$request->ip, function ($data) {
-                        $ip_data = unpack_ip_data($data); $ip_data['valid'] = 2; return pack_ip_data($ip_data);
+                        $ip_data = unpack_ip_data($data);
+                        $ip_data['valid'] = 2;
+                        return pack_ip_data($ip_data);
                     },
                     function() use ($request) { return \BitFire\new_ip_data($request->ip, $request->agent); },
                     HOUR));
@@ -544,13 +643,18 @@ use BitFire\JS_Fn;
 use BitFire\UserAgent;
 use ThreadFin\CacheItem;
 use ThreadFin\Effect;
+use ThreadFin\FileMod;
 use ThreadFin\Maybe;
 use ThreadFin\MaybeA;
 use ThreadFin\MaybeBlock;
+use ThreadFin\MaybeStr;
 
 use function BitFire\is_ipv6;
+use function BitFire\Pure\json_to_file_effect;
+use function BitFireSvr\add_ini_value;
 use function ThreadFin\array_shuffle;
 use function ThreadFin\cache_prevent;
+use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
 use function ThreadFin\each_character;
 use function ThreadFin\ends_with;
@@ -558,13 +662,16 @@ use function ThreadFin\find_regex_reduced;
 use function ThreadFin\in_array_ending;
 use function ThreadFin\is_regex_reduced;
 use function ThreadFin\memoize;
+use function ThreadFin\debug;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\random_str;
+use function ThreadFin\trace;
 use function ThreadFin\utc_date;
 
 use const BitFire\AGENT_MATCH;
 use const BitFire\BITFIRE_METRICS_INIT;
+use const BitFire\BLOCK_DIR;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\FAIL_FAKE_WHITELIST;
@@ -573,6 +680,10 @@ use const BitFire\FAIL_IS_BLACKLIST;
 use const BitFire\FAIL_MISS_WHITELIST;
 use const BitFire\FAIL_RR_TOO_HIGH;
 use const BitFire\MAX_HOST_HEADER_LEN;
+use const BitFire\UA_NET_FAIL;
+use const BitFire\UA_NET_MATCH;
+use const BitFire\UA_NO_MATCH;
+use const BitFire\WAF_ROOT;
 use const ThreadFin\DAY;
 
 /**
@@ -589,9 +700,10 @@ function header_check(\BitFire\Request $request) : MaybeBlock {
 
 
 /**
- * convert an IP to a 32bit int.  possible collisions for ipv6 addrs.  unlikely to be significant
+ * convert an IP to a 32bit int.  possible collisions for ipv6 addresses.  
+ * unlikely to be significant
  * @test test_bot.php test_ip_to_int
- * PURE!
+ * PURE
  */
 function ip_to_int(string $ip) : int {
     return crc32($ip);
@@ -599,25 +711,41 @@ function ip_to_int(string $ip) : int {
 
 /**
  * return true if the request is from the local server
- * pure
+ * PURE
  */
 function is_local_request(\BitFire\Request $request) : bool {
-    if (ends_with($request->path, '/wp-cron.php') && strstr($request->agent, 'wordpress/') != false) {
-        debug("wp-cron || wordpress");
+    // source IP is localhost
+    if ($request->ip === '127.0.0.1' || $request->ip === '::1') {
         return true;
     }
+
+    // TODO: add test for public loopback IP in configure and test here
+
+    // source agent is localhost
+    // can probably remove this after completing above TODO
+    if (strstr($request->agent, 'wordpress/'.$GLOBALS['wp_version']) != false && 
+        (ends_with($request->path, '/wp-cron.php')
+        || ends_with($request->path, '/admin-ajax.php'))) {
+        debug("local request");
+        return true;
+    }
+
     return false;
 }
 
 /**
- * test if the ipdata exceeds request rate
+ * test if the ip_data exceeds request rate
  * @test test_bot.php test_validate_rr
  * PURE!
  */
 function validate_rr(int $rr_5m_limit, \BitFire\IPData $ip_data) : MaybeBlock {
     if ($ip_data->rr > $rr_5m_limit) {
-        return BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', $ip_data->rr, "$rr_5m_limit", CFG::int("mmedium_block_time", 3600));
+        $block = BitFire::new_block(FAIL_RR_TOO_HIGH, 'REQUEST_RATE', "request rate: " .$ip_data->rr, "request rate limit: $rr_5m_limit", CFG::int("short_block_time", 600));
+        if ($ip_data->rr > $rr_5m_limit + 1) {
+            $block->do(function($x) { $x->skip_reporting = true; return $x; });
+        }
     }
+
     return Maybe::$FALSE;
 }
 
@@ -643,9 +771,9 @@ function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
 }
 
 /**
- * connect to whois and verify IP AS number, with cacheing
+ * connect to whois and verify IP AS number, with caching
  * @test test_bot.php test_memoization_verify_bot_as
- * NOT PURE!
+ * NOT PURE
  */
 function fast_verify_bot_as(string $remote_ip, bool $carry, string $network) : bool {
     return ($carry) ? $carry : memoize('\BitFireBot\verify_bot_as', "_bf_as_{$network}_{$remote_ip}", 3600)($remote_ip, $network);
@@ -654,7 +782,7 @@ function fast_verify_bot_as(string $remote_ip, bool $carry, string $network) : b
 /**
  * connect to whois and verify IP AS number
  * @test test_bot.php test__verify_bot_as
- * NOT PURE!
+ * NOT PURE
  */
 function verify_bot_as(string $remote_ip, string $network) : bool {
     $x = MaybeA::of(fsockopen("whois.radb.net", 43, $no, $str, 1))
@@ -662,6 +790,21 @@ function verify_bot_as(string $remote_ip, string $network) : bool {
         ->then('\ThreadFin\read_stream')
         ->keep_if(BINDR('stristr', $network));
         return ! $x->empty();
+}
+
+/**
+ * find the AS number of the remote IP
+ * @param string $remote_ip 
+ * @return string the AS number as a string or empty string
+ */
+function find_ip_as(string $remote_ip) : string {
+    $x = MaybeStr::of(fsockopen("whois.radb.net", 43, $no, $str, 1))
+        ->effect(BINDR('\fputs', "$remote_ip\r\n"))
+        ->then('\ThreadFin\read_stream')();
+    if (preg_match("/AS([0-9]+)/", $x, $matches)) {
+        return $matches[1];
+    }
+    return "";
 }
 
 
@@ -722,29 +865,43 @@ function validate_host_header(array $valid_domains, string $host) : bool {
 
 /**
  * test if an agent is found in a list of agents
- * $botlist is format "agent match str":reverse ip network:human comment
+ * $list is format "agent match str":reverse ip network:human comment
  * -1 - no UA match, 0 UA match network fail, 1 UA and network match
  * NOT PURE! depends on DNS and WHOIS
  */
 function agent_in_list(string $agent, string $ip, array $list) : int {
-    if (empty($agent) || strlen($agent) <= 1) { return false; }
+    if (empty($agent) || strlen($agent) <= 1) { return UA_NO_MATCH; }
 
+    $agent_crc = "crc".crc32($agent);
     foreach ($list as $k => $v) {
         assert(is_string($k), "agent list must be only string values");
         assert(!empty($k), "agent list must be only string values");
 
-        if (strpos($agent, $k) === false) { continue; }
-        if ($v === "*") { return 1; }
+        if (strpos($agent, $k) === false && $agent_crc != $k) { continue; }
+        if ($v === "*") { return UA_NET_MATCH; }
+        BitFire::get_instance()->bot_filter->ua_match = $k;
+        BitFire::get_instance()->bot_filter->ua_check = $v;
+
+        // handle auto-discover whitelist AS
+        if ($v === "discover") {
+            $as = find_ip_as($ip);
+            if (!empty($as)) { 
+                include_once \BitFire\WAF_SRC . "/server.php";
+                // TODO: replace with update_ini_fn(,,true)
+                add_ini_value("botwhitelist[$agent]", "AS{$as}", "discover", WAF_ROOT . "/cache/whitelist_agents.ini");
+                return UA_NET_MATCH;
+            }
+        }
 
         // reverse lookup, or AS network check (can check multiple AS networks)
         $r = (substr($v, 0, 2) == "AS") ?
             array_reduce(explode(',', $v), BINDL('\BitFireBot\fast_verify_bot_as', $ip), false) :
             \BitFireBot\verify_bot_ip($ip, $v);
-        return ($r) ? 1 : 0;
+        return ($r) ? UA_NET_MATCH : UA_NET_FAIL;
     }
 
     // no match, return false
-    return -1;
+    return UA_NO_MATCH;
 }
 
 /**
@@ -752,16 +909,27 @@ function agent_in_list(string $agent, string $ip, array $list) : int {
  * 
  * NOT PURE: depends on external dns and whois
  */
-function whitelist_inspection(string $agent, string $ip, ?array $whitelist) : MaybeBlock {
+function whitelist_inspection(string $agent, string $ip, ?array $whitelist, bool $bot = true) : int {
     // configured to only allow whitelisted bots, so we can block here 
     // handle whitelisting (the most restrictive)
     // return true(pass) if the agent is in the list of whitelist bots
     if (!empty($whitelist) && !empty($agent)) {
-        $r = agent_in_list($agent, $ip, $whitelist);
-        if ($r < 0) { return BitFire::new_block(FAIL_MISS_WHITELIST, "user_agent", $agent, "user agent whitelist", CFG::int("block_short_time", 600)); }
-        if ($r == 0) { return BitFire::new_block(FAIL_FAKE_WHITELIST, "user_agent", $agent, "user agent whitelist", CFG::int("block_short_time", 600)); }
+        return agent_in_list($agent, $ip, $whitelist);
+        /*
+        debug("whitelist_inspection: $agent, $ip, [$r]");
+        // only bot's can miss whitelist.  regular browsers will fall through to JavaScript
+        if ($r == UA_NET_MATCH) {
+            return UA_NET_MATCH;
+        }
+        if ($bot) {
+            if ($r < 1) { 
+                return FAIL_MISS_WHITELIST;
+            }
+            return FAIL_FAKE_WHITELIST;
+        }
+        */
     }
-    return Maybe::$FALSE;
+    return UA_NO_MATCH;
 }
 
 /**
@@ -770,6 +938,7 @@ function whitelist_inspection(string $agent, string $ip, ?array $whitelist) : Ma
  * PURE!
  */
 function blacklist_inspection(\BitFire\Request $request, ?array $blacklist) : MaybeBlock {
+    trace("BLKCHK");
     $match = new \BitFire\MatchType(\BitFire\MatchType::CONTAINS, "agent", $blacklist, CFG::int("block_medium_time", 3600));
     if ($match->match($request) !== false) {
         return BitFire::new_block(FAIL_IS_BLACKLIST, "user_agent", $request->agent, $match->match_pattern(), cfg::int("block_medium_time", 3600));
@@ -793,6 +962,9 @@ function parse_agent(string $user_agent) : UserAgent {
 
     // return robots immediately...
     if (substr($user_agent, 0, 11) !== "mozilla/5.0") {
+        if (preg_match("!\d+\.\d+\.?\d*!", $user_agent, $matches)) {
+            $agent->ver = $matches[0];
+        }
         return $agent;
     }
 
@@ -878,14 +1050,31 @@ function make_js_script(int $op1, int $op2, int $oper, string $nonce="_rand_") :
     $fn5 = js_int_obfuscate(mt_rand(1000,500000));
     $fn6 = js_int_obfuscate(mt_rand(1000,500000));
     $method = filter_input(INPUT_SERVER, "method", FILTER_SANITIZE_URL);
-    
+
     $js  = "function $fn1_name(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$fn3->fn_name}() ".oper_char($oper)." {$fn4->fn_name}();}";
     $js .= $fn5->js_code . "\n" .$fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
-    $js .= "_0x2264=['body','name','716898irJcQR','input','type','1JyCSgW','458938jhQaDj','submit','appendChild','12521RCnfSZ','731620bsLeul','60978tKMbmi','38yNhlJk','method','action','value','865714LjSURW','createElement','679754RgBBzH','17JXalWl'];(function(_0x82ed12,_0x26c7d9){const _0x429c60=_0x4a61;while(!![]){try{const _0x150118=-parseInt(_0x429c60(0x10e))*parseInt(_0x429c60(0x106))+parseInt(_0x429c60(0x107))*parseInt(_0x429c60(0x118))+-parseInt(_0x429c60(0x115))+parseInt(_0x429c60(0x111))+-parseInt(_0x429c60(0x114))*-parseInt(_0x429c60(0x119))+-parseInt(_0x429c60(0x10d))+parseInt(_0x429c60(0x10b));if(_0x150118===_0x26c7d9)break;else _0x82ed12['push'](_0x82ed12['shift']());}catch(_0x14d3d5){_0x82ed12['push'](_0x82ed12['shift']());}}}(_0x2264,0x96138));function _0x4a61(_0x19d3b3,_0x4d8bcc){_0x19d3b3=_0x19d3b3-0x106;let _0x22646a=_0x2264[_0x19d3b3];return _0x22646a;}function post(_0xfddbd3,_0x1e23f1,_0x5af7a2='post'){const _0x244f79=_0x4a61,_0x370c95=document['createElement']('form');_0x370c95[_0x244f79(0x108)]=_0x5af7a2,_0x370c95[_0x244f79(0x109)]=_0xfddbd3;for(const _0x1d3b01 in _0x1e23f1){if(_0x1e23f1['hasOwnProperty'](_0x1d3b01)){const _0x3d2f26=document[_0x244f79(0x10c)](_0x244f79(0x112));_0x3d2f26[_0x244f79(0x113)]='hidden',_0x3d2f26[_0x244f79(0x110)]=_0x1d3b01,_0x3d2f26[_0x244f79(0x10a)]=_0x1e23f1[_0x1d3b01],_0x370c95[_0x244f79(0x117)](_0x3d2f26);}}document[_0x244f79(0x10f)][_0x244f79(0x117)](_0x370c95),_0x370c95[_0x244f79(0x116)]();}";
-    $js .= "function $fn2_name() { ".'var e=document;if(!e._bitfire){e._bitfire=1;n=(new Date).getTimezoneOffset(); 
-post(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).'\',"_bfp":\''.json_encode($_POST).'\',"_bfm":"'.$method.'","_bfx":n,"_bfxa":1,"_gen":"'.date('H:i:s').'"}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
 
-    return "<html><head><script nonce=\"".htmlspecialchars($nonce)."\">{$js}</script></head><body id='body'></body></html>";
+    //$js .= "const _0x3bb5d2=_0x8cc7;function _0x8cc7(_0x3818bc,_0x1e2ab1){const _0x8cc71d=_0x1e2a();return _0x8cc7=function(_0x554c17,_0x2dd58b){_0x554c17=_0x554c17-0xa9;let _0x1728eb=_0x8cc71d[_0x554c17];return _0x1728eb;},_0x8cc7(_0x3818bc,_0x1e2ab1);}let xx=new XMLHttpRequest();function _0x1e2a(){const _0x3f2931=['open','POST','send','__BFA__'];_0x1e2a=function(){return _0x3f2931;};return _0x1e2a();}xx[_0x3bb5d2(0xa9)](_0x3bb5d2(0xaa),'/',![]),xx[_0x3bb5d2(0xab)](" . 
+    //$js .= "function _0x3ec6(_0x3ac588,_0x5bdf24){const _0x3ec6b3=_0x5bdf();return _0x3ec6=function(_0x42e6a8,_0x259e71){_0x42e6a8=_0x42e6a8-0x13d;let _0x300c57=_0x3ec6b3[_0x42e6a8];return _0x300c57;},_0x3ec6(_0x3ac588,_0x5bdf24);}function bfxa(_0x19fe4b){const _0x5cccf7=_0x3ec6,_0x481365={'JGnkA':_0x5cccf7(0x13d),'kRApR':'content-type'};let _0x5d7289=new XMLHttpRequest();_0x5d7289[_0x5cccf7(0x13e)](_0x481365[_0x5cccf7(0x13f)],'/',![]),_0x5d7289[_0x5cccf7(0x140)](_0x481365[_0x5cccf7(0x141)],'application/json'),_0x5d7289[_0x5cccf7(0x142)](_0x19fe4b);}function _0x5bdf(){const _0x265fca=['POST','open','JGnkA','setRequestHeader','kRApR','send'];_0x5bdf=function(){return _0x265fca;};\nreturn _0x5bdf(\n";
+    $js .= "function bfxa(_0x25eea7){const _0x2d2444=_0x245f,_0x440c7d={'cYjgO':_0x2d2444(0x1f1),'niPRK':_0x2d2444(0x1f2)};let _0x17856c=new XMLHttpRequest();_0x17856c[_0x2d2444(0x1f3)](_0x440c7d[_0x2d2444(0x1f4)],'/',![]),_0x17856c[_0x2d2444(0x1f5)](_0x440c7d[_0x2d2444(0x1f6)],_0x2d2444(0x1f7)),_0x17856c[_0x2d2444(0x1f8)](_0x25eea7);}function _0x245f(_0x2416c2,_0x350a2f){const _0x245fc7=_0x350a();return _0x245f=function(_0x34fd44,_0x273899){_0x34fd44=_0x34fd44-0x1f1;let _0x521ced=_0x245fc7[_0x34fd44];return _0x521ced;},_0x245f(_0x2416c2,_0x350a2f);}function _0x350a(){const _0x54928d=['POST','content-type','open','cYjgO','setRequestHeader','niPRK','application/json','send'];_0x350a=function(){return _0x54928d;};return _0x350a();}";
+
+
+    // "_bfa="+'.$fn1_name.'()+"&_bfg='.urlencode(json_encode($_GET)).'&_bfp='.urlencode(json_encode($_POST)).'&_bfxa=1&_bfm='.$method.'&_bfx=n");';
+    $js .= 'let zzz = {"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).'\',"_bfp":\''.json_encode($_POST).'\',"_bfm":"'.$method.'","_bfx":"n","_bfxa":"on","_gen":"'.date('H:i:s').'"};';
+    $js .= "\n\nconsole.log(zzz);bfxa(JSON.stringify(zzz));\n";
+    // );}";
+    //{'_bfa':$fn1_name()});console.log($fn1_name())";
+    return $js;
+    
+
+
+    $js  = "function $fn1_name(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$fn3->fn_name}() ".oper_char($oper)." {$fn4->fn_name}();}";
+    $js .= $fn5->js_code . "\n" .$fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
+    $js .= "_0x2264=['body','name','716898irJcQR','input','type','1JyCSgW','458938jhQaDj','submit','appendChild','12521RCnfSZ','731620bsLeul','60978tKMbmi','38yNhlJk','method','action','value','865714LjSURW','createElement','679754RgBBzH','17JXalWl'];(function(_0x82ed12,_0x26c7d9){const _0x429c60=_0x4a61;while(!![]){try{const _0x150118=-parseInt(_0x429c60(0x10e))*parseInt(_0x429c60(0x106))+parseInt(_0x429c60(0x107))*parseInt(_0x429c60(0x118))+-parseInt(_0x429c60(0x115))+parseInt(_0x429c60(0x111))+-parseInt(_0x429c60(0x114))*-parseInt(_0x429c60(0x119))+-parseInt(_0x429c60(0x10d))+parseInt(_0x429c60(0x10b));if(_0x150118===_0x26c7d9)break;else _0x82ed12['push'](_0x82ed12['shift']());}catch(_0x14d3d5){_0x82ed12['push'](_0x82ed12['shift']());}}}(_0x2264,0x96138));function _0x4a61(_0x19d3b3,_0x4d8bcc){_0x19d3b3=_0x19d3b3-0x106;let _0x22646a=_0x2264[_0x19d3b3];return _0x22646a;}function ptr(_0xfddbd3,_0x1e23f1,_0x5af7a2='post'){const _0x244f79=_0x4a61,_0x370c95=document['createElement']('form');_0x370c95[_0x244f79(0x108)]=_0x5af7a2,_0x370c95[_0x244f79(0x109)]=_0xfddbd3;for(const _0x1d3b01 in _0x1e23f1){if(_0x1e23f1['hasOwnProperty'](_0x1d3b01)){const _0x3d2f26=document[_0x244f79(0x10c)](_0x244f79(0x112));_0x3d2f26[_0x244f79(0x113)]='hidden',_0x3d2f26[_0x244f79(0x110)]=_0x1d3b01,_0x3d2f26[_0x244f79(0x10a)]=_0x1e23f1[_0x1d3b01],_0x370c95[_0x244f79(0x117)](_0x3d2f26);}}document[_0x244f79(0x10f)][_0x244f79(0x117)](_0x370c95),_0x370c95[_0x244f79(0x116)]();}";
+    $js .= "function $fn2_name() { ".'var e=document;if(!e._bitfire){e._bitfire=1;n=(new Date).getTimezoneOffset(); 
+ptr(window.location.href,{"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).'\',"_bfp":\''.json_encode($_POST).'\',"_bfm":"'.$method.'","_bfx":n,"_bfxa":1,"_gen":"'.date('H:i:s').'"}); } } document.addEventListener("DOMContentLoaded", '.$fn2_name.');';
+
+    return $js;
 }
 
 
@@ -914,18 +1103,32 @@ function make_challenge_cookie($answer, string $ip, string $agent) : array {
  * send the browser verification challenge
  * @test test_bot.php send_test_browser_verification
  * PURE-ish, required Config! 
+ * @param bool $document_wrap - if true, wrap the challenge in an HTML document
+ * NOTE: be sure to keep the effect up to date with bitfire-plugin
  */
-function send_browser_verification(\BitFire\IPData $ip_data, string $agent) : Effect {
+function send_browser_verification(\BitFire\IPData $ip_data, \BitFire\Request $request, bool $document_wrap = true) : Effect {
 
-    if (Config::str('cache_type') !== 'nop' && Config::disabled("cookies_enabled")) {
+    if (Config::str('cache_type') == 'nop' && Config::disabled("cookies_enabled")) {
         debug("verify disabled, no cache or cookies");
         return Effect::new();
     }
 
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
-    debug("send verify answer: $answer");
 
 
+    // can't use CMS script functions here because we are running before the CMS 
+    $document = ($document_wrap) ? 
+        "<html><head>" .
+        "<script nonce='".htmlspecialchars(CFG::str("csp_nonce"))."'>%s</script>" .
+        "</head><body id='body'></body></html>"
+        : "%s";
+
+        /*
+        $js = make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper, CFG::str("csp_nonce"));
+        echo "<pre>\n[$document]\n[$js]\n";
+        $foo = sprintf($document, $js);
+        echo "\nfoo: [$foo]\n</pre>";
+        */
     $effect = Effect::new()
         ->response_code(303)
         ->update(new CacheItem(
@@ -935,10 +1138,11 @@ function send_browser_verification(\BitFire\IPData $ip_data, string $agent) : Ef
             DAY
         ))
         ->exit(true)
-        ->out(make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper))
-        ->cookie(json_encode(make_challenge_cookie($answer, $ip_data->ip_crc, $agent)))
+        ->out(sprintf($document, make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper, CFG::str("csp_nonce"))))
+        ->cookie(json_encode(make_challenge_cookie($answer, $ip_data->ip_crc, $request->agent)), "bot_challenge")
+        ->file(new FileMod(BLOCK_DIR."/".$answer->ans.".bot.txt", json_encode($request)))
+        //->chain(json_to_file_effect(BLOCK_DIR."/".$answer->ans.".bot.txt", $request))
         ->chain(cache_prevent());
-    
 
     return $effect;
 }

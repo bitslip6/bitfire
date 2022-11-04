@@ -3,8 +3,8 @@ Contributors: BitSlip6, LLC
 Donate link: http://bitfire.co/pricing
 Tags: security, firewall, waf, malware scanner, anti-virus, antivirus, secure, virus
 Requires at least: 4.0.1
-Tested up to: 6.0.0
-Stable tag: 1.9.4
+Tested up to: 6.0.2
+Stable tag: __VERSION__
 License: AGPLv3 or later
 License URI: https://www.gnu.org/licenses/agpl-3.0.en.html
 
@@ -12,7 +12,7 @@ License URI: https://www.gnu.org/licenses/agpl-3.0.en.html
 
 == Description ==
 
-Free/Premium WordPress security - 100% refund guarantee. Lock files from attack, recover from malware, IP/Country ban, 100% bot protection - SEO compatible.
+Only patented WordPress Firewall locks your php files from malware. Complete protection from bots. Recover hacked sites. 100 MFA, SQLi, XSS, CSRF, LFI firewall  
 
 Website security that works. Don't just scan for malware. Stop it from ever infecting your site.
 
@@ -98,6 +98,26 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 `/assets/settings-1.png`
 
 == Changelog ==
+
+= 2.0.1 =
+ * Implemented setup wizards and online help functions.
+ * Added auto-learning exceptions for new installs to prevent possibility of false-positives..
+ * Workflow and usability improvements
+
+= 1.9.7 =
+ * fixed an issue that could cause false positive when non administrators 
+ were editing posts.  This check has been expanded to authors as well.
+ * fixed an issue that was causing extra padding in config.ini files
+ * added support for auto-discovering bots to whitelist
+ * reduced the maximum size of saved blocked data
+
+= 1.9.6 =
+ * fix for WordPress source code path resolution
+ * use CMS default script inclusion system for admin pages
+
+= 1.9.5 =
+ * added initial support templates for custom CMS
+ * refactored escaping on MFA page
 
 = 1.9.4 =
  * fixed an issue which could allow admin requests to be rate limited

@@ -1,0 +1,711 @@
+    <style>
+      {{theme_css}}
+    </style>
+    <style>
+      .card { max-width: 100%; }
+      .right { float: right; }
+      /*
+      .form-switch { width: 80px; margin-left: -80px; }
+      .form-switch .right { right: 0; }
+      .form-check-input { left: 85px; }
+      */
+      .form-check .form-switch { width: 80px; margin-left: -80px; }
+      .spinner-border { margin-left: -110px; }
+      /*
+      .lnum { float: right; }
+      */
+      .pointer { cursor: pointer; }
+      .card-body { padding: 0.5rem !important; }
+      .center { text-align: center; }
+      .left { float: left; }
+      .right { float: right; }
+      a.nav-link { color: #2c7be5 !important;}
+      a.nav-link:hover { text-decoration: underline; }
+
+
+      /*
+      .col { flex: 1 0 0%; }
+      .col-auto { flex: 0 0 auto; width: auto; }
+
+      .row { display: flex; }
+      .row>* {
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    padding-right: calc(var(--bs-gutter-x)/2);
+    padding-left: calc(var(--bs-gutter-x)/2);
+    margin-top: var(--bs-gutter-y);
+}
+*/
+
+      .zn1 { z-index: -1;}
+      image.type { fill: #e63757; }
+      a.nav-link { color: #2c7be5 !important;}
+
+      svg { fill: #977; }
+      .blue { fill: #30b7e5; color: #30b7e5; }
+      svg.green { fill: #21d97e; }
+      svg.yellow { fill: #f6c343; }
+      svg.red { fill: #e63757; }
+      img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
+      img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
+      img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+      img.white { filter: invert(99%) sepia(7%) saturate(889%) hue-rotate(165deg) brightness(114%) contrast(100%); }
+
+      h6 { text-transform: uppercase; line-height: 1.5;color: rgb(149, 170, 201); font-family: "Cerebri Sans", sans-serif; font-weight: 400; }
+      .header-body { padding: 24px 0; }
+      .oh { overflow: auto; }
+      .wrap { white-space: break-spaces; line-break: anywhere; }
+      .nowrap { white-space: nowrap; }
+      
+      .hidden { display: none; }
+      
+      .country { float: right; display: block; }
+
+      .btn-sm {
+        padding: 0.1rem .5rem !important;
+        font-size: .4rem !important;
+        font-weight: bold;
+      }
+      .btn-group-tiny>.btn {
+        padding: .075rem .25rem;
+        font-size: .4rem;
+        line-height: 1.0;
+        border-radius: .25rem;
+      }
+      .dropdown-toggle {
+        width: 65px;
+      }
+      
+      .nav-sm .nav-link {
+        font-size: .6125rem;
+      }
+
+      .navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
+        padding-left: .5rem;
+        padding-right: 0rem;
+      }
+      .grow { flex-grow: 1; }
+
+      .success:checked { background-color: #00d97e; }
+      .warning:checked { background-color: #f6c343; }
+      .success, .success:checked { background-color: #00d97e; }
+      .form-switch { min-height: 1.5rem; padding-left: 1.5rem; }
+      .form-switch .form-check-input:checked { background-position: 100%; }
+      .form-switch .form-check-input:checked, .form-switch .form-check-input:focus {
+      }
+      .form-check-input { cursor: pointer; }
+      input { overflow: visible; }
+      input[type=checkbox] { box-sizing: border-box; padding: 0; }
+
+
+      .form-check-input { position: absolute; vertical-align: top; background-color: #e3ebf6; background-repeat: no-repeat; background-size: contain; border: transparent; appearance: none;}
+
+
+      .form-check-input:checked[type=checkbox] {
+        background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3 6-6'/%3E%3C/svg%3E");
+        background-position: 100%;
+      }
+
+      .form-check-input[type=checkbox] {
+        background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3E%3Ccircle r='3' fill='%23fff'/%3E%3C/svg%3E");
+        background-position: 0%;
+    background-repeat: no-repeat; 
+    width: 3rem;
+    margin: 0;
+    margin-left: -3.5rem;
+    border-radius: 3rem;
+    transition: background-position .15s ease-in-out;
+    height: 1.5rem;
+}
+
+input[type=checkbox]:checked::before { content: ''; }
+
+input[type=checkbox], input[type=radio] {
+    box-sizing: border-box;
+    padding: 0;
+}
+.form-check-input { cursor: pointer; vertical-align: top; background-size: contain; border: transparent; appearance: none; position: absolute; }
+
+      /*
+      ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
+      */
+      /*
+      .dropdown-menu { margin-top: -20px; }
+      */
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-regular.eot);
+  src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-regular.woff) format("woff"),url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-medium.eot);
+  src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-medium.woff) format("woff"),url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-semibold.eot);
+  src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-semibold.woff) format("woff"),url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Feather;
+  src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),url({{font_path}}/Feather.woff?sdxovp) format("woff"),url({{font_path}}/Feather.svg?sdxovp#Feather) format("svg");
+  font-weight: 400;
+  font-style: normal;
+}
+
+      
+    </style>
+    
+    <script type="text/javascript">
+        window.CONFIG_LIST = {};
+        window.ERROR = [];
+        function GBI(name) { return document.getElementById(name); }
+
+
+        function rand_string(config_name, length = 32) {
+            let result           = '';
+            let characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            for ( var i = 0; i < length; i++ ) {
+              result += characters.charAt(Math.floor(Math.random() * characters.length));
+          }
+          GBI(config_name+"_text").value = result;
+          update_str(config_name);
+        }
+
+        function show_list(config_name) {
+          let html = "";
+          for (let i=0; i < domain_list.length; i++) {
+            let id = config_name + "-" + i;
+            html += '<div style="margin-bottom:5px;" id="item_'+id+'">';
+            html += '<input type="text" autocomplete="off" disabled id="list_'+id+'" class="form-control txtin" style="width:80%;float:left;margin-right:10px" value="'+domain_list[i]+'">';
+            html += '<div class="btn btn-danger" style="cursor:pointer;padding-top:10px;padding-left:10px;" title="remove list element" onclick="remove_list(\''+config_name+'\', \''+domain_list[i]+'\', '+i+')"><span class="fe fe-trash"></span></div>'; 
+          }
+          return html;
+        }
+
+        function remove_list(config_name, value, idx) {
+          console.log("config name delete", config_name, value, idx);
+          BitFire_api("remove_list_elm", {"config_name":config_name, "config_value":value, "index":idx})
+            .then(r => r.json())
+            .then(function(res) {
+            if (res.success) {
+              window.location.reload();
+            } else {
+              alert(res.note);
+              window.location.reload();
+            }
+          });
+        }
+
+        function add_list(config_name) {
+          let elm = GBI("new_"+config_name);
+          BitFire_api("add_list_elm", {"config_name":config_name, "config_value":elm.value})
+            .then(r => r.json())
+            .then(function(res) {
+            if (res.success) {
+                window.location.reload();
+            } else {
+              alert(res.note);
+              window.location.reload();
+            }
+          });
+        }
+
+        async function BitFire_api(api_method = '', data = {}) {
+          url = "{{self}}&BITFIRE_API=" + api_method;
+          data.BITFIRE_API = api_method;
+          data.BITFIRE_NONCE = "{{api_code}}";
+          data.ts = Date.now();
+          const response = await fetch(url, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'follow',
+          referrerPolicy: 'same-origin',
+          body: JSON.stringify(data)
+          });
+          return response; // parses JSON response into native JavaScript objects
+        }
+
+
+
+                
+        const VERSION = {{version}};
+        const VERSION_STR = "{{sym_version}}";
+        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
+        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
+        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
+        window.CTR = 0;
+        
+        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
+
+        function min(numbers) { return numbers.reduce(min_reducer); }
+        function max(numbers) { return numbers.reduce(max_reducer); }
+        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+
+
+        function set_config(id, value) {
+          console.log("set config", id, value);
+        }
+
+        function soption(config, value) {
+          GBI("drop_"+config).innerText = value;
+          return update_value(config, value);
+        }
+
+        function update_value(config, value) {
+          GBI("spin").classList.remove("hidden");
+          BitFire_api("toggle_config_value", {"param":config,"value":value})
+            .then(r => r.json())
+            .then(data => {
+              window.CTR++;
+              if (window.CTR == 5) {
+                console.log("window counter >= 5");
+                GBI("save_changes").removeEventListener("click", save_changes);
+                window.setTimeout(function() { 
+                  update_value("wizard", "true");
+                  GBI("spin").classList.add("hidden");
+                  GBI("save_changes").innerHTML = "<a href='{{self}}&{{page}}=DASHBOARD&tooltip=1' class='white' style='color:#FFF'>Tour Dashboard <span class='fe fe-chevron-right'></span></a>"; },
+                  100);
+              }
+            });
+        }
+
+
+        function update_str(config) {
+          console.log("up", config);
+          let e = GBI(config+"_text");
+          if (e) {
+            let value = e.value;
+            console.log("update str", config, value);
+            return update_value(config, value);
+          } else {
+            alert("error, unable to update " + config + " please create support ticket");
+          }
+        }
+
+        function toggle_report(config, report) {
+          if (config == "enforce_ssl_1year" && window.location.protocol != "https:") {
+            alert("Please switch to SSL to enable this feature");
+            return false;
+          }
+          GBI(config+"_spin").classList.remove("hidden");
+          if (report && window.CONFIG_LIST[config] == "on") {
+            let g = GBI(config+"_block");
+            if (g) { g.checked = false; }
+          }
+          if (!report && window.CONFIG_LIST[config] == "report") {
+            let g = GBI(config+"_report");
+            if (g) { g.checked = false; }
+          }
+          let value = "false";
+          let r = GBI(config+"_report");
+          if (r && r.checked) { value = "report"; }
+          if (GBI(config+"_block").checked) { value = "on"; }
+          window.CONFIG_LIST[config] = value;
+
+          if (config == "auto_start") {
+            let action=(value == "on") ? "install" : "uninstall";
+            BitFire_api(action, {})
+              .then(r => r.json())
+              .then(response => {
+                console.log(response); 
+                alert(response.note);
+                window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+
+          }
+          else {
+            BitFire_api("toggle_config_value", {"param":config,"value":value})
+              .then(r => r.json())
+              .then(data => {
+              console.log("response...", data);
+              if (!data.success) { alert("error updating " + config + " : " + data.note + " : " + data.errors.join()); }
+              window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+          }
+        }
+
+        // config name, block|on|true / report|alert / off|false
+        function toggle(elm, type) {
+          var e = GBI(elm);
+          console.log(e);
+          e.innerText = cap(type);
+          BitFire_api("toggle_config_value", {"param":elm,"value":type})
+            .then(r => r.json())
+            .then(data => { console.log("toggle", data); });
+          if (type == "block" || type == "on" || type == "true") {
+            e.classList.remove("btn-warning");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-success");
+          } else if (type == "report" || type == "alert") {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-warning");
+          } else {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-warning");
+            e.classList.add("btn-secondary");
+          }
+        }
+              
+    </script>
+
+    <script type="text/template" id="alert_template">
+      <div class="alert alert-warning alert-dismissible fade show">
+        {{text}}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </script>
+
+    <!-- NAVIGATION
+    ================================================== -->
+    
+
+    <div class="main-content">
+      
+      <!-- HEADER -->
+      <div class="header">
+        <div class="container-fluid">
+
+          <!-- Body -->
+          <div class="header-body">
+            <div class="row align-items-end">
+              <div class="left">
+                <!-- Pretitle -->
+                <h6 class="header-pretitle">
+                  {{release}}
+                </h6>
+                <p style="font-size:.75rem;color:#666;">
+                  <div class="{{showfree_class}} alert alert-info alert-dismissible fade">
+                  <a href="https://bitfire.co/pricing" target="_blank">Upgrade to <span class="blue font-weight-bold">PRO</span></a> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
+                  </div>
+                </p>
+
+                <!-- Title 
+                <h1 class="header-title">
+                  <img src="{{assets}}shield.png" width="24" class="navbar-brand-img mx-auto" alt="...">
+                  {{page_name}}
+                </h1>
+              -->
+
+              </div>
+            </div> <!-- / .row -->
+
+
+            <div class="row align-items-center">
+              <div class="col">
+
+                <!-- Nav -->
+                <ul class="nav nav-tabs header-tabs">
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
+                      Dashboard
+                    </a>
+                  </li>
+                  <li class="nav-item {{has_scanner}}">
+                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
+                      Malware Scan
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
+                      Settings
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
+                      Exceptions
+                    </a>
+                  </li>
+                  <li class="nav-item {{hidefree_class}}">
+                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
+                      Advanced
+                    </a>
+                  </li>
+
+                </ul>
+              </div>
+            </div>
+          </div> <!-- / .header-body -->
+
+        </div>
+      </div> <!-- / .header -->
+
+    
+
+      <!-- CARDS -->
+      <div class="container-fluid">
+        <div class="row justify-content-center">
+
+          <div class="col-12 col-lg-10 col-xl-8" id="alert_block">
+          </div>
+
+          <div class="col-12 col-lg-10 col-xl-8">
+
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-header-title text-primary">
+                  BitFire Setup Wizard
+                </h3>
+                <span class="text-muted">select major features to enable</span>
+              </div>
+              <div class="card-body mb-4" style="padding:1rem !important">
+
+                <h2 id="wizard_title" class="mb-2 mt-4">
+                </h2>
+
+                <p id="wizard_body" class="text-muted">
+                </p>
+
+                <div class="col-auto tog" id="enabled_tog" data-enabled="false" data-title="" data-toggle="true">
+                </div>
+
+
+                <div class="col-auto tog" style="margin-bottom:100px; margin-top:20px" id="wizard_enable" data-enabled="false" data-title="Enable Feature" data-toggle="false">
+                  <label class="form-label left" style="margin-right:70px; margin-left:-10px"> Enabled </label>
+                  <div class="form-switch left">
+                      <input class="form-check-input success" autocomplete="off" id="wizard_enable_tog" type="checkbox" onclick="toggle_wiz(this)" data-bs-toggle="tooltip" data-bs-placement="top" title="Enable setting">
+                  </div>
+                </div>
+
+                <button type="button" class="btn btn-primary left" id="wizard_back" disabled="disabled"><span class="fe fe-chevron-left"></span> Back</button>
+
+                <button type="button" class="btn btn-primary hidden right" id="wizard_finish" data-bs-toggle="modal" data-bs-target="#finish_modal">Finish <span class="fe fe-chevrons-right"></span></button>
+                <button type="button" class="btn btn-primary right" id="wizard_next" data-idx="0">Next <span class="fe fe-chevron-right"></span></button>
+              </div>
+              <div class="card-footer card-footer-boxed">
+                <div class="row align-items-center">
+                  <div class="col">
+                    <div class="row align-items-center g-0">
+                      <div class="col-auto">
+            
+                        <!-- Value -->
+                        <small id="progress_per" class="me-2">0%</small>
+            
+                      </div>
+                      <div class="col">
+            
+                        <!-- Progress -->
+                        <div class="progress progress-sm">
+                          <div id="progress_bar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+            
+                      </div>
+                    </div> <!-- / .row -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="modal" id="finish_modal" tabindex="-1" style="margin-top: 200px">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Firewall Setup Complete</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Firewall Setup complete.  You can come back here to adjust settings at any time.</p>
+
+            <div id="spin" class="text-success hidden spinner-border left mt-1 mr-2 " style="margin-left: 0" role="status"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" id="save_changes">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <script type="text/javascript">
+
+  window.EN = [
+    ["auto_start", true],
+    ["allow_ip_block", false],
+    ["enforce_ssl_1year", (document.location.protocol == 'https:')],
+    ["require_full_browser", true],
+    ["whitelist_enable", true]
+  ];
+  window.WIZ = [];
+  window.WIZ[0] = {'title': 'Always On Protection', 'descr': 'Always on protection runs the firewall as the very first script before any plugins load.  This ' +
+'will protect direct access to any script on your server.\nWorks for 99.99% of all installs.  Recommended setting.'};
+  window.WIZ[1] = {'title': 'Allow IP Blocking', 'descr': 'IP Blocking will add a fast block for IP address that are sending multiple ' +
+'attack probes.  This will block all traffic from the offending IP address from 1 - 24 hours. <br><small class="text-secondary">Enable if you are under active attack.</small>' };
+  window.WIZ[2] = {'title': 'Force SSL', 'descr' : 'This will prevent non SSL traffic from accessing your web site.  All non-SSL ' +
+'traffic will be disabled.  Recommended setting if your site supports HTTPS.' };
+  window.WIZ[3] = {'title': 'Require Full Browser', 'descr': 'Send javascript challenge to verify browsers are real. This will stop ' +
+'99.99% of all automated attacks.  Recommended setting, <small>(may reduce server traffic by eliminating bots)</small>.'};
+  window.WIZ[4] = {'title': 'Block Impersonating Robots', 'descr': 'Hackers often impersonate search engines like GoogleBot, Bing and others to bypass filtering. ' +
+'BitFire can prevent these attacks by verifying over 100 commonly used search engines and 3\'rd party services.'};
+
+
+  function toggle_wiz(elm) {
+    let idx = GBI("wizard_next").getAttribute("data-idx");
+    let en = elm.checked;
+    window.EN[idx][1] = en;
+    //console.log(ch)
+  }
+
+  function set_percent(per) {
+    //console.log("set wiz pos", per, percent);
+    GBI("progress_per").innerText = per + "%";
+    let b = GBI("progress_bar");
+    b.style = "width: " + per + "%";
+    b.setAttribute("aria-valuenow", per);
+  }
+
+  function set_wiz_pos(pos) {
+    //console.log("set wiz pos", pos)
+    percent = (pos / window.WIZ.length) * 100;
+    set_percent(percent);
+
+    let t = window.WIZ[pos]["title"].replace("\n", "<br>");
+    let d = window.WIZ[pos]["descr"].replace("\n", "<br>");
+    GBI("wizard_title").innerHTML = t;
+    GBI("wizard_body").innerHTML = d;
+    GBI("wizard_next").setAttribute("data-idx", pos);
+    GBI("progress_bar").setAttribute("aria-valuenow", percent);
+    //console.log("set enabled: ", pos, window.EN[pos][1]);
+    GBI("wizard_enable_tog").checked = window.EN[pos][1];
+  }
+
+  function next_click() {
+    let i = parseInt(GBI("wizard_next").getAttribute("data-idx"));
+    do_click(i+1);
+  }
+  function back_click() {
+    let i = parseInt(GBI("wizard_next").getAttribute("data-idx"));
+    do_click(i-1);
+  }
+
+  function do_click(pos, x) {
+    console.log("next click", pos, x);
+
+    let n = GBI("wizard_next");
+    let f = GBI("wizard_finish");
+    if (pos == 0) {
+      GBI("wizard_back").setAttribute("disabled", "disabled");
+    } else {
+      GBI("wizard_back").removeAttribute("disabled");
+    }
+    if (pos >= window.WIZ.length-1) {
+      f.classList.remove("hidden");
+      n.classList.add("hidden");
+    } else {
+      f.classList.add("hidden");
+      n.classList.remove("hidden");
+    }
+    set_wiz_pos(pos);
+  }
+
+  GBI("wizard_next").addEventListener("click", next_click);
+  //GBI("wizard_finish").addEventListener("click", next_click);
+  GBI("wizard_back").addEventListener("click", back_click);
+  GBI("save_changes").addEventListener("click", save_changes);
+  set_wiz_pos(0);
+
+  function save_changes() {
+    console.log("save changes", window.EN);
+    for (i=0; i<window.EN.length; i++) {
+      update_value(window.EN[i][0], window.EN[i][1]);
+    }
+  }
+
+      
+  function toggle_features() {
+    var elms = document.getElementsByClassName("feature");
+    console.log("toggle features", elms);
+
+    Array.prototype.forEach.call(elms, function (element) {
+      console.log("element", element.innerText);
+      if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
+        console.log("warn");
+        element.classList.remove("btn-success");
+        element.classList.remove("btn-secondary");
+        element.classList.add("btn-warning");
+      } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim() == "on") {
+        console.log("success");
+        element.classList.remove("btn-warning");
+        element.classList.remove("btn-secondary");
+        element.classList.add("btn-success");
+      } else {
+        element.classList.remove("btn-success");
+        element.classList.remove("btn-warning");
+        element.classList.add("btn-secondary");
+        console.log("second");
+      }
+    });
+  }
+
+  let toggles = document.getElementsByClassName("tog-crack");
+  for (let i = 0; i < toggles.length; i++) {
+    let id = toggles[i].getAttribute("id");
+    let name = id.replace("_con", "");
+    let title = toggles[i].getAttribute("data-title");
+    let tog = toggles[i].hasAttribute("data-toggle");
+
+    let alert = toggles[i].getAttribute("data-enabled");
+
+    let check1 = (alert == "report") ? "checked" : "";
+    let check2 = (alert == "on") ? "checked" : "";
+
+    let tail1 = (tog) ? "" : " in alert mode only";
+    let tail2 = (tog) ? "" : " in full blocking";
+
+    let tool1 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'+title+tail1+'"';
+    let tool2 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'+title+tail2+'"';
+
+
+    let html = '<div id="'+name+'_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status"></div>';
+    if (!tog) {
+      html += '<div class="form-check form-switch left" style="margin-left:-60px"> <input class="form-check-input warning" id="'+name+'_report" autocomplete="off" type="checkbox" onclick="return toggle_report(\''+name+'\', true)" '+check1+' '+ tool1 +'> </div>';
+    }
+    html += '\
+<div class="form-switch right">\
+    <input class="form-check-input success" autocomplete="off" id="'+name+'_block" type="checkbox" onclick="return toggle_report(\''+name+'\', false)" '+check2+' '+tool2+'>\
+</div>';
+    window.CONFIG_LIST[name] = alert;
+
+    toggles[i].innerHTML = html;
+  }
+
+
+  </script>
+
+    
+  <script type="text/javascript">
+
+    function alert_or_block(config) {
+      // console.log("alert_or_block", config);
+      if (config === 'report' || config === 'alert') { return 'report'; }
+      if (!config) { return 'off'; }
+      return 'on';
+    }
+
+
+    if (GBI("password_btn")) {
+      GBI("password_btn").addEventListener("click", function() {
+        GBI('password_close').classList.remove("hidden");
+      });
+    }
+
+  </script>
+  {{gtag}}

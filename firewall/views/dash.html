@@ -1,0 +1,957 @@
+    <style>
+      {{theme_css}}
+    </style>
+    <style>
+      .right { float: right; }
+      .left { float: left; }
+      .pr1 { margin-top: 20px; }
+      .card-body { padding: 0.5rem !important; }
+      .zup { z-index: 100 }
+      .cover-over { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; opacity: 0.8; background-color: #000; }
+      .sp1 { scroll-padding: 90px; scroll-snap-type: y; }
+      /*
+      .nav-item:hover { text-decoration: underline; color: #30b7e5 !important; }
+      */
+      a.nav-link { color: #2c7be5 !important;}
+      a.nav-link:hover { text-decoration: underline; }
+
+
+      .blue { fill: #30b7e5; color: #30b7e5; }
+      img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
+      img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
+      img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+      .avatar-xs:hover { z-index: 10 }
+      /*
+      .avatar { position: relative; margin-left: -.40625rem}
+      */
+      h6 { text-transform: uppercase; line-height: 1.5;color: rgb(149, 170, 201); font-family: "Cerebri Sans", sans-serif; font-weight: 400; }
+      .header-body { padding: 24px 0; }
+
+      .secondary {
+        filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%);
+      }
+      .success {
+        filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%);
+      }
+      .warning {
+        filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%);
+      }
+
+
+      .oh { overflow: auto; }
+      .wrap { white-space: break-spaces; line-break: anywhere; }
+      .nowrap { white-space: nowrap; }
+      
+      .hidden { display: none; }
+      
+      .country { float: right; display: block; }
+
+      .btn-sm {
+        padding: 0.1rem .5rem !important;
+        font-size: .4rem !important;
+        font-weight: bold;
+      }
+      .btn-group-tiny>.btn {
+        padding: .075rem .25rem;
+        font-size: .4rem;
+        line-height: 1.0;
+        border-radius: .25rem;
+      }
+      .dropdown-toggle {
+        width: 65px;
+      }
+      
+      .navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
+        padding-left: .5rem;
+        padding-right: 0rem;
+      }
+      
+      
+      thead.details th, th { font-size: 12px; }
+      
+      .table-sm td { padding: .25rem; }
+      .tbalt {
+        color: #333;
+		    overflow: hidden;
+        background-color: #EFEFEF;
+        font-family: monospace;
+      }
+      .tbalt td {
+        border-bottom: 1px solid #CCC;
+      }
+      .table-sm th { padding: .5rem .25rem; }
+      span.method { padding: .45rem .75rem; font-weight: bold; color: #111; }
+      tr.inforow td {
+        background-image: linear-gradient(to bottom, rgba(240,240,240,0),92%, rgba(240,240,240,1)100%);
+      }
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-regular.eot);
+  src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-regular.woff) format("woff"),url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-medium.eot);
+  src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-medium.woff) format("woff"),url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-semibold.eot);
+  src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-semibold.woff) format("woff"),url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Feather;
+  src: url({{font_path}}/Feather.ttf?sdxxovp) format("truetype"),url({{font_path}}/Feather.woff?sdxzovp) format("woff"),url({{font_path}}/Feather.svg?sdxvovp#Feather) format("svg");
+  font-weight: 400;
+  font-style: normal;
+}
+
+
+.tooltipA {
+  position: relative;
+}
+
+.alert-secondary {
+  padding: 0.35em 0.65em 0.35em 0.55em;
+  top: 20px
+}
+
+.arrow {
+  transform: rotateY( 45deg );
+  top: 74px;
+  left: 50%;
+}
+.arrow:after {
+  background-color: rgba(0,0,0,0.8) !important;
+}
+
+/* Tooltip text */
+.tooltipA .tooltiptext {
+  visibility: hidden;
+  width: 80%;
+  background-color: rgba(0,0,0,0.8);
+  color: #DDD;
+  text-align: center;
+  padding: .5em;
+  border-radius: 6px;
+  top: -110px;
+ 
+  /* Position the tooltip text - see examples below! */
+  position: absolute;
+  z-index: 1;
+}
+
+.zup.tooltipA .tooltiptext {
+  visibility: visible !important;
+}
+    </style>
+    
+<script type="text/javascript">
+  window.ERROR = [];
+  function GBI(name) { return document.getElementById(name); }
+
+  async function BitFire_api(api_method = '', data = {}) {
+      url = "{{self}}&BITFIRE_API=" + api_method;
+      data.BITFIRE_API = api_method;
+      data.BITFIRE_NONCE = "{{api_code}}";
+      data.ts = Date.now();
+      const response = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-cache',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      redirect: 'follow',
+      referrerPolicy: 'same-origin',
+      body: JSON.stringify(data)
+      });
+      return response;
+  }
+
+        
+        function url_to_path(url) {
+          console.log(url);
+          let s = url.indexOf("/");
+          return url.substr(s);
+        }
+
+        function htmlEscape(str) {
+          return str
+            .replace(/&/g, '&amp;')
+            .replace(/'/g, "&apos;")
+            .replace(/"/g, '&quot;')
+            .replace(/>/g, '&gt;')   
+            .replace(/</g, '&lt;')
+            .replace(/&amp;hellip;/g, '&hellip;');    
+        }
+
+        function truncate(str, n=80){
+          let out = (str.length > n) ? str.substr(0, n-1) + '&hellip;' : str;
+          return htmlEscape(out);
+        };
+
+
+        // TODO: update response to JSON
+        function add_exception(ex) {
+          console.log("path: ", url_to_path(ex.getAttribute("data-ex-url")));
+          console.log("code: ", ex.getAttribute("data-ex-code"));
+          BitFire_api("add_api_exception", {"code": ex.getAttribute("data-ex-code"), "param": ex.getAttribute("data-ex-param"), "value":ex.getAttribute("data-ex-value"), "path": url_to_path(ex.getAttribute("data-ex-url"))})
+          .then(response => response.json())
+          .then(data => {
+            if (!data || !data.success) {
+              alert("unable to add exception " + data.note); 
+            } else {
+              let list = document.getElementsByClassName("ex-"+ex.getAttribute("data-ex-code"));
+              console.log(ex);
+              console.log(list);
+              for (i=0; i<list.length; i++) {
+                list[i].src="{{assets}}bandage.svg";
+                list[i].classList.remove("secondary");
+                list[i].classList.add("warning");
+              }
+              alert(data.note);
+            }
+          });
+        }
+        
+        function cc_to_flag(cc) {
+          if (!cc || cc.length != 2) { return ""; }
+          const OFFSET = 127397;
+          const codePoints = [...cc.toUpperCase()].map(c => c.codePointAt() + OFFSET);
+          return String.fromCodePoint(...codePoints);
+        }
+
+        function fp(info, ...parts) {
+          return parts.reduce((accumulator, value) => {
+            for (let x in info) {
+              if (value == info[x].type) {
+                return accumulator + info[x].value;
+              }
+            }
+            return accumulator + value;
+          }, "");
+        }
+
+
+        
+        const VERSION = {{version}};
+        const VERSION_STR = "{{sym_version}}";
+        const LLANG = "{{llang}}";
+        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
+        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
+        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
+        
+        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
+
+        function min(numbers) { return numbers.reduce(min_reducer); }
+        function max(numbers) { return numbers.reduce(max_reducer); }
+        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+
+        function toggle_id(param, value_id) {
+            let e = GBI(value_id);
+            BitFire_api("toggle_config_value", {"param": param, "value": e.value})
+            .then(data => { return data.json(); })
+            .then(e => {
+              console.log(e);
+              if (e.success) {
+                alert("License activation successful!"); window.location.reload();
+              } else {
+                alert("unable to activate license.  please go to https://bitfire.co/support-center"); 
+              } });
+            return false;
+        }
+
+    </script>
+
+    <!-- MAIN CONTENT
+    ================================================== -->
+    <div class="cover-over" id="cover-over"> </div>
+
+    <div class="main-content">
+      
+      <!-- HEADER -->
+      <div class="header">
+        <div class="container-fluid">
+
+          <!-- Body -->
+          <div class="header-body">
+            <div class="row align-items-end">
+              <div class="left">
+                <!-- Pretitle -->
+                <h6 class="header-pretitle">
+                  {{release}}
+                </h6>
+                <!--
+                <p style="font-size:.75rem;color:#666;">
+                  <div class="{{showfree_class}} alert-warning">
+                  <a href="https://bitfire.co/pricing" target="_blank">Upgrade to <span class="blue font-weight-bold">PRO</span></a> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
+                  </div>
+
+                <h1 class="header-title">
+                  <img src="{{assets}}shield.png" width="24" class="navbar-brand-img mx-auto" alt="...">
+                  {{page_name}}
+                </h1>
+              -->
+
+    <div class="row {{showfree_class}}">
+			<div class="col-12">
+				<div class="card-body bg-warning-soft mb-4" style="border: solid 1px #e63757">
+					<h3 class="card-header-title">Filesystem is not locked</h3>
+					<br>
+					<p>
+            File Locking is our patented technology which seamlessly prevents malware infections by allowing only authenticated administrators to change php files.
+            Backed by our 100% refund guarantee, includes redirect protection and multi-factor authentication.
+            <a href="https://bitfire.co/pricing" target="_blank" class="right mb-2" style="text-decoration: underline">
+							Upgrade to BitFire PRO.
+							<span class='fe fe-external-link'></span>
+						</a>
+					</p>
+
+				</div>
+			</div>
+		</div>
+    <div class="row {{hidefree_class}}">
+			<div class="col-12">
+				<div class="card-body bg-success mb-4" style="border: solid 1px #999">
+					<h3 class="card-header-title left">Filesystem is locked</h3>
+					<p class="right mr-4">
+            File-System is protected. <a href="mailto:info@bitslip6.com" target="_blank">Contact support</a> <span class='fe fe-send'></span>
+             if you experience any security issues.
+						</a>
+					</p>
+          <br>
+
+				</div>
+			</div>
+		</div>
+
+
+
+              </div>
+            </div> <!-- / .row -->
+
+
+            <div class="row align-items-center">
+              <div class="col left">
+
+                <!-- Nav -->
+                <ul class="nav nav-tabs header-tabs">
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
+                      Dashboard
+                    </a>
+                  </li>
+                  <li class="nav-item {{has_scanner}}">
+                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
+                      Malware Scan
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
+                      Settings
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
+                      Exceptions
+                    </a>
+                  </li>
+                  <li class="nav-item {{hidefree_class}}">
+                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
+                      Advanced
+                    </a>
+                  </li>
+
+                </ul>
+              </div>
+            </div>
+          </div> <!-- / .header-body -->
+
+        </div>
+      </div> <!-- / .header -->
+
+      
+      <!-- CARDS -->
+      <div class="container-fluid">
+        <div class="row">
+          <div class="col-12 col-lg-4">
+            <div class="card card-fill tooltipA" id="block_by_type">
+              <a id="block_by_type_tip" style="scroll-margin-top:300px;"></a>
+              <span class="tooltiptext"><div class="left">This is the BitFire dashboard. {{access}} The last 24 hours of blocks by type can be viewed here.</div>
+                <div class="right">
+                <button class="alert-secondary alert nxt">Next 
+                  <span class="fe fe-skip-forward" class="mt-2"></span>
+                </button>
+                </div>
+                <span class="arrow"></span>
+              </span>
+              <div class="card-header">
+                <h4>24 Hour Blocks By Type
+                <span class="text-secondary" id="block_total">({{block_count_24}})</span>
+                </h4>
+              </div>
+              <div class="card-body">
+
+                <div class="chart chart-appended">
+                  <canvas class="chart-canvas" id="classChart" data-toggle="legend" data-target="#classChartLegend"></canvas>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-12 col-lg-4 sp1">
+          <a id="block_by_country_tip" class="sp1"></a>
+            <div class="card card-fill tooltipA sp1" id="block_by_country">
+              <a id="block_by_country_tip" style="scroll-margin-top:300px;"></a>
+              <span class="tooltiptext"><div class="left">The last 24 hours of blocks by Country</div>
+                <div class="right">
+                <button class="alert-secondary alert nxt">Next 
+                  <span class="fe fe-skip-forward" class="mt-4"></span>
+                </button>
+                </div>
+                <span class="arrow"></span>
+              </span>
+
+
+              <div class="card-header">
+                <h4>24 Hour Blocks By Country
+                <span class="text-secondary" id="ip_total">({{block_count_24}})</span>
+                </h4>
+              </div>
+              <div class="card-body">
+
+                <div class="chart chart-appended">
+                  <canvas class="chart-canvas" id="classChart2" data-toggle="legend" data-target="#classChart2Legend"></canvas>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-4">
+            <div class="card card-fill tooltipA" id="block_by_hour">
+              <a id="block_by_hour_tip" style="scroll-margin-top:300px"></a>
+              <span class="tooltiptext"><div class="left">Number of blocks in last 24 hours by hour</div>
+                <div class="right">
+                <button class="alert-secondary alert nxt">Next
+                  <span class="fe fe-skip-forward" style="margin-top:4px"></span>
+                </button>
+                </div>
+                <span class="arrow"></span>
+              </span>
+              <div class="card-header">
+                <h4>Blocking By Hour
+                <span class="text-secondary" id="block_sum_total">({{block_count_24}})</span>
+                <small class="text-muted">(local time)</small>
+                </h4>
+              </div>
+              <div class="card-body">
+                <div class="chart">
+                  <canvas class="chart-canvas" id="hrChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <script type="text/template" id="paginator_template">
+        <li class="page-item"><a class="page-link" href="<%= link %>"></a><li>
+        </script>
+
+        <div class="row">
+          <div class="col-12 col-lg-12 sp1">
+          <a id="alert_table_tip" class="sp1"></a>
+            <div class="card card-fill tooltipA sp1" style="max-width:100%" id="alert_table">
+              <span class="tooltiptext"><div class="left">
+Just below those charts, you can see the attacks that are in alert mode.  You can test firewall rules in alert mode first and verify that they
+do not block good traffic before flipping the rule to block mode.
+                </div>
+                <div class="right">
+                <button class="alert-secondary alert nxt">Next 
+                  <span class="fe fe-skip-forward" style="margin-top:4px"> </span>
+                </button>
+                </div>
+                <span class="arrow"></span>
+              </span>
+
+              <div class="card-header">
+                <h4>Alerts <small class="text-muted" id="alert_range">{{report_range}}</small> of {{report_count}}</h4>
+				        <a style="font-size:.75rem;" href="{{self}}&filename=alert&BITFIRE_API=download&BITFIRE_NONCE={{api_code}}">
+                <button class="btn btn-secondary mr-6" id="download_alerts">Download as JSON</button>
+                </a>
+                <span>Page: </span>
+                <nav arial-label="Alert Pagination" class="mt-4 ml-2">
+                  <ul class="pagination" id="alert_page_list">
+                    <!-- TODO: template $max_pages alert_page_list with paginator_template var -->
+                  </ul>
+                </nav>
+              </div>
+              <div class="card-body">
+
+<script type="text/template" id="line_template">
+<tr class="inforow" width="100%">
+      <td class="nowrap" scope="row">
+      <div class="avatar-group">
+        <div class="avatar-xs left">
+          <img src="{{assets}}<%= exception_img%>" alt="exception" width="24" title="<%= exception_title%>"
+          class="avatar-img rounded-circle <%= exception_class %> ex-<%=block.code%>" style="cursor:pointer;" onclick="add_exception(this)" data-ex-value="<%-block.value%>" data-ex-url="<%- request.path %>" data-ex-param="<%- block.parameter %>" data-ex-code="<%= block.code %>" />
+        </div>
+        <div class="avatar-xs left">
+          <img src="{{assets}}<%= type_img %>" alt="type" width="24" class="avatar-img type rounded-circle red" title="<%= type_title%>" />
+        </div>
+        <div class="avatar-xs left">
+          <img src="{{assets}}<%= agent_img %>" alt="agent" width="24" class="avatar-img rounded-circle" title="<%= agent_title%>" />
+        </div>
+        <div class="avatar-xs left">
+          <img src="https://bitfire.co/assets/flags/<%= country_img %>" alt="<%- country_alt %>" width="24" class="avatar-img rounded-circle" title="<%= flag_title%>"/>
+        </div>
+      </div>
+      </td>
+      <td class="nowrap"><time data-mtime="<%= tv %>"></time></td>
+      <td class="nowrap"><strong><%- request.ip %></strong></td>
+      <td class="wrap">
+        <div style="float:left"><strong><%- request.method %>&nbsp;&nbsp;&nbsp;<%- request.scheme %>://<%- request.host %><%- request.path %></strong></div>
+        <div style="float:right"><%= truncate(request.agent, 76) %></div>
+      </td>
+    </tr>
+    <tr class="tbalt inforow">
+      <td class="nowrap"><strong><%= block.code %> <%- block.message_class %></strong></td>
+      <td class="wrap">parameter: <%- block.parameter %></td>
+      <td class="wrap">match: &quot;<%= truncate(block.value, 80)%>&quot;</td>
+      <td class="nowrap">info: <%- block.pattern %></td>
+    </tr>
+</script>
+       
+                <table class="table table-sm" style="width:100%">
+                  <thead class="details">
+                    <tr>
+                      <th scope="col">Browser / Country</th>
+                      <th scope="col">Time</th>
+                      <th scope="col">IP</th>
+                      <th scope="col">URL / Agent</th>
+                    </tr>
+                  </thead>
+                  <!-- TODO: loop over $reporting and template into alert_rows -->
+                  <tbody style="font-size:10px;width:100%" id="alert_rows">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+      </div>
+      
+
+      <div class="row">
+          <div class="col-12 col-lg-12">
+            <a id="block_table_tip"></a>
+            <div class="card card-fill tooltipA" id="block_table" style="max-width: 100%">
+              <span class="tooltiptext"><div class="left">At the page bottom, you can see the attacks that have been blocked by the firewall.  
+                You can adjust which types of attacks are blocked in the Settings page.  If you see something that should not be blocked, 
+                click on the magic wand icon to add an exception for the offending block.</div>
+                <div class="right">
+                <button class="alert-secondary alert nxt">Next 
+                  <span class="fe fe-skip-forward" style="margin-top:4px"></span>
+                </button>
+                </div>
+                <span class="arrow"></span>
+              </span>
+
+              <div class="card-header">
+                <h4>Blocks <small class="text-muted" id="block_range">{{block_range}}</small> of {{block_count}}</h4>
+                <button class="btn btn-secondary mr-6" id="download_blocks">Download as JSON</button>
+                <span>Page: </span>
+                <nav arial-label="Block Pagination" class="mt-4 ml-2">
+                  <ul class="pagination" id="block_page_list">
+                    <!-- TODO: template $max_pages2 alert_page_list with paginator_template var -->
+                  </ul>
+                </nav>
+              </div>
+              <div class="card-body">
+
+                <table class="table table-sm" style="width:100%">
+                  <thead class="details">
+                    <tr>
+                      <th scope="col">Browser / Country</th>
+                      <th scope="col">Time</th>
+                      <th scope="col">IP</th>
+                      <th scope="col">URL / Agent</th>
+                    </tr>
+                  </thead>
+                  <tbody style="font-size:10px;width:100%" id="block_rows">
+                  </tbody>
+                </table>
+ 
+              </div>
+            </div>
+          </div>
+
+      </div>
+
+     
+
+
+
+    </div><!-- / .main-content -->
+
+
+    <script>
+      function show_bars(chart_id, hr_set) {
+        let total = 0;
+        console.log("chart id", chart_id, hr_set);
+        for (var i=0;i<hr_set.data.length;i++) {
+          total += hr_set.data[i];
+        }
+        GBI("block_sum_total").innerText = "(" + total + ")";
+
+        new Chart(chart_id, {
+    type: 'bar',
+    options: {
+      scales: {
+        yAxes: [{
+          ticks: {
+            callback: function(value) {
+              return value;
+            }
+          }
+        }]
+      }
+    },
+    data: {
+      labels: [...Array(24).keys()],
+      datasets: [{
+        label: 'Block per Hour',
+        data: hr_set.data,
+        backgroundColor: [
+          '#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289',
+          '#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289'
+        ]
+      }]
+    }
+  });
+      }
+
+      
+      function show_pie(id, data, label_fn) {
+        let data_labels = [];
+        let data_per = [];
+        for (const [key, value] of Object.entries(data.data)) {
+          data_labels.push(label_fn(key, value));
+          data_per.push(value);
+        }
+        
+        var opts = {
+          type: 'doughnut',
+          options: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              boxWidth: 10,
+              padding: 5,
+              usePointStyle: true,
+              labels: {
+                fontSize: 9,
+                padding: 5,
+                boxWidth: 15
+              }
+            },
+            tooltips: {
+              callbacks: {
+                afterLabel: function() {
+                  return ''
+                }
+              }
+            },
+            weight: true,
+            cutoutPercentage: 80, 
+            defaultFontSize: 15,
+            defaultLineHeight: .6
+          },
+          data: {
+            labels: data_labels,
+            datasets: [{
+              data: data_per,
+              backgroundColor: ['#56E2CF', '#56AEE2', '#5668E2', '#8A56E1', '#CF56E2', '#E256AE', '#E25668', '#E28956', '#E2CF56', '#AEE256', '#68E256', '#56E289']
+            }]
+          }
+        };
+       
+        // console.log(opts);
+
+        new Chart(id, opts);
+      }
+
+
+      var codex = {
+        0: "Unknown Bot",
+        10000: "XSS",
+        11000: "XXE",
+        12000: "RCE",
+        13000: "format",
+        14000: "SQLi",
+        15000: "LFI",
+        16000: "Web Shell",
+        17000: "Dot Dot",
+        18000: "Spam",
+        20000: "Wrong Domain",
+        21000: "File Upload",
+        22000: "General Web",
+        23000: "Wrong Domain",
+        24000: "Bot Whitelist",
+        25000: "Malicious Agent",
+        26000: "Request Rate",
+        27000: "Fake Browser",
+        29000: "File Locking",
+        30000: "XSS Account Takeover",
+        31000: "Unknown Bot",
+        32000: "Redirect",
+        70000: "Malware"
+      };
+
+      var zup_ids = ["block_by_type", "block_by_country", "block_by_hour", "alert_table", "block_table"];
+      var zup_idx = 0;
+
+
+      function label_type(key, value) { return codex[key]; }
+      function label_value(key, value) { return key; }
+
+      function check_upgrade() {
+        fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
+          .then(response => response.json())
+          .then(response => {
+            console.log(response);
+            var behind = 0;
+            var latest_str = VERSION_STR;
+            var latest = VERSION;
+            for (const r in response) {
+              //console.log("version!", r);
+              if(response[r][0] > VERSION) { 
+                if (response[r][0] > latest) {
+                  latest = response[r][0];
+                  latest_str = r;
+                  behind++;
+                }
+              }
+            }
+            window.LATEST = latest_str;
+            
+            let ul = GBI("upgrade_link");
+            if (ul && behind == 0) {
+              ul.innerText = "BitFire Up To Date";
+              ul.setAttribute("disabled", "disabled");
+              ul.classList.remove("lift");
+            } else if (ul) {
+              ul.innerText = "Upgrade to " + latest_str;
+              ul.classList.remove("btn-secondary");
+              ul.classList.add("btn-warning");
+              ul.addEventListener("click", upgrade);
+            }
+          }
+        );
+      }
+
+      /*
+      TODO: 
+      add json encoded  total: data, -> hr_data_json
+      add json encoded  total: data, -> country_data_json
+      add json encoded  total: data, -> type_data_json
+      */
+
+      const request = async () => {
+        const response4 = await BitFire_api("get_valid_data", {});
+        const data4 = await response4.json();
+
+        //console.log("data4", data4);
+
+        const data2 = {{hr_data_json}};
+        const data3 = {{country_data_json}};
+        const data5 = {{type_data_json}};
+
+        update_challenge(data4);
+
+        //console.log("data5", data5);
+        //console.log("data3", data3);
+        show_pie('classChart', data5, label_type);
+        show_pie('classChart2', data3, label_value);
+        // find browser offset, dates are in UTC
+        let tz_adjusted = [];
+        const tzoff_hr = -(new Date().getTimezoneOffset() / 60);
+
+        // adjust to local time
+        for (const [key, value] of Object.entries(data2.data)) {
+          let adjusted = (parseInt(key) + tzoff_hr) % 24;
+          if (adjusted < 0) { adjusted += 24; }
+          tz_adjusted[adjusted] = value;
+        }
+
+        data2.data = tz_adjusted;
+        show_bars('hrChart', data2);
+
+        //GBI("ip_total").innerText = "(" + data3.total + ")";
+      }
+
+      function render_alerts() {
+        let alerts = {{alerts_json}};
+        if (!alerts) { return; }
+
+        let line_e = GBI("line_template");
+        let compiled = _.template(line_e.innerText);
+        let markup = "";
+        for (const [key, value] of Object.entries(alerts)) {
+          markup += compiled(value);
+        }
+        GBI("alert_rows").innerHTML = markup;
+      }
+
+      function render_blocks() {
+        let alerts = {{blocks_json}};
+        //console.log(alerts);
+
+        let line_e = GBI("line_template");
+        let compiled = _.template(line_e.innerText);
+        let markup = "";
+        for (const [key, value] of Object.entries(alerts)) {
+          markup += compiled(value);
+        }
+        GBI("block_rows").innerHTML = markup;
+      }
+
+
+      function update_challenge(data) {
+        //console.log("update challenge", data);
+
+        if (GBI("check")) { 
+          GBI("check").innerText = data.challenge;
+          GBI("pass").innerText = data.valid;
+        }
+      }
+
+      // called on upgrade click
+      // TODO: test stand alone upgrade after WP launch
+      function upgrade() {
+        console.log("upgrade!");
+        BitFire_api("upgrade", {})
+          .then(response => response.json())
+          .then(r => { alert(r.note); });
+      }
+
+      function update_country() {
+        // update country flags
+        var elms = document.getElementsByClassName("country");
+        for (let element of elms) {
+          let t = element.innerText;
+          element.innerHTML = "["+t+"]" + cc_to_flag(t);
+        }
+      }
+function update_times() {
+  var times = document.getElementsByTagName("time");
+  let formatter = new Intl.DateTimeFormat(LLANG, {weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true})
+  for (var i=0; i<times.length; i++) {
+    let ts = parseInt(times[i].getAttribute("data-mtime"));
+    let d = formatter.formatToParts(new Date(ts*1000));
+
+    let markup = "<span class='text-primary'>"+fp(d, 'weekday', ', ', 'month', ' ', 'day') + "</span> " +
+      "<span class='text-muted'>"+fp(d, 'year')+" @</span>" +
+      "<span class='text-info'>"+fp(d, 'hour', ':', 'minute', ':', 'second', ' ', 'dayPeriod') + "</span>";
+      times[i].innerHTML = markup;
+  }
+}
+      function add_pages() {
+        let content = "";
+        for (i=0; i<{{block_pages}}; i++) {
+          let clazz = (i == {{block_page_num}}) ? "bg-secondary" : "";
+          content += "<li class='page-item'><a href='{{self}}&{{page}}=DASHBOARD&block_page_num="+i+"&alert_page_num={{alert_page_num}}' class='page-link "+clazz+"' role='button'>" + i + "</a></li>";
+        }
+        GBI("block_page_list").innerHTML = content;
+
+        content = "";
+        for (i=0; i<{{report_pages}}; i++) {
+          let clazz = (i == {{alert_page_num}}) ? "bg-secondary" : "";
+          content += "<li class='page-item'><a href='{{self}}&{{page}}=DASHBOARD&alert_page_num="+i+"&block_page_num={{block_page_num}}' class='page-link "+clazz+"' role='button'>" + i + "</a></li>";
+        }
+        GBI("alert_page_list").innerHTML = content;
+      }
+
+      function position(elem) { 
+        let top = 0; 
+
+        do { 
+            top += elem.offsetTop-elem.scrollTop; 
+        } while (elem = elem.offsetParent); 
+
+        return top;
+      } 
+
+      function next_click() {
+        let e = GBI(zup_ids[zup_idx]);
+        e.classList.remove("zup");
+
+        zup_idx++;
+        e = GBI(zup_ids[zup_idx]);
+        if (e) {
+          e.classList.add("zup");
+
+          let st2 = position(e);
+          window.scrollTo(0, st2-200);
+        }
+        else { 
+          GBI("cover-over").classList.remove("cover-over");
+          alert("Dashboard tour complete. Now let's make sure your system files are secure...");
+          window.location = "{{self}}&{{page}}=MALWARESCAN&tooltip=1";
+        }
+      }
+
+
+      function run_tooltips() {
+        if (window.location.search.indexOf("tooltip") <= 0) { GBI("cover-over").classList.remove("cover-over"); return; }
+          let e = GBI(zup_ids[zup_idx]);
+          e.classList.add("zup");
+
+          const next_buttons = document.getElementsByClassName("nxt");
+          for (let i=0; i < next_buttons.length; i++) {
+            let btn = next_buttons[i]
+            // console.log(i, btn);
+            if (btn && btn.addEventListener) {
+              // console.log(btn);
+              btn.addEventListener("click", next_click);
+            }
+          }
+
+          console.log("complete");
+      }
+
+      function download_type(type) {
+        console.log("download ", type);
+        BitFire_api("download", {"filename": type})
+          .then(response => response.json())
+          .then(r => { console.log(r); });
+      }
+
+
+      request();
+      update_country();
+      render_alerts();
+      render_blocks();
+
+      update_times();
+      add_pages();
+
+      run_tooltips();
+
+      //GBI("download_alerts").addEventListener("click", download_type("alert"));
+      //GBI("download_blocks").addEventListener("click", download_type("block"));
+
+    </script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    {{gtag}}

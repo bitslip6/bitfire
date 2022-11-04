@@ -22,7 +22,7 @@ if ($_REQUEST['slug'] === "bitfire") {
 
 	// make sure the user has at least admin credentials
 	if (function_exists("current_user_can") && !current_user_can("manage_options")) {
-		die("Uninstalling requires administrative privledges.");
+		die("Uninstalling requires administrative privileges.");
 	}
 
 	// uninstall any .htaccess file changes or user.ini changes we might have made, 
@@ -30,7 +30,7 @@ if ($_REQUEST['slug'] === "bitfire") {
 	if (defined("\BitFire\WAF_ROOT")) {
 		if (\BitFire\Config::enabled("bitfire_enabled")) { die("must disable plugin before uninstalling."); }
 		// make sure all files are deletable...
-		\TF\file_recurse(plugin_dir_path(__FILE__), \TF\partial_right('chmod', FILE_EX));
+		\ThreadFin\file_recurse(plugin_dir_path(__FILE__), \ThreadFin\partial_right('chmod', FILE_EX));
 		$lock = \BitFire\WAF_ROOT . "uninstall_lock";
 		if (file_exists($lock)) {
 			$exp = filemtime($lock);

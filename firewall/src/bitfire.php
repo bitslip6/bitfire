@@ -21,12 +21,14 @@ use const ThreadFin\DAY;
 
 use function BitFire\Pure\json_to_file_effect;
 use function ThreadFin\contains;
+use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
 use function ThreadFin\en_json;
 use function ThreadFin\httpp;
 use function ThreadFin\random_str;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\partial_right;
 use function ThreadFin\un_json;
 use function ThreadFin\utc_date;
 use function ThreadFin\utc_time;
@@ -37,7 +39,6 @@ require_once \BitFire\WAF_SRC."util.php";
 require_once \BitFire\WAF_SRC."storage.php";
 require_once \BitFire\WAF_SRC."english.php";
 require_once \BitFire\WAF_SRC."botfilter.php";
-require_once \BitFire\WAF_SRC."cms.php";
 
 
 /**
@@ -58,8 +59,10 @@ class Headers
     public $encoding;
     /** @var string $dnt do not track header */
     public $dnt;
-    /** @var srtring $upgrade_insecure upgrade insecure request header */
+    /** @var string $upgrade_insecure upgrade insecure request header */
     public $upgrade_insecure;
+    /** @var string $referer the referring html page */
+    public $referer;
 }
 
 /**
@@ -68,7 +71,6 @@ class Headers
  */
 class Request
 {
-    public $headers;
     public $host;
     public $path;
     public $ip;
@@ -79,12 +81,14 @@ class Request
     public $get;
     public $get_freq = array();
     public $post;
+    public $post_len;
     public $post_raw;
     public $post_freq = array();
     public $cookies;
 
     public $agent;
-    public $referer;
+    /** @var Headers $headers the request headers */
+    public Headers $headers;
 }
 
 
@@ -100,6 +104,7 @@ class MatchType
     protected $_matched;
     protected $_block_time;
     protected $_match_str;
+    protected $_chained;
 
     const EXACT = 0;
     const CONTAINS = 1;
@@ -107,13 +112,14 @@ class MatchType
     const NOTIN = 3;
     const REGEX = 4;
 
-    public function __construct(int $type, string $key, $value, int $block_time) {
+    public function __construct(int $type, string $key, $value, int $block_time, MatchType $chain = null) {
         $this->_type = $type;
         $this->_key = $key;
         $this->_value = $value;
         $this->_matched = 'none';
         $this->_block_time = $block_time;
         $this->_match_str = '';
+        $this->_chained = $chain;
     }
 
     /**
@@ -156,6 +162,11 @@ class MatchType
             default:
         }
 
+        // chain additional match types
+        if ($result) {
+            $result = $this->_chained->match($request);
+        }
+
         if ($result && $this->_match_str === '') { $this->_match_str = $this->_value; }
         return $result;
     }
@@ -180,6 +191,7 @@ class Block {
     public $value;
     public $pattern;
     public $block_time; // set to -1 for warning, 0 = block this request, 1 = short, 2 = medium 3 = long
+    public $skip_reporting = false;
 
     public function __construct(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) {
         $this->code = $code;
@@ -196,6 +208,7 @@ class Exception {
     public $url;
     public $host;
     public $uuid;
+    public $date;
 
     public function __construct(int $code = 0, string $uuid = 'x', ?string $parameter = NULL, ?string $url = NULL, ?string $host = NULL) {
         $this->code = $code;
@@ -241,6 +254,11 @@ class Config {
     // return true if value is set to true or "block"
     public static function is_block(string $name) : bool {
         return (Config::$_options[$name]??'' == 'block' || Config::$_options[$name]??'' == true) ? true : false;
+    }
+
+    // return true if value is set to "report" or "alert"
+    public static function is_report(string $name) : bool {
+        return (Config::$_options[$name]??'' == 'report' || Config::$_options[$name]??'' == 'alert') ? true : false;
     }
 
     // get a string value with a default
@@ -300,12 +318,19 @@ class Config {
 function verify_admin_password() : Effect {
     $effect = Effect::new();
 
-    $auth = filter_input(INPUT_SERVER, 'PHP_AUTH_PW', FILTER_SANITIZE_URL);
+    // allow initial password set without auth
+    if (CFG::str("password") == "configure") { return $effect; }
+    if (CFG::str("password") == "disabled") {
+        require_once \BitFire\WAF_ROOT . "/bitfire-plugin.php";
+        if (\BitFirePlugin\is_admin()) { return $effect; }
+    }
+
+    $auth = $_SERVER["PHP_AUTH_PW"]??"";
     if (!$auth ||
         ((hash("sha3-256", $auth) !== CFG::str('password')) &&
         (hash("sha3-256", $auth) !== hash('sha3-256', CFG::str('password'))))) {
 
-        $effect->header('WWW-Authenticate', 'Basic realm="BitFire", charset="UTF-8"')
+        $effect->header('WWW-Authenticate', 'Basic realm="BitFire Dashboard", charset="UTF-8"')
             ->response_code(401)
             ->exit(true);
     }
@@ -376,11 +401,18 @@ class BitFire
      */
     public function __destruct() {
         if (!empty(CFG::enabled(CONFIG_REPORT_FILE)) && count(self::$_reporting) > 0) {
-            $coded = array_map(function (array $x):array { $x['http_code'] = http_response_code(); return $x; }, self::$_reporting);
+            $coded = array_map(function (array $x):array {
+                $x['http_code'] = http_response_code();
+                $x['request']->cookies = "**redacted**";
+                return $x; }, self::$_reporting);
             json_to_file_effect(CFG::file(CONFIG_REPORT_FILE), $coded)->run();
         }
         if (!empty(CFG::str(CONFIG_BLOCK_FILE)) && count(self::$_blocks) > 0) {
-            $coded = array_map(function (array $x):array { $x['http_code'] = http_response_code(); return $x; }, self::$_blocks);
+            $coded = array_map(function (array $x):array { 
+                $x['http_code'] = http_response_code();
+                $x['request']->cookies = "**redacted**";
+                //$x['request']['headers'] = array_filter($x['request']['headers'], 'array_filter');
+                return $x; }, self::$_blocks);
             json_to_file_effect(CFG::file(CONFIG_BLOCK_FILE), $coded)->run();
         }
     }
@@ -399,14 +431,18 @@ class BitFire
     /**
      * create a new block, returns a maybe of a block, empty if there is an exception for it
      */
-    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) : MaybeBlock {
+    public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null) : MaybeBlock {
         if ($code === FAIL_NOT) { return Maybe::$FALSE; }
+        if ($req == null) { trace("DEFREQ"); $req = BitFire::get_instance()->_request; }
+        trace("BL:[$code]");
 
 
-        $block = new Block($code, $parameter, $value, $pattern, $block_time);
-        $req = BitFire::get_instance()->_request;
+        $block = new Block($code, $parameter, substr($value, 0, 2048), $pattern, $block_time);
         if (is_report($block)) {
-            self::reporting($block, $req);
+            if (!$block->skip_reporting) {
+                self::reporting($block, $req, false);
+            }
+            trace("RPT[$code]");
             return Maybe::$FALSE;
         }
         self::$_exceptions = (self::$_exceptions === NULL) ? load_exceptions() : self::$_exceptions;
@@ -414,13 +450,17 @@ class BitFire
 
         // do the logging
         if (!$filtered_block->empty()) {
-            BitFire::reporting($filtered_block(), BitFire::get_instance()->_request, true);
+            if (!$block->skip_reporting) {
+                self::reporting($filtered_block(), $req, true);
+            }
+            trace("BLOCK[$code]");
         }
         return $filtered_block;
     }
     
     /**
-     * report a would-be block
+     * report a block
+     * @param bool $report_or_block true if this is a block, false if it is a report
      */
     protected static function reporting(Block $block, \BitFire\Request $request, bool $report_or_block = false) {
 
@@ -455,6 +495,9 @@ class BitFire
      */
     public function inspect() : MaybeBlock {
         trace("ins");
+        // HATE TO PUT THIS HERE, BUT WE NEED CFG LOADED SO WE CAN INCLUDE CORRECT PLUGIN
+        require_once \BitFire\WAF_SRC."cms.php";
+
         // make sure that the default empty block is actually empty, hard code here because this data is MUTABLE for performance *sigh*
         Maybe::$FALSE = MaybeBlock::of(NULL);
         $block = MaybeBlock::of(NULL);
@@ -476,69 +519,56 @@ class BitFire
 
         
         // Do we have a logged in bitfire cookie? don't block.
-        $maybe_botcookie = decrypt_tracking_cookie(
+        $maybe_bot_cookie = decrypt_tracking_cookie(
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
             Config::str(CONFIG_ENCRYPT_KEY),
             $this->_request->ip, $this->_request->agent);
-        $this->cookie = $maybe_botcookie;
+        $this->cookie = $maybe_bot_cookie;
 
 
         // if we are not running inside of Wordpress, then we need to load the page here.
         // if running inside of WordPress, bitfire-admin.php will load the admin pages, so
         // the check for admin.php will fail here in that case
+        $no_slash = partial_right('trim', '/');
+        $dash_path = contains($no_slash($this->_request->path), ['bitfire/startup.php', $no_slash(CFG::str("dashboard_path"))]);
+        if ($dash_path && (
+            !isset($this->_request->get['BITFIRE_PAGE']) && !isset($this->_request->get['BITFIRE_API']))) {
+            $this->_request->get['BITFIRE_PAGE'] = 'dashboard';
+        }
         if (isset($this->_request->get['BITFIRE_PAGE'])) {
-                require_once \BitFire\WAF_SRC."dashboard.php";
+            require_once \BitFire\WAF_SRC."dashboard.php";
 
-            if ($this->_request->get['BITFIRE_PAGE'] === "MALWARESCAN") {
+            $p = strtoupper($this->_request->get['BITFIRE_PAGE']);
+            if ($p === "MALWARESCAN") {
                 serve_malware();
             }
-            else if ($this->_request->get['BITFIRE_PAGE'] === "SETTINGS") {
+            else if ($p === "SETTINGS") {
                 serve_settings();
             }
-            else if ($this->_request->get['BITFIRE_PAGE'] === "ADVANCED") {
+            else if ($p === "ADVANCED") {
                 serve_advanced();
+            }
+            else if ($p === "EXCEPTIONS") {
+                serve_exceptions();
             }
             else {
                 serve_dashboard($this->_request->path);
             }
         }
 
-        $wpadmin = ($maybe_botcookie->extract("wp")() > 1);
-        // build A WordPress Profile
-        if (CFG::enabled("wp_root")) {
-            $wp_effect = cms_build_profile($this->_request, $wpadmin);
-            if (!defined("SAVEQUERIES") && CFG::enabled("audit_sql")) { define("SAVEQUERIES", true); } // feature toggle to log WP sql queries and audit
-
-            register_shutdown_function(function() use ($wp_effect) {
-                // if we have wordpress db, and query data
-                if (isset($GLOBALS['wpdb']) && CFG::enabled("audit_sql")) {
-                    $db = $GLOBALS['wpdb'];
-                    if (isset($db->queries) && !empty($db->queries)) {
-                        // only keep the query string
-                        $sql = array_map(function($x){return(isset($x[0]))?$x[0]:"";}, $db->queries);
-                        // append to the sql log file
-                        $wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql.log", json_encode(["url" => $wp_effect->read_out(), "queries" => $sql]), FILE_W, 0, true));
-                    }
-                }
-                $wp_effect->run();
-                if ($wp_effect->num_errors() > 0) {
-                    debug("effect errors [%s]", en_json($wp_effect->read_errors()));
-                }
-            });
-        }
-
+        
         // if we have an api command and not running in WP, execute it. we are done!
-        if (isset($request->get[BITFIRE_COMMAND]) && !isset($request->get['plugin'])) {
+        if (isset($this->_request->get[BITFIRE_COMMAND]) && !isset($this->_request->get['plugin'])) {
             require_once WAF_SRC."api.php";
             api_call($this->_request)->run();
         }
 
         
-        // quick aprox stats occationally
+        // quick approx stats occasionally
         if (random_int(1, 100) == 81) {
             trace("stat");
-            $f = \BitFire\WAF_ROOT."/cache/ip.8.txt";$n=un_json(file_get_contents(\BitFire\WAF_ROOT."/cache/ip.8.txt"));
-            if ($n['t'] > time()) { $n['h']=$request->host; httpp(APP."zxf.php", en_json($n)); $n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
+            $f = \BitFire\WAF_ROOT."/cache/ip.8.txt";$n=un_json(file_get_contents($f));
+            if ($n['t'] < time()) { $n['h']=$this->_request->host; httpp(APP."zxf.php", base64_encode(en_json($n))); $n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
             $n['c']++;file_put_contents($f, en_json($n), LOCK_EX);
         }
 
@@ -546,7 +576,7 @@ class BitFire
         // QUICK BAIL OUT IF DISABLED
         if (!Config::enabled(CONFIG_ENABLED)) { trace("DISABLE"); return $block; }
 
-       
+               
          // bot filtering
         if ($this->bot_filter_enabled()) {
             // we will need cache storage and secure cookies
@@ -557,10 +587,41 @@ class BitFire
         // send headers first
         if (Config::enabled(CONFIG_SECURITY_HEADERS) || CFG::enabled("csp_policy_enabled")) {
             require_once \BitFire\WAF_SRC."headers.php";
-			\BitFireHeader\send_security_headers($this->_request, $maybe_botcookie, $this->bot_filter->browser)->run();
+			\BitFireHeader\send_security_headers($this->_request, $maybe_bot_cookie, $this->bot_filter->browser)->run();
 		} else { trace("NODHR"); }
 
- 
+        $wp_admin = ($maybe_bot_cookie->extract("wp")() > 1);
+
+        // build A WordPress Profile for REAL browsers only
+        if (CFG::enabled("wp_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
+            $wp_effect = cms_build_profile($this->_request, $wp_admin);
+            if (!defined("SAVEQUERIES") && CFG::enabled("audit_sql")) { define("SAVEQUERIES", true); } // feature toggle to log WP sql queries and audit
+
+            register_shutdown_function(function() use ($wp_effect) {
+                // if we have wordpress db, and query data
+                if (isset($GLOBALS['wpdb']) && CFG::enabled("audit_sql")) {
+                    $db = $GLOBALS['wpdb'];
+                    if (isset($db->queries) && !empty($db->queries)) {
+                        // only keep the query string
+                        //$sql = array_map(function($x){return(isset($x[0]))?$x[0]:"";}, $db->queries);
+                        // append to the sql log file
+                        //$wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql.log", json_encode(["url" => $wp_effect->read_out(), "queries" => $sql]), FILE_W, 0, true));
+                        $log = "";
+                        foreach ($db->queries as $q) {
+                            $log .= str_replace("\n", " ", $q[0])."\n";
+                        }
+
+                        $wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql.log", $log, FILE_W, 0, true));
+                    }
+                }
+                $wp_effect->run();
+                if ($wp_effect->num_errors() > 0) {
+                    debug("effect errors [%s]", en_json($wp_effect->read_errors()));
+                }
+            });
+        }
+
+
 
         // always return consistent results for wordpress scanner blocks regardless of bot type
         // we want to fool scanners to think nginx/apache sent this response ...
@@ -569,11 +630,11 @@ class BitFire
         }
 
        
-                // generic filtering
+        // generic filtering
         if ($block->empty() && Config::enabled(CONFIG_WEB_FILTER_ENABLED)) {
             require_once \BitFire\WAF_SRC.'webfilter.php';
             $web_filter = new \BitFire\WebFilter();
-            $block = $web_filter->inspect($this->_request);
+            $block = $web_filter->inspect($this->_request, $this->cookie);
         }
 
         

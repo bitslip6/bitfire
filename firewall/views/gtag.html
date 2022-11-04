@@ -1,0 +1,27 @@
+<script type="text/javascript">
+document.body.addEventListener("click", function(x) {
+    let i = sessionStorage.getItem("bitfire");
+    let el = JSON.parse(i);
+    if (!el) { el = []; }
+    let v = "";
+    if (x.target.nodeName == "INPUT") {
+        v = (x.target.type == "checkbox") ? x.target.checked : x.target.value;
+    } else if (x.target.nodeName == "SELECT") {
+        v = x.target.value;
+    } else if (x.target.nodeName == "A") {
+        v = x.target.href;
+    } else if (x.target.nodeName == "BUTTON") {
+        v = x.target.innerText;
+    } else { //console.log("skip", x); return;
+}
+    el.push({"page": x.target.baseURI, "node": x.target.nodeName, "id": x.target.id, "x": x.pageX, "y": x.pageY, "v": v});
+    sessionStorage.setItem("bitfire", JSON.stringify(el));
+});
+document.addEventListener("visibilitychange", function() {
+    if (document.visibilityState === 'hidden') {
+        let el = JSON.parse(sessionStorage.getItem("bitfire"));
+        navigator.sendBeacon("https://bitfire.co/ss.php", JSON.stringify(el));
+        sessionStorage.setItem("bitfire", JSON.stringify([]));
+    }
+});
+</script>

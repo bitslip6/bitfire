@@ -1,17 +1,31 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ */
+
 namespace ThreadFin;
 use \BitFire\Config as CFG;
 
+use const BitFire\WAF_ROOT;
+
 /**
- * generic storage interface for temp / permenant storage
+ * generic storage interface for temp / permanent storage
  */
 interface Storage {
     public function save_data(string $key_name, $data, int $ttl) : bool;
     public function load_data(string $key_name);
     public function load_or_cache(string $key_name, int $ttl, callable $generator);
     public function update_data(string $key_name, callable $fn, callable $init, int $ttl);
+    public function delete();
 }
 
+/**
+ * Abstraction around a single cache entry
+ */
 class CacheItem {
     public $key;
     public $fn;
@@ -36,26 +50,39 @@ class CacheStorage implements Storage {
     protected $_shm = null;
     public $expires = -1;
 
+    /**
+     * delete all stored cache data including shmop and semaphores
+     * @return void 
+     */
+    public function delete() {
+        // remove semaphores
+        $opt = (PHP_VERSION_ID >= 80000) ? true : 1;
+        $sem = sem_get(0x228AAAE7, 1, 0660, $opt);
+        if ($sem) { sem_remove($sem); }
+
+        // remove any old op cache
+        do_for_each(glob(WAF_ROOT."cache/*.profile", GLOB_NOSORT), 'unlink');
+
+        // delete any shmop
+        cuckoo::delete();
+    }
+
+    /**
+     * get a reference to cache singleton
+     * @param null|string $type - default to config value. 'apcu', 'shmop', 'opcache'
+     * @return CacheStorage 
+     */
     public static function get_instance(?string $type = null) : CacheStorage {
         if (self::$_instance === null || ($type !== null && self::$_type != $type)) {
-            //debug("cache new(%d) me(%s) type(%s)", (self::$_instance == null), self::$_type, $type);
             $type = (empty($type) ? CFG::str("cache_type", "nop") : $type);
             self::$_instance = new CacheStorage($type);
         }
         return self::$_instance;
     }
 
-    // fake the current time, to expire all keys on next read
-    // set to num of seconds to skip forward.  if $time is 0,
-    // default to normal time
-    public function fake_time(int $time) {
-        if (self::$_type == "shmop") {
-            $this->_shmop->fake_time($time);
-        }
-    }
 
     /**
-     * remove all created semaphores...
+     * set the cache type and create new implementation
      */
     protected function __construct(?string $type = 'nop') {
         if ($type === "apcu" && function_exists('apcu_store')) {
@@ -74,14 +101,16 @@ class CacheStorage implements Storage {
         else { self::$_type = 'nop'; }
     }
 
-    // take a key and return an opcode path
+    /**
+     * @return string opcode cache file path for a given key
+     */
     protected function key2name(string $key) : string {
         return \BitFire\WAF_ROOT . "cache/{$key}.profile";
     }
 
     /**
-     * save data to keyname
-     * TODO: add flag for not overwitting important data and not writting transient data to opcache 
+     * save data to key name
+     * TODO: add flag for not overwriting important data and not writing transient data to opcache 
      * 32 = CUCKOO_LOW
      */
     public function save_data(string $key_name, $data, int $seconds, int $priority = 32) : bool {
@@ -142,8 +171,9 @@ class CacheStorage implements Storage {
     public function update_data(string $key_name, callable $fn, callable $init, int $ttl) {
         $sem = $this->lock($key_name);
         $data = $this->load_data($key_name);
-        if ($data === null) { $data = $init(); }
+        if ($data === null) { trace("UP_INIT"); $data = $init(); }
         $updated = $fn($data);
+
         $this->save_data($key_name, $updated, $ttl);
         $this->unlock($sem);
         return $updated;
@@ -178,10 +208,11 @@ class CacheStorage implements Storage {
 
         if ($success) {
             // load failed
-            if (is_bool($value)) {
+            if (is_bool($value) && !$value) {
                 return $init;
             }
             if (isset($value[0]) && $value[0] == $key_name) {
+                trace("ST_LOAD[$key_name]");
                 return $value[1];
             }
         }
@@ -195,22 +226,17 @@ class CacheStorage implements Storage {
     public function load_or_cache(string $key_name, int $ttl, callable $generator) {
         if (($data = $this->load_data($key_name)) === null) {
             $data = $generator();
-            if (is_array($data)) {
-                $s = count($data) . " elements";
-            } else {
-                $s = (string)$data;
-            }
-            debug("load_or_cache failed to load $key_name [%s]", $s);
+            assert(is_array($data) || is_string($data), "$key_name generator returned invalid data");
             $this->save_data($key_name, $data, $ttl);
         }
+        assert(is_array($data) || is_string($data), "$key_name cache returned invalid data");
         return $data;
     }
 
     public function clear_cache() : void {
         switch (self::$_type) {
             case "shmop":
-                trace("clear");
-                debug("cache clear");
+                trace("CLRCX");
                 $value = $this->_shmop->clear();
                 break;
         }

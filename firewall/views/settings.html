@@ -1,39 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <meta name="description" content="BitFire Dashboard" />
-
-
-	<link rel="shortcut icon" href="https://www.bitfire.co/favicon.ico">
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/vs2015.css" />
-
-    <!-- Theme CSS -->
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.bundle.css" id="stylesheetLight">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
-
     <style>
-      body {
-        /*display: none; */
-      }
+      {{theme_css}}
+    </style>
+    <style>
+      .card { max-width: 100%; }
       .right { float: right; }
-      .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding: .4rem 0 0 0!important; }
+      /*
+      .form-switch { width: 80px; margin-left: -80px; }
+      .form-switch .right { right: 0; }
+      .form-check-input { left: 85px; }
+      */
+      .form-check .form-switch { width: 80px; margin-left: -80px; }
+      .spinner-border { margin-left: -110px; }
       /*
       .lnum { float: right; }
       */
       .pointer { cursor: pointer; }
-      .pr1 { margin-top: 20px; }
       .card-body { padding: 0.5rem !important; }
       .center { text-align: center; }
       .left { float: left; }
       .right { float: right; }
-      .success:checked { background-color: #00d97e; }
-      .warning:checked { background-color: #f6c343; }
+
+
+      /*
+      .col { flex: 1 0 0%; }
+      .col-auto { flex: 0 0 auto; width: auto; }
+
+      .row { display: flex; }
+      .row>* {
+    flex-shrink: 0;
+    width: 100%;
+    max-width: 100%;
+    padding-right: calc(var(--bs-gutter-x)/2);
+    padding-left: calc(var(--bs-gutter-x)/2);
+    margin-top: var(--bs-gutter-y);
+}
+*/
 
       .zn1 { z-index: -1;}
       image.type { fill: #e63757; }
+      a.nav-link { color: #2c7be5 !important;}
+      a.nav-link:hover { text-decoration: underline; }
 
       svg { fill: #977; }
       .blue { fill: #30b7e5; color: #30b7e5; }
@@ -43,8 +49,10 @@
       img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
       img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
       img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+      img.white { filter: invert(99%) sepia(7%) saturate(889%) hue-rotate(165deg) brightness(114%) contrast(100%); }
 
-
+      h6 { text-transform: uppercase; line-height: 1.5;color: rgb(149, 170, 201); font-family: "Cerebri Sans", sans-serif; font-weight: 400; }
+      .header-body { padding: 24px 0; }
       .oh { overflow: auto; }
       .wrap { white-space: break-spaces; line-break: anywhere; }
       .nowrap { white-space: nowrap; }
@@ -77,41 +85,88 @@
         padding-right: 0rem;
       }
       .grow { flex-grow: 1; }
-      
+
+      .success:checked { background-color: #00d97e; }
+      .warning:checked { background-color: #f6c343; }
+      .success, .success:checked { background-color: #00d97e; }
+      .form-switch { min-height: 1.5rem; padding-left: 1.5rem; }
+      .form-switch .form-check-input:checked { background-position: 100%; }
+      .form-switch .form-check-input:checked, .form-switch .form-check-input:focus {
+      }
+      .form-check-input { cursor: pointer; }
+      input { overflow: visible; }
+      input[type=checkbox] { box-sizing: border-box; padding: 0; }
+
+
+      .form-check-input { position: absolute; vertical-align: top; background-color: #e3ebf6; background-repeat: no-repeat; background-size: contain; border: transparent; appearance: none;}
+
+
+      .form-check-input:checked[type=checkbox] {
+        background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3 6-6'/%3E%3C/svg%3E");
+        background-position: 100%;
+      }
+
+      .form-check-input[type=checkbox] {
+        background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3E%3Ccircle r='3' fill='%23fff'/%3E%3C/svg%3E");
+        background-position: 0%;
+    background-repeat: no-repeat; 
+    width: 3rem;
+    margin: 0;
+    margin-left: -3.5rem;
+    border-radius: 3rem;
+    transition: background-position .15s ease-in-out;
+    height: 1.5rem;
+}
+
+input[type=checkbox]:checked::before { content: ''; }
+
+input[type=checkbox], input[type=radio] {
+    box-sizing: border-box;
+    padding: 0;
+}
+.form-check-input { cursor: pointer; vertical-align: top; background-size: contain; border: transparent; appearance: none; position: absolute; }
+
       /*
       ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
       */
       /*
       .dropdown-menu { margin-top: -20px; }
       */
-      .chilabel { margin-left: 1rem; }
-      
-      thead.details th, th { font-size: 12px; }
-      
-      .popover { max-width: 30rem; }
-      .underline { text-decoration: underline; margin-bottom: 1rem; }
-      .table-sm td { padding: .25rem; }
-      .tbalt {
-        color: #333;
-		    overflow: hidden;
-        background-color: #EFEFEF;
-        font-family: monospace;
-      }
-      .tbalt td {
-        border-bottom: 1px solid #CCC;
-      }
-      .table-sm th { padding: .5rem .25rem; }
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-regular.eot);
+  src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-regular.woff) format("woff"),url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
 
-      span.method { padding: .45rem .75rem; font-weight: bold; color #111; }
-      tr.inforow td {
-        background-image: linear-gradient(to bottom, rgba(240,240,240,0),92%, rgba(240,240,240,1)100%);
-      }
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-medium.eot);
+  src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-medium.woff) format("woff"),url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-semibold.eot);
+  src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-semibold.woff) format("woff"),url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Feather;
+  src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),url({{font_path}}/Feather.woff?sdxovp) format("woff"),url({{font_path}}/Feather.svg?sdxovp#Feather) format("svg");
+  font-weight: 400;
+  font-style: normal;
+}
+
+      
     </style>
     
-    <!-- Title -->
-    <title>BitFire : Control Panel</title>
-
-    <script>
+    <script type="text/javascript">
         window.CONFIG_LIST = {};
         window.ERROR = [];
         function GBI(name) { return document.getElementById(name); }
@@ -127,67 +182,68 @@
           update_str(config_name);
         }
 
-
-        /*
-        async function generateKey() {
-          const algoritm = { name: "AES-CBC", length: 256 };
-          const exportable = true;
-          const usage = ['encrypt'];
-          return await window.crypto.subtle.generateKey(algoritm, exportable, usage).then(key => { return key; 
-          });
-        }
-
-        async function exportKey(key) {
-          const format = "jwk";
-          return await window.crypto.subtle.exportKey(format, key).then(key => { return key; });
-        }
-
-        function genkey(config_name) {
-          const key = await generateKey();
-          const exp = await exportKey();
-          console.log(exp);
-          const data = exp.k.substring(0, 32);
-          console.log(data);
-
-          if (data.length > 30) {
-            GBI(config_name+"_text").value = data;
-            update_str(config_name)
+        function show_list(config_name) {
+          let html = "";
+          for (let i=0; i < domain_list.length; i++) {
+            let id = config_name + "-" + i;
+            html += '<div style="margin-bottom:5px;" id="item_'+id+'">';
+            html += '<input type="text" autocomplete="off" disabled id="list_'+id+'" class="form-control txtin" style="width:80%;float:left;margin-right:10px" value="'+domain_list[i]+'">';
+            html += '<div class="btn btn-danger" style="cursor:pointer;padding-top:10px;padding-left:10px;" title="remove list element" onclick="remove_list(\''+config_name+'\', \''+domain_list[i]+'\', '+i+')"><span class="fe fe-trash"></span></div>'; 
           }
+          return html;
         }
-        */
 
         function remove_list(config_name, value, idx) {
           console.log("config name delete", config_name, value, idx);
-          postData("<?php echo $dashboard_path?>?BITFIRE_API=remove_list_elm", {'config_name': config_name, 'config_value': value, 'index':idx});
-          window.location.reload();
+          BitFire_api("remove_list_elm", {"config_name":config_name, "config_value":value, "index":idx})
+            .then(r => r.json())
+            .then(function(res) {
+            if (res.success) {
+              window.location.reload();
+            } else {
+              alert(res.note);
+              window.location.reload();
+            }
+          });
         }
 
-        // TEST THIS
         function add_list(config_name) {
           let elm = GBI("new_"+config_name);
-          postData("<?php echo $dashboard_path?>?BITFIRE_API=add_list_elm", {'config_name': config_name, 'config_value': elm.value});
-          window.location.reload();
+          BitFire_api("add_list_elm", {"config_name":config_name, "config_value":elm.value})
+            .then(r => r.json())
+            .then(function(res) {
+            if (res.success) {
+                window.location.reload();
+            } else {
+              alert(res.note);
+              window.location.reload();
+            }
+          });
         }
 
-        async function postData(url = '', data = {}) {
-          // Default options are marked with *
-          data._bitfire_p = '<?php echo \BitFire\Config::str(\BitFire\CONFIG_SECRET);?>';
+        async function BitFire_api(api_method = '', data = {}) {
+          url = "{{self}}&BITFIRE_API=" + api_method;
+          data.BITFIRE_API = api_method;
+          data.BITFIRE_NONCE = "{{api_code}}";
+          data.ts = Date.now();
           const response = await fetch(url, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            redirect: 'follow',
-            referrerPolicy: 'same-origin',
-            body: JSON.stringify(data)
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'follow',
+          referrerPolicy: 'same-origin',
+          body: JSON.stringify(data)
           });
-          return response.text(); // parses JSON response into native JavaScript objects
+          return response; // parses JSON response into native JavaScript objects
         }
+
+
 
                 
-        const VERSION = <?php echo \BitFire\BITFIRE_VER; ?>;
-        const VERSION_STR = "<?php echo \BitFire\BITFIRE_SYM_VER; ?>";
+        const VERSION = {{version}};
+        const VERSION_STR = "{{sym_version}}";
         const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
         const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
         const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -198,11 +254,6 @@
         function max(numbers) { return numbers.reduce(max_reducer); }
         function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
 
-        function toggle_id(param, value_id) {
-            let e = GBI(value_id);
-            fetch('<?php echo $dashboard_path?>?param='+param+'&value='+e.value+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { return data.text(); }).then(e => { if (e == "success") { alert("License activation successful!"); window.location.reload(); } else { alert("unable to activate license.  please go to https://bitfire.co/support-center"); } });
-            return false;
-        }
 
         function set_config(id, value) {
           console.log("set config", id, value);
@@ -215,16 +266,26 @@
 
         function update_value(config, value) {
           GBI(config+"_spin").classList.remove("hidden");
-          fetch('<?php echo $dashboard_path?>?param='+config+'&value='+value+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { 
-            console.log(data); 
-            window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
-          });
+          console.log("update value: ", config);
+          BitFire_api("toggle_config_value", {"param":config,"value":value})
+            .then(r => r.json())
+            .then(data => {
+              console.log("saved", config, data); 
+              window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
         }
 
 
         function update_str(config) {
-          let value = GBI(config+"_text").value;
-          return update_value(config, value);
+          console.log("up", config);
+          let e = GBI(config+"_text");
+          if (e) {
+            let value = e.value;
+            console.log("update str", config, value);
+            return update_value(config, value);
+          } else {
+            alert("error, unable to update " + config + " please create support ticket");
+          }
         }
 
         function toggle_report(config, report) {
@@ -234,20 +295,39 @@
           }
           GBI(config+"_spin").classList.remove("hidden");
           if (report && window.CONFIG_LIST[config] == "on") {
-            GBI(config+"_block").checked = false;
+            let g = GBI(config+"_block");
+            if (g) { g.checked = false; }
           }
           if (!report && window.CONFIG_LIST[config] == "report") {
-            GBI(config+"_report").checked = false;
+            let g = GBI(config+"_report");
+            if (g) { g.checked = false; }
           }
           let value = "false";
           let r = GBI(config+"_report");
           if (r && r.checked) { value = "report"; }
           if (GBI(config+"_block").checked) { value = "on"; }
           window.CONFIG_LIST[config] = value;
-          fetch('<?php echo $dashboard_path?>?param='+config+'&value='+value+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { 
-            console.log(data); 
-            window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
-          });
+
+          if (config == "auto_start") {
+            let action=(value == "on") ? "install" : "uninstall";
+            BitFire_api(action, {})
+              .then(r => r.json())
+              .then(response => {
+                console.log(response); 
+                alert(response.note);
+                window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+
+          }
+          else {
+            BitFire_api("toggle_config_value", {"param":config,"value":value})
+              .then(r => r.json())
+              .then(data => {
+              console.log("response...", data);
+              if (!data.success) { alert("error updating " + config + " : " + data.note + " : " + data.errors.join()); }
+              window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+          }
         }
 
         // config name, block|on|true / report|alert / off|false
@@ -255,7 +335,9 @@
           var e = GBI(elm);
           console.log(e);
           e.innerText = cap(type);
-          fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
+          BitFire_api("toggle_config_value", {"param":elm,"value":type})
+            .then(r => r.json())
+            .then(data => { console.log("toggle", data); });
           if (type == "block" || type == "on" || type == "true") {
             e.classList.remove("btn-warning");
             e.classList.remove("btn-secondary");
@@ -272,21 +354,20 @@
         }
               
     </script>
-  </head>
 
-  <body>
-
+    <script type="text/template" id="alert_template">
+      <div class="alert alert-warning alert-dismissible fade show">
+        {{text}}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </script>
 
     <!-- NAVIGATION
     ================================================== -->
     
-    
 
-    <!-- MAIN CONTENT
-    ================================================== -->
     <div class="main-content">
       
-
       <!-- HEADER -->
       <div class="header">
         <div class="container-fluid">
@@ -294,29 +375,45 @@
           <!-- Body -->
           <div class="header-body">
             <div class="row align-items-end">
-              <div class="col">
+              <div class="left">
                 <!-- Pretitle -->
                 <h6 class="header-pretitle">
-                  BitFire <?php echo ($is_free) ? "FREE" : "PRO" ?> : Release <?php echo \BitFire\BITFIRE_SYM_VER?>
+                  {{release}}
                 </h6>
+                <!--
                 <p style="font-size:.75rem;color:#666;">
-                <?php if ($is_free) { ?>
-                  <a href="https://bitfire.co/pricing" target="_blank">Upgrade</a> to <span class="blue font-weight-bold">PRO</span> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
-                <?php } ?>
+                  <div class="{{showfree_class}}">
+                  <a href="https://bitfire.co/pricing" target="_blank">Upgrade to <span class="blue font-weight-bold">PRO</span></a> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
+                  </div>
+                </p>
+              -->
 
-                <!-- Title -->
+                <!-- Title 
                 <h1 class="header-title">
-                  <img src="https://bitfire.co/assets/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
-                  <?php echo $page_name; ?>
+                  <img src="{{assets}}shield.png" width="24" class="navbar-brand-img mx-auto" alt="...">
+                  {{page_name}}
                 </h1>
+              -->
 
-              </div>
-              <div class="col-auto">
+<div class="row {{showfree_class}}">
+			<div class="col-12">
+				<div class="card-body bg-warning-soft mb-4" style="border: solid 1px #e63757">
+					<h3 class="card-header-title">Filesystem is not locked</h3>
+					<br>
+					<p>
+            <a href="https://bitfire.co/pricing" target="_blank" class="right mb-2" style="text-decoration: underline">
+            Upgrade BitFire <span class='fe fe-external-link'></span>
+						</a>
+            to enable File-Lock and prevent malware infections, add Redirect protection and Multi Factor Authentication
+							Upgrade to BitFire PRO.
+					</p>
 
-                <!-- Buttons -->
+				</div>
+			</div>
+		</div>
 
-                <a href="https://bitfire.co/support-center" target="_blank" class="btn btn-success lift bold" id="dwn_link"><strong>Support Center</strong></a>
-                <a href="https://github.com/bitslip6/bitfire/issues" target="_blank" class="btn btn-warning lift" id="dwn_link"><strong>Report Issues</strong></a>
+
+
 
               </div>
             </div> <!-- / .row -->
@@ -326,50 +423,47 @@
               <div class="col">
 
                 <!-- Nav -->
-                <ul class="nav nav-tabs nav-overflow header-tabs">
+                <ul class="nav nav-tabs header-tabs">
+
                   <li class="nav-item">
-                    <a href="<?php echo $self;?>?BITFIRE_API=DASHBOARD" class="nav-link grow">
+                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
                       Dashboard
                     </a>
                   </li>
-                  <li class="nav-item">
-                    <a href="<?php echo $self;?>?BITFIRE_API=MALWARESCAN" class="nav-link grow">
+                  <li class="nav-item {{has_scanner}}">
+                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
                       Malware Scan
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a href="<?php echo $self;?>?BITFIRE_API=SETTINGS" class="nav-link grow">
+                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
                       Settings
                     </a>
                   </li>
-                  <li>
-        <div class="left mt-3">
-          <div id="unlock_div" <?php if (!$locked) { echo 'class="hidden"'; }?>>
-          <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-          <button id="unlock" type="button" class="btn btn-danger lift">UNLOCK SITE</button>
-          </div>
-          <div id="lock_div" <?php if ($locked) { echo 'class="hidden"'; }?>>
-          <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg>
-          <button id="lock" type="button" class="btn btn-success lift">LOCK SITE</button>
-          </div>
-        </div>
-
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
+                      Exceptions
+                    </a>
                   </li>
+                  <li class="nav-item {{hidefree_class}}">
+                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
+                      Advanced
+                    </a>
+                  </li>
+
 
                 </ul>
               </div>
             </div>
           </div> <!-- / .header-body -->
 
-
         </div>
       </div> <!-- / .header -->
 
+    
 
-      <!-- CARDS -->
-
-
-  <div class="container-fluid">
+  <!-- CARDS -->
+  <div class="container-fluid" id="full_container">
     <div class="row justify-content-center">
       <div class="col-12 col-lg-10 col-xl-8">
 
@@ -379,10 +473,10 @@
             <h4 class="card-header-title">
               System Features
             <small class="text-muted ml-4">
-              <a href="https://bitfire.co/web_blocking">Learn about web blocking</a>
+              <a href="https://bitfire.co/web-blocking" target="_blank">Learn about web blocking <span class="fe fe-external-link"></span></a>
             </small>
             </h4>
-            <h4 class="card-header-title text-secondary">Alert / Block</h4>
+            <h4 class="card-header-title text-secondary">Enable</h4>
 
           </div>
           <div class="card-body">
@@ -400,11 +494,29 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("bitfire_enabled", "BitFire to run", true); ?>
+                  <div class="col-auto tog" id="bitfire_enabled_con" data-enabled="{{bitfire_enabled}}" data-title="Turn off to prevent all blocking" data-toggle="true">
                   </div>
                 </div> <!-- / .row -->
               </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      Always On Protection
+                    </h4>
+                    <small class="text-muted">
+                      Run BitFire before WordPress.  Prevent Firewall bypass and saves server resources.  HIGHLY recommended.
+                    </small>
+                  </div>
+
+                  <div class="col-auto tog" id="auto_start_con" data-enabled="{{auto_start}}" data-title="Enable BitFire to run before ALL requests" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+
               <div class="list-group-item">
                 <div class="row align-items-center">
                   <div class="col">
@@ -417,8 +529,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("allow_ip_block", "Block everything from bad IPS for an hour", true); ?>
+                  <div class="col-auto tog" id="allow_ip_block_con" data-enabled="{{allow_ip_block}}" data-title="Block everything from bad IPS for an hour" data-toggle="true">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -434,8 +545,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("security_headers_enabled", "Send HTTP security headers",true); ?>
+                  <div class="col-auto tog" id="security_headers_enabled_con" data-enabled="{{security_headers_enabled}}" data-title="Send HTTP security headers" data-toggle="true">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -453,8 +563,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("enforce_ssl_1year", "Prevent browsers from connecting without SSL", true); ?>
+                  <div class="col-auto tog" id="enforce_ssl_1year_con" data-enabled="{{enforce_ssl_1year}}" data-title="Prevent browsers from connecting without SSL" data-toggle="true">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -471,8 +580,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("block_profanity", "Profanity filter", true); ?>
+                  <div class="col-auto tog" id="block_profanity_con" data-enabled="{{block_profanity}}" data-title="Profanity filter" data-toggle="true">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -488,10 +596,10 @@
         <div class="card">
           <div class="card-header">
 
-            <h4 class="card-header-title">
+            <h4 class="card-header-title" id="bot_handling">
               Bot Handling
             <small class="text-muted ml-4">
-              <a href="https://bitfire.co/bot_blocking">Learn about bot blocking</a>
+              <a href="https://bitfire.co/bot_blocking" target="_blank">Learn about bot blocking <span class="fe fe-external-link"></span></a>
             </small>
             </h4>
             <h4 class="card-header-title text-secondary">Alert / Block</h4>
@@ -513,8 +621,7 @@
 
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("require_full_browser", "JavaScript Challenge"); ?>
+                  <div class="col-auto tog" id="require_full_browser_con" data-enabled="{{require_full_browser}}" data-title="JavaScript Challenge">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -526,12 +633,11 @@
                       Block Bots not on Whitelist
                     </h4>
                     <small class="text-muted">
-                      Over 100 Search Engines and SEO tools included. <!--a href="<?php echo $self?>?BITFIRE_API=WHITELIST">edit</a-->
+                      Over 100 Search Engines and SEO tools included.
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("whitelist_enable", "Bot Whitelist"); ?>
+                  <div class="col-auto tog" id="whitelist_enable_con" data-enabled="{{whitelist_enable}}" data-title="Enable the Bot Allowlist">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -547,8 +653,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("blacklist_enable", "Bot Blacklist"); ?>
+                  <div class="col-auto tog" id="blacklist_enable_con" data-enabled="{{blacklist_enable}}" data-title="Enable the Bot Blocklist">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -565,8 +670,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("rate_limit", "Rate Limit"); ?>
+                  <div class="col-auto tog" id="rate_limit_con" data-enabled="{{rate_limit}}" data-title="Enable Rate Limit Enforcement">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -577,13 +681,16 @@
                   <div class="col">
 
                   <div class="">
-                    <label class="form-label">
                     <h4 class="font-weight-base mb-1">
                       5 Minute Rate Limit
-                      </h4>
-                    </label>
+                    </h4>
                     <small class="form-text text-muted">5 Minute rate limit (excludes whitelisted bots)</small>
-                    <?php echo \BitFire\text_input('rr_5m', 'width:100px', 'number'); ?>
+
+                    <div id="rr_5m_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+                      <span class="xvisually-hidden">Saving...</span>
+                    </div>
+                    <input type="number" class="form-control txtin" id="rr_5m_text" autocomplete="off" onchange="update_str('rr_5m')" value="{{rr_5m}}" style="width:100px;">
+
                   </div>
 
                   </div>
@@ -603,8 +710,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("check_domain", "Block Direct IP Access"); ?>
+                  <div class="col-auto tog" id="check_domain_con" data-enabled="{{check_domain}}" data-title="Block Direct IP Access">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -620,7 +726,7 @@
                       <small class="form-text text-muted">
                         Only allow these domains to access the website (enabled via Block Direct IP Access)
                       </small>
-                      <?php \BitFire\list_text_inputs('valid_domains'); ?>
+                      {{valid_domains_html}}
                     </div>
 
                   </div>
@@ -631,16 +737,17 @@
                 <div class="row align-items-center">
                   <div class="col">
 
-                  <div class="">
-                    <label class="form-label">
-                    <h4 class="font-weight-base mb-1">
-                      Honeypot URL
+                    <div class="">
+                      <h4 class="font-weight-base mb-1">
+                        Honeypot URL
                       </h4>
-                    </label>
-                    <small class="form-text text-muted">Add no-visit to robots.txt, block any IP that visits URL. (leave blank to disable)</small>
-                    <?php echo \BitFire\text_input('honeypot_url'); ?>
-                  </div>
+                      <small class="form-text text-muted">Add no-visit to robots.txt, block any IP that visits URL. (leave blank to disable)</small>
 
+                      <div id="honeypot_url_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+                        <span class="xvisually-hidden">Saving...</span>
+                      </div>
+                      <input type="text" class="form-control txtin" id="honeypot_url_text" autocomplete="off" onchange="update_str('honeypot_url')" value="{{honeypot_url}}">
+                    </div>
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -649,6 +756,7 @@
 
             </div>
           </div>
+        </div>
         </div>
 
 
@@ -660,7 +768,7 @@
             <h4 class="card-header-title">
               Generic Blocking
             <small class="text-muted ml-4">
-              <a href="https://bitfire.co/web_blocking">Learn about web blocking</a>
+              <a href="https://bitfire.co/web-blocking" target="_blank">Learn about web blocking <span class="fe fe-external-link"></span></a>
             </small>
             </h4>
             <h4 class="card-header-title text-secondary">Alert / Block</h4>
@@ -684,8 +792,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("web_filter_enabled", "Generic Web Attack Protection"); ?>
+                  <div class="col-auto tog" id="web_filter_enabled_con" data-enabled="{{web_filter_enabled}}" data-title="Generic Web Attack Protection">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -702,8 +809,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("xss_block", "Cross Site Scripting Protection"); ?>
+                  <div class="col-auto tog" id="xss_block_con" data-enabled="{{xss_block}}" data-title="Cross Site Scripting Protection">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -720,8 +826,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("sql_block", "SQL Injection Protection"); ?>
+                  <div class="col-auto tog" id="sql_block_con" data-enabled="{{sql_block}}" data-title="SQL Injection Protection">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -738,8 +843,7 @@
                     </small>
 
                   </div>
-                  <div class="col-auto">
-                    <?php echo \BitFire\toggle_report("file_block", "Uploaded File Protection"); ?>
+                  <div class="col-auto tog" id="file_block_con" data-enabled="{{file_block}}" data-title="Uploaded File Protection">
                   </div>
                 </div> <!-- / .row -->
               </div>
@@ -773,18 +877,13 @@
                   <small class="form-text text-muted">Server Side Cache (must have cache or cookies enabled)</small>
 
 <div class="btn-group left">
-  <button type="button" class="btn btn-primary" id="drop_cache_type"><?php echo \BitFire\Config::str('cache_type');?></button>
+  <button type="button" class="btn btn-primary" id="drop_cache_type">{{cache_type}}</button>
   <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" style="width:auto" data-bs-toggle="dropdown" aria-expanded="false">
     <span class="visually-hidden">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">
-    <?php if ($has['shmop']) { ?>
-    <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'shmop')" href="#">SHMOP</span></li>
-    <?php } if ($has['apcu']) { ?>
-    <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'apcu')"  href="#">APCU</span></li>
-    <?php } if ($has['shm']) { ?>
-    <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'shm')"  href="#">SHM</span></li>
-    <?php } ?>
+    <li class="hide_shmop"><span class="dropdown-item pointer" onclick="soption('cache_type', 'shmop')" href="#">SHMOP</span></li>
+    <li class="hide_apcu"><span class="dropdown-item pointer" onclick="soption('cache_type', 'apcu')"  href="#">APCU</span></li>
     <li><span class="dropdown-item pointer" onclick="soption('cache_type', 'nop')"  href="#">none</span></li>
   </ul>
 </div>
@@ -801,7 +900,7 @@
                   <small class="form-text text-muted">CloudFlair (1.1.1.1) or localhost</small>
 
 <div class="btn-group left">
-  <button type="button" class="btn btn-primary" id="drop_dns_service"><?php echo \BitFire\Config::str('dns_service');?></button>
+  <button type="button" class="btn btn-primary" id="drop_dns_service">{{dns_service}}</button>
   <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" style="width:auto" data-bs-toggle="dropdown" aria-expanded="false">
     <span class="visually-hidden">Toggle Dropdown</span>
   </button>
@@ -824,7 +923,7 @@
                   <small class="form-text text-muted">HTTP response code for block page</small>
 
 <div class="btn-group left">
-  <button type="button" class="btn btn-primary" id="drop_response_code"><?php echo \BitFire\Config::str('response_code');?></button>
+  <button type="button" class="btn btn-primary" id="drop_response_code">{{response_code}}</button>
   <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" style="width:auto" data-bs-toggle="dropdown" aria-expanded="false">
     <span class="visually-hidden">Toggle Dropdown</span>
   </button>
@@ -855,7 +954,7 @@
                   <small class="form-text text-muted">IP Address, X-Forwarded, Forward</small>
 
 <div class="btn-group left">
-  <button type="button" class="btn btn-primary" id="drop_ip_header"><?php echo \BitFire\Config::str_up('ip_header');?></button>
+  <button type="button" class="btn btn-primary" id="drop_ip_header">{{ip_header}}</button>
   <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" style="width:auto" data-bs-toggle="dropdown" aria-expanded="false">
     <span class="visually-hidden">Toggle Dropdown</span>
   </button>
@@ -882,7 +981,19 @@
                     Cookie Support
                   </label>
                   <small class="form-text text-muted">Disable if server does not support cookies</small>
-                  <?php echo \BitFire\toggle_report('cookies_enabled', 'BitFire cookies', true); ?>
+                  <div class="auto_col tog" id="cookies_enabled_con" data-enabled="{{cookies_enabled}}" data-title="Enable if your server supports cookies" data-toggle="true">
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-6 ">
+                 <div class="form-group">
+                  <label class="form-label">
+                    Report Errors
+                  </label>
+                  <small class="form-text text-muted">Log BitFire PHP errors and send to developers </small>
+                  <div class="auto_col tog" id="send_errors_con" data-enabled="{{send_errors}}" data-title="Disable to keep developers un-informed on potential issues" data-toggle="true">
+                  </div>
                 </div>
               </div>
               </div>
@@ -900,7 +1011,7 @@
             <h4 class="card-header-title">
               Optional Settings
               <small class="text-muted ml-4">
-                <a href="https://bitfire.co/system_settings">Learn about BitFire System Settings</a>
+                <a href="https://bitfire.co/system_settings" target="_blank">Learn about BitFire System Settings<span class="fe fe-external-link"></span></a>
               </small>
             </h4>
 
@@ -908,62 +1019,74 @@
           <div class="card-body">
             <div class="row">
 
-              <div class="col-12 col-md-6">
-
                 <div class="form-group">
                   <label class="form-label">
                     BitFire Cookie Name
                   </label>
                   <small class="form-text text-muted">Cookie name for browser meta-data, unique random name</small>
-                  <?php echo \BitFire\text_input('browser_cookie'); ?>
+
+    <div id="browser_cookie_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="xvisually-hidden">Saving...</span>
+    </div>
+    <input type="text" class="form-control txtin" id="browser_cookie_text" autocomplete="off" onchange="update_str('browser_cookie')" value="{{browser_cookie}}">
+
                 </div>
 
-              </div>
-              <?php if (!$is_wordpress) { ?>
-              <div class="col-12 col-md-6">
-                 <div class="form-group">
+
+                <div class="{{show_wp_class}}">
+                <div class="form-group">
                   <label class="form-label">
                     Dashboard Path
                   </label>
                   <small class="form-text text-muted">Path to serve BitFire dashboard from</small>
-                  <?php echo \BitFire\text_input('dashboard_path'); ?>
-                </div>
-              </div>
 
-              <div class="col-12 col-md-6">
+    <div id="dashboard_path_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="xvisually-hidden">Saving...</span>
+    </div>
+    <input type="text" class="form-control txtin" id="dashboard_path_text" autocomplete="off" onchange="update_str('dashboard_path')" value="{{dashboard_path}}">
+                </div>
+
                  <div class="form-group">
                   <label class="form-label">
                     WordPress Path
                   </label>
                   <small class="form-text text-muted">Leave blank if not WordPress</small>
-                    <?php echo \BitFire\text_input("wp_root"); ?>
+
+    <div id="wp_root_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="xvisually-hidden">Saving...</span>
+    </div>
+    <input type="text" class="form-control txtin" id="dashboard_path_text" autocomplete="off" onchange="update_str('wp_root')" value="{{wp_root}}">
                 </div>
               </div>
-              <?php } ?>
+
             </div>
 
             <div class="row">
-              <div class="col-12 col-md-6">
                 <div class="form-group">
                   <label class="form-label">
                     BitFire Encryption Key
                   </label>
                   <small class="form-text text-muted">BitFire cookie encryption key, > 32bytes random</small>
-                  <?php echo \BitFire\text_input('encryption_key', "width:88%;float:left;margin-right:10px;"); ?>
+
+    <div id="encryption_key_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="xvisually-hidden">Saving...</span>
+    </div>
+    <input type="text" class="form-control txtin" id="encryption_key_text" autocomplete="off" onchange="update_str('encryption_key')" value="{{encryption_key}}" style="width:88%;float:left;margin-right:10px;">
                   <div class="fe fe-refresh-cw pointer text-success" style="margin-top:15px;" onclick="rand_string('encryption_key')"></div>
                 </div>
-              </div>
 
-              <div class="col-12 col-md-6">
                 <div class="form-group">
                   <label class="form-label">
                     BitFire Secret Key
                   </label>
                   <small class="form-text text-muted">BitFire secret key, > 32bytes random</small>
-                  <?php echo \BitFire\text_input('secret', "width:88%;float:left;margin-right:10px;"); ?>
+
+    <div id="secret_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="xvisually-hidden">Saving...</span>
+    </div>
+    <input type="text" class="form-control txtin" id="secret_text" autocomplete="off" onchange="update_str('secret')" value="{{secret}}" style="width:88%;float:left;margin-right:10px;">
                   <div class="fe fe-refresh-cw pointer text-success" style="margin-top:15px;" onclick="rand_string('secret')"></div>
                 </div>
-              </div>
 
             </div>
           </div>
@@ -977,7 +1100,7 @@
             <h4 class="card-header-title">
               PRO / PREMIUM licensing 
               <small class="text-muted ml-4">
-                <a href="https://bitfire.co/pricing">Register for PRO / PREMIUM license</a>
+                <a href="https://bitfire.co/pricing" target="_blank">Register for PRO / PREMIUM license <span class="fe fe-external-link"></span></a>
               </small>
             </h4>
 
@@ -991,65 +1114,133 @@
                   <label class="form-label">
                     BitFire PRO License
                   </label>
-                  <small class="form-text text-muted">Receive your license via email after purchase</small>
-                  <?php echo \BitFire\text_input('pro_key'); ?>
+                  <small class="form-text text-muted">Check your email for license code after purchase</small>
+
+    <div id="pro_key_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+      <span class="xvisually-hidden">Saving...</span>
+    </div>
+    <input type="text" class="form-control txtin" id="pro_key_text" autocomplete="off"  value="{{license}}">
                 </div>
 
+              </div>
+              <div class="col-12 col-md-6">
+                <button style="margin-top:4rem" class="btn btn-primary" id="gopro">Go PRO!</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+
+            <h4 class="card-header-title">
+              Allow editing config.ini
+              <small class="text-muted ml-4">
+                 This will unlock config.ini for manual editing for a short while
+              </small>
+            </h4>
+
+          </div>
+          <div class="card-body">
+            <div class="row">
+
+              <div class="col-12">
+                <small class="text-secondary">Only unlock if you need to manually edit the config.ini file</small>
+                <button class="btn btn-secondary right" id="unlock_config">Unlock config.ini</button>
+
+                <div id="unlock_config_spin" class="spinner-border text-success spinner-border-sm right mt-1 mr-2 hidden" role="status">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+
+            <h4 class="card-header-title">
+              Uninstall BitFire
+              <small class="text-muted ml-4">
+                 This will uninstall BitFire from the startup script and remove all files. 
+              </small>
+            </h4>
+
+          </div>
+          <div class="card-body">
+            <div class="row">
+
+              <div class="col-12">
+                <small class="text-secondary">The script files can be removed after the php cache expires in 5 minutes</small>
+                <button class="btn btn-secondary right" id="uninstall">Uninstall</button>
               </div>
             </div>
           </div>
         </div>
 
 
-
      </div>
+    </div>
+  </div>
+
+  <div class="hidden" id="uninstall_content">
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-10 col-xl-8">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-header-title">
+        BitFire Uninstalled
+        <small class="text-muted ml-4">
+            BitFire has been removed from the startup script.
+        </small>
+      </h4>
+    </div>
+    <div class="card-body">
+      <div class="row">
+
+        <div class="col-12">
+          <p class="text-secondary mb-4">In 5 minutes the php ini cache will expire
+             and the new settings will take effect.  After that you can remove 
+             the script files from your server.
+          </p>
+
+          <h2 class="text-center text-secondary" data-time="300" id="countdown_timer">5:00</h2>
+          <button style="display:block;margin-left:auto;margin-right:auto;" id="remove_files" class="mb-4 btn btn-primary" disabled="disabled">Remove Files</button>
+        </div>
+      </div>
+    </div>
+  </div>
+      </div>
     </div>
   </div>
 
 
 
-
     </div><!-- / .main-content -->
 
-    <!-- JAVASCRIPT
-    ================================================== -->
-    <!-- Libs JS -->
-    <script src="https://www.bitfire.co/dash/bootstrap.bundle.min.js"></script>
-    <script src="https://www.bitfire.co/dash/chart.min.js"></script>
-    <!--
-    <script src="https://bitfire.co/dash/flatpicker.min.js"></script>
-    <script src="https://bitfire.co/dash/dropzone.min.js"></script>
-    <script src="https://bitfire.co/dash/autosize.min.js"></script>
-    <script src="https://bitfire.co/dash/highlight.pack.min.js"></script>
-    <script src="https://bitfire.co/dash/quill.min.js"></script>
-    -->
-    <script src="https://www.bitfire.co/dash/jquery.mask.min.js"></script>
-    <script src="https://www.bitfire.co/dash/list.min.js"></script>
-    <script src="https://www.bitfire.co/dash/select2.min.js"></script>
-    <script src="https://www.bitfire.co/dash/Chart.extension.js"></script>
-
-    <script>
+    <script type="text/javascript">
       
-     
-      function save_pass() {
-        let p1 = GBI("pass1").value;
-        let p2 = GBI("pass2").value;
-        if (p1 != p2) { alert("password does not match"); return; }
-        if (p1.length < 8) { alert("password must be at least 8 characters"); return; }
-        console.log(p1);
-        fetch('<?php echo $dashboard_path?>?BITFIRE_API=set_pass&pass1='+encodeURIComponent(p1)+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
-          .then(response => response.text())
-          .then(response => {
-            console.log(response);
-            if (response == "success") {
-              alert("password updated successfully");
-              $("#password_set").modal("hide");
-            }
-          });
+function save_pass() {
+  let p1 = GBI("pass1").value;
+  let p2 = GBI("pass2").value;
+  if (p1 != p2) { alert("password does not match"); return; }
+  if (p1.length < 8) { alert("password must be at least 8 characters"); return; }
+  console.log(p1);
+  BitFire_api("set_pass", {"pass1":encodeURIComponent(p1)})
+    .then(r => r.json())
+    .then(response => {
+      console.log(response);
+      if (response.success) {
+        alert("password updated successfully");
+        $("#password_set").modal("hide");
+      } else {
+        alert(response.note);
       }
+    });
+}
       
 
-fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
+/*
+// fetch("https://www."+"bitfire.co"+"/ver.php?ts="+Date.now()) // not used on WordPress
   .then(response => response.json())
   .then(response => {
     console.log(response);
@@ -1068,6 +1259,7 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
     }
     window.LATEST = latest_str;
     
+    /*
     if (GBI("upgrade_link")) {
       if (behind == 0) {
         GBI("upgrade_link").innerText = "Software Up To Date";
@@ -1080,75 +1272,46 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
         GBI("upgrade_link").addEventListener("click", upgrade);
       }
     }
-  });
+  }
+);
+*/
 
      
-      function upgrade() {
-        console.log("upgrade!");
-        fetch('<?php echo $dashboard_path?>?BITFIRE_API=upgrade&ver='+window.LATEST+'&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
-          .then(response => response.text())
-          .then(response => {
-            alert(response);
-          });
-      }
+function upgrade() {
+  console.log("upgrade!");
+  BitFire_api("upgrade", {"ver":window.LATEST})
+    .then(r => r.json())
+    .then(response => {
+      alert(response.note);
+    });
+}
 
-      function toggle_features() {
-        var elms = document.getElementsByClassName("feature");
-        console.log("toggle features", elms);
+function toggle_features() {
+  var elms = document.getElementsByClassName("feature");
+  console.log("toggle features", elms);
 
-        Array.prototype.forEach.call(elms, function (element) {
-          console.log("element", element.innerText);
-          if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
-            console.log("warn");
-            element.classList.remove("btn-success");
-            element.classList.remove("btn-secondary");
-            element.classList.add("btn-warning");
-          } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim() == "on") {
-            console.log("success");
-            element.classList.remove("btn-warning");
-            element.classList.remove("btn-secondary");
-            element.classList.add("btn-success");
-          } else {
-            element.classList.remove("btn-success");
-            element.classList.remove("btn-warning");
-            element.classList.add("btn-secondary");
-            console.log("second");
-          }
-        });
-      }
+  Array.prototype.forEach.call(elms, function (element) {
+    console.log("element", element.innerText);
+    if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
+      console.log("warn");
+      element.classList.remove("btn-success");
+      element.classList.remove("btn-secondary");
+      element.classList.add("btn-warning");
+    } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim() == "on") {
+      console.log("success");
+      element.classList.remove("btn-warning");
+      element.classList.remove("btn-secondary");
+      element.classList.add("btn-success");
+    } else {
+      element.classList.remove("btn-success");
+      element.classList.remove("btn-warning");
+      element.classList.add("btn-secondary");
+      console.log("second");
+    }
+  });
+}
 
-      //toggle_features();
-
-      if (GBI("lock")) {
-        GBI("lock").addEventListener("click", function() {
-          <?php if ($is_free) {
-          echo "alert('Site Lock only available in PRO');\nreturn;"; } ?>
-          GBI("lock").innerText = "locking...";
-          fetch('<?php echo $dashboard_path?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
-          .then(response => {
-            console.log(response); 
-            GBI("lock").innerText = "LOCK SITE";
-            GBI("unlock_div").classList.remove("hidden");
-            GBI("lock_div").classList.add("hidden");
-          });
-        });     
-
-        GBI("unlock").addEventListener("click", function() {
-          GBI("unlock").innerText = "unlocking...";
-          fetch('<?php echo $dashboard_path?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
-          .then(response => {
-            console.log(response); 
-            GBI("unlock").innerText = "UNLOCK SITE";
-            GBI("lock_div").classList.remove("hidden");
-            GBI("unlock_div").classList.add("hidden");
-          });
-        });  
-      }
-    </script>
-
-    <!-- Theme JS -->
-    <script src="https://www.bitfire.co/dash/dashkit.min.js"></script>
-
+   </script>
 
     
       <div class="modal fade" id="password_set" role="dialog" data-backdrop="static" data-keyboard="false" tabindex="-1">
@@ -1174,25 +1337,98 @@ fetch("https://www.bitfire.co/ver.php?ts="+Date.now())
           </div>
         </div>
       </div>
-    <script>
+    <script type="text/javascript">
+
+      function alert_or_block(config) {
+        // console.log("alert_or_block", config);
+        if (config === 'report' || config === 'alert') { return 'report'; }
+        if (!config) { return 'off'; }
+        return 'on';
+      }
+
+
       if (GBI("password_btn")) {
         GBI("password_btn").addEventListener("click", function() {
           GBI('password_close').classList.remove("hidden");
         });
       }
-    <?php if ($password_reset) { echo "$('password_set').modal('show');\n"; } ?>
+
+      let toggles = document.getElementsByClassName("tog");
+      for (let i = 0; i < toggles.length; i++) {
+        let id = toggles[i].getAttribute("id");
+        let name = id.replace("_con", "");
+        let title = toggles[i].getAttribute("data-title");
+        let tog = toggles[i].hasAttribute("data-toggle");
+
+        let de = toggles[i].getAttribute("data-enabled");
+        let alert = alert_or_block(de);
+
+        let check1 = (alert == "report") ? "checked" : "";
+        let check2 = (alert == "on") ? "checked" : "";
+
+        let tail1 = (tog) ? "" : " in alert mode only";
+        let tail2 = (tog) ? "" : " in full blocking";
+
+        let tool1 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'+title+tail1+'"';
+        let tool2 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'+title+tail2+'"';
+
+
+        let html = '<div id="'+name+'_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status"></div>';
+        if (!tog) {
+          html += '<div class="form-check form-switch left" style="margin-left:-60px"> <input class="form-check-input warning" id="'+name+'_report" autocomplete="off" type="checkbox" onclick="return toggle_report(\''+name+'\', true)" '+check1+' '+ tool1 +'> </div>';
+        }
+        html += '\
+    <div class="form-switch right">\
+        <input class="form-check-input success" autocomplete="off" id="'+name+'_block" type="checkbox" onclick="return toggle_report(\''+name+'\', false)" '+check2+' '+tool2+'>\
+    </div>';
+        window.CONFIG_LIST[name] = alert;
+
+        toggles[i].innerHTML = html;
+      }
+
+
+      function gopro() {
+        update_str('pro_key');
+        window.setTimeout(function() {
+          alert("BitFire Pro license installed.  Click OK to edit advanced-settings.");
+          window.location = "{{self}}&{{page}}=ADVANCED";
+        }, 1000);
+      }
+
+      function unlock_config() {
+        update_value("unlock_config", "true");
+      }
+
+      function uninstall() {
+        BitFire_api("uninstall", {})
+          .then(r => r.json())
+          .then(data => {
+            let e = GBI("uninstall_content");
+            GBI("full_container").innerHTML = e.innerHTML;
+            window.BITF_INT = window.setInterval(function() {
+              let e = GBI("countdown_timer");
+              let sec = parseInt(e.getAttribute("data-time")) - 1;
+              if (sec == 0) {
+                window.clearInterval(window.BITF_INT);
+                GBI("remove_files").removeAttribute("disabled");
+              } else {
+                let min = Math.floor(sec / 60);
+                let rem = sec - (min * 60);
+                e.setAttribute("data-time", sec);
+                e.innerText = min + ":" + rem;
+              }
+            }, 1000);
+          });
+
+      }
+
+      let e2 = GBI("gopro");
+      e2.addEventListener("click", gopro);
+      e2 = GBI("unlock_config");
+      e2.addEventListener("click", unlock_config);
+      e2 = GBI("uninstall");
+      e2.addEventListener("click", uninstall);
+
+      
     </script>
-
-    <script src="https://bitfire.co/assets/js/theme.bundle.js" type="text/javascript"></script>
-    <script src="https://bitfire.co/assets/js/vendor.bundle.js" type="text/javascript"></script>
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-2YZ4QCZJHC"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-2YZ4QCZJHC');
-</script>
-  </body>
-</html>
+    {{gtag}}

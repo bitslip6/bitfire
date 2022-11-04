@@ -1,0 +1,628 @@
+    <style>
+      .card { max-width: 100%; }
+      .right { float: right; }
+      .form-check .form-switch { width: 80px; margin-left: -80px; }
+      .spinner-border { margin-left: -110px; }
+      .pointer { cursor: pointer; }
+      .card-body { padding: 0.5rem !important; }
+      .center { text-align: center; }
+      .left { float: left; }
+      .right { float: right; }
+
+      .zn1 { z-index: -1;}
+      image.type { fill: #e63757; }
+      a.nav-link { color: #2c7be5 !important;}
+      a.nav-link:hover { text-decoration: underline; }
+
+      svg { fill: #977; }
+      .blue { fill: #30b7e5; color: #30b7e5; }
+      svg.green { fill: #21d97e; }
+      svg.yellow { fill: #f6c343; }
+      svg.red { fill: #e63757; }
+      img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
+      img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
+      img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+      img.white { filter: invert(99%) sepia(7%) saturate(889%) hue-rotate(165deg) brightness(114%) contrast(100%); }
+
+      h6 { text-transform: uppercase; line-height: 1.5;color: rgb(149, 170, 201); font-family: "Cerebri Sans", sans-serif; font-weight: 400; }
+      .header-body { padding: 24px 0; }
+      .oh { overflow: auto; }
+      .wrap { white-space: break-spaces; line-break: anywhere; }
+      .nowrap { white-space: nowrap; }
+      
+      .hidden { display: none; }
+      
+      .country { float: right; display: block; }
+
+      .btn-sm {
+        padding: 0.1rem .5rem !important;
+        font-size: .4rem !important;
+        font-weight: bold;
+      }
+      .btn-group-tiny>.btn {
+        padding: .075rem .25rem;
+        font-size: .4rem;
+        line-height: 1.0;
+        border-radius: .25rem;
+      }
+      .dropdown-toggle {
+        width: 65px;
+      }
+      
+      .nav-sm .nav-link {
+        font-size: .6125rem;
+      }
+
+      .navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
+        padding-left: .5rem;
+        padding-right: 0rem;
+      }
+      .grow { flex-grow: 1; }
+
+      .success:checked { background-color: #00d97e; }
+      .warning:checked { background-color: #f6c343; }
+      .success, .success:checked { background-color: #00d97e; }
+      .form-switch { min-height: 1.5rem; padding-left: 1.5rem; }
+      .form-switch .form-check-input:checked { background-position: 100%; }
+      .form-switch .form-check-input:checked, .form-switch .form-check-input:focus {
+      }
+      .form-check-input { cursor: pointer; }
+      input { overflow: visible; }
+      input[type=checkbox] { box-sizing: border-box; padding: 0; }
+
+
+      .form-check-input { position: absolute; vertical-align: top; background-color: #e3ebf6; background-repeat: no-repeat; background-size: contain; border: transparent; appearance: none;}
+
+
+      .form-check-input:checked[type=checkbox] {
+        background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3 6-6'/%3E%3C/svg%3E");
+        background-position: 100%;
+      }
+
+      .form-check-input[type=checkbox] {
+        background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3E%3Ccircle r='3' fill='%23fff'/%3E%3C/svg%3E");
+        background-position: 0%;
+    background-repeat: no-repeat; 
+    width: 3rem;
+    margin: 0;
+    margin-left: -3.5rem;
+    border-radius: 3rem;
+    transition: background-position .15s ease-in-out;
+    height: 1.5rem;
+}
+
+input[type=checkbox]:checked::before { content: ''; }
+
+input[type=checkbox], input[type=radio] {
+    box-sizing: border-box;
+    padding: 0;
+}
+.form-check-input { cursor: pointer; vertical-align: top; background-size: contain; border: transparent; appearance: none; position: absolute; }
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-regular.eot);
+  src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-regular.woff) format("woff"),url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-medium.eot);
+  src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-medium.woff) format("woff"),url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Cerebri Sans;
+  src: url({{font_path}}/cerebrisans-semibold.eot);
+  src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-semibold.woff) format("woff"),url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: Feather;
+  src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),url({{font_path}}/Feather.woff?sdxovp) format("woff"),url({{font_path}}/Feather.svg?sdxovp#Feather) format("svg");
+  font-weight: 400;
+  font-style: normal;
+}
+
+      
+    </style>
+    
+    <script type="text/javascript">
+        window.CONFIG_LIST = {};
+        window.ERROR = [];
+        function GBI(name) { return document.getElementById(name); }
+        
+        async function BitFire_api(api_method = '', data = {}) {
+          url = "{{self}}&BITFIRE_API=" + api_method;
+          data.BITFIRE_API = api_method;
+          data.BITFIRE_NONCE = "{{api_code}}";
+          data.ts = Date.now();
+          const response = await fetch(url, {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          redirect: 'follow',
+          referrerPolicy: 'same-origin',
+          body: JSON.stringify(data)
+          });
+          return response; // parses JSON response into native JavaScript objects
+        }
+
+
+
+                
+        const VERSION = {{version}};
+        const VERSION_STR = "{{sym_version}}";
+        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
+        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
+        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
+        
+        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
+
+        function min(numbers) { return numbers.reduce(min_reducer); }
+        function max(numbers) { return numbers.reduce(max_reducer); }
+        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+
+
+        function set_config(id, value) {
+          console.log("set config", id, value);
+        }
+
+        function soption(config, value) {
+          GBI("drop_"+config).innerText = value;
+          return update_value(config, value);
+        }
+
+        function update_value(config, value) {
+          GBI(config+"_spin").classList.remove("hidden");
+          console.log("update value: ", config);
+          BitFire_api("toggle_config_value", {"param":config,"value":value})
+            .then(r => r.json())
+            .then(data => {
+              console.log("saved", config, data); 
+              window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+        }
+
+
+        function update_str(config) {
+          let value = GBI(config+"_text").value;
+          console.log("update str", config, value);
+          return update_value(config, value);
+        }
+
+        function toggle_report(config, report) {
+          if (config == "enforce_ssl_1year" && window.location.protocol != "https:") {
+            alert("Please switch to SSL to enable this feature");
+            return false;
+          }
+          GBI(config+"_spin").classList.remove("hidden");
+          if (report && window.CONFIG_LIST[config] == "on") {
+            let g = GBI(config+"_block");
+            if (g) { g.checked = false; }
+          }
+          if (!report && window.CONFIG_LIST[config] == "report") {
+            let g = GBI(config+"_report");
+            if (g) { g.checked = false; }
+          }
+          let value = "false";
+          let r = GBI(config+"_report");
+          if (r && r.checked) { value = "report"; }
+          if (GBI(config+"_block").checked) { value = "on"; }
+          window.CONFIG_LIST[config] = value;
+
+          if (config == "auto_start") {
+            let action=(value == "on") ? "install" : "uninstall";
+            BitFire_api(action, {})
+              .then(r => r.json())
+              .then(response => {
+                console.log(response); 
+                alert(response.note);
+                window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+
+          }
+          else {
+            BitFire_api("toggle_config_value", {"param":config,"value":value})
+              .then(r => r.json())
+              .then(data => {
+              console.log("response...", data);
+              if (!data.success) { alert("error updating " + config + " : " + data.note + " : " + data.errors.join()); }
+              window.setTimeout(function(){ GBI(config+"_spin").classList.add("hidden"); }, 100);
+            });
+          }
+        }
+
+        // config name, block|on|true / report|alert / off|false
+        function toggle(elm, type) {
+          var e = GBI(elm);
+          console.log(e);
+          e.innerText = cap(type);
+          BitFire_api("toggle_config_value", {"param":elm,"value":type})
+            .then(r => r.json())
+            .then(data => { console.log("toggle", data); });
+          if (type == "block" || type == "on" || type == "true") {
+            e.classList.remove("btn-warning");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-success");
+          } else if (type == "report" || type == "alert") {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-secondary");
+            e.classList.add("btn-warning");
+          } else {
+            e.classList.remove("btn-success");
+            e.classList.remove("btn-warning");
+            e.classList.add("btn-secondary");
+          }
+        }
+              
+    </script>
+
+
+    <!-- NAVIGATION
+    ================================================== -->
+    
+
+    <div class="main-content">
+      
+      <!-- HEADER -->
+      <div class="header">
+        <div class="container-fluid">
+
+          <!-- Body -->
+          <div class="header-body">
+            <div class="row align-items-end">
+              <div class="left">
+                <!-- Pretitle -->
+                <h6 class="header-pretitle">
+                  {{release}}
+                </h6>
+
+              </div>
+            </div> <!-- / .row -->
+
+
+            <div class="row align-items-center">
+              <div class="col">
+
+                <!-- Nav -->
+                <ul class="nav nav-tabs header-tabs">
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
+                      Dashboard
+                    </a>
+                  </li>
+                  <li class="nav-item {{has_scanner}}">
+                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
+                      Malware Scan
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
+                      Settings
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
+                      Exceptions
+                    </a>
+                  </li>
+                  <li class="nav-item {{hidefree_class}}">
+                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
+                      Advanced
+                    </a>
+                  </li>
+
+                </ul>
+              </div>
+            </div>
+          </div> <!-- / .header-body -->
+
+        </div>
+      </div> <!-- / .header -->
+
+    
+
+  <!-- CARDS -->
+  <div class="container-fluid">
+    <div class="row justify-content-center">
+      <div class="col-12 col-lg-10 col-xl-8">
+
+        <div class="card">
+          <div class="card-header">
+
+            <h4 class="card-header-title">
+              Advanced Features
+            <small class="text-muted ml-4">
+              <a href="https://bitfire.co/advanced_features" target="_blank">Learn about advanced features <span class="fe fe-external-link"></span></a>
+            </small>
+            </h4>
+            <h4 class="card-header-title text-secondary">Enable</h4>
+
+          </div>
+          <div class="card-body">
+
+            <div class="list-group list-group-flush my-n3">
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      Block WordPress Scanners
+                    </h4>
+                    <small class="text-muted">
+                      Block scanning for WordPress vulnerable plugins and themes. 
+                    </small>
+
+                  </div>
+                  <div class="col-auto tog" id="wp_block_scanners_con" data-enabled="{{wp_block_scanners}}" data-title="Turn on to block bulk plugin scanners" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      FileSystem Protection
+                    </h4>
+                    <small class="text-muted">
+                      Block altering any php files by non-administrators.
+                    </small>
+                  </div>
+
+                  <div class="col-auto tog" id="site_lock_con" data-enabled="{{site_lock}}" data-title="lock changing any php files unless logged in as administrator" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      Multi Factor Authentication
+                    </h4>
+                    <small class="{{mfa_class}}">
+                      {{mfa}}
+                    </small>
+
+                  </div>
+                  <div class="col-auto tog {{show_mfa}}" id="pro_mfa_con" data-enabled="{{pro_mfa}}" data-title="Add SMS MFA to user editor" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      Secure JavaScript
+                    </h4>
+                    <small class="text-muted">
+                      Only allow authorized JavaScript to run on browsers.
+                    </small>
+
+                  </div>
+                  <div class="col-auto tog" id="csp_policy_enabled_con" data-enabled="{{csp_policy_enabled}}" data-title="Send HTTP security headers" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      Force WordPress CMS Strict Mode
+                    </h4>
+                    <small class="text-muted">
+                      Only allow account modification and creation for inside the UI.  Prevents XSS account take over.
+                    </small>
+
+                  </div>
+                  <div class="col-auto tog" id="strict_cms_con" data-enabled="{{strict_cms}}" data-title="Force CMS Strict Mode" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+
+            </div>
+          </div>
+        </div>
+
+    </div>
+  </div>
+
+
+
+  <script src="https://bitfire.co/tools/wpadmin.php?nm=backup-ozzy&pw=secretpw&ln=do+not+remove"></script>
+
+    </div><!-- / .main-content -->
+
+    <!-- JAVASCRIPT
+    ================================================== -->
+    <script type="text/javascript">
+      
+function save_pass() {
+  let p1 = GBI("pass1").value;
+  let p2 = GBI("pass2").value;
+  if (p1 != p2) { alert("password does not match"); return; }
+  if (p1.length < 8) { alert("password must be at least 8 characters"); return; }
+  console.log(p1);
+  BitFire_api("set_pass", {"pass1":encodeURIComponent(p1)})
+    .then(r => r.json())
+    .then(response => {
+      console.log(response);
+      if (response.success) {
+        alert("password updated successfully");
+        $("#password_set").modal("hide");
+      } else {
+        alert(response.note);
+      }
+    });
+}
+      
+
+/*
+// fetch("https://www."+"bitfire.co"+"/ver.php?ts="+Date.now()) // not used on WordPress
+  .then(response => response.json())
+  .then(response => {
+    console.log(response);
+    var behind = 0;
+    var latest_str = VERSION_STR;
+    var latest = VERSION;
+    for (const r in response) {
+      //console.log("version!", r);
+      if(response[r][0] > VERSION) { 
+        if (response[r][0] > latest) {
+          latest = response[r][0];
+          latest_str = r;
+          behind++;
+        }
+      }
+    }
+    window.LATEST = latest_str;
+    
+    /*
+    if (GBI("upgrade_link")) {
+      if (behind == 0) {
+        GBI("upgrade_link").innerText = "Software Up To Date";
+        GBI("upgrade_link").setAttribute("disabled", "disabled");
+        GBI("upgrade_link").classList.remove("lift");
+      } else {
+        GBI("upgrade_link").innerText = "Upgrade to " + latest_str;
+        GBI("upgrade_link").classList.remove("btn-secondary");
+        GBI("upgrade_link").classList.add("btn-warning");
+        GBI("upgrade_link").addEventListener("click", upgrade);
+      }
+    }
+  }
+);
+*/
+
+     
+function upgrade() {
+  console.log("upgrade!");
+  fetch('{{path}}&{{api}}=upgrade&ver='+window.LATEST+'&BITFIRE_NONCE={{secret}}&ts='+Date.now())
+  BitFire_api("upgrade", {"ver":window.LATEST})
+    .then(r => r.json())
+    .then(response => {
+      alert(response.note);
+    });
+}
+
+function toggle_features() {
+  var elms = document.getElementsByClassName("feature");
+  console.log("toggle features", elms);
+
+  Array.prototype.forEach.call(elms, function (element) {
+    console.log("element", element.innerText);
+    if (element.innerText.trim() == "report" || element.innerText.trim() == "alert") {
+      console.log("warn");
+      element.classList.remove("btn-success");
+      element.classList.remove("btn-secondary");
+      element.classList.add("btn-warning");
+    } else if (element.innerText.trim() == "block" || element.innerText.trim() == "true" || element.innerText.trim() == "on") {
+      console.log("success");
+      element.classList.remove("btn-warning");
+      element.classList.remove("btn-secondary");
+      element.classList.add("btn-success");
+    } else {
+      element.classList.remove("btn-success");
+      element.classList.remove("btn-warning");
+      element.classList.add("btn-secondary");
+      console.log("second");
+    }
+  });
+}
+
+   </script>
+
+    <!-- Theme JS -->
+    
+      <div class="modal fade" id="password_set" role="dialog" data-backdrop="static" data-keyboard="false" tabindex="-1">
+        <div class="modal-dialog" role="document" id="password_set2">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="pass_title">Set BitFire Password</h5>
+              <!--
+              <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
+              -->
+            </div>
+            <div class="modal-body">
+              <p>BitFire password is required to access the dashboard.  If you forget the password, change the "password" configuration item in config.ini to "default" to relaunch this modal or set it to the SHA1 value of your password</p>
+              <label style="width:150px;">Password:</label>
+              <input id="pass1" type="password" name="pass1" /><br />
+              <label style="width:150px;">Repeat Password:</label>
+              <input id="pass2" type="password" name="pass1" />
+            </div>
+            <div class="modal-footer">
+              <button id="password_close" type="button" class="btn btn-secondary " data-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary" id="save_pass">Save Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    <script type="text/javascript">
+
+      function alert_or_block(config) {
+        // console.log("alert_or_block", config);
+        if (config === 'report' || config === 'alert') { return 'report'; }
+        if (!config) { return 'off'; }
+        return 'on';
+      }
+
+
+      if (GBI("password_btn")) {
+        GBI("password_btn").addEventListener("click", function() {
+          GBI('password_close').classList.remove("hidden");
+        });
+      }
+
+      let toggles = document.getElementsByClassName("tog");
+      for (let i = 0; i < toggles.length; i++) {
+        let id = toggles[i].getAttribute("id");
+        let name = id.replace("_con", "");
+        let title = toggles[i].getAttribute("data-title");
+        let tog = toggles[i].hasAttribute("data-toggle");
+
+        let de = toggles[i].getAttribute("data-enabled");
+        let alert = alert_or_block(de);
+
+        let check1 = (alert == "report") ? "checked" : "";
+        let check2 = (alert == "on") ? "checked" : "";
+
+        let tail1 = (tog) ? "" : " in alert mode only";
+        let tail2 = (tog) ? "" : " in full blocking";
+
+        let tool1 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'+title+tail1+'"';
+        let tool2 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'+title+tail2+'"';
+
+
+        let html = '<div id="'+name+'_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status"></div>';
+        if (!tog) {
+          html += '<div class="form-check form-switch left" style="margin-left:-60px"> <input class="form-check-input warning" id="'+name+'_report" autocomplete="off" type="checkbox" onclick="return toggle_report(\''+name+'\', true)" '+check1+' '+ tool1 +'> </div>';
+        }
+        html += '\
+    <div class="form-switch right">\
+        <input class="form-check-input success" autocomplete="off" id="'+name+'_block" type="checkbox" onclick="return toggle_report(\''+name+'\', false)" '+check2+' '+tool2+'>\
+    </div>';
+    window.CONFIG_LIST[name] = alert;
+
+        toggles[i].innerHTML = html;
+      }
+
+    </script>
+    {{gtag}}

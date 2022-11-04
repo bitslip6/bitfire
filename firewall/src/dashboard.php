@@ -1,19 +1,32 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * all functions are called via api_call() from bitfire.php and all authentication 
+ * is done there before calling any of these methods.
+ */
 
 namespace BitFire;
 
 use BitFire\Config as CFG;
+use FilesystemIterator;
 use ThreadFin\FileData;
 use ThreadFin\Effect;
 
 use const ThreadFin\DAY;
+use const ThreadFin\ENCODE_RAW;
 
 use function BitFire\list_text_inputs as BitFireList_text_inputs;
 use function BitFireSvr\get_wordpress_version;
+use function BitFireSvr\update_ini_value;
 use function ThreadFin\array_add_value;
 use function ThreadFin\b2s;
 use function ThreadFin\compact_array;
 use function ThreadFin\compose;
+use function ThreadFin\dbg;
 use function ThreadFin\en_json;
 use function ThreadFin\ends_with;
 use function ThreadFin\find_fn;
@@ -34,7 +47,6 @@ require_once \BitFire\WAF_SRC . "botfilter.php";
 require_once \BitFire\WAF_SRC . "renderer.php";
 
 const PAGE_SZ = 30;
-// this case is impossible to hit, but it's better to be safe
 
 function str_replace_first($from, $to, $content)
 {
@@ -47,18 +59,38 @@ function str_replace_first($from, $to, $content)
  * SNAP, file_put_contents back
  */
 function remove_lines(FileData $file, int $num_lines) : FileData {
+    debug("File lines: " . $file->num_lines . " num_lines: $num_lines");
+
     if ($file->num_lines > $num_lines) { 
         $file->lines = array_slice($file->lines, -$num_lines);
-        $content = join("\n", $file->lines);
+        $content = join("", $file->lines);
+        
         file_put_contents($file->filename, $content, LOCK_EX);
     }
     return $file;
 }
 
+function get_file_count($path) : int {
+    $files = scandir($path);
+    if (!$files) { return 0; }
+
+    $size = 0;
+    $ignore = array('.','..');
+    foreach($files as $t) {
+        if(in_array($t, $ignore)) continue;
+        if (is_dir(rtrim($path, '/') . '/' . $t)) {
+            $size += get_file_count(rtrim($path, '/') . '/' . $t);
+        } else {
+            if (strpos($t, ".php") > 0) { $size++; }
+        }   
+    }
+    return $size;
+}
 
 
 
-/** @depricated */
+
+/** @deprecated */
 function text_input(string $config_name, string $styles="", string $type="text") :string {
     $value = CFG::str($config_name);
     $str = '
@@ -71,36 +103,13 @@ function text_input(string $config_name, string $styles="", string $type="text")
 }
 
 
-function toggle_report(string $config_name, string $tooltip = "", bool $onoff = false) :string {
-    $alert = alert_or_block(CFG::str($config_name));
-    $check1 = ($alert == "report") ? "checked" : "";
-    $check2 = ($alert == "on") ? "checked" : "";
-    if (empty($tooltip)) { $tooltip == "Enable / Disable " . $config_name; }
-    $tail1 = ($onoff) ? "" : " in alert mode only";
-    $tail2 = ($onoff) ? "" : " in full blocking";
-    $tool1 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'.$tooltip.$tail1.'"';
-    $tool2 = 'data-bs-toggle="tooltip" data-bs-placement="top" title="'.$tooltip.$tail2.'"';
-    $format = 
-    '<div id="%s_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
-      <span class="visually-hidden">Saving...</span>
-    </div>';
-    $format .= ($onoff == false) ? '<div class="form-check form-switch left">
-        <input class="form-check-input warning" id="%s_report" autocomplete="off" type="checkbox" onclick="return toggle_report(\'%s\', true)" %s %s>
-    </div>' : '<!-- %s %s %s %s -->';
-
-    $format .= '
-    <div class="form-switch right">
-        <input class="form-check-input success" autocomplete="off" id="%s_block" type="checkbox" onclick="return toggle_report(\'%s\', false)" %s %s>
-    </div><script type="text/javascript">window.CONFIG_LIST["%s"] = "%s"; </script>';
-    return sprintf($format, $config_name, $config_name, $config_name, $check1, $tool1, $config_name, $config_name, $check2, $tool2, $config_name, $alert);
-}
-
 function list_text_inputs(string $config_name) :string {
 
-    $assets = (CFG::enabled("wp_contenturl")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/"; // DUP
+    $assets = (defined("WPINC")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/"; // DUP
     $list = CFG::arr($config_name);
     $idx = 0;
-    $result = '<script type="text/javascript">window.list_'.$config_name.' = '.json_encode($list).';</script>'."\n";
+    //$result = \BitFirePlugin\add_script_inline("bitfire-list-$config_name", 'window.list_'.$config_name.' = '.json_encode($list).';');
+    $result = '<script>window.list_'.$config_name.' = '.json_encode($list).';</script>';
     foreach ($list as $element) {
         $id = $config_name.'-'.$idx;
         $result .= '
@@ -258,7 +267,6 @@ function dump_hashes()
     $all_plugroot = glob(CFG::str("wp_contentdir")."/plugins/*.php");
     $all_themeroot = glob(CFG::str("wp_contentdir")."/themes/*.php");
 
-    //$files = FileData::new(\BitFire\WAF_ROOT."cache/file_roots.json")->read()->unjson()->lines;
     $hash_fn = BINDR('\BitFireSvr\hash_file2', $root, "", find_fn('file_type'));
     $hashes = array_map($hash_fn, array_merge($list1, $all_plugroot, $all_themeroot));
     $h2 = en_json(["ver" => $ver, "files" => array_filter($hashes)]);
@@ -298,10 +306,12 @@ function dump_hashes()
 function serve_malware()
 {
     // authentication guard
-    $pw = filter_input(INPUT_SERVER, "PHP_AUTH_PW", FILTER_SANITIZE_URL);
+    $pw = $_SERVER["PHP_AUTH_PW"]??'';
     validate_auth($pw)->run();
 
 
+    // for reading php files
+    if (CFG::enabled("FPL")) { stream_wrapper_restore("file"); }
     $config = map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
     $config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
 
@@ -317,13 +327,13 @@ function serve_malware()
     $root = \BitFireSvr\cms_root();
     $data = array();
 
-    $assets = (CFG::enabled("wp_contentdir")) ? CFG::str("wp_contentdir")."/plugins/bitfire/public/" : "https://bitfire.co/assets/";
+    //$assets = (defined("WPINC")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/";
     //$f2 = "{$assets}vs2015.css";
-    $f3 = "{$assets}prism2.css";
-    debug("F2 [$f3]");
-    $f4 = \BitFire\WAF_ROOT . "public/theme.min.css";
-    $f5 = \BitFire\WAF_ROOT . "public/theme.bundle.css";
-    $data['theme_css'] = file_get_contents($f3) . file_get_contents($f4) . file_get_contents($f5);
+    //$f3 = "{$assets}prism2.css";
+    //debug("F2 [$f3]");
+    //$f4 = \BitFire\WAF_ROOT . "public/theme.min.css";
+    //$f5 = \BitFire\WAF_ROOT . "public/theme.bundle.css";
+    //$data['theme_css'] = file_get_contents($f3) . file_get_contents($f4) . file_get_contents($f5);
     $data['date_z'] = date('Z');
     $data['version'] = BITFIRE_VER;
     $data['version_str'] = BITFIRE_SYM_VER;
@@ -336,9 +346,12 @@ function serve_malware()
     $data['dir_list_json'] = en_json(array_keys($dir_list));
     $data['show_diff1'] = ($is_free) ? "\nalert('d1 Upgrade to PRO to access over 10,000,000 WordPress file datapoints and view and repair these file changes');\n" : "\nout.classList.toggle('collapse');\n";
     $data['show_diff2'] = (!$is_free) ? "\ne.innerHTML = html;\ne2.innerText = line_nums.trim();\n" : "";
+    $root = \BitFireSvr\cms_root();
+    $data["total_files"] = get_file_count($root);
 
-    render_view(\BitFire\WAF_ROOT."views/hashes.html", "BitFire Malware Scanner", $data)->run();
-    die();
+    $view = ($root == "") ? "nohashes.html" : "hashes.html";
+
+    render_view(\BitFire\WAF_ROOT."views/$view", "BitFire Malware Scanner", $data)->exit()->run();
 }
 
 function human_date($time) : string {
@@ -364,6 +377,7 @@ function dashboard_url() : string {
     }
     unset($get['BITFIRE_WP_PAGE']);
     unset($get['BITFIRE_PAGE']);
+    unset($get['tooltip']);
     return $url['path'] . '?' . http_build_query($get);
 }
 
@@ -375,15 +389,15 @@ function render_view(string $view_filename, string $page_name, array $variables 
     $is_free = (strlen(Config::str('pro_key')) < 20);
     // inject common variables and extract at the end
     $variables['license'] = CFG::str('pro_key', "unlicensed");
-    $variables['font_path'] = (CFG::enabled("wp_contenturl")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public" : "https://bitfire.co/dash/fonts/cerebrisans";
+    $variables['font_path'] = (defined("WPINC")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public" : "https://bitfire.co/dash/fonts/cerebrisans";
     $variables['is_wordpress'] = !empty(\BitFireSvr\cms_root());
-    $variables['page'] = ($variables["is_wordpress"]) ? "BITFIRE_WP_PAGE" : "BITFIRE_PAGE";
+    $variables['page'] = (defined("WPINC")) ? "BITFIRE_WP_PAGE" : "BITFIRE_PAGE";
     $variables['api_code'] = make_code(CFG::str("secret"));
     $variables['api'] = BITFIRE_COMMAND;
     $variables['password_reset'] = (CFG::str('password') === 'default') || (CFG::str('password') === 'bitfire!');
     $variables['is_free'] = b2s($is_free);
     $variables['llang'] = "en-US";
-    $variables['assets'] = (CFG::enabled("wp_contenturl")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/";
+    $variables['assets'] = (defined("WPINC")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/";
     $variables['version'] = BITFIRE_VER;
     $variables['sym_version'] = BITFIRE_SYM_VER;
     $variables['showfree_class'] = $is_free ? "" : "hidden";
@@ -391,18 +405,28 @@ function render_view(string $view_filename, string $page_name, array $variables 
     $variables['release'] = (($is_free)  ? "FREE" : "PRO") . " Release " . BITFIRE_SYM_VER;
     $variables['underscore_path'] = (defined("WPINC")) ? "/wp-includes/js/underscore.min.js" : "https://bitfire.co/assets/js/unders"."core.min.js";
     $variables['show_wp_class'] = (defined("WPINC")) ? "" : "hidden";
-    $variables['jquery'] = (defined("WPINC")) ? "" : "https://bitfire.co/assets/js/jqu"."ery/jqu"."ery.js";
+    //$variables['jquery'] = (defined("WPINC")) ? "" : "https://bitfire.co/assets/js/jqu"."ery/jqu"."ery.js";
     $variables['need_reset'] = b2s((CFG::str('password') === 'bitfire!'));
     $variables['gtag'] = '';
-    if (CFG::enabled("dashboard-usage")) {
-        $variables['gtag'] = '<script async src="https://www.googletagmanager.com/gtag/js?id=G-2YZ4QCZJHC"></script> <script> window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag("js", new Date()); gtag("config", "G-2YZ4QCZJHC"); </script>';
-    }
-
-
     // handle old "include" style views and new templates
     $effect = Effect::new()->exit(true);
+
+
+
     if (ends_with($view_filename, "html")) {
+        if (CFG::enabled("dashboard-usage")) {
+            $variables['gtag']  = file_get_contents(\BitFire\WAF_ROOT."views/gtag.html");
+        }
         $effect->out(render_file($view_filename, $variables));
+    }
+
+    // if we don't have wordpress, then wrap the content in our skin
+    if (!defined("WPINC")) {
+        // save current content
+        $out = $effect->read_out();
+        $variables["maincontent"] = $out;
+        // render the skin with old content
+        $effect->out(render_file(\BitFire\WAF_ROOT."views/skin.html", $variables), ENCODE_RAW, true);
     }
 
     return $effect;
@@ -411,40 +435,55 @@ function render_view(string $view_filename, string $page_name, array $variables 
 
 function serve_settings() {
     // authentication guard
-    $pw = filter_input(INPUT_SERVER, "PHP_AUTH_PW", FILTER_SANITIZE_URL);
+    $pw = $_SERVER["PHP_AUTH_PW"]??'';
     validate_auth($pw)->run();
 
+    $view = (CFG::disabled("wizard", false)) ? "wizard.html" : "settings.html";
+
     //"dashboard_path" => $dashboard_path,
-    render_view(\BitFire\WAF_ROOT . "views/settings.html", "BitFire Settings", array_merge(CFG::$_options, array(
+    render_view(\BitFire\WAF_ROOT . "views/$view", "BitFire Settings", array_merge(CFG::$_options, array(
         "auto_start" => CFG::str("auto_start"),
-		"theme_css" => file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css"),
+		//"theme_css" => file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css"),
         "valid_domains_html" => BitFireList_text_inputs("valid_domains"),
         "hide_shmop" => (function_exists("shmop_open")) ? "" : "hidden",
         "hide_apcu" => (function_exists("apcu_store")) ? "" : "hidden",
         "hide_shm" => (function_exists("shm_put_var")) ? "" : "hidden"
-    )))->run();
+    )))->exit()->run();
 }
 
 function serve_advanced() {
     // authentication guard
-    $pw = filter_input(INPUT_SERVER, "PHP_AUTH_PW", FILTER_SANITIZE_URL);
+    $pw = $_SERVER["PHP_AUTH_PW"]??'';
     validate_auth($pw)->run();
-
+    $data = ["mfa" => defined("WPINC") ? "Enable multi factor authentication. Add MFA phone numbers in user editor." :
+        "Multi Factor Authentication is only available in the WordPress plugin. Reinstall the plugin to enable.",
+        "show_mfa" => (defined("WPINC")) ? "" : "hidden",
+        "mfa_class" => (defined("WPINC")) ? "text-muted" : "text-danger"];
     //"dashboard_path" => $dashboard_path,
-    render_view(\BitFire\WAF_ROOT . "views/advanced.html", "BitFire Advanced", array_merge(CFG::$_options, array(
-		"theme_css" => file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css")
-    )))->run();
+    render_view(\BitFire\WAF_ROOT . "views/advanced.html", "BitFire Advanced", array_merge(CFG::$_options, $data))->exit()->run();
 }
 
 
 
 
 /**
- * auth on bastic auth string or wordpress is admin
+ * auth on basic auth string or wordpress is admin
  * @param string $raw_pw the password to validate against Config::password
  * @return Effect validation effect. after run, ensured to be authenticated
  */
 function validate_auth(?string $raw_pw) : Effect {
+
+    // ensure that the server configuration is complete...
+    if (CFG::disabled("configured")) { \BitFireSVR\bf_activation_effect()->run(); }
+
+    // run the initial password setup if the password is not configured
+    if (CFG::str("password") == "configure") {
+        render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->exit()->run();
+    }
+
+
+
+
     $effect = Effect::new();
     //$effect = cache_prevent();
     // disable caching for auth pages
@@ -481,45 +520,8 @@ function validate_auth(?string $raw_pw) : Effect {
     return $effect;
 }
 
-function enrich_alerts(array $reporting) : array{
-    $t = time();
-    $exceptions = \BitFire\load_exceptions();
 
-    for($i=0,$m=count($reporting); $i<$m; $i++) {
-        if (!isset($reporting[$i])) { continue; }
-        $cl = \BitFire\code_class($reporting[$i]['block']['code']);
-        $reporting[$i]['block']['message_class'] = MESSAGE_CLASS[$cl];
-        $test_exception = new \BitFire\Exception($reporting[$i]['block']['code'], 'x', NULL, $reporting[$i]['request']['path']);
-
-        $reporting[$i]['type_img'] = CODE_CLASS[$cl];
-        $browser = \BitFireBot\parse_agent($reporting[$i]['request']['agent']);
-        if (!$browser->bot && !$browser->browser) {
-            $browser->browser = "unknown";
-        }
-        $reporting[$i]['browser'] = $browser;
-        $reporting[$i]['agent_img'] = ($browser->bot) ? 'robot.svg' : ($browser->browser . ".png");
-        $reporting[$i]['country_img'] = strtolower($reporting[$i]['country']) . ".svg";
-        $reporting[$i]['country_alt'] = strtolower($reporting[$i]['country']);
-        if ($reporting[$i]['country_img'] == "-.svg") {
-            $reporting[$i]['country_img'] = "us.svg";
-        }
-
-        $reporting[$i]['when'] = human_date($line['tv']??$t);
-
-
-        // filter out the "would be" exception for this alert, and compare if we removed the exception
-        $filtered_list = array_filter($exceptions, compose("\ThreadFin\\not", BINDR("\BitFire\match_exception", $test_exception)));
-        $has_exception = (count($exceptions) > count($filtered_list));
-        $reporting[$i]['exception_class'] = ($has_exception) ? "warning" : "secondary";
-        $reporting[$i]['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
-        $reporting[$i]['exception_title'] = ($has_exception) ?
-        "exception already added for this block" :
-        "add exception for [" . MESSAGE_CLASS[$cl] . '] url: [' . $reporting[$i]['request']['path']. ']';
-    }
-    return $reporting;
-}
-
-function enrich_alert(array $report, array $exceptions) : array{
+function enrich_alert(array $report, array $exceptions, array $whitelist) : array{
     assert(isset($report["block"]), "enrich_alert: report must have a block");
     $t = time();
 
@@ -546,8 +548,19 @@ function enrich_alert(array $report, array $exceptions) : array{
     // filter out the "would be" exception for this alert, and compare if we removed the exception
     $filtered_list = array_filter($exceptions, compose("\ThreadFin\\not", BINDR("\BitFire\match_exception", $test_exception)));
     $has_exception = (count($exceptions) > count($filtered_list));
+    if ($cl == 24000) {
+        $crc = "crc".crc32($report['request']['agent']);
+        $has_exception = array_key_exists($crc, $whitelist);
+        debug("chk $crc [$has_exception]");
+    }
+
     $report['exception_class'] = ($has_exception) ? "warning" : "secondary";
     $report['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
+
+    $report['type_title'] = "[" . MESSAGE_CLASS[$cl] . '] url: [' . $report['request']['path']. ']';
+    $report['agent_title'] = "Browser type: " . $browser->browser;
+    $report['flag_title'] = "Origin Country: " . $report['country'];
+
     $report['exception_title'] = ($has_exception) ?
     "exception already added for this block" :
     "add exception for [" . MESSAGE_CLASS[$cl] . '] url: [' . $report['request']['path']. ']';
@@ -556,68 +569,134 @@ function enrich_alert(array $report, array $exceptions) : array{
 }
 
 
+function serve_exceptions() :void
+{
+    $file_name = \BitFire\WAF_ROOT."exceptions.json";
+    $exceptions = FileData::new($file_name)->read()->unjson()->map(function ($x) {
+        $class = (floor($x["code"] / 1000) * 1000);
+        $x["message"] = MESSAGE_CLASS[$class];
+        if (!$x["parameter"]) {
+            $x["parameter"] = "All Parameters";
+        }
+        if (!$x["host"]) {
+            $x["host"] = "All Hosts";
+        }
+        if (!$x["url"]) {
+            $x["url"] = "Any URL";
+        }
+        return $x;
+    });
+
+    // ugly...
+    $complete = CFG::int("dynamic-exceptions");
+    if ($complete < 10) { 
+        $when = "Learning complete";
+        $enabled = false;
+    } else {
+        $enabled = true;
+        if ($complete > time()) {
+            $num = ceil(($complete - time()) / DAY);
+            $day = ($num > 1) ? "days" : "day";
+            $when = "Learning complete in $num $day";
+        } else {
+            $when = "Learning completed on " . date("M j, Y", $complete);
+        }
+
+    }
+    $data = [
+        "exceptions" => $exceptions(),
+        "exception_json" => json_encode($exceptions()),
+        "learn_complete" => $when,
+        "enabled" => $enabled,
+        "checked" => ($enabled) ? "checked" : ""
+    ];
+
+    render_view(\BitFire\WAF_ROOT."views/exceptions.html", "BitFire Blocking Exceptions", $data)->exit()->run();
+}
+
 
 /**
  * TODO: split this up into multiple functions
  */
 function serve_dashboard() :void
 {
+    // handle dashboard wizard
+    if (CFG::disabled("wizard") && !isset($_GET['tooltip'])) {
+       die(serve_settings());
+    }
+
     // authentication guard
-    $pw = filter_input(INPUT_SERVER, "PHP_AUTH_PW", FILTER_SANITIZE_URL);
+    $pw = $_SERVER["PHP_AUTH_PW"]??'';
     validate_auth($pw)->run();
     
-    $page = filter_input(INPUT_GET, "page_num", FILTER_VALIDATE_INT);
-    $data = [];
+    $block_page_num = intval($_GET["block_page_num"]??0);
+    $alert_page_num = intval($_GET["alert_page_num"]??0);
+    $data = [
+        "block_page_num" => max(0, $block_page_num),
+        "alert_page_num" => max(0, $alert_page_num)
+    ];
 
     $country_fn = country_enricher(\ThreadFin\un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country.json")));
 
     // load all alert data
     // TODO: make dry
     $report_file = \ThreadFin\FileData::new(CFG::file(CONFIG_REPORT_FILE))
-        ->read()
-        ->apply(BINDR('\BitFire\remove_lines', 400))
+        ->read();
+
+    $report_count = $report_file->num_lines;
+    debug("report count: $report_count, page: $alert_page_num, size: " . PAGE_SZ);
+    $report_file->apply(BINDR('\BitFire\remove_lines', 400))
         ->apply_ln('array_reverse')
-        ->apply_ln(BINDR('array_slice', $page * PAGE_SZ, PAGE_SZ, false))
+        ->apply_ln(BINDR('array_slice', $alert_page_num * PAGE_SZ, PAGE_SZ, false))
         ->map('\ThreadFin\un_json')
         ->map($country_fn);
     $reporting = $report_file->lines;
-
-    // calcualte number of alert pages
-    $report_count = $report_file->num_lines;
-    $data["report_pages"] = $report_count / PAGE_SZ;
+    // calculate number of alert pages
+    //$report_count = $report_file->num_lines;
+    $last = min([(($report_count * PAGE_SZ) + PAGE_SZ), $report_count]);
+    $data["report_count"] = $report_count;
+    $data["report_range"] = ($alert_page_num * PAGE_SZ) . " - $last";
+    $data["report_pages"] = ceil($report_count / PAGE_SZ);
     $data["alerts"] = [];
+    $data["access"] = defined("WPINC") ? "You can access the dashboard by clicking the BitFire icon in the admin bar." : "You can access the dashboard by visiting " . CFG::str("dashboard_path");
 
     $exceptions = load_exceptions();
-    array_map(function($line) use (&$data, $exceptions) {
+    // this will create a $config array from whitelist agents
+    $config = ["botwhitelist" => []];
+    @include (\BitFire\WAF_ROOT."cache/whitelist_agents.ini.php");
+    array_map(function($line) use (&$data, $exceptions, $config) {
         if (isset($line["block"])) {
-            $data["alerts"][] = enrich_alert($line, $exceptions);
+            $data["alerts"][] = enrich_alert($line, $exceptions, $config["botwhitelist"]);
         }
     }, $reporting);
 
     // add alerts
-    $data['alerts_json'] = \ThreadFin\en_json($data["alerts"]);
+    $data['alerts_json'] = json_encode($data["alerts"], JSON_HEX_APOS);
 
 
 
     // load all alert data
     $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
         ->read()
-        ->apply(BINDR('\BitFire\remove_lines', 400))
-        ->apply_ln('array_reverse')
-        ->apply_ln(BINDR('array_slice', $page * PAGE_SZ, PAGE_SZ, false))
+        ->apply(BINDR('\BitFire\remove_lines', 400));
+    $block_count = $block_file->num_lines; // need block count before filtering pagination
+    $block_file->apply_ln('array_reverse')
+        ->apply_ln(BINDR('array_slice', $block_page_num * PAGE_SZ, PAGE_SZ, false))
         ->map('\ThreadFin\un_json')
         ->map($country_fn);
     $blocking = $block_file->lines;
 
     // calcualte number of alert pages
-    $block_count = $block_file->num_lines;
-    $data["block_pages"] = $block_count / PAGE_SZ;
+    $data["block_count"] = $block_count;
+    $last = min([(($block_count * PAGE_SZ) + PAGE_SZ), $block_count]);
+    $data["block_range"] = ($block_page_num * PAGE_SZ) . " - $last";
+    $data["block_pages"] = ceil($block_count / PAGE_SZ);
     $data["blocks"] = [];
 
     $exceptions = load_exceptions();
-    array_map(function($line) use (&$data, $exceptions) {
+    array_map(function($line) use (&$data, $exceptions, $config) {
         if (isset($line["block"])) {
-            $data["blocks"][] = enrich_alert($line, $exceptions);
+            $data["blocks"][] = enrich_alert($line, $exceptions, $config["botwhitelist"]);
         }
     }, $blocking);
 
@@ -631,7 +710,7 @@ function serve_dashboard() :void
         return isset($x['tv']) && $x['tv'] > $check_day;
     });
     $data['block_count_24'] = count($block_24);
-    $blocks = array_slice($blocking, $page * PAGE_SZ, PAGE_SZ);
+    $blocks = array_slice($blocking, $block_page_num * PAGE_SZ, PAGE_SZ);
 
 
     // calculate hr data
@@ -660,7 +739,14 @@ function serve_dashboard() :void
     }, array());
     $data['type_data_json'] = en_json(["total" => count($type_data), "data" => $type_data]);
 
-    $data["theme_css"] = file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css");
-    render_view(\BitFire\WAF_ROOT."views/dash.html", "BitFire Alert Dashboard", $data)->run();
-    die();
+    //$data["theme_css"] = file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css");
+    render_view(\BitFire\WAF_ROOT."views/dash.html", "BitFire Alert Dashboard", $data)->exit()->run();
 }
+
+
+// ensure that passwords are always hashed
+if (strlen(CFG::str("password")) < 40 && CFG::str("password") != "disabled") {
+    $hashed = hash("sha3-256", CFG::str("password"));
+    update_ini_value("password", $hashed)->run();
+}
+

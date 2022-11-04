@@ -1,11 +1,21 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * all functions are called via api_call() from bitfire.php and all authentication 
+ * is done there before calling any of these methods.
+ */
+
 namespace ThreadFin;
 
 use function BitFireSvr\update_ini_value;
 
 const CUCKOO_SLOT_SIZE_BYTES = 19;
 const CUCKOO_EXP_SIZE_BYTES = 6;
-const CUCKOO_MAX_SIZE = 65534;
+const CUCKOO_MAX_SIZE = 32768;
 const CUCKOO_UNPACK = "Loffset/Lhash1/Lhash2/Lexpires/nlen/Cflags";
 const CUCKOO_PACK = "LLLLnC";
 
@@ -227,14 +237,20 @@ function cuckoo_mem_defrag(&$ctx): int {
  * write $item to $key and expires in ttl_sec
  * will overwrite existing keys with a lower priority
  */
-function cuckoo_write(array &$ctx, string $key, int $ttl_sec, $item, int $priority = CUCKOO_LOW): bool {
+function cuckoo_write(array &$ctx, string $key, int $ttl_sec, array $item, int $priority = CUCKOO_LOW): bool {
     if (!$ctx['rid']) { return debugF("ctx rid is false"); }
     
     $header = cuckoo_find_header_for_write($ctx, $key, $priority);
     if ($header === null) { return debugF("unable to find header [%s] pri: [%d]", $key, $priority); }
 
     // we have a header we can write cache data to...
-    $data = (function_exists('\msgpack_pack')) ? @\msgpack_pack($item) : json_encode($item);
+    if (function_exists('\igbinary_serialize')) {
+        $data = \igbinary_serialize($item);
+    } else if (function_exists('\msgpack_pack')) {
+        $data = \msgpack_pack($item);
+    } else {
+        $data = serialize($item);    
+    }
     $size = strlen($data);
 
     // debug("shmop: $size:[$data]\n");
@@ -324,7 +340,12 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
         }
     }
 
-    return ($header['expires'] > $ctx['now']) ? $header : null;
+    // return the header if not expired
+    if ($header['expires'] > $ctx['now']) {
+        return $header;
+    } else {
+        return debugN("cache entry expired [%s] %d/%d", $key, $header['expires'], $ctx['now']);
+    }
 }
 
 // clear position flags and keep any other flags, then set the position
@@ -419,18 +440,21 @@ function cuckoo_read(array $ctx, string $key) {
     if ($header !== null && $header['len'] > 0) {
         $data = shmop_read($ctx['rid'], $header['offset'], $header['len']);
 
-        $x = (function_exists('\msgpack_unpack')) ? @\msgpack_unpack($data) : @json_decode($data, true);
-        //$x = @json_decode($data, true);
-        if ($x === false && ! function_exists('\msgpack_unpack')) {
-            $d2 = str_replace('"]', '["', $data);
-            //$x = @json_decode($d2, true);
-            $x = @json_decode($d2, true);
-            if ($x === false) {
-                debug("unserialize failed 2 [%s]", $d2);
+        // we have a header we can write cache data to...
+        if (function_exists('\igbinary_serialize')) {
+            $x = \igbinary_serialize($data);
+        } else if (function_exists('\msgpack_pack')) {
+            $x = \msgpack_pack($data);
+        } else {
+            $x = serialize($data);
+        }
+
+        if (is_array($x)) {
+            $n = count($x); 
+            if ($n == 2) {
+                return $x;
             }
         }
-        trace("HIT:{$key}");
-        return $x;
     }
 
     $x = "E";
@@ -518,7 +542,6 @@ function cuckoo_open_mem(int $size_in_bytes, $token, bool $reduced = false) {
  */
 function cuckoo_connect(int $items = 4096, int $chunk_size = 2048, int $mem = 1114112, bool $force_init = false):array {
     $token = \BitFire\Config::int("cache_token", 1234560);
-    debug("shm open:$token");
     $entry_end = $items * CUCKOO_SLOT_SIZE_BYTES;
     $mem_end = $entry_end + $mem;
 
@@ -556,13 +579,7 @@ class cuckoo {
     public static function update_free(int $free_pos) {
         self::$ctx['free'] = $free_pos;
         self::$ctx['free_mem'] = self::$ctx['mem_end']-$free_pos;
-    }
-
-    // fake the current time, to expire all keys on next read
-    // set to num of seconds to skip forward.  if $time is 0,
-    // default to normal time
-    public function fake_time(int $time) {
-        self::$ctx['now'] = time() + $time;
+        trace("FM:".self::$ctx['free_mem']);
     }
 
     // TODO: determine 
@@ -578,12 +595,16 @@ class cuckoo {
         return cuckoo_read_or_set(self::$ctx, $key, $ttl, $fn, $priority);
     }
 
-    public static function write(string $key, int $ttl, $item, int $priority = CUCKOO_LOW) { 
-        return cuckoo_write(self::$ctx, $key, $ttl, $item, $priority);
+    public static function write(string $key, int $ttl, array $storage, int $priority = CUCKOO_LOW) { 
+        return cuckoo_write(self::$ctx, $key, $ttl, $storage, $priority);
     }
 
     public static function clear() {
         cuckoo_init_memory(self::$ctx, 20000, 128);
+    }
+
+    public static function delete() {
+        shmop_delete(self::$ctx['rid']);
     }
 
     public static function defrag() {

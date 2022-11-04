@@ -1,896 +1,1134 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <meta name="description" content="BitFire Dashboard" />
+<style>{{theme_css}}</style>
+<style>
+	/* global bitfire styles, TODO: move to include from disk... */
+	.right {
+		float: right;
+	}
+	.zup { z-index: 100; }
 
-    <!-- Libs CSS -->
-    <!--
-    <link rel="stylesheet" href="https://bitfire.co/dash/flatpicker.min.css" />
-    <link rel="stylesheet" href="https://bitfire.co/dash/feather.css" />
-    <link rel="stylesheet" href="https://bitfire.co/dash/quill.core.css" />
-    -->
+	div.evil {
+		background-color: rgb(255, 210, 220);
+		color: #111 !important;
+	}
 
-	<link rel="shortcut icon" href="https://www.bitfire.co/favicon.ico">
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/vs2015.css" />
+	.left {
+		float: left;
+	}
 
-    <!-- Theme CSS -->
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.min.css" id="stylesheetLight">
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme.bundle.css" id="stylesheetLight">
-    <link rel="stylesheet" href="https://www.bitfire.co/assets/css/prism.css" id="stylesheetLight">
-    <!--
-    <link rel="stylesheet" href="https://www.bitfire.co/dash/theme-dark.min.css" id="stylesheetDark">
-    -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js" type="text/javascript"></script>
-    <script src="https://bitfire.co/assets/js/difflib.js" type="text/javascript"></script>
-    <script src="https://bitfire.co/assets/js/prism.js" data-manual type="text/javascript"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.13.2/underscore-umd-min.js" type="text/javascript"></script>
+	.card-body {
+		padding: 0.5rem !important;
+	}
 
-    <style>
-.lds-dual-ring {
-  display: inline-block;
-  width: 64px;
-  height: 64px;
-  margin-top:-48px;
-  margin-right:128px;
+	.secondary {
+		filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%);
+	}
+
+	.success {
+		filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%);
+	}
+
+	.warning {
+		filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%);
+	}
+
+	.danger {
+		filter: invert(29%) sepia(81%) saturate(2221%) hue-rotate(330deg) brightness(94%) contrast(91%);
+	}
+
+	.blue {
+		fill: #30b7e5;
+		color: #30b7e5;
+	}
+
+	img.red {
+		filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%);
+	}
+
+	img.grey_blue {
+		filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%);
+	}
+
+	img.orange {
+		filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%);
+	}
+
+	.avatar {
+		position: relative;
+		margin-left: -.40625rem
+	}
+
+	h6 {
+		text-transform: uppercase;
+		line-height: 1.5;
+		color: rgb(149, 170, 201);
+		font-family: "Cerebri Sans", sans-serif;
+		font-weight: 400;
+	}
+
+	.header-body {
+		padding: 24px 0;
+	}
+
+
+	.wrap {
+		white-space: break-spaces;
+		line-break: anywhere;
+	}
+
+	.nowrap {
+		white-space: nowrap;
+	}
+
+	.hidden {
+		display: none;
+	}
+	.cover-over { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; opacity: 0.8; background-color: #000; }
+
+	.country {
+		float: right;
+		display: block;
+	}
+
+	.btn-sm {
+		padding: 0.1rem .5rem !important;
+		font-size: .4rem !important;
+		font-weight: bold;
+	}
+
+	.btn-group-tiny>.btn {
+		padding: .075rem .25rem;
+		font-size: .4rem;
+		line-height: 1.0;
+		border-radius: .25rem;
+	}
+
+	.dropdown-toggle {
+		width: 65px;
+	}
+
+	.navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
+		padding-left: .5rem;
+		padding-right: 0rem;
+	}
+	a.nav-link { color: #2c7be5 !important;}
+	a.nav-link:hover { text-decoration: underline; }
+
+
+	thead.details th,
+	th {
+		font-size: 12px;
+	}
+
+	.tbalt {
+		color: #333;
+		overflow: hidden;
+		background-color: #EFEFEF;
+		font-family: monospace;
+	}
+
+	.tbalt td {
+		border-bottom: 1px solid #CCC;
+	}
+
+	.table-sm th {
+		padding: .5rem .25rem;
+	}
+
+	span.method {
+		padding: .45rem .75rem;
+		font-weight: bold;
+		color: #111;
+	}
+
+	tr.inforow td {
+		background-image: linear-gradient(to bottom, rgba(240, 240, 240, 0), 92%, rgba(240, 240, 240, 1)100%);
+	}
+
+	@font-face {
+		font-family: Cerebri Sans;
+		src: url({{font_path}}/cerebrisans-regular.eot);
+		src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),
+		url({{font_path}}/cerebrisans-regular.woff) format("woff"),
+		url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
+		font-weight: 400;
+		font-style: normal;
+	}
+
+	@font-face {
+		font-family: Cerebri Sans;
+		src: url({{font_path}}/cerebrisans-medium.eot);
+		src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),
+		url({{font_path}}/cerebrisans-medium.woff) format("woff"),
+		url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
+		font-weight: 500;
+		font-style: normal;
+	}
+
+	@font-face {
+		font-family: Cerebri Sans;
+		src: url({{font_path}}/cerebrisans-semibold.eot);
+		src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),
+		url({{font_path}}/cerebrisans-semibold.woff) format("woff"),
+		url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
+		font-weight: 600;
+		font-style: normal;
+	}
+
+	@font-face {
+		font-family: Feather;
+		src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),
+		url({{font_path}}/Feather.woff?sdxovp) format("woff");
+		font-weight: 400;
+		font-style: normal;
+	}
+.tooltipA {
+  position: relative;
 }
-.lds-dual-ring:after {
-  content: " ";
-  display: block;
-  width: 64px;
-  height: 64px;
-  margin: 8px;
-  border-radius: 50%;
-  border: 6px solid #fff;
-  border-color: #1657af transparent #1657af transparent;
-  animation: lds-dual-ring 1.2s linear infinite;
-}
-.add { background-color: rgba(0, 240, 0, 0.2); }
-.remove { background-color: rgba(240, 0, 0, 0.2); }
-.right { float: right; }
-.left { float: left; }
 
-.line_nums {
-  width:50px;
-  float:left;
-  background-color: #ddd;
-  padding:1 0 0 0;
-  font-size:15px;
-  line-height:22.5px;
+.alert-secondary {
+  padding: 0.35em 0.65em 0.35em 0.55em;
+  top: 20px
 }
 
-@keyframes lds-dual-ring {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+.arrow {
+  transform: rotateY( 45deg );
+  top: 74px;
+  left: 50%;
 }
-      .right { float: right; }
-      .chilabel { color: #333; display: block; width: 140px; float: left; margin-right: 0; padding: .4rem 0 0 0!important; }
-      /*
-      .lnum { float: right; }
-      */
-      .pr1 { margin-top: 20px; }
-      .card-body { padding: 0.5rem !important; }
-      .center { text-align: center; }
+.arrow:after {
+  background-color: rgba(0,0,0,0.8) !important;
+}
 
-      .zn1 { z-index: -1;}
-      image.type { fill: #e63757; }
+/* Tooltip text */
+.tooltipA .tooltiptext {
+  visibility: hidden;
+  width: 80%;
+  background-color: rgba(0,0,0,0.8);
+  color: #DDD;
+  text-align: center;
+  padding: .5em;
+  border-radius: 6px;
+  top: -110px;
+ 
+  /* Position the tooltip text - see examples below! */
+  position: absolute;
+  z-index: 1;
+}
 
-      svg { fill: #977; }
-      .blue { fill: #30b7e5; color: #30b7e5; }
-      svg.green { fill: #21d97e; }
-      svg.yellow { fill: #f6c343; }
-      svg.red { fill: #e63757; }
-      img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
-      img.grey_blue { filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%); }
-      img.orange { filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%); }
+.zup.tooltipA .tooltiptext {
+  visibility: visible !important;
+}
 
-
-      .oh { overflow: auto; }
-      .wrap { white-space: break-spaces; line-break: anywhere; }
-      .nowrap { white-space: nowrap; }
-      
-      .hidden { display: none; }
-      
-      .country { float: right; display: block; }
-
-      .btn-sm {
-        padding: 0.1rem .5rem !important;
-        font-size: .4rem !important;
-        font-weight: bold;
-      }
-      .btn-group-tiny>.btn {
-        padding: .075rem .25rem;
-        font-size: .4rem;
-        line-height: 1.0;
-        border-radius: .25rem;
-      }
-      .dropdown-toggle {
-        width: 65px;
-      }
-      
-      .nav-sm .nav-link {
-        font-size: .6125rem;
-      }
-
-      .navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
-        padding-left: .5rem;
-        padding-right: 0rem;
-      }
-      
-      /*
-      ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
-      */
-      /*
-      .dropdown-menu { margin-top: -20px; }
-      */
-      .chilabel { margin-left: 1rem; }
-      
-      thead.details th, th { font-size: 12px; }
-      
-      .popover { max-width: 30rem; }
-      .underline { text-decoration: underline; margin-bottom: 1rem; }
-      .table-sm td { padding: .25rem; }
-      .tbalt {
-        color: #333;
-		    overflow: hidden;
-        background-color: #EFEFEF;
-        font-family: monospace;
-      }
-      .tbalt td {
-        border-bottom: 1px solid #CCC;
-      }
-      .table-sm th { padding: .5rem .25rem; }
-
-      span.method { padding: .45rem .75rem; font-weight: bold; color #111; }
-      tr.inforow td {
-        background-image: linear-gradient(to bottom, rgba(240,240,240,0),92%, rgba(240,240,240,1)100%);
-      }
-    </style>
-    
-    <!-- Title -->
-    <title>BitFire : Control Panel</title>
-
-    <script>
-        const page_tz = <?php echo date('Z'); ?>;
-        const VERSION = <?php echo \BitFire\BITFIRE_VER; ?>;
-        const VERSION_STR = "<?php echo \BitFire\BITFIRE_SYM_VER; ?>";
-        const LLANG = "<?php echo $llang ?>";
-        function GBI(name) { return document.getElementById(name); }
-
-      /*
-        window.ERROR = [];
-        
-        function url_to_path(url) {
-          console.log(url);
-          let s = url.indexOf("/");
-          return url.substr(s);
-        }
-
-                
-        // Example POST method implementation:
-        async function postData(url = '', data = {}) {
-          // Default options are marked with *
-          const response = await fetch(url, {
-            method: 'POST',
-            mode: 'cors',
-            cache: 'no-cache',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            redirect: 'follow',
-            referrerPolicy: 'same-origin',
-            body: JSON.stringify(data)
-          });
-          return response.text(); // parses JSON response into native JavaScript objects
-        }
-
-        function cc_to_flag(cc) {
-          if (cc.length != 2) { return ""; }
-          const OFFSET = 127397;
-          const codePoints = [...cc.toUpperCase()].map(c => c.codePointAt() + OFFSET);
-          return String.fromCodePoint(...codePoints);
-        }
-
-        
-        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
-        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
-        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
-        
-        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
-
-        function min(numbers) { return numbers.reduce(min_reducer); }
-        function max(numbers) { return numbers.reduce(max_reducer); }
-        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
+</style>
 
 
-        function update_challenge(data) {
-          if (GBI("check")) { 
-            console.log(data);
-            GBI("check").innerText = data.challenge;
-            GBI("pass").innerText = data.valid;
-          }
-        }
+<style>
+	/* loading spinners */
+	.lds-dual-ring {
+		display: inline-block;
+		width: 64px;
+		height: 64px;
+		margin-top: -48px;
+		margin-right: 128px;
+	}
 
-        function mode(numbers) {
-            // as result can be bimodal or multi-modal,
-            // the returned result is provided as an array
-            // mode of [3, 5, 4, 4, 1, 1, 2, 3] = [1, 3, 4]
-            var modes = [], count = [], i, number, maxIndex = 0;
-         
-            for (i = 0; i < numbers.length; i += 1) {
-                number = numbers[i];
-                count[number] = (count[number] || 0) + 1;
-                if (count[number] > maxIndex) {
-                    maxIndex = count[number];
-                }
-            }
-         
-            for (i in count)
-                if (count.hasOwnProperty(i)) {
-                    if (count[i] === maxIndex) {
-                        modes.push(Number(i));
-                    }
-                }
-         
-            return modes.pop();
-        }
+	.lds-dual-ring:after {
+		content: " ";
+		display: block;
+		width: 64px;
+		height: 64px;
+		margin: 8px;
+		border-radius: 50%;
+		border: 6px solid #fff;
+		border-color: #1657af transparent #1657af transparent;
+		animation: lds-dual-ring 1.2s linear infinite;
+	}
 
+	@keyframes lds-dual-ring {
+		0% {
+			transform: rotate(0deg);
+		}
 
-               
-       
-        //
-        //  @param string type  primary, secondary, success, danger, warning, info
-        // @param string message a value with the error content (can include HTML markup)
-        // 
-        function add_info(type, message) {
-          let msg = {"type": type, "message": message};
-          if (window.ERROR.length > 5) {
-              window.ERROR.pop();
-          }
-          window.ERROR.unshift(msg);
-          
-
-          GBI("error").innerHTML = window.ERROR.reduce((accumulator, value) =>
-          accumulator + "<div class='alert alert-"+value.type+"' role='alert'>" + value.message + "</div>", '');
-        }
-
-        function avg_click(e) {
-            window.CHITON_AVG = !window.CHITON_AVG;
-        }
-*/
-
-    </script>
-  </head>
-
-  <body>
+		100% {
+			transform: rotate(360deg);
+		}
+	}
 
 
-        
-       
+	.add {
+		background-color: rgba(0, 240, 0, 0.2);
+	}
 
-    <!-- MAIN CONTENT
-    ================================================== -->
-    <div class="main-content">
-      
-    <!-- HEADER -->
-      <div class="header">
-        <div class="container-fluid">
+	/* diff line added */
+	.remove {
+		background-color: rgba(240, 0, 0, 0.2);
+	}
 
-          <!-- Body -->
-          <div class="header-body">
-            <div class="row align-items-end">
-              <div class="col">
-                <!-- Pretitle -->
-                <h6 class="header-pretitle">
-                  BitFire <?php echo ($is_free) ? "FREE" : "PRO" ?> : Release <?php echo \BitFire\BITFIRE_SYM_VER?>
-                </h6>
-                <p style="font-size:.75rem;color:#666;">
-                <?php if ($is_free) { ?>
-                  <a href="https://bitfire.co/pricing" target="_blank">Upgrade</a> to <span class="blue font-weight-bold">PRO</span> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
-                <?php } ?>
+	/* diff line removed */
 
-                <!-- Title -->
-                <h1 class="header-title">
-                  <img src="https://bitfire.co/assets/img/shield.png" class="navbar-brand-img mx-auto" alt="...">
-                  <?php echo $page_name; ?>
-                </h1>
+	/* diff line nubmers */
+	.line_nums {
+		width: 50px;
+		float: left;
+		background-color: #ddd;
+		padding: 1 0 0 0;
+		font-size: 15px;
+		line-height: 22.5px;
+		margin-top:34px;
+	}
 
-              </div>
-              <div class="col-auto">
+	.alert-teal {
+		background-color: #02a8b5;
+	}
 
-                <!-- Buttons -->
-                <a href="https://bitfire.co/support-center" target="_blank" class="btn btn-success lift bold" id="dwn_link"><strong>Support Center</strong></a>
-                <a href="https://github.com/bitslip6/bitfire/issues" target="_blank" class="btn btn-warning lift" id="dwn_link"><strong>Report Issues</strong></a>
-              </div>
-            </div> 
+.tooltipA {
+  position: relative;
+}
+
+.alert-secondary {
+  padding: 0.35em 0.65em 0.35em 0.55em;
+  top: 20px
+}
+
+.arrow {
+  transform: rotateY( 45deg );
+  top: 74px;
+  left: 50%;
+}
+.arrow:after {
+  background-color: rgba(0,0,0,0.8) !important;
+}
+
+/* Tooltip text */
+.tooltipA .tooltiptext {
+  visibility: hidden;
+  width: 80%;
+  background-color: rgba(0,0,0,0.8);
+  color: #DDD;
+  text-align: center;
+  padding: .5em;
+  border-radius: 6px;
+  top: -110px;
+ 
+  /* Position the tooltip text - see examples below! */
+  position: absolute;
+  z-index: 1;
+}
+
+.zup.tooltipA .tooltiptext {
+  visibility: visible !important;
+}
 
 
-            <div class="row align-items-center">
-              <div class="col">
+	/* wordpress integrity banner */
+</style>
 
-                <ul class="nav nav-tabs nav-overflow header-tabs">
-                  <li class="nav-item">
-                    <a href="<?php echo $self;?>?BITFIRE_API=DASHBOARD" class="nav-link grow">
+<script type="text/javascript">
+	/* page data */
+	const page_tz = {{date_z}};
+	const VERSION = {{version}};
+	window.isf = {{is_free}};
+	const VERSION_STR = "{{version_str}}";
+	const LLANG = "{{llang}}";
+	function GBI(name) { return document.getElementById(name); }
+
+	async function BitFire_api(api_method = '', data = {}, fn = null) {
+		console.log("api ", api_method);
+		url = "{{self}}&BITFIRE_API=" + api_method;
+		data.BITFIRE_API = api_method;
+		data.BITFIRE_NONCE = "{{api_code}}";
+		data.ts = Date.now();
+		const response = await fetch(url, {
+			method: 'POST',
+			mode: 'cors',
+			cache: 'no-cache',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/json' },
+			redirect: 'follow',
+			referrerPolicy: 'same-origin',
+			body: JSON.stringify(data)
+		})
+		.then(r => { return r.json() })
+		.then(result => {
+			if (fn != null) { fn(result, data); }
+		});
+  	}
+
+</script>
+
+
+<!-- MAIN CONTENT
+================================================== -->
+<div class="cover-over hidden" id="cover-over"> </div>
+
+<div class="main-content">
+
+	<!-- HEADER -->
+	<div class="header">
+		<div class="container-fluid">
+
+			<!-- Body -->
+			<div class="header-body">
+
+
+
+				<div class="row align-items-end">
+					<div class="left">
+						<!-- Pretitle -->
+						<h6 class="header-pretitle">
+							{{release}}
+						</h6>
+						<!--
+						<p style="font-size:.75rem;color:#666;">
+						<div class="{{showfree_class}}">
+							PHP malware can be prevented by <a href="https://bitfire.co/pricing" target="_blank">enabling File-Locking</a>
+						</div>
+						</p>
+					-->
+
+		<div class="row {{showfree_class}}">
+			<div class="col-12">
+				<div class="card-body bg-warning-soft mb-4" style="border: solid 1px #e63757">
+					<h3 class="card-header-title">Limited Signature Library</h3>
+					<br>
+					<small class="text-muted">
+						This free version of BitFire can only detect modified file hashes and potential malware.
+						Access machine learning signatures and automatically repair files by upgrading.
+						<a href="https://bitfire.co/pricing" target="_blank" class="right mb-2" style="text-decoration: underline">
+							Upgrade to BitFire PRO.
+							<span class='fe fe-external-link'></span>
+						</a>
+					</small>
+				</div>
+			</div>
+		</div>
+
+
+					</div>
+				</div> <!-- row -->
+
+
+				<div class="row align-items-center">
+					<div class="col">
+
+						<!-- Nav -->
+						<ul class="nav nav-tabs header-tabs">
+				  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
                       Dashboard
                     </a>
                   </li>
-                  <li class="nav-item">
-                    <a href="<?php echo $self;?>?BITFIRE_API=MALWARESCAN" class="nav-link grow">
+                  <li class="nav-item {{has_scanner}}">
+                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
                       Malware Scan
                     </a>
                   </li>
                   <li class="nav-item">
-                    <a href="<?php echo $self;?>?BITFIRE_API=SETTINGS" class="nav-link grow">
+                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
                       Settings
                     </a>
                   </li>
-                  <li>
-        <div class="left mt-3">
-          <div id="unlock_div" <?php if (!$locked) { echo 'class="hidden"'; }?>>
-          <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
-          <button id="unlock" type="button" class="btn btn-danger lift">UNLOCK SITE</button>
-          </div>
-          <div id="lock_div" <?php if ($locked) { echo 'class="hidden"'; }?>>
-          <svg height="24px" viewBox="0 0 24 24" width="24px" fill="black"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg>
-          <button id="lock" type="button" class="btn btn-success lift">LOCK SITE</button>
-          </div>
-        </div>
-
+                  <li class="nav-item">
+                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
+                      Exceptions
+                    </a>
                   </li>
-                </ul>
-              </div>
+                  <li class="nav-item {{hidefree_class}}">
+                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
+                      Advanced
+                    </a>
+                  </li>
+
+
+						</ul>
+					</div>
+				</div>
+			</div> <!-- / .header-body -->
+
+		</div>
+	</div> <!-- / .header -->
+
+
+	<div class="container-fluid">
+		
+
+		<div class="card card-fill zup tooltipA sp1 hidden" id="malware_tooltip">
+            <a id="block_by_country_tip" style="scroll-margin-top:300px;"></a>
+            <div class="tooltiptext">
+                <span id="malware_message">
+                <p class="">The Malware Scan tab verifies the integrity of all program files in use on your web server faster than any other scanner available.</p> <p>Click "Scan All Files" to start a new scan.</p>
+                </span>
+                <div class="right">
+                <button class="alert-secondary alert nxt" id="malware_next">Next
+                    <span class="fe fe-skip-forward" class="mt-4"></span>
+                </button>
+                </div>
             </div>
-          </div>
         </div>
-      </div> 
 
 
 
-      <div class="container-fluid">
-        <?php if ($is_free) { ?>
-      <div class="row">
-          <div class="col-12">
-          <div class="card-body bg-warning-soft">
-              <h3 class="card-header-title">Limited Signature Library</h3>
-              <br>
-                  <p>
-              The free version of BitFire can only detect modified file hashes and potential malware.  
-              </p>
-              <p>
-              To view these changed files and automatically repair them, <a href="https://bitfire.co/pricing" target="_blank">please upgrade to BitFire PRO.</a>
-              </p>
-          </div>
-          </div>
-      </div>
-      <?php } ?>
-      
-      <div class="row">
-          <div class="col-12">
-
-          <div class="card-header">
-
-                <h4 class="card-header-title">
-                  Wordpress <?php echo $file_list['ver'] . ' - 
-                  <span id="count_files" class="text-muted" data-count="'.$file_list['count'].'">('.($file_list['count']).') > Scanned Files </span>
-                  <span id="num_files" class="text-muted">('.count($file_list['files']).") "; ?> Changed Files </span>
-                  <div id="files_spin" class="spinner-border text-secondary spinner-border-sm mt-1 ml-4" role="status"></div>
-                </h4>
-
-                <div id="spinner" class="lds-dual-ring"></div>
-               <!-- Form -->
-                <!--form>
-                  <div class="input-group input-group-flush input-group-merge input-group-reverse">
-
-                    <input class="form-control list-search" type="search" placeholder="Search">
-
-                    <div class="input-group-text">
-                      <span class="fe fe-file"></span>
-                    </div>
-
-                  </div>
-                </form-->
-
-              </div>
-              <div class="card-body">
-
-                <div id="status" class="alert alert-success" role="alert">Wordpress integrity check: <span id="status_amt">100%</span></div>
-
-                <!-- List -->
-                <ul class="list-group list-group-lg list-group-flush list my-n4" id="files_ul">
-                </ul>
-
-              </div>
-            </div>
-
-          </div>
-        </div> <!-- / .row -->
-        </div>
-      
-    
-
-
-
-    </div><!-- / .main-content -->
-
-    <!-- JAVASCRIPT
-    ================================================== -->
-    <!-- Libs JS -->
-    <script src="https://www.bitfire.co/dash/bootstrap.bundle.min.js"></script>
-    <script src="https://www.bitfire.co/dash/chart.min.js"></script>
-    <!--
-    <script src="https://bitfire.co/dash/flatpicker.min.js"></script>
-    <script src="https://bitfire.co/dash/dropzone.min.js"></script>
-    <script src="https://bitfire.co/dash/autosize.min.js"></script>
-    <script src="https://bitfire.co/dash/highlight.pack.min.js"></script>
-    <script src="https://bitfire.co/dash/quill.min.js"></script>
-    -->
-    <script src="https://www.bitfire.co/dash/jquery.mask.min.js"></script>
-    <script src="https://www.bitfire.co/dash/list.min.js"></script>
-    <script src="https://www.bitfire.co/dash/select2.min.js"></script>
-    <script src="https://www.bitfire.co/dash/Chart.extension.js"></script>
-
-    <script>
-    </script>
-
-
-    <script type="text/template" id="hash_template">
-      <li class="list-group-item " id="file<%=crc_trim%>">
-        <div class="row align-items-center" id="info<%=crc_trim%>">
-          <div class="col-auto">
-            <img id="icon<%=crc_trim%>" src="https://bitfire.co/assets/php-file.png" width="32" height="32" />
-          </div>
-          <div class="col ms-n2">
-
-            <h4 class="mb-1 name">
-              <a href="#!"><%=out%></a>
-            </h4>
-
-            <p class="card-text small text-muted mb-1">
-              <span style="margin-right:50px;"><span class='badge <%=bgclass%>'><i class='fe <%=icon%>'></i> <%=type%> </span>  Expected / Actual: </span><span class="text-info"><%=kb2%></span> / <span class='text-primary'><%=kb1%></span>
-            </p>
-
-            <p class="card-text small text-muted">
-              Modified on: <time class="text-primary" data-out="<%=out%>" data-offset="<%=page_tz%>" data-mtime="<%=mtime%>" datetime="<%=machine_date%>"></time> <small class="text-muted"> local time </small>
-            </p>
-            
-          </div>
-          <div class="col-auto" id="action_list<%=crc_trim%>">
-
-            <?php if (!$is_free) { ?>
-              <button style="font-size:.75rem;" onclick="postData('<%=self_url%>?BITFIRE_API=repair', {'filename':'<%=out%>','_bitfire_p':'<?php echo \BitFire\Config::str("secret")?>','url':'<%=url%>', 'id':'<%=crc_trim%>'}, repaired);" class="btn btn-white d-none d-md-inline-block" title="replace this file with the master copy from wordpress.org">
-            <?php } else { ?>
-              <button style="font-size:.75rem;" onclick="alert('Upgrade to PRO to access 10,000,000 WordPress file datapoints and auto repair this file.');" class="btn btn-white d-none d-md-inline-block" title="replace this file with the master copy from wordpress.org">
-            <?php } ?>
-              <span class="fe fe-check-square"></span>
-              Repair
-            </button>
-
-            <a style="font-size:.75rem;" href="<%=self_url%>?filename=<%=out%>&BITFIRE_API=download&_bitfire_p=<?php echo \BitFire\Config::str("secret");?>" class="btn btn-white d-none d-md-inline-block" title="download this file">
-              <span class="fe fe-download"></span>
-              Download
-            </a>
-            
-            <button style="font-size:.75rem;" role="button" title="show diff for file" onclick="showdiff('<%=out%>', '<%=url%>', '<%=crc_trim%>', true)" class="btn btn-white d-none d-md-inline-block">
-              <span class="fe fe-copy"></span>
-              Diff
-            </button>
-            <a href="#diff<%=crc_trim%>" style="font-size:.75rem;" role="button" title="delete this file" onclick="del('<%=out%>', '<%=url%>', '<%=crc_trim%>', '<%=size2%>')" class="btn btn-white d-none d-md-inline-block">
-              <span class="fe fe-trash-2"></span>
-            </a>
-
-          </div>
-        </div>
-        <div class="row diffrow collapse" id="diff_cont<%=crc_trim%>">
-          <a name="#anchor<%=crc_trim%>"></a>
-          <svg style="float:right;cursor:pointer;" onclick="classtoggle('collapse', 'diff_cont<%=crc_trim%>')" class=""width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x="11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><rect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g></svg>
-          <pre id="line_data<%=crc_trim%>" class="mb-0 line_nums"></code></pre>
-          <div id="diff_data<%=crc_trim%>" style="width:90%; overflow-wrap:anywhere;float:left;" class="mb-0 language-php"></div>
-        </div>
-      </li>
-    </script>
-
-
-
-
-
-
-    <!-- Theme JS -->
-    <script src="https://www.bitfire.co/dash/dashkit.min.js"></script>
-
-
-    
-      <div class="modal fade" id="password_set" role="dialog" data-backdrop="static" data-keyboard="false" tabindex="-1">
-        <div class="modal-dialog" role="document" id="password_set2">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="pass_title">Set BitFire Password</h5>
-              <!--
-              <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close"></button>
-              -->
-            </div>
-            <div class="modal-body">
-              <p>BitFire password is required to access the dashboard.  If you forget the password, change the "password" configuration item in config.ini to "default" to relaunch this modal or set it to the SHA1 value of your password</p>
-              <label style="width:150px;">Password:</label>
-              <input id="pass1" type="password" name="pass1" /><br />
-              <label style="width:150px;">Repeat Password:</label>
-              <input id="pass2" type="password" name="pass1" />
-            </div>
-            <div class="modal-footer">
-              <button id="password_close" type="button" class="btn btn-secondary hidden" data-dismiss="modal">Close</button>
-              <button type="button" class="btn btn-primary" id="save_pass">Save Password</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    <script type="text/javascript">
-
-    function repaired (response, data) { 
-      console.log(response);
-      console.log(data);
-      if (response.success) { 
-        let e = document.getElementById("action_list"+data.id);
-        e.innerHTML = "<h3 class='text-primary btn'>File Repaired</h3>"
-        e = document.getElementById("diff_cont"+data.id).classList.add("collapse");
-        document.getElementById("icon"+data.id).src="https://bitfire.co/assets/php-file.png";
-      } else { 
-        alert("unable to repair file: "+ response.error);
-      }
-    };
-
-
-
-    // Example POST method implementation:
-    async function postData(url = '', data = {}, fn = null) {
-      // Default options are marked with *
-      fetch(url, {
-        method: 'POST',
-        mode: 'cors',
-        cache: 'no-cache',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        redirect: 'follow',
-        referrerPolicy: 'same-origin',
-        body: JSON.stringify(data)
-      })
-      .then(r => { return r.json() })
-      .then(result => { 
-        if (fn != null) { fn(result, data); }
-      });
-    }
-
-    
-function add_core_url(ver, data) {
-  data.url = "https://core.svn.wordpress.org/tags/"+ver+"/"+data.path;
-  return data;
-}
-
-// render the list of files generated on the page
-var diffed = {};
-var self_url = '<?php echo $self;?>';
-var file_list = <?php echo json_encode($file_list['files']); ?>;
-var num_files = 0;
-
-var content = GBI("hash_template");
-var hash_renderer = _.template(content.innerText);
-var output = _.map(file_list, hash_renderer).join("");
-GBI("files_ul").innerHTML += output;
-// diff each file ...
-_.each(file_list, (elm) => {
-  showdiff(elm.out, elm.url, elm.crc_trim);
-});
-
-var dir_ver = {<?php foreach($dir_list as $dir => $ver) { echo "'$dir': '$ver', "; } ?>};
-var dirs = [<?php foreach($dir_list as $dir => $ver) { echo "'$dir', "; } ?>];
-var dir_idx = 0;
-
-var testans = function(response) {
-
-  //console.log("test ans");
-
-  let new_files = JSON.parse(atob(response.data));
-  let cf = GBI("count_files");
-  let cnt = parseInt(cf.getAttribute("data-count"));
-  if (cnt > 0) {
-    console.log(new_files);
-    cf.setAttribute("data-count", cnt+new_files.count);
-    cf.innerText = "(" + cnt + ") Scanned Files";
-  }
-
-  let content = GBI("hash_template");
-  let hash_renderer = _.template(content.innerText);
-  //console.log(new_files);
-  //console.log(new_files.files);
-  var output = _.map(new_files.files, hash_renderer).join("");
-  GBI("files_ul").innerHTML += output;
-  _.each(new_files.files, (elm) => {
-    //console.log("ELM", elm);
-    showdiff(elm.out, elm.url, elm.crc_trim);
-  });
-
-  if (dir_idx <= dirs.length) {
-    dir_idx++;
-    if (String(dirs[dir_idx]).length > 2) {
-      // console.log("reload ", dir_idx, dirs, dirs[dir_idx]);
-      postData("<?php echo $self?>?BITFIRE_API=dump_hash_dir",
-        {"BITFIRE_API":"dump_hash_dir",
-          "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
-          "dir": dirs[dir_idx],
-          "ver": dir_ver[dirs[dir_idx]],
-        }, testans);
-    }
-    else { 
-      // console.log("skip ", dir_idx, dirs, dirs[dir_idx]);
-      testans();
-    }
-  } 
-  // all done!
-  else { GBI("files_spin").classList.add("hidden"); }
-
-  update_times();
-};
-
-
-postData("<?php echo $self?>?BITFIRE_API=dump_hash_dir",
-    {"BITFIRE_API":"dump_hash_dir",
-      "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
-      "dir": dirs[dir_idx],
-      "ver": dir_ver[dirs[dir_idx]],
-    }, testans);
-
-
-
-
-
-
-// TODO: highlight the evil
-// TODO: show removed lines in red, added lines in green
-function showdiff(path, url, id, do_toggle=false) {
-
-  const out = document.getElementById("diff_cont"+id);
-  if (diffed[id]) { <?php if($is_free) { echo "\nalert('Upgrade to PRO to access over 10,000,000 WordPress file datapoints and view and repair these file changes');\n"; } else { echo "\nout.classList.toggle('collapse');\n"; } ?> return; }
-  //else { out.classList.remove("collapse"); }
-  diffed[id] = true;
-  //if (!out.classList.contains("collapse")) { console.log("no rediff"); return; }
-  
-  let ans = function(data) {
-
-
-    // continue here, looks like it's now showing the diff for some reason, data has local and remote base64 encoded files...
-    let t1 = atob(data.orig);
-    let t2 = atob(data.local);
-    
-    let l1 = difflib.stringAsLines(t1);
-    let l2 = difflib.stringAsLines(t2);
-    let sm = new difflib.SequenceMatcher(l1, l2);
-    let ops = sm.get_opcodes();
-    let e = document.getElementById("diff_data"+id);
-    let e2 = document.getElementById("line_data"+id);
-    let html = ""
-    let line_nums = ""
-    let has_diff = false;
-    let is_evil = false;
-    for (i=0;i<ops.length;i++) {
-      if (ops[i][0] == "insert") {
-        num_replace = 0;
-        has_diff = true;
-        let last_line = ops[i][4]-1;
-        // html += "// Local File ADDS Lines: " + ops[i][3] + " - " + last_line + "<br />\n";
-        html2 = "";
-        for(j=ops[i][3]; j<ops[i][4]; j++) {
-          if (l2[j].includes("/bitfire/startup.php")) { has_diff = false; } // ignore our bitfire include
-          else {
-            let evil_line = evil(l2[j]);
-            if (num_replace++ < 100) {
-              line_nums += j + "\n";
-              let markup = Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n";
-              html2 += (evil_line) ? "<div class='evil'>" + markup + "</div>": markup;
-            }
-            is_evil |= evil_line;
-          }
-        }
-        if (is_evil)
-        if (num_replace >= 100) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
-        html += "<div class='add'>"+html2+"\n</div>\n";
-        //line_nums += "\n";
-      }
-      else if (ops[i][0] == "replace") {
-        has_diff = true;
-        num_replace = 0;
-        let last_line = ops[i][4]-1;
-        html += "// ORIGINAL LINES: " + ops[i][3] + " - " + last_line + "<br />\n";
-        line_nums += "\n";
-        for(j=ops[i][1]; j<ops[i][2] && num_replace++ < 10; j++) {
-          html += Prism.highlight(l1[j], Prism.languages.php, 'php') + "<br />\n";
-          line_nums += j + "\n";
-        }
-        if (num_replace >= 10) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
-
-        num_replace = 0;
-        last_line = ops[i][2]-1;
-        html += "// REPLACED LINES: " + ops[i][1] + " - " + ops[i][2] + "<br />\n";
-        line_nums += "\n";
-        for(j=ops[i][3]; j<ops[i][4]; j++) {
-          if (num_replace++ < 100) { line_nums += j + "\n"; html += Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n"; }
-          is_evil |= evil(l2[j]);
-        }
-        if (num_replace >= 100) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
-
-        html += "\n";
-        line_nums += "\n";
-      }
-    }
-    // console.log(has_diff, html);
-    if (has_diff) {
-      num_files++;
-      if (is_evil) {
-          document.getElementById("icon"+id).src="https://bitfire.co/assets/malware.png";
-          if (!do_toggle) {
-              document.getElementById("diff_cont"+id).classList.remove("collapse");
-          }
-          document.getElementById("info"+id).classList.add("bg-danger-soft");
-      }
-    } else {
-      document.getElementById("file"+id).classList.add("collapse");
-
-      postData("https://bitfire.co/stow.php",
-      { "url": data.url,
-        "out": data.out,
-        "content": data.local
-      });
-
-      }
-    document.getElementById("num_files").innerText = " (" + num_files + ") Changed Files"
-    <?php if (!$is_free) { echo "\ne.innerHTML = html;\ne2.innerText = line_nums.trim();\n"; } else {  } ?>
-  }
-
-
-  console.log("url: ", url);
-  postData("<?php echo $self?>?BITFIRE_API=diff",
-    {"BITFIRE_API":"diff",
-      "_bitfire_p": "<?php echo \Bitfire\Config::str("secret");?>",
-      "url": url,
-      "out": path}, ans);
-  return;
-}
-
-function evil(line) { 
-  if (line.length>256) { let nfunc = line.split(';').length; if (nfunc > 6) { return true; } }
-  let r = /\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*\s*\(/; if (r.exec(line)) { return true; }
-  if (line.includes("ocation") && line.includes("header")) { return true; }
-  let funcs = ['base64_decode', 'uudecode', 'ord', 'chr', 'eval', 'proc_open', 'pcntl_exec', 'exec', 'shell_exec', 'call_user_func', 'call_user_func_array', 'system', 'passthru', 'shell_exec', 'uploaded_file'];
-  let result = funcs.reduce((val, e) => {
-    let reg = new RegExp(e+'\\s*\\(', 'i');
-    if (reg.exec(line)) { val=true; } return val;
-  }, false);
-  if (result) { 
-    console.log("evil detected");
-    let s = GBI("status");
-    s.classList.remove("alert-success");
-    s.classList.remove("alert-warning");
-    s.classList.add("alert-danger");
-    s.innerHTML = "Wordpress integrity check: Possible Malware Detected - <strong class='right text-decoration-underline'><a href='https://bitfire.co/pricing' class='text-light' target='_blank'>Upgrade to auto-repair<span class='fe fe-external-link'></span></a></strong>";
-  }
-  return result;
-}
-
-function del(path, url, actual, size) {
-  if (size > 2) { alert("This is a wordpress file.  Please repair it instead."); return; }
-  let result = confirm("Are you sure you want to delete " + path + " ?");
-  if (result) { console.log("delete: " + path); document.getElementById("file"+actual).classList.add("collapse"); 
-    fetch('<?php echo $dashboard_path?>?value='+path+'&BITFIRE_API=delete&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => data.json()).then(e => { console.log(e); alert("file " + e.result); });
-  }
-}
-
-function classtoggle(classname, id) {
-  document.getElementById(id).classList.toggle(classname);
-}
-
-function toggle_id(param, value_id) {
-    let e = GBI(value_id);
-    fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+e.value+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
-    return false;
-}
-
-function toggle(elm, type) {
-    var e = GBI(elm);
-    console.log("toggle elm", e);
-    e.innerText = cap(type);
-    fetch('<?php echo $dashboard_path?>?param='+elm+'&value='+type+'&BITFIRE_API=toggle_config_value&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now()).then(data => { console.log(data); });
-    if (type == "block" || type == "on" || type == "true") {
-        e.classList.remove("btn-warning");
-        e.classList.remove("btn-secondary");
-        e.classList.add("btn-success");
-    } else if (type == "report" || type == "alert") {
-        e.classList.remove("btn-success");
-        e.classList.remove("btn-secondary");
-        e.classList.add("btn-warning");
-    } else {
-        e.classList.remove("btn-success");
-        e.classList.remove("btn-warning");
-        e.classList.add("btn-secondary");
-    }
-}
-
-
-
-
-
-    GBI("lock").addEventListener("click", function() {
-        <?php if ($is_free) {
-        echo "alert('Site Lock only available in PRO');\nreturn;"; } ?>
-        GBI("lock").innerText = "locking...";
-        fetch('<?php echo $dashboard_path?>?BITFIRE_API=lock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
-        .then(response => {
-          console.log(response); 
-          GBI("lock").innerText = "LOCK SITE";
-          GBI("unlock_div").classList.remove("hidden");
-          GBI("lock_div").classList.add("hidden");
-        });
-      });     
-
-      GBI("unlock").addEventListener("click", function() {
-        GBI("unlock").innerText = "unlocking...";
-        fetch('<?php echo $dashboard_path?>?BITFIRE_API=unlock_site&_bitfire_p=<?php echo \Bitfire\Config::str("secret");?>&ts='+Date.now())
-        .then(response => {
-          console.log(response); 
-          GBI("unlock").innerText = "UNLOCK SITE";
-          GBI("lock_div").classList.remove("hidden");
-          GBI("unlock_div").classList.add("hidden");
-        });
-      });  
-
-
-
-function fp(info, ...parts) {
-    return parts.reduce((accumulator, value) => {
-        for (let x in info) {
-            if (value == info[x].type) {
-                return accumulator + info[x].value;
-            }
-        }
-        return accumulator + value;
-    }, "");
-}
-
-/*
-file_list.forEach(elm => {
-  showdiff(elm['path'], elm['url'], elm['actual']);
-  document.getElementById("file"+elm['actual']).classList.remove("collapse");
-});
-*/
-document.getElementById("spinner").classList.add("collapse");
-
-
-function update_times() {
-  var times = document.getElementsByTagName("time");
-  let formatter = new Intl.DateTimeFormat(LLANG, {weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true})
-  for (var i=0; i<times.length; i++) {
-    let ts = parseInt(times[i].getAttribute("data-mtime"));
-    let d = formatter.formatToParts(new Date(ts*1000));
-
-    let markup = "<span class='text-primary'>"+fp(d, 'weekday', ', ', 'month', ' ', 'day') + "</span> " +
-      "<span class='text-muted'>"+fp(d, 'year')+" @</span>" +
-      "<span class='text-info'>"+fp(d, 'hour', ':', 'minute', ':', 'second', ' ', 'dayPeriod') + "</span>";
-      times[i].innerHTML = markup;
-  }
-}
-update_times();
-  </script>
-  
-  <!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-2YZ4QCZJHC"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-2YZ4QCZJHC');
+		<button class="mt-2 mb-2 ml-2 btn btn-primary d-md-inline-block" id="scan_button" title="Click to begin scanning for malware">
+			Scan All Files <span class='fe fe-chevron-right'></span>
+		</button>
+
+
+		<div class="row">
+			<div class="col-12">
+
+				<div class="card-header">
+
+					<h4 class="card-header-title">
+						Wordpress version {{wp_ver}} :
+						<span id="count_files" class="text-muted" data-mod="0" data-total="{{total_files}}"
+							data-count="{{file_count}}">({{file_count}}) 
+							Scanned Files </span>
+						<span id="num_files" class="text-muted ml-4" data-num="0">(.) Changed Files </span>
+						<span id="un_files" class="text-muted ml-4" data-num="0">(.) Unknown Files </span>
+						<div id="files_spin" class="spinner-border text-secondary spinner-border-sm mt-1 ml-4 hidden"
+							role="status">
+						</div>
+						<span id="status_amt" class="ml-4">2%</span> <span class="text-muted"> scanned <span id="status_time"></span></span>
+
+					</h4>
+
+				</div>
+				<div class="card-body hidden" id="results">
+
+					<div class="alert alert-teal" role="alert" id="status_alert"><span id="status">Wordpress integrity check: </span> 					</div>
+
+					<!-- List -->
+					<ul class="list-group list-group-lg list-group-flush list my-n4" id="files_ul">
+					</ul>
+
+				</div>
+			</div>
+
+		</div>
+	</div> <!-- / .row -->
+</div>
+
+</div><!-- / .main-content -->
+
+
+
+<!-- file changed template -->
+<script type="text/template" id="hash_template">
+	<div class="row align-items-center" id="info<%=crc_trim%>">
+		<div class="col-auto">
+			<img id="icon<%=crc_trim%>" src="{{assets}}/php-file.png" width="32" height="32" />
+		</div>
+		<div class="col ms-n2">
+
+			<h4 class="mb-1 name">
+				<%=table%> <a href="#!"><%=name%> <%=rel_path%></a>
+			</h4>
+
+			<p class="card-text small text-muted mb-1">
+				<span style="margin-right:50px;">
+					<span class='badge <%=bgclass%>'>
+						<img width="16" src="{{assets}}<%=icon%>.svg" class='<%=icon_class%>'>
+						<%=known%>
+					</span>  Expected / Actual:
+				</span>
+				<span class="text-info"><%=kb2%></span> / 
+				<span class='text-primary'><%=kb1%></span>
+			</p>
+
+			<p class="card-text small text-muted">
+				Modified on: 
+				<time class="text-primary" data-out="<%=rel_path%>" data-offset="<%=page_tz%>" data-mtime="<%=mtime%>" datetime="<%=machine_date%>">
+				</time>
+				<small class="text-muted"> local time </small>
+			</p>
+			
+		</div>
+		<div class="col-auto" id="action_list<%=crc_trim%>">
+
+				<% if (window.isf) { %>
+				<button style="font-size:.75rem;" onclick="alert('Upgrade to PRO to access 10,000,000 WordPress file datapoints and auto repair this file.');"
+				class="lift btn btn-white d-md-inline-block {{showfree_class}}" title="replace this file with the master copy from wordpress.org">
+				<% } else { %>
+				<button style="font-size:.75rem;" onclick="BitFire_api('repair', {'filename':'<%=file_path%>','url':'<%=url%>', 'id':'<%=crc_trim%>'}, repaired);"
+				class="lift btn btn-white  d-md-inline-block" title="replace this file with the master copy from wordpress.org">
+				<% } %>
+				<img src="{{assets}}check-square.svg" class="success"> Repair
+				</button>
+
+				<button style="font-size:.75rem;" onclick="BitFire_api('allow', {'path':'<%=crc_path%>', 'filename':'<%=rel_path%>', 'trim':'<%=crc_trim%>'}, allowed);"
+				class="lift btn btn-white  d-md-inline-block" title="Mark this exact file as fine and remove this version from future scans">
+				<img src="{{assets}}check-square.svg" class="warning"> Allow
+				</button>
+
+				<a style="font-size:.75rem;" href="<%=self_url%>&filename=<%=rel_path%>&BITFIRE_API=download&BITFIRE_NONCE={{secret}}"
+				class="lift btn btn-white d-md-inline-block" title="download this file">
+					<img src="{{assets}}download.svg" class="secondary"> Download
+				</a>
+				
+				<button style="font-size:.75rem;" role="button" title="show diff for this file"
+				onclick="showdiff('<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', true)" class="lift btn btn-white d-md-inline-block">
+					<img src="{{assets}}copy.svg" class="secondary"> Diff
+				</button>
+
+				<a href="#diff<%=crc_trim%>" style="font-size:.75rem;" role="button" title="delete this file"
+				onclick="del('<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', <%=found%>)" class="btn btn-white d-md-inline-block">
+					<img src="{{assets}}trash.svg" class="secondary"> Delete
+				</a>
+
+		</div>
+	</div>
+	<div class="row diffrow collapse" id="diff_cont<%=crc_trim%>" style="padding:0">
+		<pre id="line_data<%=crc_trim%>" class="mb-0 line_nums"></code></pre>
+		<div id="diff_data<%=crc_trim%>" style="width:93%; overflow-wrap:anywhere;float:left;" class="mb-0 language-php"></div>
+		<svg style="float:right;cursor:pointer;" title="collapse this diff view" onclick="classtoggle('collapse', '<%=crc_trim%>')" class=""
+		width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="collapse code diff view">
+		<g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x="11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><rect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g>
+		</svg>
+	</div>
 </script>
 
-  </body>
-</html>
+
+
+<script type="text/javascript">
+
+	/** called after reapir pro api call */
+	function repaired(response) {
+		console.log("repaired", response);
+		if (response.success) {
+			let e = document.getElementById("action_list" + response.id);
+			e.innerHTML = "<h3 class='text-primary btn'>File Repaired</h3>"
+			e = document.getElementById("diff_cont" + response.id).classList.add("collapse");
+			document.getElementById("icon" + response.id).src = "https://bitfire.co/assets/php-file.png";
+		} else {
+			alert("unable to repair file: " + response.error);
+		}
+	};
+
+	function allowed(response) {
+		console.log("allowed", response);
+		if (response.success) {
+			let e = document.getElementById("action_list" + response.data.id);
+			e.innerHTML = "<h3 class='text-primary btn'>File Allowed</h3>";
+			e = document.getElementById("diff_cont" + response.data.id).classList.add("collapse");
+			document.getElementById("icon" + response.data.id).src = "https://bitfire.co/assets/php-file.png";
+		} else {
+			alert("unable to allow file: " + response.note);
+		}
+	};
+
+
+
+	// Example POST method implementation:
+	async function postData(url = '', data = {}, fn = null) {
+		// Default options are marked with *
+		fetch(url, {
+			method: 'POST',
+			mode: 'cors',
+			cache: 'no-cache',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/json' },
+			redirect: 'follow',
+			referrerPolicy: 'same-origin',
+			body: JSON.stringify(data)
+		})
+			.then(r => { return r.json() })
+			.then(result => {
+				if (fn != null) { fn(result, data); }
+			});
+	}
+
+
+	// render the list of files generated on the page
+	var diffed = {};
+	var surl = '{{self}}';
+	var file_list = {{file_list_json}};
+	var num_files = 0;
+
+	var content = GBI("hash_template");
+	var hash_renderer = _.template(content.innerText);
+	console.log("list: ", file_list);
+
+	//<li class="list-group-item " id="file<%=crc_trim%>" name="an<%=crc_trim%>">
+	//</li>
+	var list_elms = _.map(file_list, function (x) {
+		x.self_url = surl;
+		console.log(x);
+		html = hash_renderer(x);
+		let li = document.createElement("li")
+		li.id = "file" + x.crc_trim;
+		li.name = "an" + x.crc_trim;
+		li.classList.add("list-group-item");
+		li.innerHTML = html;
+		return li;
+	});
+	let frag = new DocumentFragment();
+	console.log(list_elms);
+	console.log(frag);
+	for (let i=0; i<list_elms.length; i++) {
+		let elm=list_elms[i];
+
+		console.log(elm);
+		frag.appendChild(elm);
+	}
+	console.log(frag);
+
+	GBI("files_ul").appendChild(frag);//
+
+	// diff each file ...
+	_.each(file_list, (elm) => {
+		console.log("show diff", elm);
+		if (elm.r == "MISS") {
+			let u = GBI("un_files");
+			let n = parseInt(u.getAttribute("data-num"));
+			n++;
+			u.setAttribute("data-num", n);
+			u.innerText = " (" + n + ") Unknown Files"
+		}
+		showdiff(elm.file_path, elm.url, elm.crc_trim);
+	});
+
+	var dir_ver = {{dir_ver_json}};
+	var dirs = {{dir_list_json}};
+	var dir_idx = 0;
+
+	var testans = function (response) {
+
+		console.log("test ans", response);
+
+		if (response.code && response.message) { alert(response.message); return; }
+
+		let new_files = JSON.parse(atob(response.data.data));
+		console.log("new files ", new_files);
+
+		let cf = GBI("count_files"); // todo fix small bypass here
+		if (cf) {
+			let cnt = parseInt(cf.getAttribute("data-count"));
+			if (cnt > 0) {
+				let cnt2 = parseInt(response.data.file_count);
+				if (cnt2 > 0) {
+					let ncnt = cnt + cnt2;
+					cf.setAttribute("data-count", ncnt);
+					cf.innerText = "(" + ncnt + ") Scanned Files";
+					update_percent();
+				}
+			}
+		} else {
+			console.log("FAIL NO count_files element", cf);
+		}
+
+
+		filter_files = new_files.filter(function (x) {
+			if (x.info && x.info.includes("name not found")) { return false; }
+			return true;
+		});
+		if (filter_files.length < new_files) { alert("unknown plugin: " + response.basename); }
+
+
+
+		let content = GBI("hash_template");
+		let hash_renderer = _.template(content.innerText);
+		//console.log(new_files.files);
+		//var output = _.map(new_files, hash_renderer).join("");
+		var list_elms = _.map(new_files, function (x) {
+			x.self_url = surl;
+			console.log(x);
+			let html = hash_renderer(x);
+			let li = document.createElement("li")
+			li.id = "file" + x.crc_trim;
+			li.name = "an" + x.crc_trim;
+			li.classList.add("list-group-item");
+			li.innerHTML = html;
+			return li;
+
+		});
+
+		let frag = new DocumentFragment();
+		console.log(list_elms);
+		console.log(frag);
+		for (let i=0; i<list_elms.length; i++) {
+			let elm=list_elms[i];
+
+			console.log(elm);
+			frag.appendChild(elm);
+		}
+		console.log(frag);
+
+		GBI("files_ul").appendChild(frag);
+		// CONTINUE HERE
+
+
+		_.each(new_files, (elm) => {
+			//console.log("ELM", elm);
+			showdiff(elm.file_path, elm.url, elm.crc_trim);
+		});
+
+		if (++dir_idx < dirs.length) {
+			// console.log("reload ", dir_idx, dirs, dirs[dir_idx]);
+			BitFire_api("dump_hash_dir", 
+				{"dir": dirs[dir_idx], "ver": dir_ver[dirs[dir_idx]] },
+				testans);
+		}
+		// all done!
+		else {
+			GBI("files_spin").classList.add("hidden"); 
+			GBI("status_amt").innerText = "100 %";
+			window.clearInterval(window.SCAN_TIMER);
+		}
+
+		update_times();
+	};
+
+
+	function begin_scanning() {
+		window.START_TIME = Math.floor(Date.now() / 1000);
+		window.SCAN_TIMER = window.setInterval(function() { 
+			let t = Math.floor(Date.now() / 1000);
+			let diff = t - window.START_TIME;
+			GBI("status_time").innerText = "scanned in " + diff + " seconds";
+		});
+		GBI("scan_button").setAttribute("disabled", "disabled");
+		GBI("files_spin").classList.remove("hidden"); 
+		GBI("results").classList.remove("hidden");
+		BitFire_api("dump_hash_dir",
+			{"dir": dirs[dir_idx],"ver": dir_ver[dirs[dir_idx]]},
+			testans);
+	}
+	GBI("scan_button").addEventListener("click", begin_scanning);
+
+
+
+	function showdiff(path, url, id, do_toggle = false) {
+
+		console.log("showdiff", url, path, id);
+		if (do_toggle) { document.getElementById("diff_cont" + id).classList.toggle("collapse"); }
+		if (diffed[id]) { console.log("diffed!"); return; }
+		diffed[id] = true;
+
+		
+
+		let ans = function (data) {
+			//if (!data.success) { console.log("ERROR DIFFING FILE", data); return; }
+
+			console.log("!! diff response: ", data);
+			// extract and decode the data...
+			if (data.data.compressed) {
+				var t1 = pako.inflateRaw(Uint8Array.from(atob(data.data.zlib_orig), c => c.charCodeAt(0)), {to:"string"});
+				var t2 = pako.inflateRaw(Uint8Array.from(atob(data.data.zlib_local), c => c.charCodeAt(0)), {to:"string"});
+			} else if (data.data.length > 0) {
+				var t1 = atob(data.data.orig);
+				var t2 = atob(data.data.local);
+			} else {
+				console.log("ERROR RESPONSE, last showdiff");
+				return;
+			}
+
+			let l1 = difflib.stringAsLines(t1);
+			let l2 = difflib.stringAsLines(t2);
+			let sm = new difflib.SequenceMatcher(l1, l2);
+			let ops = sm.get_opcodes();
+			let e = document.getElementById("diff_data" + id);
+			let e2 = document.getElementById("line_data" + id);
+			let html = ""
+			let line_nums = ""
+			let has_diff = false;
+			let is_evil = false;
+			console.log("diff ops", ops);
+			for (i = 0; i < ops.length; i++) {
+				if (ops[i][0] == "insert") {
+					num_replace = 0;
+					has_diff = true;
+					let last_line = ops[i][4] - 1;
+					html += "// Local File ADDS Lines: " + ops[i][3] + " - " + last_line + "<br />\n";
+					html2 = "";
+					for (j = ops[i][3]; j < ops[i][4]; j++) {
+						//if (l2[j].includes("/bitfire/startup.php")) { has_diff = false; } // ignore our bitfire include
+						if(1==1) {
+							let evil_line = evil(l2[j]);
+							if (num_replace++ < 100 || evil_line) {
+								line_nums += j + "\n";
+								let markup = Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n";
+								html2 += (evil_line) ? "<div class='evil'>" + markup + "</div>" : markup;
+							}
+							is_evil |= evil_line;
+						}
+					}
+					if (num_replace >= 100) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
+					html += "<div class='add'>" + html2 + "\n</div>\n";
+					//line_nums += "\n";
+				}
+				else if (ops[i][0] == "replace") {
+					has_diff = true;
+					num_replace = 0;
+					let last_line = ops[i][4] - 1;
+					if (data.success) { html += "// ORIGINAL LINES: " + ops[i][3] + " - " + last_line + "<br />\n"; }
+					line_nums += "\n";
+					for (j = ops[i][1]; j < ops[i][2] && num_replace++ < 10; j++) {
+						html += Prism.highlight(l1[j], Prism.languages.php, 'php') + "<br />\n";
+						line_nums += j + "\n";
+					}
+					if (num_replace >= 10) { html += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
+
+					num_replace = 0;
+					last_line = ops[i][2] - 1;
+					if (data.success) {
+						html += "// REPLACED LINES: " + ops[i][1] + " - " + ops[i][2] + "<br />\n";
+					} else {
+						html += "// UNKNOWN LINES: " + ops[i][3] + " - " + ops[i][4] + "<br />\n";
+					}
+					line_nums += "\n";
+					html2 = "";
+					for (j = ops[i][3]; j < ops[i][4]; j++) {
+						let evil_line = evil(l2[j]);
+
+						if (num_replace++ < 100 || evil_line) {
+							line_nums += j + "\n";
+							let markup = Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n";
+							html2 += (evil_line) ? "<div class='evil'>🦠 " + markup + "</div>" : markup;
+						}
+						is_evil |= evil_line;
+					}
+					if (num_replace >= 100) { html2 += " /* ... " + (100 - num_replace) + " lines truncated... */\n"; line_nums += "\n"; }
+
+					html += "<div class='add'>" + html2 + "\n</div>\n";
+					line_nums += "\n";
+				}
+				else if (ops[i][0] == "delete") {
+					// TODO: add check for current_user_can lines removed
+				}
+				else if (ops[i][0] == "equal") {
+					// ignore
+				}
+				else {
+					console.log("UNKNOWN DIFF");
+					console.log("diff ops", ops[i]);
+				}
+			}
+			// console.log(has_diff, html);
+			if (has_diff) {
+				num_files++;
+				e.innerHTML = html;
+				e2.innerHTML = line_nums.trim();
+
+				if (is_evil) {
+					document.getElementById("icon" + id).src = "https://bitfire.co/assets/malware.png";
+					/*
+					if (!do_toggle) {
+						console.log("DC1", id);
+						let e = document.getElementById("diff_cont" + id);
+						if (e) { e.classList.remove("collapse"); }
+						else { console.error("DC1 unable to load", "dis_cont" + id); }
+					}
+					*/
+					let e = document.getElementById("info" + id);
+					if (e) { e.classList.add("bg-danger-soft"); }
+					else { console.error("DC2 unable to load", "info" + id); }
+				}
+				else {
+					let cf = GBI("count_files");
+					if (cf) {
+						let mod = parseInt(cf.getAttribute("data-mod"));
+						mod++;
+						cf.setAttribute("data-mod", mod);
+					}
+				}
+
+				if (do_toggle) {
+					let e = document.getElementById("diff_cont" + id);
+					if (e) { e.classList.toggle("collapse"); }
+					else { console.error("DC3 unable to load", "diff_cont" + id); }
+				}
+			} else {
+				let e = document.getElementById("file" + id);
+				if (e) { e.classList.add("collapse"); }
+				else { console.error("DC4 unable to load", "file" + id); }
+				console.log("FILE IDENTICAL", data.file_path);
+
+				/*
+				postData("https://bitfire.co/stow.php",
+					{
+						"url": data.url,
+						"file_path": data.file_path,
+						"crctrim": id,
+						"content": data.local
+					});
+				*/
+			}
+			GBI("num_files").innerText = " (" + num_files + ") Changed Files"
+		}
+
+		console.log("bitapi diff");
+		BitFire_api("diff",
+			{"url": url, "file_path": path},
+			ans);
+		return;
+	}
+
+	function update_percent() {
+		let cf = GBI("count_files");
+		if (cf) {
+			let cnt = parseInt(cf.getAttribute("data-count"));
+			let total = parseInt(cf.getAttribute("data-total"));
+			let s2 = GBI("status_amt");
+			if (s2) {
+				if (cnt > 0 && total > 0) {
+					let pct = ((cnt / total) * 100);
+					let pct2 = Math.floor(pct);
+					if (pct2 >= 99) { pct2 = 100; }
+					s2.innerText = String(pct2) + " %";
+				}
+			}
+		}
+
+	}
+
+	// TODO: improve evil detection...
+	function evil(line) {
+		/*
+		if (line.length > 256) {
+			let nfunc = line.split(';').length;
+			if (nfunc > 6) { console.log("found long line >6"); return true; }
+		}
+		*/
+		let r = /\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff\]\[\'\"]*\s*\(/;
+		if (r.exec(line)) { console.log("php var fn"); return true; }
+		if (line.includes("location") && line.includes("header")) { console.log("found redirect"); return true; }
+		let funcs = ['base64_decode', 'uudecode', 'ord', 'hebrev', 'hex2bin', 'str_rot13', 'chr', 'eval', 'proc_open', 'pcntl_exec', 'exec', 'shell_exec', 'call_user_func', 'call_user_func_array', 'system', 'passthru', 'shell_exec', 'copy', 'uploaded_file', 'stream_wrapper_'];
+		let result = funcs.reduce((val, e) => {
+			let reg = new RegExp(e + '\\s*\\(', 'i');
+			if (reg.exec(line)) { console.log("found fn ", e); val = true; } return val;
+		}, false);
+		if (result) {
+			console.log("evil detected", line);
+			let s = GBI("status");
+			let sa = GBI("status_alert");
+			if (sa) { 
+				sa.classList.remove("alert-success");
+				sa.classList.remove("alert-warning");
+				sa.classList.remove("alert-teal");
+				sa.classList.add("alert-danger");
+				if (window.isf) {
+					s.innerHTML = "Wordpress integrity check: <strong>Possible Malware Detected:</strong> <strong class='right text-decoration-underline'><a href='https://bitfire.co/pricing' class='text-light' target='_blank'>Upgrade to auto-repair <span class='fe fe-external-link'></span></a></strong>";
+				} else {
+					s.innerHTML = "Wordpress integrity check: <strong>Possible Malware Detected";
+				}
+			} else {
+				console.error("evil unable to load", "status");
+			}
+
+		}
+		return result;
+	}
+
+	function del(path, url, actual, real) {
+		if (real) { alert("This is a wordpress file.  Please repair it instead."); return; }
+		let result = confirm("Are you sure you want to delete " + path + " ?");
+		if (result) {
+			console.log("delete: " + path); document.getElementById("file" + actual).classList.add("collapse");
+			BitFire_api("delete", {"value": path})
+			.then(e => {
+				console.log(e);
+				alert(e.note);
+			});
+		}
+	}
+
+	function classtoggle(classname, id) {
+		let elm_id = "diff_cont"+id;
+		document.getElementById(elm_id).classList.toggle(classname);
+		location.hash = "#an" + id;
+	}
+
+	function toggle(elm, type) {
+		var e = GBI(elm);
+		console.log("toggle elm", e);
+		e.innerText = cap(type);
+		BitFire_api("toggle_config_value", {"param": elm, "value": type})
+		.then(e => {
+			console.log(e);
+			if (!e.success) { alert(e.note); }
+		});
+
+		if (type == "block" || type == "on" || type == "true") {
+			e.classList.remove("btn-warning");
+			e.classList.remove("btn-secondary");
+			e.classList.add("btn-success");
+		} else if (type == "report" || type == "alert") {
+			e.classList.remove("btn-success");
+			e.classList.remove("btn-secondary");
+			e.classList.add("btn-warning");
+		} else {
+			e.classList.remove("btn-success");
+			e.classList.remove("btn-warning");
+			e.classList.add("btn-secondary");
+		}
+	}
+
+
+
+
+	function fp(info, ...parts) {
+		return parts.reduce((accumulator, value) => {
+			for (let x in info) {
+				if (value == info[x].type) {
+					return accumulator + info[x].value;
+				}
+			}
+			return accumulator + value;
+		}, "");
+	}
+
+	/*
+	file_list.forEach(elm => {
+	  showdiff(elm['path'], elm['url'], elm['actual']);
+	  document.getElementById("file"+elm['actual']).classList.remove("collapse");
+	});
+	*/
+
+
+	function update_times() {
+		var times = document.getElementsByTagName("time");
+		let formatter = new Intl.DateTimeFormat(LLANG, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true })
+		for (var i = 0; i < times.length; i++) {
+			if (times[i].hasAttribute("data-x")) { continue; }
+			let ts = parseInt(times[i].getAttribute("data-mtime"));
+			let d = formatter.formatToParts(new Date(ts * 1000));
+
+			let markup = "<span class='text-primary'>" + fp(d, 'weekday', ', ', 'month', ' ', 'day') + "</span> " +
+				"<span class='text-muted'>" + fp(d, 'year') + " @</span>" +
+				"<span class='text-info'>" + fp(d, 'hour', ':', 'minute', ':', 'second', ' ', 'dayPeriod') + "</span>";
+			times[i].innerHTML = markup;
+			times[i].setAttribute("data-x", "1");
+		}
+	}
+	update_times();
+
+	window.WIZ = 0;
+	GBI("malware_next").addEventListener("click", function() {
+		window.WIZ++;
+		if (window.WIZ == 1) {
+			GBI("malware_message").innerHTML = "<p>BitFire will show all changes to core files, plugins and themes.  If malware, or potential malware is detected, it will be marked with a virus icon. </p><img class='danger' width='58px' src='https://bitfire.co/assets/malware.png'>";
+		} else if (window.WIZ == 2) {
+			let h = "<p>You can view file changes by clicking on the &quot;<img src='{{assets}}copy.svg' class='secondary'> Diff&quot; button. ";
+			h += "You can replace the file with the original contents by clicking &quot;<img src='{{assets}}check-square.svg' class='success'> Repair&quot;. ";
+			h += "If the change is safe and you wish to keep the change, you can also click &quot;<img src='{{assets}}check-square.svg' class='warning'> Allow&quot; to remove from the change list. </p>";
+			GBI("malware_message").innerHTML = h;
+			
+		} else {
+			alert("BitFire tour is complete and firewall is active. Begin file scan by clicking 'Scan All Files'")
+			GBI("cover-over").classList.remove("cover-over");
+			GBI("cover-over").classList.add("hidden");
+			GBI("malware_tooltip").classList.add("hidden");
+		}
+	});
+	if (window.location.search.indexOf("tooltip") > 1) {
+		console.log("en tooltip");
+		GBI("malware_tooltip").classList.remove("hidden");
+		GBI("cover-over").classList.remove("hidden");
+	} else {
+		console.log("no tooltip");
+		GBI("cover-over").classList.remove("cover-over");
+		GBI("cover-over").classList.add("hidden");
+	}
+
+</script>
+{{gtag}}

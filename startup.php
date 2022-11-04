@@ -22,13 +22,14 @@ const DS = DIRECTORY_SEPARATOR;
 if (!defined("BitFire\WAF_ROOT")) {
     define("BitFire\WAF_ROOT", realpath(__DIR__) . DS); 
     define("BitFire\WAF_INI", \BitFire\WAF_ROOT . "config.ini");
-    define("BitFire\BLOCKDIR", \BitFire\WAF_ROOT . "blocks");
-    define("BitFire\WAF_SRC", \BitFire\WAF_ROOT . "src/"); 
+    define("BitFire\BLOCK_DIR", \BitFire\WAF_ROOT . "blocks");
+    define("BitFire\WAF_SRC", \BitFire\WAF_ROOT . "src" . DS); 
+    define("BitFire\TYPE", "__TYPE__");
 }
 
 include \BitFire\WAF_SRC."bitfire.php";
 
-function onerr($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
+function on_err($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
     $data = array("errno" => $errno, "errstr" => $errstr, "errfile" => $errfile, "errline" => $errline);
     $known = un_json(file_get_contents(\BitFire\WAF_ROOT."cache/errors.json"));
     $have_err = false;
@@ -38,22 +39,25 @@ function onerr($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
                 $err['errfile'] == $data['errfile']) { $have_err = true; }
     } 
     if (!$have_err) { 
+        $data['debug'] = debug(null);
+        $data['trace'] = trace(null);
         $known[] = $data;
         file_put_contents(\BitFire\WAF_ROOT."cache/errors.json", en_json($known, JSON_PRETTY_PRINT));
         $data['bt'] = debug_backtrace(0, 3);
         if (CFG::enabled('send_errors')) { httpp(APP."err.php", base64_encode(json_encode($data))); }
     }
+
     return false;
 }
 
 // capture any bitfire errors
-$error_handler = set_error_handler("\BitFire\onerr");
+$error_handler = set_error_handler("\BitFire\on_err");
 // capture any bitfire fatal errors
 register_shutdown_function(function() {
     $e = error_get_last();
     // if last error was from bitfire, log it
-    if (is_array($e) && $e['type']??-1 == E_ERROR && strstr($e['file']??"", "bitfire") !== false) {
-        onerr(1, $e['message'], $e['file'], $e["line"]);
+    if (is_array($e) && $e['type']??-1 == E_ERROR && stripos($e['file']??"", "bitfire") > 0) {
+        on_err(1, $e['message'], "({$e['file']})", $e["line"]);
         exit();
 }});
 
@@ -66,11 +70,21 @@ try {
     // handle IP level blocks, requires single stat call for test
     if (CFG::enabled("allow_ip_block")) {
         $ip = filter_input(INPUT_SERVER, CFG::str_up("ip_header", "REMOTE_ADDR"), FILTER_VALIDATE_IP);
-        if ($ip != "127.0.0.1" && $ip != "::1") {
-            $blockfile = \BitFire\BLOCKDIR . DS . $ip;
-            if (file_exists($blockfile) && filemtime($blockfile) > time()) { 
-                $block = array("blocked IP address");
-                exit(include \BitFire\WAF_ROOT."views/block.php");
+        $myself = filter_input(INPUT_SERVER, "SERVER_ADDR", FILTER_VALIDATE_IP);
+        if ($ip != "" && $ip != $myself) {
+            $block_file = \BitFire\BLOCK_DIR . DS . $ip;
+            if (file_exists($block_file)) {
+                // ip is still blocked
+                if (filemtime($block_file) > time()) { 
+                    $block = array("blocked IP address");
+                    header("");
+                    exit(include \BitFire\WAF_ROOT."views/block.php");
+                }
+                // ip block has expired
+                else {
+                    // whitelisted ips are never blocked
+                    if (file_get_contents($block_file) != "allow") { unlink($block_file); }
+                }
             }
         }
     }
@@ -78,7 +92,7 @@ try {
     // enable/disable assertions via debug setting
     $active = (CFG::enabled("debug_header") || CFG::enabled("debug_file")) ? 1 : 0;
     $zend_assert = 99;
-    if ($active) {
+    if (defined("BitFire\ASSERT")) {
         $zend_assert = assert_options(ASSERT_ACTIVE);
         @assert_options(ASSERT_ACTIVE, $active);
         @ini_set("zend.assertions", $active);
@@ -100,20 +114,31 @@ try {
             register_shutdown_function('\BitFire\post_request', $bitfire->_request, $block, $ip_data);
             \BitFire\block_ip($block, $bitfire->_request)->run();
             return $block;
-        })->then(function(\BitFire\Block $block) {
+        })->then(function(\BitFire\Block $block) use ($bitfire) {
             if ($block->code > 0) {
+                if ($bitfire->bot_filter->browser->valid > 1 && CFG::enabled("dynamic-exceptions")) {
+                    if (time() < CFG::int("dynamic-exceptions")) {
+                        // use the API to add a dynamic exception
+                        $r = new \BitFire\Request();
+                        $r->post = array("path" => $bitfire->_request->path, "code" => $block->code, "param" => $block->parameter);
+                        require_once \BitFire\WAF_SRC."api.php";
+                        \BitFire\add_api_exception($r)->hide_output()->run();
+                        return;
+                    }
+                }
                 debug("block 3");
+                debug(trace(null));
                 exit(include \BitFire\WAF_ROOT."views/block.php");
             }
         });
 }
 catch (\Exception $e) {
-    \BitFire\onerr($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
+    \BitFire\on_err($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
 }
 
 $m1 = microtime(true);
 debug("bitfire [%dms] [%s]", round((($m1-$start_time)*1000),4), trace());//, utc_date("m/d @H.i.s"));
-//file_put_contents("/tmp/xhprf.json", json_encode(xhprof_disable(), JSON_PRETTY_PRINT));
+//file_put_contents("/tmp/xhr_profile.json", json_encode(xhprof_disable(), JSON_PRETTY_PRINT));
 //output_profile(\xhprof_disable());
 //$data = \xhprof_disable();
 //$data = array_filter(\xhprof_disable(), function($elm) { return ($elm['wt'] > 100 || $elm['cpu'] > 100); }); 

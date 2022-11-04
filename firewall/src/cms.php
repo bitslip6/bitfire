@@ -1,4 +1,14 @@
 <?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ * 
+ * all functions are called via api_call() from bitfire.php and all authentication 
+ * is done there before calling any of these methods.
+ */
+
 namespace BitFire;
 
 use ThreadFin\CacheItem;
@@ -12,6 +22,7 @@ use const BitFire\APP;
 use const BitFire\FILE_W;
 use const ThreadFin\DAY;
 
+use function ThreadFin\dbg;
 use function ThreadFin\ends_with;
 use function ThreadFin\find_const_arr;
 use function ThreadFin\find_fn;
@@ -23,7 +34,7 @@ use function ThreadFin\trace;
 
 
 const ENUMERATION_FILES = ["readme.txt", "license.txt"];
-const PLUGIN_DIRS = ["\/plugins\/", "\/themes\/"];
+const PLUGIN_DIRS = ["/plugins/", "/themes/"];
 const ACTION_PARAMS = ["do", "page", "action", "screen-id"];
 const PACKAGE_FILES = ["readme.txt", "README.txt", "package.json"];
 
@@ -32,9 +43,19 @@ const PROFILE_INIT = ["^a" => 0, "^u" => 0, "^g" => 0, "^p" => 0];
 const PROFILE_MAX_PARAM = 30;
 const PROFILE_MAX_VARS = 20;
 
-$cms_include_file = \BitFire\WAF_ROOT . "includes.php";
-if (file_exists($cms_include_file) && !defined("BitFire\\CMS_INCLUDED")) {
-    @include_once $cms_include_file;
+$standalone_wp_include = \BitFire\WAF_ROOT . "wordpress-plugin".DS."includes.php";
+$standalone_custom_include = \BitFire\WAF_ROOT . "custom-plugin".DS."includes.php";
+if (CFG::str("wp_root") || defined("WPINC")) {
+    if (file_exists($standalone_wp_include)) {
+        trace("wpalone");
+        require_once $standalone_wp_include;
+    } else {
+        trace("wproot");
+        require_once \BitFire\WAF_ROOT . "includes.php";
+    }
+} else {
+    trace("custom");
+    @include_once $standalone_custom_include;
 }
 
 
@@ -52,21 +73,33 @@ function enrich_hashes(string $ver, string $doc_root, array $hash): array
 {
     // TODO: trim down the data in $hash
     // GUARDS
-    if (!isset($hash['path'])) { $hash['path'] = $hash['path']; }
+    if (!isset($hash['path'])) { $hash['path'] = $hash['file_path']; }
 
 
-    $out = '/' . trim($doc_root, '/') . DS . $hash['name'] . (($hash['path'][0] != DS) ? DS : '') . $hash['path'];
-    $out = realpath($out);
-    $hash['o2'] = $out;
+    if (file_exists($hash['path'])) {
+        $out = realpath($hash['path']);
+        $hash['o2'] = realpath($out);
+    } else {
+        $out = '/' . trim($doc_root, '/') . DS . $hash['name'] . (($hash['path'][0] != DS) ? DS : '') . $hash['path'];
+        $out = realpath($out);
+        $hash['o2'] = $out;
+    }
 
-    if (!$hash["rel_path"]) { \ThreadFin\dbg($hash); }
+    if (!$hash["rel_path"]) {
+        \BitFire\on_err(PCNTL_EINVAL, "hashes: no rel_path", __FILE__, __LINE__);
+        $hash["rel_path"] = $hash["o2"];
+    }
+    if (!$ver) {
+        $ver = ($hash["r"] != "MISS") ? $hash["tag"] : "1.0";
+    }
+
     // abstracted source cms mapping
     $path_to_source_fn = find_fn("path_to_source");
     $path = $path_to_source_fn($hash["rel_path"], $hash["type"], $ver, $hash["name"]??null);
 
     
     $hash['mtime'] = filemtime($out);
-    $hash['url'] = str_replace("//", "/", $path);
+    $hash['url'] = $path;
     $hash['ver'] = $ver;
     $hash['doc_root'] = $doc_root;
     $hash['machine_date'] = machine_date($hash['mtime']);
@@ -96,7 +129,7 @@ function load_cms_profile(string $path) : array {
         if (file_exists($profile_path)) {
             // read the profile, unserizlize and return result or empty array
             $profile = FileData::new($profile_path)->read()->unjson()->lines;
-            if (!isset($profile["^a"])) { $profile = PROFILE_INIT; }
+            if (!isset($profile["^a"])) { $profile = PROFILE_INIT; $profile['h'] = $_SERVER['HTTP_HOST']??'na'; }
         } else {
             $profile = PROFILE_INIT;
         }
@@ -161,15 +194,15 @@ function cms_build_profile(\BitFire\Request $request, bool $is_admin) : Effect {
 
     $profile_path = \BitFire\WAF_ROOT . "cache/profile/{$sane_path}.txt";
     $effect->out($sane_path)->hide_output(true); // report $sane_path to caller.  do not output if effect is run
-    // persist 1 in 10
-    if (mt_rand(0, 10) == 1) {
+    // persist 1 in 5
+    if (mt_rand(0, 5) == 1) {
         // strip any possible php tags and make file unreadable...
         $content = str_replace("<?", "PHP_OPEN", json_encode($profile));
         $effect->file(new FileMod($profile_path, $content, FILE_W, 0));
     }
 
-    // backup 1 in 50
-    if (mt_rand(0, 50) == 1 || !file_exists($profile_path)) {
+    // backup 1 in 20
+    if (mt_rand(0, 20) == 1 || !file_exists($profile_path)) {
         httpp(APP."profile.php", base64_encode(json_encode(["path" => $sane_path, "profile" => $profile])));
     }
 
@@ -197,7 +230,8 @@ function file_type(string $path) : string {
  */
 function path_to_source(string $name, string $path, string $ver) : string {
     $client = CFG::str("client_id", "default");
-    return "archive.bitfire.co/source/{$client}/{$name}/{$ver}/{$path}?auth=".CFG::str("pro_key");
+    $source = "archive.bitfire.co/source/{$client}/{$name}/{$ver}/{$path}?auth=".CFG::str("pro_key");
+    return "https://" . str_replace("//", "/", $source);
 }
 
 /**

@@ -5,12 +5,14 @@ namespace BitFirePlugin;
 use BitFire\Config AS CFG;
 
 use function BitFire\get_subdirs;
+use function BitFireSvr\get_wordpress_version;
 use function ThreadFin\contains;
+use function ThreadFin\ends_with;
 
 define("\BitFire\\CMS_INCLUDED", true);
 
 const ENUMERATION_FILES = ["readme.txt", "license.txt"];
-const PLUGIN_DIRS = ["\/plugins\/", "\/themes\/"];
+const PLUGIN_DIRS = ["/plugins/", "/themes/"];
 const ACTION_PARAMS = ["do", "page", "action", "screen-id"];
 const PACKAGE_FILES = ["readme.txt", "README.txt", "package.json"];
 
@@ -35,19 +37,24 @@ function file_type(string $path) : string {
  */
 function path_to_source(string $rel_path, string $type, string $ver, ?string $name=null) : string {
 
+    static $core_ver = null;
+    if ($core_ver == null) {
+        $core_ver = get_wordpress_version(CFG::str("wp_root"));
+    }
+
     switch($type) {
         case "wp_plugin":
-            $source = "https://plugins.svn.wordpress.org/{$name}/tags/{$ver}/{$rel_path}";
+            $source = "plugins.svn.wordpress.org/{$name}/tags/{$ver}/{$rel_path}";
             break;
         case "wp_themes":
-            $source = "https://themes.svn.wordpress.org/{$name}/{$ver}/{$rel_path}";
+            $source = "themes.svn.wordpress.org/{$name}/{$ver}/{$rel_path}";
             break;
         case "wp_core":
         default:
-            $source = "https://core.svn.wordpress.org/tags/{$ver}/{$rel_path}?type={$type}";
+            $source = "core.svn.wordpress.org/tags/{$core_ver}/{$rel_path}?type={$type}";
             break;
     }
-
+    $source = "https://" . str_replace("//", "/", $source);
     return $source;
 }
 
@@ -65,7 +72,19 @@ function package_to_ver(string $carry, string $line) : string {
 }
 
 function malware_scan_dirs(string $root) : array {
+    if (!ends_with($root, "/")) { $root .= "/"; }
     $d1 = CFG::str("wp_contentdir")."/plugins";
     $d2 = CFG::str("wp_contentdir")."/themes";
     return array_merge(get_subdirs($d1), get_subdirs($d2), ["{$root}wp-includes", "{$root}wp-admin"]);
 }
+
+
+/**
+ * wrapper function for cms mail implementation
+ * @param string $subject 
+ * @param string $message 
+ * @return void 
+ */
+function mail(string $subject, string $message) {
+    \wp_mail(CFG::str("email"), $subject, $message);
+} 
