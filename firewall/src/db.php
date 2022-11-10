@@ -101,7 +101,7 @@ class DB {
     protected $_simulation = false;
     protected $_replay_enabled = false;
     protected $_err_filter_fn;
-    protected $_replay = [];
+    protected $_replay_log = [];
 
     protected function __construct(?\mysqli $db) { $this->_db = $db; $this->_errors = array(); }
 
@@ -386,11 +386,11 @@ class SQL {
      * @param string $sql the sql that generated the result
      * @return SQL 
      */
-    public static function from(?array $x, string $sql="") : SQL { 
+    public static function from(?array $x, string $in_sql="") : SQL { 
         $sql = new SQL();
         $sql->_x = $x;
         $sql->_len < (is_array($x)) ? count($x) : 0;
-        $sql->_sql = $sql;
+        $sql->_sql = $in_sql;
         return $sql; 
     }
     
