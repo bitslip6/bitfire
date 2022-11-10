@@ -745,7 +745,7 @@ function serve_dashboard() :void
 
 
 // ensure that passwords are always hashed
-if (strlen(CFG::str("password")) < 40 && CFG::str("password") != "disabled") {
+if (strlen(CFG::str("password")) < 40 && CFG::str("password") != "disabled" && CFG::str("password") != "configure") {
     $hashed = hash("sha3-256", CFG::str("password"));
     update_ini_value("password", $hashed)->run();
 }
