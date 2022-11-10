@@ -302,7 +302,7 @@ function update_config(string $ini_src) : Effect
     // configure wordpress root path
     // TODO: move all of WordPress settings into the wordpress-plugin/bitfire-admin.php
     $root = cms_root();
-    $content_dir = "wp-content"; // default fallback
+    $content_dir = cms_root() . "/wp-content"; // default fallback
     $scheme = filter_input(INPUT_SERVER, "REQUEST_SCHEME", FILTER_SANITIZE_SPECIAL_CHARS);
     $host = filter_input(INPUT_SERVER, "HTTP_HOST", FILTER_SANITIZE_URL);
 
@@ -794,7 +794,7 @@ function hash_file(string $filename, string $root_dir, string $plugin_id, string
 function get_wordpress_version(string $root_dir): string
 {
     $full_path = "$root_dir/wp-includes/version.php";
-    $wp_version = "0";
+    $wp_version = "1.0";
     if (file_exists($full_path)) {
         include $full_path;
     }

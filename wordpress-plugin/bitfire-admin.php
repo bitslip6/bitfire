@@ -7,6 +7,7 @@ use function BitFire\serve_malware;
 use function BitFire\serve_settings;
 use function BitFire\serve_exceptions;
 use function BitFireSvr\doc_root;
+use function BitFireSvr\get_wordpress_version;
 
 use BitFire\BitFire;
 use BitFire\Config as CFG;
@@ -97,10 +98,17 @@ function sync_paths() : void {
         debug("sync wp_root [%s] / [%s] - [%d] (%s)", \get_home_path(), CFG::str("wp_root"), $e->read_status(), $e->read_errors());
     }
     if (defined("WP_CONTENT_DIR") && \WP_CONTENT_DIR != CFG::str("wp_contentdir")) {
-        update_ini_value("wp_contentdir", \WP_CONTENT_DIR)->run();
+        $dir = (!contains(\WP_CONTENT_DIR, doc_root())) ? doc_root() . \WP_CONTENT_DIR : \WP_CONTENT_DIR;
+        $e = update_ini_value("wp_contentdir", $dir)->run();
+        debug("sync wp_contentdir [%s] / [%s] - [%d] (%s)", \WP_CONTENT_DIR, CFG::str("wp_contentdir"), $e->read_status(), $e->read_errors());
     }
     if (\content_url() != CFG::str("wp_contenturl")) {
         update_ini_value("wp_contenturl", \content_url())->run();
+    }
+    $wp_version = get_wordpress_version(CFG::str("wp_root"));
+    // update wordpress version
+    if (CFG::str("wp_version") != $wp_version) {
+        update_ini_value("wp_version", $wp_version)->run();
     }
 }
 
