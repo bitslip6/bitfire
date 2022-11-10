@@ -45,8 +45,7 @@ const ENCODE_BASE64=4;
 
 
 /**
- * TODO: clean up some of the syn with content and lines
- * ^^^^^^^^^^^^^ THIS!
+ * Complete filesystem abstraction
  * @package ThreadFin
  */
 class FileData {
@@ -56,14 +55,16 @@ class FileData {
     public $num_lines;
     /** @var array $lines - file content array of lines */
     public $lines = array();
-    public $content = "";
-    /** @var bool $existss - true if file or mocked content exists */
-    public $exists = false;
-    public $readable = false;
-    public $writeable = false;
     public $debug = false;
+    public $content = "";
+    /** @var bool $exists - true if file or mocked content exists */
+    public $exists = false;
+    /** @var bool $readable - true if file is readable */
+    public $readable = false;
+    /** @var bool $readable - true if file is writeable */
+    public $writeable = false;
 
-    protected static $fsdata = array();
+    protected static $fs_data = array();
     protected $errors = array();
 
     /**
@@ -72,7 +73,7 @@ class FileData {
      * @param string $content 
      */
     public static function mask_file(string $filename, string $content) {
-        FileData::$fsdata[$filename] = $content;
+        FileData::$fs_data[$filename] = $content;
     }
 
     /**
@@ -80,16 +81,22 @@ class FileData {
      */
     public function get_errors() : array { return $this->errors; }
 
-    // enable / disable debug logging
+    /**
+     * @param bool $enable enable or disable debug mode
+     * @return FileData 
+     */
     public function debug_enable(bool $enable) : FileData { $this->debug = $enable; return $this; }
 
+    /**
+     * preferred method of creating a FileData object
+     */
     public static function new(string $filename) : FileData {
         return new FileData($filename);
     }
 
     public function __construct(string $filename) {
         $this->filename = $filename;
-        if (isset(FileData::$fsdata[$filename])) {
+        if (isset(FileData::$fs_data[$filename])) {
             $this->exists = $this->writeable = $this->readable = true;
         } else {
             $this->exists = file_exists($filename);
@@ -104,8 +111,8 @@ class FileData {
      */
     public function raw() : string {
         if (empty($this->lines)) {
-            if (isset(FileData::$fsdata[$this->filename])) {
-                return FileData::$fsdata[$this->filename];
+            if (isset(FileData::$fs_data[$this->filename])) {
+                return FileData::$fs_data[$this->filename];
             } else {
                 return file_exists($this->filename) ? file_get_contents($this->filename) : "";
             }
@@ -119,8 +126,8 @@ class FileData {
      */
     public function read($with_newline = true) : FileData {
         // mock data, and raw reads
-        if (isset(FileData::$fsdata[$this->filename])) {
-            $this->lines = explode("\n", FileData::$fsdata[$this->filename]);
+        if (isset(FileData::$fs_data[$this->filename])) {
+            $this->lines = explode("\n", FileData::$fs_data[$this->filename]);
             $this->num_lines = count($this->lines);
         }
         else {
@@ -249,23 +256,9 @@ class FileData {
      * @return FileData 
      */
     public function map(callable $fn) : FileData {
-
         if ($this->num_lines > 0) {
-            //$n1 = count($this->lines);
             $this->lines = array_map($fn, $this->lines);
             $this->num_lines = count($this->lines);
-            /*
-            print_r($x);
-            print_r($this->lines);
-            for ($i = 0; $i < $n1; $i++) {
-                $this->lines[$i] = $fn($this->lines[$i]);
-            }
-            print_r($this->lines);
-            //print_r($x);
-            $n2 = count($this->lines);
-            debug("file map lines %d/%d", $n1, $n2);
-            //if (!empty($this->content)) { $this->content = join("\n", $this->lines); }
-            */
         } else {
             error("unable to map empty file");
         }
@@ -288,6 +281,16 @@ class FileData {
     // return a file modification effect for current FileData
     public function file_mod($mode = 0, $mtime = 0) : FileMod {
         return new FileMod($this->filename, $this->raw(), $mode, $mtime);
+    }
+
+    /**
+     * @return int the file modification time, or 0 if the file does not exist
+     */
+    public function mtime() : int {
+        if ($this->exists) {
+            return filemtime($this->filename);
+        }
+        return 0;
     }
 }
 
@@ -317,6 +320,7 @@ function in_array_ending(array $data, string $key) : bool { foreach ($data as $i
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
 function contains(string $haystack, $needle) : bool { if(is_array($needle)) { foreach ($needle as $n) { if (!empty($n) && strpos($haystack, $n) !== false) { return true; } } return false; } else { return strpos($haystack, $needle) !== false; } }
+function icontains(string $haystack, $needle) : bool { if(is_array($needle)) { foreach ($needle as $n) { if (!empty($n) && stripos($haystack, $n) !== false) { return true; } } return false; } else { return stripos($haystack, $needle) !== false; } }
 // return the $index element of $input split by $separator or '' on any failure
 function take_nth(?string $input, string $separator, int $index, string $default="") : string { if (empty($input)) { return ''; } $parts = explode($separator, $input); return (isset($parts[$index])) ? $parts[$index] : $default; }
 // $fn = $result .= function(string $character, int $index) { return x; }
@@ -339,6 +343,7 @@ function find_const_arr(string $const, array $default=[]) : array {
     if (defined("BitFire\\$const")) { return constant("BitFire\\$const"); }
     return $default;
 }
+function not_empty($in) { return !empty($in); }
 
 
 function set_if_empty($data, $key, $value) { if (is_object($data) && !isset($data->$key)) { $data->$key = $value; } if (is_array($data) && !isset($data[$key])) { $data[$key] = $value; } return $data; }
@@ -368,11 +373,11 @@ function find_match(string $input, array $matches) : ?array {
  * recursively perform a function over directory traversal.
  */
 function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL, array $result = array(), $max_results = 20000) : array {
-    $maxfiles = 20000;
+    $max_files = 20000;
     $result_count = count($result);
 
     if ($dh = \opendir($dirname)) {
-        while(($file = \readdir($dh)) !== false && $maxfiles-- > 0 && $result_count < $max_results) {
+        while(($file = \readdir($dh)) !== false && $max_files-- > 0 && $result_count < $max_results) {
             $path = $dirname . '/' . $file;
             if (!$file || $file === '.' || $file === '..') {
                 continue;
@@ -671,7 +676,7 @@ class Effect {
         foreach ($this->file_outs as $file) {
             assert(!empty($file->filename), "can't write to null file: " . en_json($file));
             $len = strlen($file->content);
-            assert($len > 0, "can't write empty file: " . en_json($file));
+            // assert($len > 0, "can't write empty file: " . en_json($file));
             $mods = ($file->append) ? FILE_APPEND : LOCK_EX;
             debug("FS(w) [%s] (%d)bytes", $file->filename, $len);
 
@@ -697,7 +702,7 @@ class Effect {
 
             $bytes = strlen($file->content);
             $written = file_put_contents($file->filename, $file->content, $mods);
-            if (!$written == $bytes) {
+            if ($written != $bytes) {
                 $e = error_get_last();
                 debug("file mod write error [%s] (%s)", $file->filename, $file->content);
                 $this->errors[] = "failed to write file: $file->filename " . strlen($file->content) . " bytes. " . en_json($e);
@@ -1239,7 +1244,8 @@ function error(?string $fmt, ...$args) : void {
     }
 }
 
-function format_chk(string $fmt, int $args) : bool {
+function format_chk(?string $fmt, int $args) : bool {
+    if ($fmt == null) { return true; }
     return(substr_count($fmt, "%") === $args);
 }
 
