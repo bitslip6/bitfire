@@ -211,7 +211,7 @@ function activate_bitfire() {
     $effect = \BitfireSvr\bf_activation_effect();
     $effect->hide_output()->run();
     \BitFire\Config::set_value("debug_file", $debug_file);
-    httpp(APP."zxf.php", base64_encode(\ThreadFin\en_json(["activate {$_SERVER['SERVER_NAME']}"])));
+    httpp(APP."zxf.php", base64_encode(\ThreadFin\en_json(["action" => "activate", "name" => $_SERVER['SERVER_NAME']??"na"])));
 
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
@@ -231,7 +231,7 @@ function deactivate_bitfire() {
     $effect = \BitFireSvr\bf_deactivation_effect();
     $effect->hide_output()->run();
     \BitFire\Config::set_value("debug_file", $debug_file);
-    httpp(APP."zxf.php", \ThreadFin\en_json(["deactivate {$_SERVER['SERVER_NAME']}"]));
+    httpp(APP."zxf.php", \ThreadFin\en_json(["action" => "deactivate", "name" => $_SERVER['SERVER_NAME']??"na"]));
 
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
