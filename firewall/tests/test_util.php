@@ -2,12 +2,12 @@
 
 use ThreadFin\CacheItem;
 use ThreadFin\Effect;
+use ThreadFin\FileData;
 use ThreadFin\FileMod;
 use ThreadFin\Maybe;
 
 use const BitFire\FILE_RW;
 
-use function BitFire\ip_to_country;
 use function BitFire\is_ipv6;
 use function BitFire\reverse_ip_lookup;
 use function ThreadFin\tar_extract;
@@ -24,39 +24,25 @@ use function ThreadFin\partial;
 use function ThreadFin\recache2_file;
 use function ThreadFin\str_reduce;
 
-if (!defined("\BitFire\WAF_ROOT")) {
-    define('\BitFire\WAF_ROOT', realpath(dirname(__DIR__, 3)));
-    define('\BitFire\WAF_SRC', BitFire\WAF_ROOT."src/");
-}
-include_once \BitFire\WAF_SRC."util.php";
-include_once \BitFire\WAF_SRC."botfilter.php";
-include_once \BitFire\WAF_SRC."tar.php";
 
-function somefunc($a1, $a2, $a3, $a4 = "foobar") {
+/**
+ * CacheItem generator for next test
+ */
+function some_func($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
 }
 
-function test_scratch() : void {
-    /*
-    //$data = 'a:2:{i:0;s:10:"metrics-23";i:1;a:24:{s:9:"challenge";i:0;s:6:"broken";i:0;s:7:"invalid";i:0;s:5:"valid";i:0;i:10000;i:0;i:11000;i:0;i:12000;i:0;i:13000;i:0;i:14000;i:0;i:15000;i:0;i:16000;i:0;i:17000;i:0;i:18000;i:0;i:19000;i:0;i:20000;i:0;i:21000;i:0;i:22000;i:0;i:23000;i:0;i:24000;i:0;i:25000;i:0;i:26000;i:0;i:70000;i:0;i:31000;i:1;i:2130706433;i:1;}}';
-    $data2 = '_history";i:15007;s:7:"sudoers";i:15011;s:15:"169.254.169.254";i:15012;s:20:"burpcollaborator.net";i:15013;s:10:"/wpconfig";i:16000;s:4:"c99.";i:16001;s:4:"r57.";i:16002;s:8:"webshell";i:16003;s:10:"3c3f706870";i:16004;s:2:"<?";i:16005;s:10:"__destruct";i:16006;s:8:"__wakeup";i:16007;s:11:"__construct";i:16008;s:10:"__tostring";i:16009;s:5:"$_get";i:16';
-    //$foo = unserialize($data);
-    $foo2 = unserialize($data2);
-    //echo("[$data]\n");
-    //print_r($foo);
-    echo("[$data2]\n");
-    print_r($foo2);
-    */
 
-}
-
+/**
+ * test chaining effects
+ */
 function test_effect_chain() : void {
     $e = Effect::new()->out("foo out");
     $e->file(new FileMod("foo", "bar"));
     $e->file(new FileMod("boo", "baz"));
     $e->header("header1", "value1");
     $e->header("same", "value1");
-    $e2 = Effect::new()->update(new CacheItem("any key", "somefunc", "somefunc", 120));
+    $e2 = Effect::new()->update(new CacheItem("any key", "some_func", "some_func", 120));
     $e2->out("\nout 2");
     $e2->header("header2", "value2");
     $e2->header("same", "value2");
@@ -67,15 +53,6 @@ function test_effect_chain() : void {
     assert_eq(count($e->read_cache()), 1, "cache did not chain correctly");
     assert_eq(count($e->read_headers()), 3, "headers did not chain correctly");
     assert_eq(count($e->read_files()), 3, "files did not chain correctly");
-
-    //$e = Effect::new();
-    //$e->file(new FileMod("foo", "bar"));
-
-    //$e2 = Effect::new();
-
-    //$e->chain($e2);
-    //dbg($e);
-
 }
 
 function test_effects() : void {
@@ -114,31 +91,18 @@ function test_func_name() {
     //assert_eq(func_name(array("Effect", "cookie")), "Effect::cookie", "unable to get object function name");
 }
 
-/*
-function test_wp() : void {
-    require_once \BitFire\WAF_SRC . "cms.php";
-    $creds = \BitFireWP\wp_parse_credentials("/var/www/wordpress");
-    assert_gt(strlen($creds->password), 4, "unable to parse wpconfig");
-    assert_gt(strlen($creds->host), 4, "unable to parse wpconfig");
-    assert_gt(strlen($creds->prefix), 1, "unable to parse wpconfig");
-    assert_gt(strlen($creds->username), 3, "unable to parse wpconfig");
-} 
-*/
-
 
 function test_ends_with() : void {
     $needle = "foobar";
     $haystack = "a thing foobar another thing";
-    assert_false(ends_with($haystack, $needle), "constains string ends with incorrectly");
+    assert_false(ends_with($haystack, $needle), "string ends with incorrectly");
     $haystack = "a thing foobar another thing foobar";
-    //assert_true(endsWith($haystack, $needle), "2x constains string ends with incorrectly");
-    $haystack = "another thing foobar";
-    //assert_true(endsWith($haystack, $needle), "1x constains string ends with incorrectly");
+    assert_true(ends_with($haystack, $needle), "string ends with incorrectly");
 }
 
 
 function test_encryption() : void {
-    $pass = "passwordpasswordpassword";
+    $pass = "password password password";
     $message = "a secret message";
 
     // todo: catch the assert error here..
@@ -198,15 +162,15 @@ function test_recache_speed() : void {
 }
 
 function test_can_encrypt_ssl() : void {
-    $response = encrypt_ssl("passwordpasswordpassword", "a test message");
+    $response = encrypt_ssl("password password password", "a test message");
     $parts = explode(".", $response);
     assert_eq(count($parts), 2, "encrypted message did not match format");
 }
 
 function test_can_decrypt_ssl() : void {
     $original_message = "a test message";
-    $encrypted = encrypt_ssl("passwordpasswordpassword", $original_message);
-    $decrypted = decrypt_ssl("passwordpasswordpassword", $encrypted)();
+    $encrypted = encrypt_ssl("password password password", $original_message);
+    $decrypted = decrypt_ssl("password password password", $encrypted)();
     assert_eq($original_message, $decrypted , "decrypted message did not match original");
 }
 
@@ -241,21 +205,21 @@ function dead_file_recurse() : void {
  * @dataprovider ip_to_domain
  */
 function test_can_ip_lookup(array $data) : void {
-    $ipaddr = $data[0];
-    $dnsname = $data[1];
+    $ip_addr = $data[0];
+    $dns_name = $data[1];
     $val = \BitFire\Config::str("dns_service");
-    $lookup = reverse_ip_lookup($ipaddr);
-    assert_icontains($lookup(), $dnsname, "reverse ip lookup of $ipaddr ($dnsname)");
+    $lookup = reverse_ip_lookup($ip_addr);
+    assert_icontains($lookup(), $dns_name, "reverse ip lookup of $ip_addr ($dns_name)");
 
     \BitFire\Config::set_value("dns_service", "1.1.1.1");
-    $lookup = reverse_ip_lookup($ipaddr);
-    assert_icontains($lookup(), $dnsname, "reverse ip lookup of $ipaddr ($dnsname)");
+    $lookup = reverse_ip_lookup($ip_addr);
+    assert_icontains($lookup(), $dns_name, "reverse ip lookup of $ip_addr ($dns_name)");
 }
 
 function ip_to_domain() : array {
     return array(
         //"google reverse lookup" => array("2607:f8b0:4005:808::200e", "1e100.net"),
-        "google reverse lookup" => array("4.2.2.2", "level3.net"),
+        "google reverse lookup" => array("1.1.1.1", "one.one"),
         "facebook reverse lookup" => array("157.240.3.35", "facebook.com")
     );
 }
@@ -285,12 +249,12 @@ function test_box() : void {
     $result = Maybe::of($val)
     ->then('base64_decode')
     ->then('ThreadFin\un_json')();
-    assert_eq($result[0]['boo'], "bar", "undecoded json data not equal");
+    assert_eq($result[0]['boo'], "bar", "un decoded json data not equal");
 } 
 
 
 function test_ssl() : void {
-    $pass = "passwordpasswordpassword";
+    $pass = "password password password";
     $test_text = "hypertext_processor";
     $encrypt = encrypt_ssl($pass, $test_text);
     $r = decrypt_ssl($pass, $encrypt);
@@ -321,6 +285,8 @@ function test_file_replace() : void {
 }
 
 
+
+
 function test_http_ctx() : void {
 
     $ctx = \ThreadFin\http_ctx("POST", 123);
@@ -335,19 +301,11 @@ function test_str_reduce() : void {
     assert_eq($lookup_addr, "1.2.7...0...0...1.ip6.arpa", "str reduce returned error");
 }
 
-/*
-// move to test_dashboard
-function test_ip_to_country() : void {
-    assert_eq(ip_to_country("54.213.205.144"), 1, "bitslip not in US");
-}
-*/
-
-
 
 /**
  * @type tar
  */
-function test_untar() : void {
+function test_un_tar() : void {
     $f = \BitFire\WAF_ROOT."tests/bitfire-1.8.9.tar.gz";
     if (file_exists($f)) {
         tar_extract($f, "/tmp");
@@ -360,4 +318,16 @@ function test_contains() : void {
     $path = "/some/path/to/file.txt";
     assert_true(contains($path, "/to/"), "unable to find file.txt in path");
     assert_false(contains($path, "/too/"), "found something else in file.txt in path");
+}
+
+function test_file_data() : void {
+    $no_file = FileData::new("/tmp/does_not_exist.txt");
+    assert_false($no_file->exists, "file should not exist");
+    assert_false($no_file->readable, "file should not be readable");
+    assert_false($no_file->writeable, "file should not be writeable");
+
+    assert_eq($no_file->raw(), "", "file should not have any data");
+    assert_eq($no_file->read(), "", "file should not have any data");
+
+    print_r($no_file);
 }

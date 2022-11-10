@@ -1,16 +1,13 @@
 <?php declare(strict_types=1);
 
-use TF\FileData;
+use ThreadFin\FileData;
 
 use function BitFire\flatten;
-use function TF\tar_extract;
+use function ThreadFin\tar_extract;
 
 if (!defined("\BitFire\WAF_ROOT")) {
     define('\BitFire\WAF_ROOT', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)));
 }
-include_once \BitFire\WAF_SRC."php";
-include_once \BitFire\WAF_SRC."php";
-include_once \BitFire\WAF_SRC."php";
 
 
 

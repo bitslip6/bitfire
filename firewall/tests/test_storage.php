@@ -30,10 +30,7 @@ function test_shmop_write() : void {
     $value1 = "test";
     $storage->save_data("test", $value1, 2);
     $value2 = $storage->load_data("test");
-    // phpinfo();
 
-    //echo "$value1 - $value2\n";
-    //die();
 
     assert_eq($value2, $value1, "shmop storage not working");
 }

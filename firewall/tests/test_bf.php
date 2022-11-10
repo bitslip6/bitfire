@@ -5,7 +5,6 @@ use \BitFire\Config;
 use ThreadFin\CacheStorage;
 
 require_once \BitFire\WAF_SRC."const.php";
-//die("test bf req const\n");
 
 
 function newbotfilter() : BitFire\BotFilter {

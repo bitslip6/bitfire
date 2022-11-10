@@ -15,7 +15,6 @@ use function BitFireBot\make_js_challenge;
 if (!defined("\BitFire\WAF_ROOT")) {
     define('\BitFire\WAF_ROOT', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR);
 }
-include_once \BitFire\WAF_SRC."php";
 include_once \BitFire\WAF_SRC."util.php";
 
 $bf = \BitFire\BitFire::get_instance();
@@ -250,7 +249,7 @@ function test_header_check() : void {
     $request->host = "anormaldomainname.com";
     assert_true(\BitFireBot\header_check($request)->empty(), "normal domain name failed header check");
 
-    $request->host = "a really long abnormal domain name with lots of grap in it and another whatever com";
+    $request->host = "a really long abnormal domain name with lots of crap in it and another whatever com";
     assert_false(\BitFireBot\header_check($request)->empty(), "normal domain name failed header check");
 }
 

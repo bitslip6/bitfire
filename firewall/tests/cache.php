@@ -10,7 +10,7 @@ function cache_unique() : string {
 
 
 // chain after inspect() call in startup.php
-//      ->doifnot(array($bitfire, 'cache_behind'));
+//      ->do_if_not(array($bitfire, 'cache_behind'));
 //    const CACHE_PAGE = \BitFire\WAF_ROOT . "cache/root";
 
 // TODO: move this to "pure function"

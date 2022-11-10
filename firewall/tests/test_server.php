@@ -1,7 +1,11 @@
 <?php declare(strict_types=1);
 
+use ThreadFin\FileData;
+
 use function BitFireSvr\have_valid_http_code;
+use function BitFireSvr\update_ini_fn;
 use function ThreadFin\en_json;
+use function ThreadFin\partial;
 
 /** SETUP  */
 if (!defined("\BitFire\WAF_ROOT")) {
@@ -21,16 +25,26 @@ function test_update_ini_value() : void {
     assert_contains($files[0]->content, "dns_service = \"4.2.2.2\"", "unable to set dns_service :(");
 }
 
-/** TESTS */
-function test_conf_globing() : void {
-    $filez = \BitFireSvr\get_server_config_file_list();
-    $can_test = \ThreadFin\find($filez, "file_exists");
-    if ($can_test) {
-        $r = \BitFireSvr\pattern_to_list_3($filez);
-        assert_gt(count($r), 1, "unable to glob http configs");
-    } else {
+function test_ini_update() : void {
+    $sample = "; a comment
+    foo = 'bar'
+    foobar = 1
+    ";
 
-    }
+    FileData::mask_file("TEST_FILE", $sample);
+    $sample_fn = partial("str_replace", "'bar'", "'baz'");
+    $x = $sample_fn("foo'bar'");
+    assert_contains($x, "baz'", "ini replace function failure");
+
+
+    $e = update_ini_fn($sample_fn, "TEST_FILE");
+    assert_eq(count($e->read_files()), 2, "update ini file failed to update .ini and .php");
+
+    $file_mod = $e->read_files()[0];
+    assert_contains($file_mod->content, "'baz'", "ini replace function failure");
+
+    //assert_contains($)
+    //\ThreadFin\dbg($e);
 }
 
 

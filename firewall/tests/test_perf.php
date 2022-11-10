@@ -2,7 +2,7 @@
 namespace BitFire;
 use \BitFire\Config as CFG;
 
-function onerr($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
+function on_err($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
     if ($GLOBALS['bf_err_skip'] || !CFG::enabled('send_errors')) { return true; }
     $data = array("errno" => $errno, "errstr" => $errstr, "errfile" => $errfile, "errline" => $errline);
     $known = \TF\un_json(file_get_contents(\BitFire\WAF_ROOT."cache/errors.json"));

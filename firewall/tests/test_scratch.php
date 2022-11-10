@@ -9,16 +9,6 @@ if (!defined("\BitFire\WAF_ROOT")) {
 include_once \BitFire\WAF_SRC."bitfire.php";
 include_once \BitFire\WAF_SRC."util.php";
 
-/*
-class mywrap {
-    public $context;
-
-    public function __construct() {
-        die("mywrap");
-    }
-}
-*/
-
 
 
 function test_thing() : void {

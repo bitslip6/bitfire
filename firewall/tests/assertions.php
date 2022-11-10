@@ -11,6 +11,10 @@ namespace {
         }
     }
 
+    function assert_effect_status(\ThreadFin\Effect $effect, int $status, string $message, string $output = "") {
+        assert_true($effect->read_status() == $status, $message, $output);
+    }
+
     function assert_true($condition, string $message, string $output = "") {
         assert_base_condition(function($condition, $expected) { return $condition; }, $condition, true, $message, $output);
     }

@@ -11,6 +11,10 @@ function acpu_delete(string $key) : bool {
 function acpu_fetch(string $key) : ?string {
     return null;
 }
+function wp_get_inline_script_tag(string $js, array $attributes = []) : string {
+    return '';
+}
+
 
 function brotli_compress(string $data) : string {
     return $data;
@@ -36,6 +40,10 @@ function wp_enqueue_script(string $handle, string $src) : void {
     //echo "wp_enqueue_script($handle, $src, $deps, $ver, $in_footer)";
 }
 
+function is_user_logged_in() : bool {
+    return true;
+}
+
 function admin_url(string $path) : string {
     return "http://localhost/wp-admin/$path";
 }
@@ -49,8 +57,19 @@ function add_menu_page(string $page_title, string $menu_title, string $capabilit
 }
 
 function add_action(string $action, callable $fn) : void {
-
 }
+
+function add_filter($data) {
+}
+
+function wp_add_inline_script(string $handle, string $content, string $before_or_after = "after") : void {}
+function login_header(string $title = 'Log In', string $message = '', $wp_error = null) : string { return $message; }
+function login_footer(string $input_id = 'Log In') : string { return $input_id; }
+function esc_html(string $text) : string { return $text; }
+function esc_url(string $text) : string { return $text; }
+function wp_login_url(string $url) : string { return $url; }
+
+
 
 function register_activation_hook(string $path, callable $fn) : void {
 
@@ -65,11 +84,15 @@ function esc_attr(string $x) : string {
 function get_the_author_meta(string $name, $id) : string {
     return "";
 }
-function get_user_meta(int $id, string $field, bool $single) : string {
+function get_user_meta(int $id, string $field, bool $single = false) : string {
     return "";
+}
+function get_userdata($user_id) : Object {
+    return new stdClass(); 
 }
 function update_user_meta(int $user_id, string $name, string $value) {
 }
+function get_current_user_id() : int { return 1; }
 function get_user_by(string $method, string $username) : stdClass {
     return new stdClass();
 }
