@@ -723,7 +723,7 @@ function is_local_request(\BitFire\Request $request) : bool {
 
     // source agent is localhost
     // can probably remove this after completing above TODO
-    if (strstr($request->agent, 'wordpress/'.$GLOBALS['wp_version']) != false && 
+    if (strstr($request->agent, 'wordpress/'.CFG::str('wp_version')) != false && 
         (ends_with($request->path, '/wp-cron.php')
         || ends_with($request->path, '/admin-ajax.php'))) {
         debug("local request");
