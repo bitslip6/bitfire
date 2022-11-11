@@ -32,7 +32,8 @@ echo "copy config startup files"
 cp --remove-destination -L ../wordpress-plugin/config.ini bitfire/config.ini
 cp --remove-destination -L ../startup.php bitfire/startup.php
 cp --remove-destination -L ../wordpress-plugin/config-sample.ini bitfire/config-sample.ini
-cp -r --remove-destination -L ../public bitfire/public
+rm -r bitfire/public
+cp -r ../public bitfire
 cd bitfire
 
 
@@ -45,7 +46,6 @@ cp ../../LICENSE src
 cp ../../SECURITY.md src
 cp -r ../../firewall/views .
 cp -r ../../firewall/cache .
-cp -r ../../public .
 mkdir blocks
 mkdir quarantine
 
