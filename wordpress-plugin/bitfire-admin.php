@@ -13,6 +13,7 @@ use BitFire\BitFire;
 use BitFire\Config as CFG;
 use RuntimeException;
 use ThreadFin\Effect as Effect;
+use ThreadFin\FileData;
 use ThreadFin\FileMod;
 
 use const BitFire\FILE_RW;
@@ -260,6 +261,30 @@ function alerts() {
     // permanently disable nag messages  
     if (isset($_GET['bitfire_nag_ignore'])) { \BitFireSvr\update_ini_value("nag_ignore", "true")->run(); return; }
 
+    // fetch the list of plugins with security issues
+    $file_data = FileData::new(CFG::str("wp_contentdir")."/plugins/bitfire/cache/plugins.json");
+
+    if (strpos($_SERVER['REQUEST_URI'], "plugins.php") > 1) {
+        if($file_data->exists) {
+            $plugins = json_decode($file_data->read()->raw(), true);
+            //$plugins = json_decode(file_get_contents(CFG::str("wp_contentdir")."plugins/bitfire/cache/plugins.json"), true);
+            foreach ($plugins as $plugin) {
+                $name = $plugin["name"];
+                if (strlen($plugin["vendor"])) {
+                    $name = $plugin["name"] . " by " . $plugin["vendor"];
+                }
+                if (!strlen($name) > 3) { $name = $plugin["plugin_name"]; }
+                $cve = $plugin["cve"]??"unknown";
+
+
+                $links = array_reduce(explode("\n", $plugin["links"]), function($carry, $item) {
+                    return $carry . " <a href='$item' target='_blank'>$item</a><br>";
+                }, "");
+                show_alert("error", "<strong>$name has a known security issue <a target='_blank' href='https://cve.mitre.org/cgi-bin/cvename.cgi?name=$cve'>$cve</a></strong> <span style='padding-left:3rem'>Exploit difficulty: {$plugin["difficulty"]}</span><br><hr>{$plugin["cvss_type"]}<br><hr>{$plugin["info"]}<br><br>$links", $plugin["plugin_name"]); 
+            }
+        }
+    }
+
     // honor disable nag notices
     if (defined("DISABLE_NAG_NOTICES") && DISABLE_NAG_NOTICES) { return; }
     // notice has been dismissed
@@ -291,11 +316,15 @@ function alerts() {
  * @param string $type  (warning|error|success|info)
  * @param string $notice 
  */
-function show_alert(string $type, string $notice) {
-    echo "<div class='notice notice-{$type}'>{$notice}</div>\n";
+function show_alert(string $type, string $notice, string $id="") {
+    if ($id != "") {
+        echo "<div data-dismissible='$id-1' class='notice notice-{$type} is-dismissible'><p>{$notice}</p></div>\n";
+    } else {
+        echo "<div data-dismissible='disable-done-notice-forever' class='notice notice-{$type}'>{$notice}</div>\n";
+    }
 }
 
 add_action("admin_enqueue_scripts", "\BitFirePlugin\bitfire_styles");
 
 add_action("admin_notices", "\BitFirePlugin\alerts");
-//\wp_enqueue_script("bootstrap", \get_template_directory_uri() . "/js/bootstrap.min.js", array("jquery"), "20220601", true);
+

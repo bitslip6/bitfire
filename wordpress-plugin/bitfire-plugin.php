@@ -35,7 +35,10 @@ use BitFire\Request;
 use Exception;
 use RuntimeException;
 use ThreadFin\Effect;
+use ThreadFin\FileData;
+use ThreadFin\FileMod;
 
+use const BitFire\APP;
 use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\FILE_W;
@@ -51,10 +54,14 @@ use function BitFireSvr\update_ini_value;
 use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\partial as BINDL;
+use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
 use function ThreadFin\do_for_each;
+use function ThreadFin\en_json;
 use function ThreadFin\file_recurse;
+use function ThreadFin\http2;
+use function ThreadFin\httpp;
 
 // If this file is called directly, abort.
 if ( ! defined( "WPINC" ) ) { die(); }
@@ -300,10 +307,47 @@ function make_js_challenge_effect() : Effect {
     return $alert_effect;
 }
 
+function bitfire_plugin_check() {
+    $all_dirs = malware_scan_dirs(CFG::str("wp_content"));
+    $plugins = [];
+    foreach ($all_dirs as $dir) {
+        if (contains($dir, ["wp-includes", "wp-admin"])) { continue; }
+        $plugin = basename($dir);
+        $file = FileData::new("{$dir}/readme.txt")->read()->filter(BINDR("\ThreadFin\icontains", "Stable Tag"));
+        $line = implode(" ", $file->lines);
+        $parts = explode(":", $line);
+        if (isset($parts[1])) {
+            $plugins[$plugin] = trim($parts[1]);
+        } else {
+            file_recurse($dir, function ($x) use (&$plugins, $plugin) {
+                $file = FileData::new($x)->read()->filter(BINDR("\ThreadFin\icontains", " Version: "));
+                if (!empty($file->lines)) {
+                    $line = implode(" ", $file->lines);
+                    $parts = explode(":", $line);
+                    $plugins[$plugin] = trim($parts[1]);
+                    return true;
+                }
+                return false;
+            }, "/.*.php/", [], 1); 
+        }
+    }
+
+    $encoded = base64_encode(en_json($plugins));
+    $result = http2("POST", APP."cve_check.php", $encoded, ["Content-Type: application/json"]);
+    $effect = Effect::new()->file(new FileMod(CFG::str("wp_contentdir")."/plugins/bitfire/cache/plugins.json", $result["content"], FILE_W));
+    $effect->run();
+}
+
 // we must do this here because by the time bitfire-admin.php loads, content has already been
 // rendered.  Don't want to introduce dependency on WordPress with admin-ajax.php calls
 function bitfire_init() {
     trace("init");
+
+    add_action("bitfire_plugin_check", "BitFirePlugin\bitfire_plugin_check");
+    if (! wp_next_scheduled( 'bitfire_plugin_check' ) ) {
+        wp_schedule_event( time(), 'hourly', 'bitfire_plugin_check' );
+    }
+
     if (is_user_logged_in()) {
         trace("admin");
         include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";

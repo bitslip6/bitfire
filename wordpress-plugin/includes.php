@@ -4,7 +4,7 @@ namespace BitFirePlugin;
 
 use BitFire\Config AS CFG;
 
-use function BitFire\get_subdirs;
+use function ThreadFin\get_subdirs;
 use function BitFireSvr\get_wordpress_version;
 use function ThreadFin\contains;
 use function ThreadFin\ends_with;
