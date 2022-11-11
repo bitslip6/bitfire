@@ -198,30 +198,6 @@ function url_to_path($url)
     return substr($url, $idx);
 }
 
-/**
- * return sub directories for a single directory. non-recursive. non-pure
- * @param string $dirname to search
- * @return array 
- */
-function get_subdirs(string $dirname) : array {
-    $dirs = array();
-    if (!file_exists($dirname)) { debug("unable to find subdirs [$dirname]"); }
-
-    if ($dh = \opendir($dirname)) {
-        while(($file = \readdir($dh)) !== false) {
-            $path = $dirname . '/' . $file;
-            if (!$file || $file === '.' || $file === '..') {
-                continue;
-            }
-            if (is_dir($path) && !is_link($path)) {
-                $dirs[] = $path;
-			}
-        }
-        \closedir($dh);
-    }
-
-    return $dirs;
-}
 
 
 // find a plugin / theme version number located in $path

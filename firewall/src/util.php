@@ -370,11 +370,41 @@ function find_match(string $input, array $matches) : ?array {
 }
 
 /**
+ * return sub directories for a single directory. non-recursive. non-pure
+ * @param string $dirname to search
+ * @return array 
+ */
+function get_subdirs(string $dirname) : array {
+    $dirs = array();
+    if (!file_exists($dirname)) { debug("unable to find subdirs [$dirname]"); }
+
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false) {
+            $path = $dirname . '/' . $file;
+            if (!$file || $file === '.' || $file === '..') {
+                continue;
+            }
+            if (is_dir($path) && !is_link($path)) {
+                $dirs[] = $path;
+			}
+        }
+        \closedir($dh);
+    }
+
+    return $dirs;
+}
+
+
+/**
  * recursively perform a function over directory traversal.
  */
 function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL, array $result = array(), $max_results = 20000) : array {
     $max_files = 20000;
     $result_count = count($result);
+    if (!file_exists($dirname)) { 
+        debug("[$dirname] not exist");
+        return $result;
+    }
 
     if ($dh = \opendir($dirname)) {
         while(($file = \readdir($dh)) !== false && $max_files-- > 0 && $result_count < $max_results) {
