@@ -29,14 +29,17 @@ if (!defined("BitFire\WAF_ROOT")) {
 
 include \BitFire\WAF_SRC."bitfire.php";
 
-function on_err($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
-    $data = array("errno" => $errno, "errstr" => $errstr, "errfile" => $errfile, "errline" => $errline);
+function on_err($errno, $errstr, $err_file, $err_line, $context = NULL) : bool {
+    $data = array("errno" => $errno, "errstr" => $errstr, "err_file" => $err_file, "err_line" => $err_line);
+    // ignore errors that may not be ours...
+    if (!strpos($err_file, "bitfire")) { return false; }
+
     $known = un_json(file_get_contents(\BitFire\WAF_ROOT."cache/errors.json"));
     $have_err = false;
     foreach ($known as $err) {
         if ($err['errno'] == $data['errno'] && 
-            ($err['errline'] == $data['errline']) &&
-                $err['errfile'] == $data['errfile']) { $have_err = true; }
+            ($err['err_line'] == $data['err_line']) &&
+                $err['err_file'] == $data['err_file']) { $have_err = true; }
     } 
     if (!$have_err) { 
         $data['debug'] = debug(null);
