@@ -15,6 +15,7 @@ use ThreadFin\CacheItem;
 
 use function BitFireBot\find_ip_as;
 use function BitFireBot\send_browser_verification;
+use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
 use function ThreadFin\en_json;
@@ -31,6 +32,7 @@ use RuntimeException;
 use ThreadFin\CacheStorage;
 use ThreadFin\Effect;
 use ThreadFin\Maybe;
+use ThreadFin\MaybeA;
 use ThreadFin\MaybeBlock;
 use ThreadFin\MaybeI;
 use ThreadFin\MaybeStr;
@@ -251,6 +253,7 @@ function reverse_ip_lookup(string $ip) : MaybeStr {
 
         return fast_ip_lookup($lookup_addr, 'PTR');
     }
+    debug("get host [$ip]");
     return MaybeStr::of(gethostbyaddr($ip));
 }
 
@@ -328,6 +331,7 @@ function get_server_ip_data(string $remote_addr, string $agent) : IPData {
  */
 class BotFilter {
 
+    /** @var UserAgent $browser - the parsed useragent info */
     public $browser;
     public $cache;
     public $ua_match;
@@ -366,7 +370,7 @@ class BotFilter {
         }
 
         // 10% update failed challenge bots
-        if (mt_rand(0, 100) < 99) {
+        if (mt_rand(0, 100) < 10) {
             $bot_file_list = glob(BLOCK_DIR."/*.bot.txt");
             array_map("\BitFire\bot_to_block", $bot_file_list);
         }
@@ -381,6 +385,7 @@ class BotFilter {
         $maybe_bot_cookie = BitFire::get_instance()->cookie;
 
         $this->browser->valid = max($this->ip_data->valid, $maybe_bot_cookie->extract('v', 0)->value('int'));
+        if ($maybe_bot_cookie->extract("wp", 0)->value("int") > 1) { $this->browser->valid = 2; }
         debug("x-valid: %d server_cache_ip_valid [%d]", $this->browser->valid, $this->ip_data->valid);
 
         // handle wp-cron and other self requested pages
@@ -461,9 +466,13 @@ class BotFilter {
 
         // lastly verify, real browsers
         // set browser validity to cookie value or server ip data
-        if (!$this->browser->bot && CFG::is_block(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
+        if (!$this->browser->bot && CFG::enabled(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
             if (!$this->browser->whitelist) {
-                $this->verify_browser($request, $maybe_bot_cookie);
+                $effect = $this->verify_browser($request, $maybe_bot_cookie);
+                if (CFG::is_block(CONFIG_REQUIRE_BROWSER)) {
+                    $effect->exit(true);
+                }
+                $effect->run();
             }
         }
         return $block;
@@ -472,7 +481,7 @@ class BotFilter {
     protected function verify_browser(\BitFire\Request $request, MaybeStr $maybe_bot_cookie) {
         // javascript browser challenges
         if ($this->browser->valid < 2 && Config::enabled(CONFIG_REQUIRE_BROWSER)) {
-            if (isset($_POST['_bfxa'])) {
+            if (isset($_POST['_bfxa']) || (strlen($request->post_raw) > 20 && contains($request->post_raw, '_bfxa'))) {
                 $effect = verify_browser_effect($request, $this->ip_data, $maybe_bot_cookie);
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
                 // UGLY, move this to function
@@ -483,20 +492,21 @@ class BotFilter {
                     // this allows us to recreate the original request that we intercepted to verify
                     // the browser runs JavaScript
                     $_SERVER['REQUEST_METHOD'] = $maybe_bot_cookie->extract('m', $method)();
-                    $_GET = un_json($maybe_bot_cookie->extract('g', $_POST['_bfg'])());
-                    $_POST = un_json($maybe_bot_cookie->extract('p', $_POST['_bfp'])());
+                    $_GET = un_json($maybe_bot_cookie->extract('g', $_POST['_bfg']??"")());
+                    $_POST = un_json($maybe_bot_cookie->extract('p', $_POST['_bfp']??"")());
                     // remove any possible cache busting from the browser required reload script
                     unset($_GET['_rqw']);
                     $_SERVER['REQUEST_URI'] = str_replace('_rqw=xpr', '', $uri);
                 }
-                $effect->run();
+                return $effect;
             } else {
-                send_browser_verification($this->ip_data, $request)->run();
+                return send_browser_verification($this->ip_data, $request);
             }
         } else {
             trace("valid");
         }
 
+        return new Effect(STATUS_OK);
     }
 }
 
@@ -518,6 +528,7 @@ function bot_to_block(string $file) {
         $request->agent = $tmp["agent"]??'?';
         $request->ip = $tmp["ip"]??'?';
         $request->method = $tmp["method"]??"?";
+        $request->scheme = $tmp["scheme"]??"?";
         $request->path = $tmp["path"]??'/';
         $request->host = $tmp["host"]??'';
         $request->get = $tmp["get"]??[];
@@ -573,7 +584,7 @@ function browser_clear(\BitFire\Request $request) : Effect {
  * @test test_verify_browser
  * PURE! 
  */
-function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, MaybeStr $cookie) : Effect {
+function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, MaybeA $cookie) : Effect {
 
     $effect = Effect::new();
     // user manually refreshed the page, lets clear as much server state as we can and try to reload the original page
@@ -591,7 +602,9 @@ function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, Maybe
         $bfa = $request->post["_bfa"];
     } else {
         $tmp = urldecode($request->post_raw);
+        debug("x-valid-decoded: %s", $tmp);
         parse_str($tmp, $result);
+        debug("x-valid-decoded: %s", print_r($result, true));
         $bfa = $result["_bfa"]??0;
     }
     debug("x-valid-answer cache: (%s) post (%s)", $answer->ans, $bfa);
@@ -605,6 +618,9 @@ function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, Maybe
     // correct answer
     if ($correct_answer->value('int') === intval($bfa) || $correct_answer->value('int') === intval($request->post['_bfa']??-1)) {
         debug("x-challenge: pass");
+
+        // update the browser valid state!
+        BitFire::get_instance()->bot_filter->browser->valid = 2;
 
         // increase metric counter
         $effect->update(bot_metric_inc('valid'))
@@ -663,6 +679,7 @@ use function ThreadFin\in_array_ending;
 use function ThreadFin\is_regex_reduced;
 use function ThreadFin\memoize;
 use function ThreadFin\debug;
+use function ThreadFin\en_json;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\random_str;
@@ -1061,7 +1078,7 @@ function make_js_script(int $op1, int $op2, int $oper, string $nonce="_rand_") :
 
     // "_bfa="+'.$fn1_name.'()+"&_bfg='.urlencode(json_encode($_GET)).'&_bfp='.urlencode(json_encode($_POST)).'&_bfxa=1&_bfm='.$method.'&_bfx=n");';
     $js .= 'let zzz = {"_bfa":'.$fn1_name.'(),"_bfg":\''.json_encode($_GET).'\',"_bfp":\''.json_encode($_POST).'\',"_bfm":"'.$method.'","_bfx":"n","_bfxa":"on","_gen":"'.date('H:i:s').'"};';
-    $js .= "\n\nconsole.log(zzz);bfxa(JSON.stringify(zzz));\n";
+    $js .= "\n\nbfxa(JSON.stringify(zzz));\n";
     // );}";
     //{'_bfa':$fn1_name()});console.log($fn1_name())";
     return $js;
@@ -1140,8 +1157,7 @@ function send_browser_verification(\BitFire\IPData $ip_data, \BitFire\Request $r
         ->exit(true)
         ->out(sprintf($document, make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper, CFG::str("csp_nonce"))))
         ->cookie(json_encode(make_challenge_cookie($answer, $ip_data->ip_crc, $request->agent)), "bot_challenge")
-        ->file(new FileMod(BLOCK_DIR."/".$answer->ans.".bot.txt", json_encode($request)))
-        //->chain(json_to_file_effect(BLOCK_DIR."/".$answer->ans.".bot.txt", $request))
+        ->file(new FileMod(BLOCK_DIR."/".$answer->ans.".bot.txt", en_json($request, true)))
         ->chain(cache_prevent());
 
     return $effect;
