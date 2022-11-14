@@ -63,8 +63,10 @@ class CacheStorage implements Storage {
         // remove any old op cache
         do_for_each(glob(WAF_ROOT."cache/*.profile", GLOB_NOSORT), 'unlink');
 
-        // delete any shmop
-        cuckoo::delete();
+        include_once \BitFire\WAF_ROOT."src/cuckoo.php";
+        if (class_exists("\BitFire\Cuckoo")) {
+            cuckoo::delete();
+        }
     }
 
     /**
@@ -212,7 +214,7 @@ class CacheStorage implements Storage {
                 return $init;
             }
             if (isset($value[0]) && $value[0] == $key_name) {
-                trace("ST_LOAD[$key_name]");
+                trace("OK[$key_name]");
                 return $value[1];
             }
         }
