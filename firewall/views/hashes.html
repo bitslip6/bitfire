@@ -772,6 +772,15 @@
 		else {
 			GBI("files_spin").classList.add("hidden"); 
 			GBI("status_amt").innerText = "100 %";
+
+			let num = GBI("num_files").getAttribute("data-num");
+			if (num == 0) {
+				GBI("status").innerHTML = "Wordpress integrity check: <strong>File Integrity 100%</strong>";
+				GBI("status_alert").classList.remove("alert-teal");
+				GBI("status_alert").classList.add("alert-success");
+			} else {
+				GBI("status").innerHTML = "Wordpress integrity check: <strong>Complete</strong>";
+			}
 			window.clearInterval(window.SCAN_TIMER);
 		}
 
@@ -954,6 +963,7 @@
 				*/
 			}
 			GBI("num_files").innerText = " (" + num_files + ") Changed Files"
+			GBI("num_files").setAttribute("data-num", num_files);
 		}
 
 		console.log("bitapi diff");

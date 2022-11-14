@@ -1400,6 +1400,9 @@ function toggle_features() {
       }
 
       function uninstall() {
+        let doit = confirm("Are you sure you want to uninstall BitFire?  This will remove all configuration and logs and cannot be undone.");
+        if (!doit) { return; }
+
         BitFire_api("uninstall", {})
           .then(r => r.json())
           .then(data => {
