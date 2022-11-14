@@ -11,7 +11,10 @@
 
 namespace ThreadFin;
 
+use const ThreadFin\CUCKOO_LOW as ThreadFinCUCKOO_LOW;
+
 use function BitFireSvr\update_ini_value;
+use function ThreadFin\cuckoo_write as ThreadFinCuckoo_write;
 
 const CUCKOO_SLOT_SIZE_BYTES = 19;
 const CUCKOO_EXP_SIZE_BYTES = 6;
@@ -436,17 +439,18 @@ function cuckoo_read_or_set(array $ctx, string $key, int $ttl, callable $fn, int
 function cuckoo_read(array $ctx, string $key) {
     if (!$ctx['rid']) { return debugN("cache rid is null"); }
     $header = cuckoo_find_header_for_read($ctx, $key);
+    $data = "x";
 
     if ($header !== null && $header['len'] > 0) {
         $data = shmop_read($ctx['rid'], $header['offset'], $header['len']);
 
         // we have a header we can write cache data to...
         if (function_exists('\igbinary_serialize')) {
-            $x = \igbinary_serialize($data);
+            $x = \igbinary_unserialize($data);
         } else if (function_exists('\msgpack_pack')) {
-            $x = \msgpack_pack($data);
+            $x = \msgpack_unserialize($data);
         } else {
-            $x = serialize($data);
+            $x = unserialize($data);
         }
 
         if (is_array($x)) {
@@ -460,7 +464,9 @@ function cuckoo_read(array $ctx, string $key) {
     $x = "E";
     if ($header == null) { $x = "N"; }
     else if ($header['len'] < 1) { $x = "0"; }
+    else (debug("read cache error [%s] len: %d, (%s)", $key, strlen($data), $data));
     trace("MISS:{$key}[$x]");
+    cuckoo_write($ctx, $key, 0, [$key, ""], CUCKOO_LOW);
     return null;
 }
 
