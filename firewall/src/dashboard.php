@@ -12,7 +12,6 @@
 namespace BitFire;
 
 use BitFire\Config as CFG;
-use FilesystemIterator;
 use ThreadFin\FileData;
 use ThreadFin\Effect;
 
@@ -24,6 +23,7 @@ use function BitFireSvr\get_wordpress_version;
 use function BitFireSvr\update_ini_value;
 use function ThreadFin\array_add_value;
 use function ThreadFin\b2s;
+use function ThreadFin\ip_to_country;
 use function ThreadFin\compact_array;
 use function ThreadFin\compose;
 use function ThreadFin\dbg;
@@ -125,35 +125,7 @@ function list_text_inputs(string $config_name) :string {
     return $result;
 }
 
-/**
- * find the IP DB for a given IP
- * TODO: split into more files, improve distribution
- * PURE: IDEMPOTENT, REFERENTIAL INTEGRITY
- */
-function ip_to_file(int $ip_num) : string {
-    $n = floor($ip_num/0x5F5E100);
-	return "cache/ip.$n.bin";
-}
 
-/**
- * ugly AF returns the country number
- * depends on IP DB
- * NOT PURE, should this be refactored to FileData ?
- */
-function ip_to_country(?string $ip) : int {
-    if (empty($ip)) { return 0; }
-	$n = ip2long($ip);
-    if ($n === false) { return 0; }
-	$d = file_get_contents(\BitFire\WAF_ROOT.ip_to_file($n));
-	$len = strlen($d);
-	$off = 0;
-	while ($off < $len) {
-		$data = unpack("Vs/Ve/Cc", $d, $off);
-		if ($data['s'] <= $n && $data['e'] >= $n) { return $data['c']; }
-		$off += 9;
-	}
-	return 0;
-}
 
 
 function country_enricher(array $country_info): callable
@@ -208,25 +180,25 @@ function version_from_path(string $path) {
     foreach($files as $file) {
         $file_path = "{$path}/{$file}";
         if (file_exists($file_path)) {
-            return FileData::new($file_path)->read()->reduce($package_fn, "");
+            $version = FileData::new($file_path)->read()->reduce($package_fn, "");
+            if ($version) { return $version; }
         }
     }
     return "";
 }
-
  
 function dump_dirs() : array {
     // todo root maybe null
     $root = \BitFireSvr\cms_root();
-    $rootver = \BitFireSvr\get_wordpress_version($root);
+    $root_ver = \BitFireSvr\get_wordpress_version($root);
     if ($root == NULL) { return NULL; }
 
     $dir_list_fn = find_fn("malware_scan_dirs");
     $all_paths = $dir_list_fn($root);
 
     $dir_versions = array_add_value($all_paths, '\BitFire\version_from_path');
-    $dir_versions["{$root}wp-includes"] = $rootver;
-    $dir_versions["{$root}wp-admin"] = $rootver;
+    $dir_versions["{$root}wp-includes"] = $root_ver;
+    $dir_versions["{$root}wp-admin"] = $root_ver;
     return $dir_versions;
 }
 
@@ -282,12 +254,13 @@ function dump_hashes()
 function serve_malware()
 {
     // authentication guard
-    $pw = $_SERVER["PHP_AUTH_PW"]??'';
-    validate_auth($pw)->run();
+    validate_auth()->run();
 
 
     // for reading php files
-    if (CFG::enabled("FPL")) { stream_wrapper_restore("file"); }
+    if (CFG::enabled("FPL") && function_exists("\BitFirePRO\site_unlock")) { 
+        \BitFirePro\site_unlock();
+    }
     $config = map_mapvalue(Config::$_options, '\BitFire\alert_or_block');
     $config['security_headers_enabled'] = ($config['security_headers_enabled'] === "block") ? "true" : "false";
 
@@ -361,6 +334,7 @@ function dashboard_url() : string {
 function render_view(string $view_filename, string $page_name, array $variables = []) : Effect {
     
     $variables['self'] = find_fn("dashboard_url")();
+    $public = CFG::str("wp_contenturl")."/plugins/bitfire/public/";
 
     $is_free = (strlen(Config::str('pro_key')) < 20);
     // inject common variables and extract at the end
@@ -373,6 +347,7 @@ function render_view(string $view_filename, string $page_name, array $variables 
     $variables['password_reset'] = (CFG::str('password') === 'default') || (CFG::str('password') === 'bitfire!');
     $variables['is_free'] = b2s($is_free);
     $variables['llang'] = "en-US";
+    $variables['public'] = $public;
     $variables['assets'] = (defined("WPINC")) ? CFG::str("wp_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/";
     $variables['version'] = BITFIRE_VER;
     $variables['sym_version'] = BITFIRE_SYM_VER;
@@ -411,8 +386,7 @@ function render_view(string $view_filename, string $page_name, array $variables 
 
 function serve_settings() {
     // authentication guard
-    $pw = $_SERVER["PHP_AUTH_PW"]??'';
-    validate_auth($pw)->run();
+    validate_auth()->run();
 
     $view = (CFG::disabled("wizard", false)) ? "wizard.html" : "settings.html";
 
@@ -429,8 +403,7 @@ function serve_settings() {
 
 function serve_advanced() {
     // authentication guard
-    $pw = $_SERVER["PHP_AUTH_PW"]??'';
-    validate_auth($pw)->run();
+    validate_auth()->run();
     $data = ["mfa" => defined("WPINC") ? "Enable multi factor authentication. Add MFA phone numbers in user editor." :
         "Multi Factor Authentication is only available in the WordPress plugin. Reinstall the plugin to enable.",
         "show_mfa" => (defined("WPINC")) ? "" : "hidden",
@@ -447,7 +420,7 @@ function serve_advanced() {
  * @param string $raw_pw the password to validate against Config::password
  * @return Effect validation effect. after run, ensured to be authenticated
  */
-function validate_auth(?string $raw_pw) : Effect {
+function validate_auth() : Effect {
 
     // ensure that the server configuration is complete...
     if (CFG::disabled("configured")) { \BitFireSVR\bf_activation_effect()->run(); }
@@ -457,43 +430,7 @@ function validate_auth(?string $raw_pw) : Effect {
         render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->exit()->run();
     }
 
-
-
-
-    $effect = Effect::new();
-    //$effect = cache_prevent();
-    // disable caching for auth pages
-    $effect->response_code(203);
-
-    // prefeer plugin authentication first
-    if (function_exists("BitFirePlugin\is_admin") && \BitFirePlugin\is_admin()) {
-        return $effect;
-    }
-
-
-
-    // inspect the cookie wp admin status, we pass auth if wp value is admin(2)
-    // TODO: make this a function on the BitFire class
-    $cookie = BitFire::get_instance()->cookie;
-    if ($cookie != null) {
-        if ($cookie->extract("wp")->value("int") == 2) {
-            return $effect;
-        }
-    }
-    // if we don't have a password, or the password does not match
-    // or the password function is disabled
-    // create an effect to force authentication and exit
-    if (strlen($raw_pw) < 2 ||
-        CFG::str("password") == "disabled" ||
-        (hash("sha3-256", $raw_pw) !== CFG::str('password')) &&
-        (hash("sha3-256", $raw_pw) !== hash("sha3-256", CFG::str('password')))) {
-
-        $effect->header("WWW-Authenticate", 'Basic realm="BitFire", charset="UTF-8"');
-        $effect->response_code(401);
-        $effect->exit(true);
-    }
-
-    return $effect;
+    return \BitFire\verify_admin_password();
 }
 
 
@@ -527,7 +464,6 @@ function enrich_alert(array $report, array $exceptions, array $whitelist) : arra
     if ($cl == 24000) {
         $crc = "crc".crc32($report['request']['agent']);
         $has_exception = array_key_exists($crc, $whitelist);
-        debug("chk $crc [$has_exception]");
     }
 
     $report['exception_class'] = ($has_exception) ? "warning" : "secondary";
@@ -602,8 +538,7 @@ function serve_dashboard() :void
     }
 
     // authentication guard
-    $pw = $_SERVER["PHP_AUTH_PW"]??'';
-    validate_auth($pw)->run();
+    validate_auth()->run();
     
     $block_page_num = intval($_GET["block_page_num"]??0);
     $alert_page_num = intval($_GET["alert_page_num"]??0);
@@ -629,9 +564,8 @@ function serve_dashboard() :void
     $reporting = $report_file->lines;
     // calculate number of alert pages
     //$report_count = $report_file->num_lines;
-    $last = min([(($report_count * PAGE_SZ) + PAGE_SZ), $report_count]);
     $data["report_count"] = $report_count;
-    $data["report_range"] = ($alert_page_num * PAGE_SZ) . " - $last";
+    $data["report_range"] = ($alert_page_num * PAGE_SZ) . " - " . ($alert_page_num * PAGE_SZ) + PAGE_SZ;
     $data["report_pages"] = ceil($report_count / PAGE_SZ);
     $data["alerts"] = [];
     $data["access"] = defined("WPINC") ? "You can access the dashboard by clicking the BitFire icon in the admin bar." : "You can access the dashboard by visiting " . CFG::str("dashboard_path");
@@ -639,7 +573,8 @@ function serve_dashboard() :void
     $exceptions = load_exceptions();
     // this will create a $config array from whitelist agents
     $config = ["botwhitelist" => []];
-    @include (\BitFire\WAF_ROOT."cache/whitelist_agents.ini.php");
+    //@include (\BitFire\WAF_ROOT."cache/whitelist_agents.ini.php");
+    $config = array_merge($config, \parse_ini_file(\BitFire\WAF_ROOT."cache/whitelist_agents.ini"));
     array_map(function($line) use (&$data, $exceptions, $config) {
         if (isset($line["block"])) {
             $data["alerts"][] = enrich_alert($line, $exceptions, $config["botwhitelist"]);
@@ -654,18 +589,19 @@ function serve_dashboard() :void
     // load all alert data
     $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
         ->read()
-        ->apply(BINDR('\BitFire\remove_lines', 400));
+        ->apply(BINDR('\BitFire\remove_lines', 400))
+        ->apply_ln('array_reverse')
+        ->map('\ThreadFin\un_json');
     $block_count = $block_file->num_lines; // need block count before filtering pagination
-    $block_file->apply_ln('array_reverse')
-        ->apply_ln(BINDR('array_slice', $block_page_num * PAGE_SZ, PAGE_SZ, false))
-        ->map('\ThreadFin\un_json')
+    $blocking_full = $block_file->lines;
+    $block_file->apply_ln(BINDR('array_slice', $block_page_num * PAGE_SZ, PAGE_SZ, false))
         ->map($country_fn);
     $blocking = $block_file->lines;
 
-    // calcualte number of alert pages
+    // calculate number of alert pages
     $data["block_count"] = $block_count;
-    $last = min([(($block_count * PAGE_SZ) + PAGE_SZ), $block_count]);
-    $data["block_range"] = ($block_page_num * PAGE_SZ) . " - $last";
+    //$last = min([(($block_count / PAGE_SZ)), $block_count]);
+    $data["block_range"] = ($block_page_num * PAGE_SZ) . " - " . ($block_page_num * PAGE_SZ) + PAGE_SZ;
     $data["block_pages"] = ceil($block_count / PAGE_SZ);
     $data["blocks"] = [];
 
@@ -682,11 +618,11 @@ function serve_dashboard() :void
 
 
     $check_day = time() - DAY;
-    $block_24 = array_filter($blocking, function ($x) use ($check_day) {
+    $block_24 = array_filter($blocking_full, function ($x) use ($check_day) {
         return isset($x['tv']) && $x['tv'] > $check_day;
     });
     $data['block_count_24'] = count($block_24);
-    $blocks = array_slice($blocking, $block_page_num * PAGE_SZ, PAGE_SZ);
+    //$blocks = array_slice($blocking, $block_page_num * PAGE_SZ, PAGE_SZ);
 
 
     // calculate hr data
@@ -702,7 +638,8 @@ function serve_dashboard() :void
 
     // calculate country data
     $country_data = array_reduce($block_24, function ($carry, $x) {
-        $carry[$x['country']] = isset($carry[$x['country']]) ? $carry[$x['country']] + 1 : 1;
+        $c = $x['country']??'-';
+        $carry[$c] = isset($carry[$c]) ? $carry[$c] + 1 : 1;
         return $carry;
     }, array());
     $data['country_data_json'] = en_json(["total" => count($country_data), "data" => $country_data]);
@@ -714,6 +651,15 @@ function serve_dashboard() :void
         return $carry;
     }, array());
     $data['type_data_json'] = en_json(["total" => count($type_data), "data" => $type_data]);
+
+    if (function_exists('\BitFirePlugin\create_plugin_alerts')) {
+        $alerts = \BitFirePlugin\create_plugin_alerts();
+        $data['plugin_alerts'] = "";
+        foreach ($alerts as $alert) {
+            $data['plugin_alerts'] = "<div style='border-left: 5px solid #d63638; padding-left: 1rem;'>
+            <span class='dashicons dashicons-admin-plugins' data-code='f485'></span> {$alert}</div>\n";
+        }
+    }
 
     //$data["theme_css"] = file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css");
     render_view(\BitFire\WAF_ROOT."views/dash.html", "BitFire Alert Dashboard", $data)->exit()->run();
