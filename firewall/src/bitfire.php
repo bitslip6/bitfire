@@ -163,7 +163,7 @@ class MatchType
         }
 
         // chain additional match types
-        if ($result) {
+        if ($result && $this->_chained) {
             $result = $this->_chained->match($request);
         }
 
@@ -253,12 +253,14 @@ class Config {
 
     // return true if value is set to true or "block"
     public static function is_block(string $name) : bool {
-        return (Config::$_options[$name]??'' == 'block' || Config::$_options[$name]??'' == true) ? true : false;
+        $value = self::$_options[$name]??'';
+        return ($value === 'block' || $value === true) ? true : false;
     }
 
     // return true if value is set to "report" or "alert"
     public static function is_report(string $name) : bool {
-        return (Config::$_options[$name]??'' == 'report' || Config::$_options[$name]??'' == 'alert') ? true : false;
+        $value = self::$_options[$name]??'';
+        return ($value === 'report' || $value === 'alert') ? true : false;
     }
 
     // get a string value with a default
@@ -316,24 +318,61 @@ class Config {
  * NOT PURE.  depends on: SERVER['PHP_AUTH_PW'], Config['password']
  */
 function verify_admin_password() : Effect {
+
+    // ensure that the server configuration is complete...
+    if (CFG::disabled("configured")) { \BitFireSVR\bf_activation_effect()->run(); }
+
+    // run the initial password setup if the password is not configured
+    if (CFG::str("password") == "configure") {
+        render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->exit()->run();
+    }
+
+    $raw_pw = $_SERVER["PHP_AUTH_PW"]??'';
+    // read any recovery passwords
+    $password = CFG::str("password");
+    $files = glob(CFG::str("wp_root")."/bitfire.recovery.*");
+    foreach ($files as $file) {
+        if (filemtime($file) < time() - 3600) {
+            unlink($file);
+        } else {
+            // set the password and unlock the config file
+            $password = trim(file_get_contents($file));
+            @chmod(WAF_INI, FILE_RW);
+        }
+    }
+
     $effect = Effect::new();
+    // disable caching for auth pages
+    $effect->response_code(203);
 
-    // allow initial password set without auth
-    if (CFG::str("password") == "configure") { return $effect; }
-    if (CFG::str("password") == "disabled") {
-        require_once \BitFire\WAF_ROOT . "/bitfire-plugin.php";
-        if (\BitFirePlugin\is_admin()) { return $effect; }
+    // prefer plugin authentication first
+    if (function_exists("BitFirePlugin\is_admin") && \BitFirePlugin\is_admin()) {
+        return $effect;
     }
 
-    $auth = $_SERVER["PHP_AUTH_PW"]??"";
-    if (!$auth ||
-        ((hash("sha3-256", $auth) !== CFG::str('password')) &&
-        (hash("sha3-256", $auth) !== hash('sha3-256', CFG::str('password'))))) {
-
-        $effect->header('WWW-Authenticate', 'Basic realm="BitFire Dashboard", charset="UTF-8"')
-            ->response_code(401)
-            ->exit(true);
+    // inspect the cookie wp admin status, we pass auth if wp value is admin(2)
+    // TODO: make this a function on the BitFire class
+    $cookie = BitFire::get_instance()->cookie;
+    if ($cookie != null) {
+        if ($cookie->extract("wp")->value("int") == 2) {
+            return $effect;
+        }
     }
+    
+
+    // if we don't have a password, or the password does not match
+    // or the password function is disabled
+    // create an effect to force authentication and exit
+    if (strlen($raw_pw) < 2 ||
+        $password == "disabled" ||
+        (hash("sha3-256", $raw_pw) !== $password) &&
+        (hash("sha3-256", $raw_pw) !== hash("sha3-256", $password))) {
+
+        $effect->header("WWW-Authenticate", 'Basic realm="BitFire", charset="UTF-8"');
+        $effect->response_code(401);
+        $effect->exit(true);
+    }
+
     return $effect;
 }
 
@@ -350,7 +389,7 @@ class BitFire
     public static $_exceptions = NULL;
     public static $_reporting = array();
     public static $_blocks = array();
-    /** @var MaybeStr $cookie */
+    /** @var \ThreadFin\MaybeStr $cookie */
     public $cookie = NULL;
 
     public static $_fail_reasons = array();
@@ -524,13 +563,14 @@ class BitFire
             Config::str(CONFIG_ENCRYPT_KEY),
             $this->_request->ip, $this->_request->agent);
         $this->cookie = $maybe_bot_cookie;
+        //debug("cookie %s", print_r($maybe_bot_cookie, true));
 
 
         // if we are not running inside of Wordpress, then we need to load the page here.
         // if running inside of WordPress, bitfire-admin.php will load the admin pages, so
         // the check for admin.php will fail here in that case
-        $no_slash = partial_right('trim', '/');
-        $dash_path = contains($no_slash($this->_request->path), ['bitfire/startup.php', $no_slash(CFG::str("dashboard_path"))]);
+        $no_slash_fn = partial_right('trim', '/');
+        $dash_path = contains($no_slash_fn($this->_request->path), ['bitfire/startup.php', $no_slash_fn(CFG::str("dashboard_path"))]);
         if ($dash_path && (
             !isset($this->_request->get['BITFIRE_PAGE']) && !isset($this->_request->get['BITFIRE_API']))) {
             $this->_request->get['BITFIRE_PAGE'] = 'dashboard';
