@@ -48,7 +48,6 @@ class Credentials {
  */
 function glue(string $join, array $data, string $append_str = "") : string {
     $result = "";
-    var_export($data);
     foreach ($data as $key => $value) {
         if ($result != '') { $result .= $append_str; }
         if ($key[0] === '!') { $key = substr($key, 1); $result .= "`{$key}` $join $value"; }
@@ -78,11 +77,12 @@ function quote($input) : string {
 function where_clause(array $data) : string { 
     $result = " WHERE ";
     foreach ($data as $key => $value) {
+        if (strlen($result) > 7) { $result .= " AND "; }
         if ($key[0] == '!') {
             $t = substr($key, 1);
-            $result .= " `{$t}` = {$value} , ";
+            $result .= " `{$t}` = {$value} ";
         } else {
-            $result .= " `{$key}` = " . quote($value) . ",";
+            $result .= " `{$key}` = " . quote($value);
         }
     }
     $x = trim($result, ",");
@@ -198,7 +198,22 @@ class DB {
             $err = "[$sql] errno($errno) " . mysqli_error($this->_db);
             $this->_errors[] = $err;
         }
-        return (bool)$r;
+        $success = (bool)$r;
+        if ($success) {
+            if ($this->_replay_enabled || $this->_log_enabled) {
+                $e = mysqli_affected_rows($this->_db);
+                if ($e && $e > 0) {
+                    if ($this->_replay_enabled && $e > 0) {
+                        $this->_replay_log[] = $sql;
+                    }
+                }
+            }
+            if ($this->_log_enabled) {
+                $this->logs[] = " --> effected rows: $e";
+            }
+        }
+
+        return $success;
     }
 
     /**
@@ -255,17 +270,6 @@ class DB {
     public function delete(string $table, array $where) : bool {
         $sql = "DELETE FROM $table " . where_clause($where);
         $success = $this->_qb($sql);
-        if ($success) {
-            if ($this->_replay_enabled || $this->_log_enabled) {
-                $e = mysqli_affected_rows($this->_db);
-            }
-            if ($this->_replay_enabled && $e > 0) {
-                $this->_replay_log[] = $sql;
-            }
-            if ($this->_log_enabled) {
-                $this->logs[] = " --> effected rows: $e";
-            }
-        }
         return $success;
     }
 
@@ -277,10 +281,9 @@ class DB {
      */
     public function insert(string $table, array $kvp) : bool {
         $sql = "INSERT INTO $table (" . join(",", array_keys($kvp)) . 
-        ") VALUES (" . join(",", array_map('\DB\quote', array_values($kvp))).")";
+        ") VALUES (" . join(",", array_map('\ThreadFinDB\quote', array_values($kvp))).")";
 
         $success = $this->_qb($sql);
-        if ($success && $this->_replay_enabled) { $this->_replay_log[] = $sql; }
         return $success;
     }
 
@@ -298,10 +301,9 @@ class DB {
                 $data = array_filter($data, BINDR('in_array', $keys), ARRAY_FILTER_USE_KEY);
             }
             $sql = "INSERT INTO $table (" . join(",", array_keys($data)) . 
-                ") VALUES (" . join(",", array_map('\DB\quote', array_values($data))) . ")";
+                ") VALUES (" . join(",", array_map('\ThreadFinDB\quote', array_values($data))) . ")";
 
             $success = $t->_qb($sql);
-            if ($success && $this->_replay_enabled) { $t->_replay_log[] = $sql; }
             return $success;
         };
     }
@@ -319,12 +321,11 @@ class DB {
         $sql = "INSERT INTO $table (" . join(",", array_keys($columns)) . ") VALUES ";
         return function(?array $data = null) use (&$sql) : bool {
             if ($data !== null) {
-                $sql .= join(",", array_map('\DB\quote', array_values($data))) . ")";
+                $sql .= join(",", array_map('\ThreadFinDB\quote', array_values($data))) . ")";
                 return false;
             }
 
             $success = $this->_qb($sql);
-            if ($success && $this->_replay_enabled) { $this->_replay_log[] = $sql; }
             return $success;
         };
     }
@@ -362,8 +363,12 @@ class DB {
     public function close() : void {
         if ($this->_db) { mysqli_close($this->_db); $this->_db = NULL; }
         if (count($this->_errors) > 0) {
-            $errors = array_filter($this->_errors, function($x) { return stripos($x, "Duplicate") != false; });
+            $errors = array_filter($this->_errors, function($x) { return stripos($x, "Duplicate") !== false; });
             file_put_contents("/tmp/php_db_errors.txt", print_r($errors, true), FILE_APPEND);
+        }
+        if (count ($this->_replay_log)) { 
+            file_put_contents("replay.log", "\n".implode(";\n", $this->_replay_log).";\n", FILE_APPEND);
+            $this->_replay_log = [];
         }
     }
 }
