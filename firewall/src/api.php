@@ -18,6 +18,7 @@ use ThreadFin\MaybeStr;
 use BitFire\Config as CFG;
 use RuntimeException;
 
+use const ThreadFin\DAY;
 use const ThreadFin\HOUR;
 
 use function BitFireBot\find_ip_as;
@@ -233,7 +234,7 @@ function diff(\BitFire\Request $request) : Effect {
     // verify valid url
     $url = $request->post["url"];
     // TODO: move regex to plugin function
-    if (!preg_match("/https?:\/\/\w+\.svn.wordpress.org\//", $url)) {
+    if (!preg_match("/^https?:\/\/\w+\.svn.wordpress.org\//", $url)) {
         return Effect::new()->api(false, "invalid URL: $url");
     }
     // verify valid path
@@ -344,17 +345,26 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
             $sum = array_sum(array_map(function($x){return filesize($x['file_path']);}, $compacted));
             $sum_kb = round($sum/1024, 2);
 
-            $compacted[0]["rel_path"] = "";// basename($hashes[0]->file_path);
+            $compacted[0]["crc_trim"] = $hashes[0]->crc_trim;
+            $compacted[0]["crc_path"] = $hashes[0]->crc_path;
+            $compacted[0]["found"] = false;
+            
+            $compacted[0]["rel_path"] = (isset($hashes[0]->file_path)) ? basename($hashes[0]->file_path): "";
+            $compacted[0]["file_path"] = $compacted[0]["rel_path"];
             $compacted[0]["mtime"] = filemtime($hashes[0]->file_path);
             $compacted[0]["machine_date"] = machine_date($compacted[0]["mtime"]);
 
-            $compacted[0]["known"] = "Unknown {$compacted[0]["type"]} {$compacted[0]["name"]}";
+            $type = $compacted[0]["type"]??"type";
+            $name = $compacted[0]["name"]??$hashes[0]->name;
+            $compacted[0]["known"] = "Unknown $type $name";
             $compacted[0]["bgclass"] = "bg-danger-soft";
             $compacted[0]["icon"] = "x";
             $compacted[0]["icon_class"] = "danger";
             $compacted[0]["kb2"] = "0 Files";
             $compacted[0]["kb1"] = count($compacted) . " Files ({$sum_kb} Kbytes)";
-            $compacted[0]["table"] = "Unknown " . $compacted[0]["table"];
+
+            $thing = isset($compacted[0]["table"]) ? $compacted[0]["table"] : $hashes[0]->type;
+            $compacted[0]["table"] = "Unknown $thing";
             $compacted = [$compacted[0]];
         } else {
             $enrich_fn = BINDL('\BitFire\enrich_hashes', $ver, $dir_without_plugin_name);
@@ -487,7 +497,10 @@ function get_valid_data(\BitFire\Request $request) : Effect {
     $response = array('challenge' => 0, 'valid' => 0);
     for($i=0; $i<25; $i++) {
         $data = $cache->load_data("metrics-$i", null);
-        if ($data === null) { continue; }
+        if ($data === null) { 
+            $cache->save_data("metrics-$i", $response, DAY);
+            continue;
+        }
         foreach ($data as $code => $cnt) {
             if ($code === "challenge") { $response['challenge'] += $cnt; }
             if ($code === "valid") { $response['valid'] += $cnt; }
@@ -706,6 +719,16 @@ function uninstall(\BitFire\Request $request) : Effect {
 function toggle_config_value(\BitFire\Request $request) : Effect {
     // handle fixing write permissions
     if ($request->post["param"] == "unlock_config") { chmod(\BitFire\WAF_INI, 0664); return Effect::new()->api(true, "updated"); }
+    // ugly fix for missing valid domain line
+    $config = FileData::new(WAF_INI)->read()->filter(function($line) {
+        return contains($line, "valid_domains[] = \"\"");
+    });
+    if ($config->num_lines < 1) {
+        file_replace(WAF_INI, "; domain_fix_line", "valid_domains[] = \"\"\n; domain_fix_line")->run();
+    }
+
+
+
     // update the config file
     $effect = \BitFireSvr\update_ini_value($request->post["param"], $request->post["value"]);
     // handle auto_start install
@@ -764,6 +787,7 @@ function clear_cache(\BitFire\Request $request) : Effect {
 
 function api_call(Request $request) : Effect {
     if (!isset($request->get[BITFIRE_COMMAND])) {
+        die("api call NULL");
         return Effect::$NULL;
     }
     trace("api");
@@ -771,6 +795,7 @@ function api_call(Request $request) : Effect {
     $fn_name = htmlspecialchars($request->get[BITFIRE_COMMAND]);
     $fn = "\\BitFire\\$fn_name";
     if (!in_array($fn, BITFIRE_API_FN)) {
+        die("api call no such $fn");
         return Effect::new()->exit(true, STATUS_ENOENT, "no such method");
     }
 
@@ -782,6 +807,7 @@ function api_call(Request $request) : Effect {
         $auth_effect = (function_exists("\\BitFirePlugin\\verify_admin_effect"))
             ? \BitFirePlugin\verify_admin_effect($request) 
             : verify_admin_password($request);
+    
         $auth_effect->run();
     }
     
