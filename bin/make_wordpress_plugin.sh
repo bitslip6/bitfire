@@ -107,7 +107,7 @@ zip -r ../bitfire-$1.zip bitfire --exclude 'bitfire/quarantine/*' --exclude 'bit
 cd ..
 pwd
 ls -l 
-#rm -rf _build
+rm -rf _build
 #rm -rf wordpress-plugin/src
 #rm -rf wordpress-plugin/blocks
 #rm -rf wordpress-plugin/cache

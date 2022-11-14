@@ -78,7 +78,7 @@ tar zcf ../bitfire-standalone-$1.tar.gz bitfire --exclude 'bitfire/quarantine/*'
 cd ..
 pwd
 ls -l 
-#rm -rf _build
+rm -rf _build
 #rm -rf wordpress-plugin/src
 #rm -rf wordpress-plugin/blocks
 #rm -rf wordpress-plugin/cache
