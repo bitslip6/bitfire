@@ -119,7 +119,7 @@ class WebFilter {
             $x = $cookie->extract("x")->value("int");
             // always check on get params
             $block->do_if_not('\ThreadFin\map_whilenot', $request->get, $reducer, NULL);
-            // dont check for post if user can
+            // don't check for post if user can
             if (empty($x) || $x < 2) {
                 $block->do_if_not('\ThreadFin\map_whilenot', $request->post, $reducer, NULL);
             }
@@ -190,35 +190,35 @@ function file_filter(array $files) : MaybeBlock {
 /**
  * look for php tags in file uploads
  */
-function check_php_tags(array $file) : MaybeBlock {
+function check_php_tags(array $file) : MaybeA {
     // check for <?php tags
     $data = file_get_contents($file["tmp_name"]);
     if (stripos($data, "<?php") !== false) {
         if (preg_match('/<\?php\s/i', $data)) {
-            return Maybe::of(BitFire::new_block(FAIL_FILE_PHP_TAG, "file upload", $file["name"], ".php", BLOCK_SHORT));
+            return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_TAG, "file upload", $file["name"], ".php", BLOCK_SHORT));
         }
     }
     // check for phar polyglots (tar)
     if (substr($data, -4) === "GBMB") {
-        return Maybe::of(BitFire::new_block(FAIL_FILE_POLYGLOT, "file upload", $file["name"], "phar polyglot", BLOCK_SHORT));
+        return MaybeBlock::of(BitFire::new_block(FAIL_FILE_POLYGLOT, "file upload", $file["name"], "phar polyglot", BLOCK_SHORT));
     }
 
     return Maybe::$FALSE;
 }
 
-function check_ext_mime(array $file) : MaybeBlock {
+function check_ext_mime(array $file) : MaybeA {
      // check file extensions...
     $info = pathinfo($file["tmp_name"]);
     if (ends_with(strtolower($file["name"]), "php") ||
         in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
-        return Maybe::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
     }
         
     // check mime types
     $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
     $info = finfo_file($ctx, $file["tmp_name"]);
     if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
-        return Maybe::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
     }
 
     return Maybe::$FALSE;
@@ -228,7 +228,7 @@ function check_ext_mime(array $file) : MaybeBlock {
 /**
  * find sql injection for short strings
  */
-function search_short_sql(string $name, string $value) : MaybeBlock {
+function search_short_sql(string $name, string $value) : MaybeA {
     if (preg_match('/\s*(or|and)\s+(\d+|true|false|\'\w+\'|)\s*!?=(\d+|true|false|\'\w+\'|)/sm', $value, $matches)) {
         return BitFire::get_instance()->new_block(FAIL_SQL_OR, $name, $matches[0], ERR_SQL_INJECT, BLOCK_NONE);
     }
@@ -258,7 +258,7 @@ function search_short_sql(string $name, string $value) : MaybeBlock {
  * find sql looking things...
  * this could be way more functional, but it would be slower, choices...
  */
-function search_sql(string $name, string $value, ?array $counts) : MaybeBlock {
+function search_sql(string $name, string $value, ?array $counts) : MaybeA {
     // block union select - super basic
     $find = function(string $search) use ($value) : callable {
         return function(?int $offset) use ($value, $search) : int {
@@ -299,7 +299,7 @@ function search_sql(string $name, string $value, ?array $counts) : MaybeBlock {
 /**
  * check if removed sql was found
  */
-function check_removed_sql(StringResult $stripped_comments, int $total_control, string $name, string $value) : MaybeBlock {
+function check_removed_sql(StringResult $stripped_comments, int $total_control, string $name, string $value) : MaybeA {
  
 
     $sql_removed = str_replace(SQL_WORDS, "", $stripped_comments->value);
@@ -347,7 +347,7 @@ function strip_comments(string $value) {
 /**
  * search for likely spam
  */ 
-function search_spam(string $all_content) : MaybeBlock {
+function search_spam(string $all_content) : MaybeA {
     trace("spam");
     if (preg_match('/[^a-z]('.SPAM.')[^a-z$]/', $all_content, $matches)) {
         return BitFire::get_instance()->new_block(FAIL_SPAM, 'GET/POST input parameters', $matches[1][0] ?? '', 'static match');
@@ -358,7 +358,7 @@ function search_spam(string $all_content) : MaybeBlock {
 /**
  * reduce key / value with fn
  */
-function trivial_reducer(callable $fn, string $key, string $value, $ignore) : MaybeBlock {
+function trivial_reducer(callable $fn, string $key, string $value, $ignore) : MaybeA {
     if (strlen($value) > 0) {
         return $fn($key, $value);
     }
@@ -368,7 +368,7 @@ function trivial_reducer(callable $fn, string $key, string $value, $ignore) : Ma
 /**
  * reduce key / value with fn
  */
-function generic_reducer(array $keys, array $values, $name, ?string $value) : MaybeBlock {
+function generic_reducer(array $keys, array $values, $name, ?string $value) : MaybeA {
     // don't reduce these empty values
     if (strlen($value) < 4) {
         return Maybe::$FALSE;
@@ -385,16 +385,21 @@ function generic_reducer(array $keys, array $values, $name, ?string $value) : Ma
 /**
  * generic search function for keys and values
  */
-function generic(string $name, string $value, array $values, array $keys) : MaybeBlock {
+function generic(string $name, string $value, array $values, array $keys) : MaybeA {
     $block = Maybe::$FALSE;
 
     foreach ($values as $key => $needle) {
-        if (!is_int($key)) { debug("key $key, need $needle"); }
-        $block->do_if_not('\BitFire\static_match', $key, $needle, $value, $name);
+        if (!is_int($key) || empty($needle)) { debug("key $key, need $needle"); continue; }
+        if ((strpos($value, $needle) !== false || strpos($name, $needle) !== false)) { 
+            return BitFire::new_block($key, $name, $value, "static match: $needle");
+        }
     }
 
     foreach ($keys as $key => $needle) {
-        $block->do_if_not('\BitFire\dynamic_match', $key, $needle, $value, $name);
+        $block = \BitFire\dynamic_match($key, $needle, $value, $name);
+        if ($block != Maybe::$FALSE) {
+            return $block;
+        }
     }
 
     return $block;
@@ -403,13 +408,22 @@ function generic(string $name, string $value, array $values, array $keys) : Mayb
 /**
  * dynamic analysis
  */
-function dynamic_match($key, string $needle, string $value, string $name) : MaybeBlock {
+function dynamic_match($key, string $needle, string $value, string $name) : MaybeA {
     assert(! empty($needle), "generic block list error: needle:[$needle] - code[$key]");
     assert(! ctype_digit($needle), "generic block list error: needle code swap");
     assert($needle[0] === "/", "generic block list error: no regex_identifier");
+    static $list = null;
 
     if (empty($needle) == false && preg_match($needle, $value) === 1) {
-        return BitFire::new_block($key, $name, $value, 'static match');
+        // extra special case here
+        if ($key == 10101) {
+            if ($list == null) { $list = file(WAF_ROOT . "cache/events.txt", FILE_IGNORE_NEW_LINES); debug("load events sz %d", count($list)); }
+            if (!\ThreadFin\contains($value, $list)) {
+                debug("found non event ($value)");
+                return Maybe::$FALSE;
+            }
+        }
+        return BitFire::new_block($key, $name, $value, 'dynamic match');
     }
     return Maybe::$FALSE;
 }
@@ -417,7 +431,7 @@ function dynamic_match($key, string $needle, string $value, string $name) : Mayb
 /**
  * static analysis
  */
-function static_match($key, $needle, string $value, string $name) : MaybeBlock {
+function static_match($key, $needle, string $value, string $name) : MaybeA {
     if (empty($needle) == false && (strpos($value, $needle) !== false || strpos($name, $needle) !== false)) { 
         return BitFire::new_block($key, $name, $value, 'static match');
     }
