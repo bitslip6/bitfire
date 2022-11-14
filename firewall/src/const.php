@@ -20,8 +20,8 @@ const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg
 
 const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\allow', '\\BitFire\\send_mfa', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff','\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\download', '\\BitFire\\rem_api_exception', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\add_list_elm', '\\BitFire\\remove_list_elm', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\dump_hash_dir','\\BitFire\\install', '\\BitFire\\uninstall', '\\BitFire\\download');
 const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 29000 => 0, 70000 => 0);
-const BITFIRE_VER = 999;//__VERSION_NUM__;
-const BITFIRE_SYM_VER = "9.9.9";//"__VERSION__";
+const BITFIRE_VER = __VERSION_NUM__;
+const BITFIRE_SYM_VER = "__VERSION__";
 const APP = "https://bitfire.co/";
 
 const BITFIRE_INTERNAL_PARAM = 'BITFIRE_NONCE';
