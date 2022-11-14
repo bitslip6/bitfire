@@ -45,7 +45,7 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = NULL) : bool {
         $data['debug'] = debug(null);
         $data['trace'] = trace(null);
         $known[] = $data;
-        file_put_contents(\BitFire\WAF_ROOT."cache/errors.json", en_json($known, JSON_PRETTY_PRINT));
+        file_put_contents(\BitFire\WAF_ROOT."cache/errors.json", en_json($known, true));
         $data['bt'] = debug_backtrace(0, 3);
         if (CFG::enabled('send_errors')) { httpp(APP."err.php", base64_encode(json_encode($data))); }
     }
@@ -61,7 +61,6 @@ register_shutdown_function(function() {
     // if last error was from bitfire, log it
     if (is_array($e) && $e['type']??-1 == E_ERROR && stripos($e['file']??"", "bitfire") > 0) {
         on_err(1, $e['message'], "({$e['file']})", $e["line"]);
-        exit();
 }});
 
 
@@ -119,8 +118,10 @@ try {
             return $block;
         })->then(function(\BitFire\Block $block) use ($bitfire) {
             if ($block->code > 0) {
+                //debug("block 2 [%s]", print_r($bitfire->bot_filter->browser, true));
                 if ($bitfire->bot_filter->browser->valid > 1 && CFG::enabled("dynamic-exceptions")) {
                     if (time() < CFG::int("dynamic-exceptions")) {
+                        debug("add dynamic exception");
                         // use the API to add a dynamic exception
                         $r = new \BitFire\Request();
                         $r->post = array("path" => $bitfire->_request->path, "code" => $block->code, "param" => $block->parameter);
