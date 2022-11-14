@@ -145,7 +145,7 @@ class FileData {
                 $this->lines = file($this->filename, $mode);
                 // count lines...
                 $this->num_lines = count($this->lines);
-                debug(basename($this->filename) . " read num lines: " . $this->num_lines);
+                //debug(basename($this->filename) . " read num lines: " . $this->num_lines);
 
                 if ($this->debug) {
                     debug("FS(r) [%s] (%d)lines", $this->filename, $this->num_lines);
@@ -313,9 +313,10 @@ function find_regex_reduced($value) : callable { return function($initial, $argu
 function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
 function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
-function un_json(string $data) : array { $j = json_decode($data, true, 6); return (empty($j)) ? array() : $j; }
+function un_json(?string $data="") : array { $d = trim($data, "\n\r,"); $j = json_decode($d, true, 20); $r = []; if (is_array($j)) { $r = $j; } else { 
+    error("json decode error");
+    $wrote = file_put_contents("/tmp/decodes2.txt", "$data\n", FILE_APPEND); } return $r; }
 function en_json($data) : string { $j = json_encode($data); return ($j == false) ? "" : $j; }
-function un_json_array(array $data) { $data = array_map(partial_right("trim", ","), $data); return un_json('['. join(",", $data) . ']'); }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
@@ -367,6 +368,23 @@ function find_match(string $input, array $matches) : ?array {
         if ($carry == null && preg_match($x, $input, $matches) !== false) { return $matches; }
         return $carry;
     }, null);
+}
+
+
+/**
+ * modify all elements of $list that match $filter_fn with $modify_fn
+ * @param array $list 
+ * @param callable $filter_fn  - function($key, $value) : bool
+ * @param callable $modify_fn  - function($key, $value) : T of $value
+ * @return array the modified array
+ */
+function array_filter_modify(array $list, callable $filter_fn, callable $modify_fn) {
+    foreach ($list as $key => $value) {
+        if ($filter_fn($key, $value)) {
+            $list[$key] = $modify_fn($key, $value);
+        }
+    }
+    return $list;
 }
 
 /**
@@ -730,11 +748,10 @@ class Effect {
                 }
             }
 
-            $bytes = strlen($file->content);
             $written = file_put_contents($file->filename, $file->content, $mods);
-            if ($written != $bytes) {
+            if ($written != $len) {
                 $e = error_get_last();
-                debug("file mod write error [%s] (%s)", $file->filename, $file->content);
+                debug("file mod write error [%s] (%d/%d bytes)", basename($file->filename), $written, $len);
                 $this->errors[] = "failed to write file: $file->filename " . strlen($file->content) . " bytes. " . en_json($e);
             }
             if ($file->modtime > 0) { if (!touch($file->filename, $file->modtime)) { $this->error[] = "unable to set {$file->filename} modtime to: " . $file->modtime; } }
@@ -811,6 +828,7 @@ interface MaybeI {
     public function index(int $index) : MaybeI;
     public function isa(string $type) : bool;
     public function __toString() : string;
+    public function __isset($object) : bool;
 }
 
 
@@ -866,7 +884,7 @@ class MaybeA implements MaybeI {
     public function do_if_not(callable $fn, ...$args) : MaybeI { if (empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     public function empty() : bool { return empty($this->_x); } // false = true
     public function errors() : array { return $this->_errors; }
-    public function value(string $type = null) { 
+    public function value(string $type = null) : mixed { 
         $result = $this->_x;
 
         switch($type) {
@@ -903,15 +921,17 @@ class MaybeA implements MaybeI {
     public function index(int $index) : MaybeI { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? NULL); } return new static(NULL); }
     public function isa(string $type) : bool { return $this->_x instanceof $type; }
     public function __toString() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
+    public function __isset($object) : bool { debug("isset"); if ($object instanceof MaybeA) { return (bool)$object->empty(); } return false; }
+    public function __invoke(string $type = null) : mixed { return $this->value($type); }
 }
 class Maybe extends MaybeA {
-    public function __invoke(string $type = null) { return $this->value($type); }
+    public function __invoke(string $type = null) : mixed { return $this->value($type); }
 }
 class MaybeBlock extends MaybeA {
-    public function __invoke() : ?Block { return $this->_x; }
+    public function __invoke(string $type = null) : mixed { return $this->_x; }
 }
 class MaybeStr extends MaybeA {
-    public function __invoke() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
+    public function __invoke(string $type = null) : mixed { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
     public function compare(string $test) : bool { return (!empty($this->_x)) ? $this->_x == $test : false; }
 }
 Maybe::$FALSE = MaybeBlock::of(NULL);
@@ -956,18 +976,36 @@ function recache2_file(string $filename) : array {
  * @return string message.iv
  */
 function encrypt_ssl(string $password, string $text) : string {
-    $iv = random_str(16);
-    $e = openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
-    return $e;
+    /*
+    if (function_exists('sodium_crypto_secretbox')) {
+        $iv = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+        //debug("encrypt: [$text] [$iv] [$password]\n");
+        return sodium_crypto_secretbox($text, $iv, $password) . "." . sodium_bin2base64($iv, SODIUM_BASE64_VARIANT_ORIGINAL);
+    } else 
+    */
+    if (function_exists('openssl_encrypt')) {
+        $iv = random_str(16);
+        return openssl_encrypt($text, 'AES-128-CBC', $password, 0, $iv) . "." . $iv;
+    }
+    return "";
 }
 
 /**
  * aes-128-cbc decryption of data, return raw value
  * PURE
  */ 
-function raw_decrypt(string $cipher, string $iv, string $password) {
-    $decrypt = openssl_decrypt($cipher, "AES-128-CBC", $password, 0, $iv);
-    return $decrypt;
+function raw_decrypt(string $cipher, string $iv, string $password) : string {
+    /*
+    if (function_exists('sodium_crypto_secretbox')) {
+        $iv = sodium_base642bin($iv, SODIUM_BASE64_VARIANT_ORIGINAL);
+        //debug("de crypt: [$cipher] [$iv] [$password]\n");
+        sodium_crypto_secretbox_open($cipher, $iv, $password);
+    } else
+    */
+    if (function_exists('openssl_decrypt')) {
+        return openssl_decrypt($cipher, 'AES-128-CBC', $password, 0, $iv);
+    }
+    return "";
 }
 
 /**
@@ -984,12 +1022,12 @@ function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
         return MaybeStr::of(NULL);
     }
 
-    $decrypt = BINDR("ThreadFin\\raw_decrypt", $password);
+    $decrypt_fn = BINDR("ThreadFin\\raw_decrypt", $password);
 
     $a = MaybeStr::of($cipher)
         ->then(BINDL("explode", "."))
         ->keep_if(BINDR("\ThreadFin\arraylen", 2))
-        ->then($decrypt, true);
+        ->then($decrypt_fn, true);
     return $a;
 }
 
@@ -1234,6 +1272,38 @@ function http_ctx(string $method, int $timeout) : array {
 }
 
 /**
+ * find the IP DB for a given IP
+ * TODO: split into more files, improve distribution
+ * PURE: IDEMPOTENT, REFERENTIAL INTEGRITY
+ */
+function ip_to_file(int $ip_num) : string {
+    $n = floor($ip_num/0x5F5E100);
+	return "cache/ip.$n.bin";
+}
+
+
+/**
+ * ugly AF returns the country number
+ * depends on IP DB
+ * NOT PURE, should this be refactored to FileData ?
+ */
+function ip_to_country(?string $ip) : int {
+    if (empty($ip)) { return 0; }
+	$n = ip2long($ip);
+    if ($n === false) { return 0; }
+	$d = file_get_contents(\BitFire\WAF_ROOT.ip_to_file($n));
+	$len = strlen($d);
+	$off = 0;
+	while ($off < $len) {
+		$data = unpack("Vs/Ve/Cc", $d, $off);
+		if ($data['s'] <= $n && $data['e'] >= $n) { return $data['c']; }
+		$off += 9;
+	}
+	return 0;
+}
+
+
+/**
  * call debug and return NULL
  */
 function debugN(string $fmt, ...$args) : ?bool {
@@ -1285,7 +1355,7 @@ function format_chk(?string $fmt, int $args) : bool {
  */
 function debug(?string $fmt, ...$args) : ?array {
     assert(class_exists('\BitFire\Config'), "programmer error, call debug() before config is loaded");
-    assert(format_chk($fmt, count($args)), "programmer error, format string does not match number of arguments");
+    assert(format_chk($fmt, count($args)), "programmer error, format string does not match number of arguments [$fmt]");
 
     static $idx = 0;
     static $len = 0;
@@ -1631,7 +1701,7 @@ function call_to_source(string $fn, array $x, string $cost = "wt") : array {
 }
 
 
-function output_profile(array $data) {
+function output_profile(?array $data) {
     $pre  = "version: 1\ncreator: https://bitfire.co\ncmd: BitFire\npart: 1\npositions: line\nevents: Time\nsummary: ";
 
     $fn_list = array();
@@ -1658,6 +1728,6 @@ function output_profile(array $data) {
         $out .= "\n";
     });
 
-    file_put_contents("callgrind.out", $pre . $sum . "\n\n". $out);
+    file_put_contents("/tmp/callgrind.out", $pre . $sum . "\n\n". $out);
     return;
 }
