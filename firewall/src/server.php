@@ -58,7 +58,7 @@ const ACCESS_HOST = 11;
 const ACCESS_URL_METHOD = 12;
 const ACCESS_URL_URI = 13;
 
-const CONFIG_KEY_NAMES = [ "bitfire_enabled","allow_ip_block","security_headers_enabled","enforce_ssl_1year","csp_policy_enabled","csp_default","csp_policy","csp_uri","pro_key","site_lock","max_cache_age","web_filter_enabled","spam_filter_enabled","xss_block","sql_block","file_block","block_profanity","filtered_logging","allowed_methods","whitelist_enable","blacklist_enable","require_full_browser","honeypot_url","check_domain","valid_domains","ignore_bot_urls","rate_limit","rr_5m","cache_type","cookies_enabled","wordfence_emulation","report_file","block_file","debug_file","debug_header","send_errors","dashboard_usage","browser_cookie","dashboard_path","encryption_key","secret","password","wp_root","wp_contenturl","wp_contentdir","debug","skip_local_bots","response_code","ip_header","dns_service","short_block_time","medium_block_time","long_block_time","cache_ini_files","root_restrict","configured" ];
+const CONFIG_KEY_NAMES = [ "bitfire_enabled","allow_ip_block","security_headers_enabled","enforce_ssl_1year","csp_policy_enabled","csp_default","csp_policy","csp_uri","pro_key","site_lock","max_cache_age","web_filter_enabled","spam_filter_enabled","xss_block","sql_block","file_block","block_profanity","filtered_logging","allowed_methods","whitelist_enable","blacklist_enable","require_full_browser","honeypot_url","check_domain","valid_domains","valid_domains[]","ignore_bot_urls","rate_limit","rr_5m","cache_type","cookies_enabled","wordfence_emulation","report_file","block_file","debug_file","debug_header","send_errors","dashboard_usage","browser_cookie","dashboard_path","encryption_key","secret","password","wp_root","wp_contenturl","wp_contentdir","debug","skip_local_bots","response_code","ip_header","dns_service","short_block_time","medium_block_time","long_block_time","cache_ini_files","root_restrict","configured" ];
 
 
 // helpers
@@ -110,7 +110,6 @@ function cms_root() : string {
         debug("error finding doc_root [%s]", $root);
         $root = doc_root();
     }
-    debug("cms root [%s]", $root);
 
     return $root;
 }
@@ -729,7 +728,7 @@ function hash_file2(string $path, string $root_dir, string $name, callable $type
     $hash->type = $type_fn($realpath);
     $hash->name = $name;
     $hash->size = filesize($realpath);
-
+    if ($hash->crc_trim == 1162311920) { return null; }
 
     // HACKS AND FIXES
     if (stristr($realpath, "/wp-includes/") !== false) { $hash->rel_path = "/wp-includes".$hash->rel_path; }
