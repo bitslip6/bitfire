@@ -17,8 +17,8 @@
  * @wordpress-plugin
  * Plugin Name:       BitFire
  * Plugin URI:        https://bitfire.co/
- * Description:       Free/Premium WordPress Security - 100% refund guarantee. Lock files from attack, recover from malware, IP/Country ban, 100% bot protection - SEO compatible.
- * Version:           __VERSION__
+ * Description:       Patented WordPress Firewall. Lock your php files from malware. Complete bot protection. Malware Recovery. plugin vulnerability alert, login protection, and more. 
+ * Version:           2.22
  * Author:            BitFire.co
  * License:           AGPL-3.0+
  * License URI:       https://www.gnu.org/licenses/agpl-3.0.en.html
@@ -43,6 +43,7 @@ use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\FILE_W;
 use const BitFire\STATUS_EACCES;
+use const BitFire\WAF_ROOT;
 use const ThreadFin\ENCODE_RAW;
 
 use function BitFire\verify_browser_effect;
@@ -62,6 +63,8 @@ use function ThreadFin\en_json;
 use function ThreadFin\file_recurse;
 use function ThreadFin\http2;
 use function ThreadFin\httpp;
+use function ThreadFin\ip_to_country;
+use function ThreadFin\un_json;
 
 // If this file is called directly, abort.
 if ( ! defined( "WPINC" ) ) { die(); }
@@ -69,7 +72,6 @@ if (defined("BitFire\TYPE") && \BitFire\TYPE == "STANDALONE") {
     require_once \BitFire\WAF_SRC."server.php";
     $effect = \BitFireSvr\uninstall()->hide_output();
     $effect->run();
-
 }
 
 /**
@@ -86,7 +88,13 @@ function dashboard_url() : string {
  * @since 1.9.0
  */ 
 function is_admin() : bool {
-    return \current_user_can("manage_options");
+    if (function_exists('wp_get_current_user')) {
+        $user = wp_get_current_user();
+        if ( in_array( 'administrator', (array) $user->roles ) ) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function is_author() : bool {
@@ -220,9 +228,16 @@ function deactivate_bitfire() {
  * Register a custom admin menu page.
  */
 function bitfire_add_menu() {
+    $alerts = create_plugin_alerts();
+    $base_num = count($alerts);
+    $title = ($base_num > 0) ? "Vulnerable Plugins, " : "";
+    $base_num += (CFG::disabled("whitelist_enable") || CFG::disabled("require_full_browser")) ? 1 : 0;
+    $title = ($base_num > 0) ? "Bot Blocking Disabled, " : "";
+    $base_num += (CFG::disabled("auto_start")) ? 1 : 0;
+    $title = ($base_num > 0) ? "Always On Disabled" : "";
     \add_menu_page(
-        "BitFire Firewall",
-        "BitFire Firewall",
+        "BitFire",
+        "BitFire <span class='update-plugins count-$base_num' title='$title'><span class='plugin-count'>$base_num</span></span>",
         "manage_options",
         "bitfire_admin",
         "\BitFirePlugin\bitfire_menu_hit",
@@ -309,6 +324,8 @@ function make_js_challenge_effect() : Effect {
 
 function bitfire_plugin_check() {
     $all_dirs = malware_scan_dirs(CFG::str("wp_content"));
+    file_put_contents("/tmp/plugin_check.txt", print_r($all_dirs, true), FILE_APPEND);
+
     $plugins = [];
     foreach ($all_dirs as $dir) {
         if (contains($dir, ["wp-includes", "wp-admin"])) { continue; }
@@ -334,7 +351,11 @@ function bitfire_plugin_check() {
 
     $encoded = base64_encode(en_json($plugins));
     $result = http2("POST", APP."cve_check.php", $encoded, ["Content-Type: application/json"]);
-    $effect = Effect::new()->file(new FileMod(CFG::str("wp_contentdir")."/plugins/bitfire/cache/plugins.json", $result["content"], FILE_W));
+    $content_dir = CFG::str("wp_contentdir");
+    if ($content_dir == "" && defined(WP_CONTENT_DIR)) {
+        $content_dir = WP_CONTENT_DIR;
+    }
+    $effect = Effect::new()->file(new FileMod($content_dir."/plugins/bitfire/cache/plugins.json", $result["content"], FILE_W));
     $effect->run();
 }
 
@@ -357,10 +378,10 @@ function bitfire_init() {
     }
 
     if (CFG::enabled("pro_mfa") && function_exists("\BitFirePRO\sms")) {
-        trace("mfa");
         function mfa_field($user) { echo \BitFirePRO\wp_render_user_form($user); }
         // mfa field display
         add_action('show_user_profile', '\BitFirePlugin\mfa_field');
+        add_action('edit_user_profile', '\BitFirePlugin\mfa_field');
         // mfa field update
         add_action("edit_user_profile_update", "\BitFirePlugin\user_edit");
         add_action("personal_options_update", "\BitFirePlugin\user_edit");
@@ -380,14 +401,46 @@ function bitfire_init() {
     }
 
 
-    // show the MFA form if we are on the login page and we are configured to use MFA
-    if (CFG::enabled("pro_mfa") && function_exists("\BitFirePRO\wp_render_mfa_page")) {
-        $path = BitFire::get_instance()->_request->path;
-        if (contains($path, "wp-login.php")) {
+    $path = BitFire::get_instance()->_request->path;
+    if (contains($path, "wp-login.php")) {
+        // show the MFA form if we are on the login page and we are configured to use MFA
+        if (CFG::enabled("pro_mfa") && function_exists("\BitFirePRO\wp_render_mfa_page")) {
             trace("wp_login");
-            add_action("wp_authenticate", "\BitFirePRO\wp_user_login");
+            add_action("wp_login", "\BitFirePRO\wp_user_login", 60, 1);
         }
+        add_action("check_password", "\BitFirePlugin\user_login", 100, 4);
     }
+
+    /*
+    if (CFG::enabled("debug_header")) {
+        debug("PLUGIN TRACE: " . trace(null));
+    }
+    */
+}
+
+/**
+ * update last login time info
+ * @param mixed $check 
+ * @param mixed $password 
+ * @param mixed $hash 
+ * @param mixed $user_id 
+ * @return void 
+ * @throws RuntimeException 
+ */
+function user_login($check, $password, $hash, $user_id) {
+    if ($check) {
+        $country_info = un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country.json"));
+        $ip = $_SERVER[strtoupper(CFG::str("ip_header"))];
+        $code = ip_to_country($ip);
+        $country = $country_info[$code]??'N/A';
+        $browser = BitFire::get_instance()->bot_filter->browser;
+        if ($browser->ver == "x" || strlen($browser->browser) > 12) {
+            $browser->ver = "unknown";
+            $browser->browser = "unknown";
+        }
+        update_user_meta($user_id, "bitfire_last_login", time() . ":" . $browser->os . ":" . $browser->browser . ":" . $browser->ver . ":" . $country . ":" . $ip);
+    }
+    return $check;
 }
 
 /**
@@ -444,33 +497,35 @@ $br = $i->bot_filter->browser;
  * and NOT block the request.
  */
 if (!$br->bot && CFG::is_report(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
+    if ($br->valid < 2) {
+        debug("Bot Checking: [%s/%s] (%d)", $br->browser, $br->ver, $br->valid);
+        // we may have to check this here if we are not running in always on mode
+        if (isset($r->post['_bfxa']) || (strlen($r->post_raw) > 20 && contains($r->post_raw, '_bfxa'))) {
+            $effect = verify_browser_effect($r, $i->bot_filter->ip_data, $i->cookie)->exit(false);
+            $effect->run();
+        }
 
-    if (isset($r->post['_bfxa'])) {
-        $effect = verify_browser_effect($r, $i->bot_filter->ip_data, $i->cookie)->exit(true);
-        $effect->run();
-    }
-    // don't challenge if the browser is already valid
-    else if (!$br->valid) {
-
-        debug("browser verification level [%d]", $br->valid);
         // effect contains the inline javascript and cache entry updates
         // run(print) the challenge effect at the bottom of the <body> tag
         add_action("wp_footer", function() { 
             // make the challenge and send the cookie here (before headers are sent)
             // this function will split up the normal blocking effect into two parts
             // the first cookie effect will be run here, the second will be run in the action
+            echo "<!-- BitFire wp_footer -->\n";
             make_js_challenge_effect()->run();
         });
-    } else {
+    }
+    // don't challenge if the browser is already valid
+    else {
         add_action("wp_footer", function() {
-            echo "<!-- browser verification passed -->\n";
+            echo "<!-- BitFire browser verification passed -->\n";
         });
     }
 }
 
 
 if (CFG::enabled("csp_policy_enabled")) {
-    $nonce = CFG::str("csp_nonce", random_str(16));
+    $nonce = CFG::str("csp_nonce", \ThreadFin\random_str(16));
     // script nonces. Prefer new attribute style for >= 5.7
     if (version_compare($GLOBALS["wp_version"]??"4.0", "5.7") >= 0) {
         add_filter("wp_script_attributes", BINDL("\BitFirePlugin\add_nonce_attr", $nonce));
@@ -487,3 +542,4 @@ if (function_exists('BitFirePRO\wp_requirement_check') && !wp_requirement_check(
     BitFire::new_block(31001, "referer", $request->headers->referer, "new-user.php", 0);
     die("Invalid request");
 }
+

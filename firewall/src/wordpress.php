@@ -227,29 +227,4 @@ function wp_handle_admin(\BitFire\Request $request, \TF\MaybeA $cookie) {
     if (strpos($request->path, "/wp-admin/") === false) { \TF\debug("no wp-admin"); return; }
     if ($request->post['action']??'' === "heartbeat") { return; }
     \TF\debug("wp admin request %s", $request->path);
-
-    @chmod("$root/.htaccess", 0644);
-    @chmod("$root/wp-config.php", 0644);
-    register_shutdown_function(function() use ($root) {
-        @chmod("$root/.htaccess", 0444);
-        @chmod("$root/wp-config.php", 0444);
-    });
-
-    if (\TF\contains($request->path, array("/upgrade"))) {
-        temp_lock_dir("");
-    }
-    // upgrade requested, or plugin stuff happening.  unlock for 1 hour.
-    if (\TF\contains($request->path, array("/update"))) {
-        // site admin on wp-admin
-        // allow editing htaccess and wp-config
-        if (\TF\contains($request->post['action']??'', 'update')) {
-            if (\TF\contains($request->post['action'], 'plugin')) {
-                temp_lock_dir("wp-content/plugins");
-            } 
-            else if (\TF\contains($request->post['action'], 'theme')) {
-                temp_lock_dir("wp-content/themes");
-            } 
-        }
-    }
-
 }

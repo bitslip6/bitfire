@@ -300,7 +300,7 @@ function serve_malware()
 
     $view = ($root == "") ? "nohashes.html" : "hashes.html";
 
-    render_view(\BitFire\WAF_ROOT."views/$view", "BitFire Malware Scanner", $data)->exit()->run();
+    render_view(\BitFire\WAF_ROOT."views/$view", "BitFire Malware Scanner", $data)->run();
 }
 
 function human_date($time) : string {
@@ -360,7 +360,7 @@ function render_view(string $view_filename, string $page_name, array $variables 
     $variables['need_reset'] = b2s((CFG::str('password') === 'bitfire!'));
     $variables['gtag'] = '';
     // handle old "include" style views and new templates
-    $effect = Effect::new()->exit(true);
+    $effect = Effect::new();
 
 
 
@@ -398,7 +398,7 @@ function serve_settings() {
         "hide_shmop" => (function_exists("shmop_open")) ? "" : "hidden",
         "hide_apcu" => (function_exists("apcu_store")) ? "" : "hidden",
         "hide_shm" => (function_exists("shm_put_var")) ? "" : "hidden"
-    )))->exit()->run();
+    )))->run();
 }
 
 function serve_advanced() {
@@ -409,7 +409,7 @@ function serve_advanced() {
         "show_mfa" => (defined("WPINC")) ? "" : "hidden",
         "mfa_class" => (defined("WPINC")) ? "text-muted" : "text-danger"];
     //"dashboard_path" => $dashboard_path,
-    render_view(\BitFire\WAF_ROOT . "views/advanced.html", "BitFire Advanced", array_merge(CFG::$_options, $data))->exit()->run();
+    render_view(\BitFire\WAF_ROOT . "views/advanced.html", "BitFire Advanced", array_merge(CFG::$_options, $data))->run();
 }
 
 
@@ -427,7 +427,7 @@ function validate_auth() : Effect {
 
     // run the initial password setup if the password is not configured
     if (CFG::str("password") == "configure") {
-        render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->exit()->run();
+        render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->run();
     }
 
     return \BitFire\verify_admin_password();
@@ -523,7 +523,7 @@ function serve_exceptions() :void
         "checked" => ($enabled) ? "checked" : ""
     ];
 
-    render_view(\BitFire\WAF_ROOT."views/exceptions.html", "BitFire Blocking Exceptions", $data)->exit()->run();
+    render_view(\BitFire\WAF_ROOT."views/exceptions.html", "BitFire Blocking Exceptions", $data)->run();
 }
 
 
@@ -534,7 +534,8 @@ function serve_dashboard() :void
 {
     // handle dashboard wizard
     if (CFG::disabled("wizard") && !isset($_GET['tooltip'])) {
-       die(serve_settings());
+       serve_settings();
+       return;
     }
 
     // authentication guard
@@ -662,7 +663,7 @@ function serve_dashboard() :void
     }
 
     //$data["theme_css"] = file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css");
-    render_view(\BitFire\WAF_ROOT."views/dash.html", "BitFire Alert Dashboard", $data)->exit()->run();
+    render_view(\BitFire\WAF_ROOT."views/dash.html", "BitFire Alert Dashboard", $data)->run();
 }
 
 

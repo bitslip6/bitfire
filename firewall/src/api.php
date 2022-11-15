@@ -217,6 +217,61 @@ function download(\BitFire\Request $r) : Effect {
     return $effect;
 }
 
+function malware_files(\BitFire\Request $request) : Effect {
+    $effect = Effect::new();
+    $malware_file = WAF_ROOT . "/cache/malware_files.json";
+    $data = [
+        "changed" => intval($request->post["changed"]),
+        "unknown" => intval($request->post["unknown"]),
+        "malware" => intval($request->post["malware"]),
+        "time" => time()];
+    $file = new FileMod($malware_file, en_json($data), FILE_RW);
+    $effect->file($file);
+    $effect->api(true, "malware files updated");
+    return $effect; 
+}
+
+function archive_source(\BitFire\Request $request) : Effect {
+    $effect = Effect::new();
+    /*
+    $root = CFG::str("wp_root");
+    if ($root == "" || !contains($root, $_SERVER['DOCUMENT_ROOT'])) {
+        return $effect->api(false, "wordpress root not set");
+    }
+    $content = CFG::str("wp_contentdir");
+    if ($root == "" || !contains($content, $_SERVER['DOCUMENT_ROOT'])) {
+        return $effect->api(false, "wordpress content root not set");
+    }
+    if (!class_exists("ZipArchive")) {
+        return $effect->api(false, "zip extension not installed");
+    }
+    */
+    //die("ARCHIVE !\n\n\n\n\n\n\n\n\n");
+
+    //$fh = fopen("bitfire.sql", "w+");
+    $fh = gzopen("bitfire.sql.gz", "w6");
+    //$fh = fopen("php://stdout", "w+");
+    //ob_start("ob_gzhandler", 6);
+    //fwrite($fh, "\x1f\x8b\x08\x00\x00\x00\x00\x00");
+    //stream_filter_append($fh, "bzip2.compress", STREAM_FILTER_WRITE, ["level" => 6, "window" => 15]);
+    //stream_filter_append($fh, "zlib.deflate", STREAM_FILTER_WRITE, ["level" => 6, "window" => 15]);
+    include_once WAF_SRC . "db.php";
+    if (!defined("DB_USER")) {
+        @include_once CFG::str("wp_root") . "wp-config.php";
+    }
+    $db_user     = defined( 'DB_USER' ) ? DB_USER : '';
+	$db_password = defined( 'DB_PASSWORD' ) ? DB_PASSWORD : '';
+	$db_name     = defined( 'DB_NAME' ) ? DB_NAME : '';
+	$db_host     = defined( 'DB_HOST' ) ? DB_HOST : '';
+    $credentials = new \ThreadFinDB\Credentials($db_user, $db_password, $db_host, $db_name);
+    \ThreadFinDB\dump_database($credentials, $db_name, $fh);
+    //fclose($fh);
+    gzclose($fh);
+    $effect->api(true, "");
+    return $effect;
+}
+
+
 /**
  * todo: deprecate and perform this function client side
  */
@@ -247,8 +302,8 @@ function diff(\BitFire\Request $request) : Effect {
     $len = strlen($local);
     // hard coded WP files that are okay. todo: update with hashes
     if (
-        ($len < 30 && contains($local, "is golden")) ||
-        (($len > 30000 && $len < 35000) && contains($local, "BitFire")) ||
+        //($len < 30 && contains($local, "is golden")) ||
+        //(($len > 30000 && $len < 35000) && contains($local, "BitFire")) ||
         ($len == 2578 && md5($local) == "d945a3c574b70e3500c6dccc50eccc77")
     ) {
         $info = ["content" => $local, "success" => true];
@@ -261,7 +316,21 @@ function diff(\BitFire\Request $request) : Effect {
             "upgrade-insecure-requests" => "1"]);
 
         // if we don't have a 200, then 0 out the 404 response.
-        if (!in_array("http/1.1 200", $info["headers"]) && $info["http_code"] != 200) { $info["success"] = false; $info["content"] = ""; }
+        if ($info["length"] < 1 || (!in_array("http/1.1 200", $info["headers"]) && $info["http_code"] != 200)) { 
+            $url2 = preg_replace("/\/tags\/[^\/]+\//", "/trunk/", $url);
+            $info = http2("GET", $url2, "", [
+                "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36",
+                "Accept" => "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng",
+                "Accept-Encoding" => "gzip, deflate",
+                "sec-ch-ua-platform" => "Linux",
+                "upgrade-insecure-requests" => "1"]);
+
+            // if we don't have a 200, then 0 out the 404 response.
+            if ($info['length'] < 1 || (!in_array("http/1.1 200", $info["headers"]) && $info["http_code"] != 200)) { 
+                $info["success"] = false; $info["content"] = "";
+            }
+
+        }
     }
 
     $success = $info["success"] && strlen($local) > 0;
@@ -307,7 +376,11 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         $result = httpp(APP."hash_compare.php", $encoded, array("Content-Type" => "application/json"));
         $decoded = un_json($result);
         $c1 = count($decoded);
-        debug("sent $num_files hashes received $c1 hashes");
+        debug(" [%s] sent $num_files hashes received $c1 hashes", $plugin_name);
+        if ($plugin_name == "trackerly") {
+            //file_put_contents("/tmp/trackerly.json", "$h2\n", FILE_APPEND);
+            file_put_contents("/tmp/trackerly.json", "$result\n", FILE_APPEND);
+        }
 
         $dir_without_plugin_name = dirname($dir_path);
 
@@ -340,7 +413,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
 
 
         // if the entire directory is unknown, squash it to a single entry
-        if ($num_files == $num_miss) {
+        if ($num_files == $num_miss && !$decoded[0]["found"]) {
             $compacted = compact_array($filtered);
             $sum = array_sum(array_map(function($x){return filesize($x['file_path']);}, $compacted));
             $sum_kb = round($sum/1024, 2);

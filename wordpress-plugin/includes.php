@@ -14,7 +14,7 @@ define("\BitFire\\CMS_INCLUDED", true);
 const ENUMERATION_FILES = ["readme.txt", "license.txt"];
 const PLUGIN_DIRS = ["/plugins/", "/themes/"];
 const ACTION_PARAMS = ["do", "page", "action", "screen-id"];
-const PACKAGE_FILES = ["readme.txt", "README.txt", "package.json"];
+const PACKAGE_FILES = ["readme.txt", "README.txt", "style.css", "package.json"];
 
 
 /**
@@ -66,8 +66,8 @@ function path_to_source(string $rel_path, string $type, string $ver, ?string $na
  */
 function package_to_ver(string $carry, string $line) : string {
     if (!empty($carry)) { return $carry; }
-    if (preg_match("/stable\s+tag[\'\":\s]+([\d\.]+)/i", $line, $matches)) { return $matches[1]; }
-    if (preg_match("/version[\'\":\s]+([\d\.]+)/i", $line, $matches)) { return $matches[1]; }
+    if (preg_match("/stable\s+tag\s*[\'\":]+\s*([\d\.]+)/i", $line, $matches)) { return $matches[1]; }
+    if (preg_match("/version\s*[\'\":]+\s*([\d\.]+)/i", $line, $matches)) { return $matches[1]; }
     return $carry;
 }
 

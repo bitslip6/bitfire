@@ -13,6 +13,7 @@ use ThreadFin\MaybeStr;
 use const BitFire\WAF_ROOT;
 use function ThreadFin\func_name;
 use function ThreadFin\partial_right as BINDR;
+use function ThreadFin\partial as BINDL;
 
 if (!defined("DUMP_FILE")) {
     if (defined("WAF_ROOT")) {
@@ -497,7 +498,6 @@ class SQL {
      */
     public function reduce(callable $fn, $initial = "") {
         if (is_array($this->_x) && !empty($this->_x)) {
-            echo "<pre>". print_r($this->_x);
             return array_reduce($this->_x, $fn, $initial);
         } else {
             $this->_errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
@@ -539,3 +539,79 @@ class SQL {
     }
 }
 
+
+/**
+ * dump a single SQL table 100 rows at a time
+ * @param DB $db 
+ * @param string $db_dump_file 
+ * @param mixed $row 
+ * @return int number of uncompressed bytes written
+ */
+function dump_table(DB $db, $out_fp, $row) : int {
+    $len = 0;
+    $db_name = $db->database;
+    $table = $row["Tables_in_$db_name"];
+
+    // drop table if it exists
+    $result = "DROP TABLE IF EXISTS `$table`;\n";
+
+    // add create statement
+    $create = $db->fetch("SHOW CREATE TABLE $table");
+    $result .= $create->col("Create Table")() . ";\n\n";
+
+    // add number of rows
+    $num_rows = intval($db->fetch("SELECT count(*) as count FROM $table")->col("count")());
+    $result .= "# $num_rows rows in $table\n";
+
+    // write the table header to the file
+    //file_put_contents($db_dump_file, $result, FILE_APPEND);
+    fwrite($out_fp, $result);
+    $len += strlen($result);
+    $result = "";
+
+
+    $idx = 0;
+    $limit = 300;
+    // insert 100 rows at a time
+    while($idx < $num_rows) {
+        $limit = min($limit, $num_rows - $idx);
+        $rows = $db->fetch("SELECT * FROM $table LIMIT $limit OFFSET $idx", NULL, MYSQLI_NUM);
+        $result .= $rows->reduce(function($carry, $row) {
+            return $carry . "(" . implode(",", array_map('\ThreadFinDB\quote', $row)) . "),\n";
+        }, "INSERT INTO $table VALUES");
+        $result = substr($result, 0, -2) . ";\n\n"; 
+
+        //file_put_contents($db_dump_file, $result, FILE_APPEND);
+        //fwrite($out_fp, $result);
+        gzwrite($out_fp, $result);
+        $len += strlen($result);
+        $result = "";
+
+        $idx += $limit;
+        echo "$table: $idx/$num_rows\r\n";
+        flush();
+        usleep(10000);
+    }
+
+    return $len;
+}
+
+function dump_database(Credentials $cred, string $db_name, $dump_stream) : int {
+    $db = DB::cred_connect($cred);
+    $db->unsafe_raw("SET NAMES 'utf8'");
+    $tables = $db->fetch("SHOW TABLES");
+    //file_put_contents($db_dump_file, "# Database dump began at: " . date("Y-m-d H:i:s") . "\n# tv: " . time() . "\n\n");
+    $header = "# Database dump began at: " . date("Y-m-d H:i:s") . "\n# tv: " . time() . "\n\n";
+    //fwrite($dump_stream, $header);
+    gzwrite($dump_stream, $header);
+
+    $t = BINDL('\ThreadFinDB\dump_table', $db, $dump_stream);
+    $tables->map($t);
+    $written = $tables->reduce(function($carry, $row) {
+        print_r($row);
+        return $carry;
+        //return $carry + $row;
+    }, 0);
+
+    return intval($written) + strlen($header);
+}

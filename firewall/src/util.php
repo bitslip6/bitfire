@@ -313,10 +313,10 @@ function find_regex_reduced($value) : callable { return function($initial, $argu
 function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
 function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
-function un_json(?string $data="") : array { $d = trim($data, "\n\r,"); $j = json_decode($d, true, 20); $r = []; if (is_array($j)) { $r = $j; } else { 
-    error("json decode error");
-    $wrote = file_put_contents("/tmp/decodes2.txt", "$data\n", FILE_APPEND); } return $r; }
-function en_json($data) : string { $j = json_encode($data); return ($j == false) ? "" : $j; }
+function un_json(?string $data="") : array {
+    $d = trim($data, "\n\r,"); $j = json_decode($d, true, 20); $r = []; if (is_array($j)) { $r = $j; }
+    else { error("json decode error"); } return $r; }
+function en_json($data, $pretty = false) : string { $mode = $pretty ? JSON_PRETTY_PRINT : 0; $j = json_encode($data, $mode); return ($j == false) ? "" : $j; }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
 function lookbehind(string $s, string $r) : string { return @$r($s); }
@@ -483,6 +483,7 @@ function compose(callable $a, callable $b) {
 
 /**
  * returns a function that will cache the call to $fn with $key for $ttl
+ * NOTE: $fn must return an array or a string (see: load_or_cache)
  */
 function memoize(callable $fn, string $key, int $ttl) : callable {
     return function(...$args) use ($fn, $key, $ttl) {
@@ -503,7 +504,7 @@ function memoize(callable $fn, string $key, int $ttl) : callable {
             cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), $cookie_data, DAY); 
             return $cookie[$key];
         } else {
-            debug("unable to memoize [%s]", (string)$fn);
+            debug("unable to memoize [%s]", func_name($fn));
             return $fn(...$args);
         }
     };
@@ -717,7 +718,7 @@ class Effect {
 
         // update cache entries
         do_for_all_key_value($this->cache, function($nop, CacheItem $item) {
-            debug("cache {$item->key} for {$item->ttl}");
+            // debug("cache {$item->key} for {$item->ttl}");
             CacheStorage::get_instance()->update_data($item->key, $item->fn, $item->init, $item->ttl);
         });
         // write all effect files
@@ -1240,11 +1241,11 @@ function http(string $method, string $path, $data, array $optional_headers = nul
     
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
 
-    $ctx = stream_context_create($params);
     if (function_exists('curl_init')) {
         return bit_curl($method, $path, $data, $optional_headers);
     }
 
+    $ctx = stream_context_create($params);
     $response = @file_get_contents($path, false, $ctx);
     if ($response === false) {
         return debugF("http_resp [$path] fail");
@@ -1467,8 +1468,14 @@ function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
     return $result;
 }
 
-function load_ini_fn(string $src) {
-    return function() use ($src) {
+/**
+ * make the config file readable, parse it, then make it unreadable again
+ * @param string $src 
+ * @return callable 
+ */
+function load_ini_fn(string $src) : callable {
+    // returns an array, first entry is the ini data, second is the mtime
+    return function() use ($src) : array {
         @chmod($src, FILE_R);
         debug("inidisk");
         $result = parse_ini_file($src, false, INI_SCANNER_TYPED);

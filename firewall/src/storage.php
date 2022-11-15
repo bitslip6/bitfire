@@ -228,10 +228,10 @@ class CacheStorage implements Storage {
     public function load_or_cache(string $key_name, int $ttl, callable $generator) {
         if (($data = $this->load_data($key_name)) === null) {
             $data = $generator();
-            assert(is_array($data) || is_string($data), "$key_name generator returned invalid data");
+            assert(is_array($data) || is_string($data), "$key_name generator returned invalid data (" . gettype($data) . ")");
             $this->save_data($key_name, $data, $ttl);
         }
-        assert(is_array($data) || is_string($data), "$key_name cache returned invalid data");
+        assert(is_array($data) || is_string($data), "$key_name cache returned invalid data (" . gettype($data) . ")");
         return $data;
     }
 

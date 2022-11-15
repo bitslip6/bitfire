@@ -233,10 +233,10 @@ function is_ipv6(string $addr) : bool {
 /**
  * reverse ip lookup, takes ipv4 and ipv6 addresses, 
  */
-function reverse_ip_lookup(string $ip) : MaybeStr {
+function reverse_ip_lookup(string $ip) : string {
     $ip = trim($ip);
     // handle localhost case
-    if ($ip == "127.0.0.1" || $ip == "::1") { return MaybeStr::of($ip); }
+    if ($ip == "127.0.0.1" || $ip == "::1") { return $ip; }
 
     if (CFG::str('dns_service', 'localhost') == "1.1.1.1") {
         $lookup_addr = ""; 
@@ -253,21 +253,22 @@ function reverse_ip_lookup(string $ip) : MaybeStr {
 
         return fast_ip_lookup($lookup_addr, 'PTR');
     }
-    debug("get host [$ip]");
-    return MaybeStr::of(gethostbyaddr($ip));
+    $lookup = gethostbyaddr($ip);
+    debug("gethostbyaddr [$ip] = ($lookup)");
+    return ($lookup !== false) ? $lookup : "";
 }
 
 /**
- * queries quad 1 for dns data, no SSL or uses local DNS services
- * @returns Maybe the result
+ * queries quad 1 for dns data over SSL or uses local DNS services
+ * @returns a string with teh result, or empty string
  */
-function ip_lookup(string $ip, string $type = "A") : MaybeStr {
+function ip_lookup(string $ip, string $type = "A") : string {
     assert(in_array($type, array("A", "AAAA", "CNAME", "MX", "NS", "PTR", "SRV", "TXT", "SOA")), "invalid dns query type [$type]");
     debug("ip_lookup %s / %s", $ip, $type);
-    $dns = null;
+    $dns = "";
     if (CFG::str('dns_service') === 'localhost') {
-        return MaybeStr::of(($type === "PTR") ?
-            gethostbyaddr($ip) : gethostbyname($ip));
+        $lookup = ($type === "PTR") ? gethostbyaddr($ip) : gethostbyname($ip);
+        return ($lookup !== false) ? $lookup : "";
     }
     try {
         $url = "https://1.1.1.1/dns-query?name=$ip&type=$type";
@@ -284,15 +285,15 @@ function ip_lookup(string $ip, string $type = "A") : MaybeStr {
         // silently swallow http errors.
     }
 
-    return MaybeStr::of($dns);
+    return $dns;
 }
 
 /**
  * memoized version of ip_lookup (1 hour)
  * NOT PURE
  */
-function fast_ip_lookup(string $ip, string $type = "A") : MaybeStr {
-    return memoize('BitFire\ip_lookup', "_bf_dns_{$type}_{$ip}", 3600)($ip, $type);
+function fast_ip_lookup(string $ip, string $type = "A") : string {
+    return memoize('BitFire\ip_lookup', "dns_{$type}_{$ip}", 3600)($ip, $type);
 }
 
 
@@ -313,7 +314,6 @@ function get_server_ip_data(string $remote_addr, string $agent) : IPData {
         if ($ip_data['rrtime'] < $t) { 
             $ip_data['rr'] = 0; 
             $ip_data['rrtime'] = $t+(60*5);
-            debug("rest rr time: [%s]", $ip_data['rrtime']);
         }
         $ip_data['rr']++;
 
@@ -386,7 +386,7 @@ class BotFilter {
 
         $this->browser->valid = max($this->ip_data->valid, $maybe_bot_cookie->extract('v', 0)->value('int'));
         if ($maybe_bot_cookie->extract("wp", 0)->value("int") > 1) { $this->browser->valid = 2; }
-        debug("x-valid: %d server_cache_ip_valid [%d]", $this->browser->valid, $this->ip_data->valid);
+        trace("BV".$this->browser->valid." SV". $this->ip_data->valid);
 
         // handle wp-cron and other self requested pages
         if (CFG::enabled("skip_local_bots") && (\BitFireBot\is_local_request($request))) {
@@ -602,9 +602,8 @@ function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, Maybe
         $bfa = $request->post["_bfa"];
     } else {
         $tmp = urldecode($request->post_raw);
-        debug("x-valid-decoded: %s", $tmp);
         parse_str($tmp, $result);
-        debug("x-valid-decoded: %s", print_r($result, true));
+        debug("x-valid-decoded: (%s) %s", $tmp, print_r($result, true));
         $bfa = $result["_bfa"]??0;
     }
     debug("x-valid-answer cache: (%s) post (%s)", $answer->ans, $bfa);
@@ -793,20 +792,23 @@ function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
  * NOT PURE
  */
 function fast_verify_bot_as(string $remote_ip, bool $carry, string $network) : bool {
-    return ($carry) ? $carry : memoize('\BitFireBot\verify_bot_as', "_bf_as_{$network}_{$remote_ip}", 3600)($remote_ip, $network);
+    if ($carry) { return $carry; }
+    $verify_string = memoize('\BitFireBot\verify_bot_as', "{$network}_{$remote_ip}", 3600)($remote_ip, $network);
+    return ($verify_string === "yes") ? true : false;
 }
 
 /**
  * connect to whois and verify IP AS number
  * @test test_bot.php test__verify_bot_as
+ * @return string "yes" or "no", (load_or_cache does not support bool types)
  * NOT PURE
  */
-function verify_bot_as(string $remote_ip, string $network) : bool {
+function verify_bot_as(string $remote_ip, string $network) : string {
     $x = MaybeA::of(fsockopen("whois.radb.net", 43, $no, $str, 1))
         ->effect(BINDR('\fputs', "$remote_ip\r\n"))
         ->then('\ThreadFin\read_stream')
         ->keep_if(BINDR('stristr', $network));
-        return ! $x->empty();
+        return $x->empty() ? "no" : "yes";
 }
 
 /**

@@ -594,6 +594,7 @@ class BitFire
             else {
                 serve_dashboard($this->_request->path);
             }
+            exit;
         }
 
         
