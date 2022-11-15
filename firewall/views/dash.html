@@ -2,6 +2,8 @@
       {{theme_css}}
     </style>
     <style>
+      .slideup { height: 0px; transition: height 0.25s linear;}
+      .slideup.open { height: auto; transition: height 0.5s linear;}
       .right { float: right; }
       .left { float: left; }
       .pr1 { margin-top: 20px; }
@@ -334,6 +336,7 @@
 				</div>
 			</div>
 		</div>
+    <div>{{plugin_alerts}}</div>
 
 
 
@@ -469,7 +472,59 @@
         <li class="page-item"><a class="page-link" href="<%= link %>"></a><li>
         </script>
 
-        <div class="row">
+              
+
+      <div class="row">
+          <div class="col-12 col-lg-12">
+            <a id="block_table_tip"></a>
+            <div class="card card-fill tooltipA" id="block_table" style="max-width: 100%">
+              <span class="tooltiptext"><div class="left">At the page bottom, you can see the attacks that have been blocked by the firewall.  
+                You can adjust which types of attacks are blocked in the Settings page.  If you see something that should not be blocked, 
+                click on the magic wand icon to add an exception for the offending block.</div>
+                <div class="right">
+                <button class="alert-secondary alert nxt">Next 
+                  <span class="fe fe-skip-forward" style="margin-top:4px"></span>
+                </button>
+                </div>
+                <span class="arrow"></span>
+              </span>
+
+              <div class="card-header" style="padding-left:0;">
+
+                <span class="fe fe-chevron-down " style="flex:0;margin-right:4rem;" type="button" id="block_toggle" onclick="collapseit('block')"></span>
+                <h4 style="margin-right: 4rem;">Blocks <small class="text-muted" id="block_range">{{block_range}}</small> of {{block_count}}</h4>
+                <button class="btn btn-secondary mr-6" id="download_blocks">Download as JSON</button>
+                <span>Page: </span>
+                <nav arial-label="Block Pagination" class="mt-4 ml-2">
+                  <ul class="pagination" id="block_page_list">
+                    <!-- TODO: template $max_pages2 alert_page_list with paginator_template var -->
+                  </ul>
+                </nav>
+              </div>
+              <div class="card-body ">
+                <div class="slideup open" id="block_table_content">
+
+                <table class="table table-sm" style="width:100%">
+                  <thead class="details">
+                    <tr>
+                      <th scope="col">Browser / Country</th>
+                      <th scope="col">Time</th>
+                      <th scope="col">IP</th>
+                      <th scope="col">URL / Agent</th>
+                    </tr>
+                  </thead>
+                  <tbody style="font-size:10px;width:100%" id="block_rows">
+                  </tbody>
+                </table>
+                </div>
+ 
+              </div>
+            </div>
+          </div>
+
+      </div>
+
+      <div class="row">
           <div class="col-12 col-lg-12 sp1">
           <a id="alert_table_tip" class="sp1"></a>
             <div class="card card-fill tooltipA sp1" style="max-width:100%" id="alert_table">
@@ -485,8 +540,14 @@ do not block good traffic before flipping the rule to block mode.
                 <span class="arrow"></span>
               </span>
 
-              <div class="card-header">
+              <div class="card-header" style="padding-left:0">
+
+                <span class="fe fe-chevron-down " style="flex:0;margin-right:4rem;" type="button" id="alert_toggle"></span>
+                <h4 style="margin-right: 4rem;">Blocks <small class="text-muted" id="block_range">{{block_range}}</small> of {{block_count}}</h4>
+                <!--
                 <h4>Alerts <small class="text-muted" id="alert_range">{{report_range}}</small> of {{report_count}}</h4>
+              -->
+
 				        <a style="font-size:.75rem;" href="{{self}}&filename=alert&BITFIRE_API=download&BITFIRE_NONCE={{api_code}}">
                 <button class="btn btn-secondary mr-6" id="download_alerts">Download as JSON</button>
                 </a>
@@ -533,6 +594,7 @@ do not block good traffic before flipping the rule to block mode.
     </tr>
 </script>
        
+                <div class="slideup open" id="alert_table_content">
                 <table class="table table-sm" style="width:100%">
                   <thead class="details">
                     <tr>
@@ -546,59 +608,12 @@ do not block good traffic before flipping the rule to block mode.
                   <tbody style="font-size:10px;width:100%" id="alert_rows">
                   </tbody>
                 </table>
-              </div>
-            </div>
-          </div>
-      </div>
-      
-
-      <div class="row">
-          <div class="col-12 col-lg-12">
-            <a id="block_table_tip"></a>
-            <div class="card card-fill tooltipA" id="block_table" style="max-width: 100%">
-              <span class="tooltiptext"><div class="left">At the page bottom, you can see the attacks that have been blocked by the firewall.  
-                You can adjust which types of attacks are blocked in the Settings page.  If you see something that should not be blocked, 
-                click on the magic wand icon to add an exception for the offending block.</div>
-                <div class="right">
-                <button class="alert-secondary alert nxt">Next 
-                  <span class="fe fe-skip-forward" style="margin-top:4px"></span>
-                </button>
                 </div>
-                <span class="arrow"></span>
-              </span>
-
-              <div class="card-header">
-                <h4>Blocks <small class="text-muted" id="block_range">{{block_range}}</small> of {{block_count}}</h4>
-                <button class="btn btn-secondary mr-6" id="download_blocks">Download as JSON</button>
-                <span>Page: </span>
-                <nav arial-label="Block Pagination" class="mt-4 ml-2">
-                  <ul class="pagination" id="block_page_list">
-                    <!-- TODO: template $max_pages2 alert_page_list with paginator_template var -->
-                  </ul>
-                </nav>
-              </div>
-              <div class="card-body">
-
-                <table class="table table-sm" style="width:100%">
-                  <thead class="details">
-                    <tr>
-                      <th scope="col">Browser / Country</th>
-                      <th scope="col">Time</th>
-                      <th scope="col">IP</th>
-                      <th scope="col">URL / Agent</th>
-                    </tr>
-                  </thead>
-                  <tbody style="font-size:10px;width:100%" id="block_rows">
-                  </tbody>
-                </table>
- 
               </div>
             </div>
           </div>
-
       </div>
-
-     
+    
 
 
 
@@ -606,6 +621,20 @@ do not block good traffic before flipping the rule to block mode.
 
 
     <script>
+      function collapseit(elm_type) {
+        console.log(elm_type);
+        let e = GBI(elm_type + "_table_content");
+        let e2 = GBI(elm_type + "_toggle");
+        console.log(e);
+        if (e.classList.contains("open")) {
+          e2.classList.remove("fe-chevron-down");
+          e2.classList.add("fe-chevron-up");
+        } else {
+          e2.classList.remove("fe-chevron-up");
+          e2.classList.add("fe-chevron-down");
+        }
+        e.classList.toggle("open");
+      }
       function show_bars(chart_id, hr_set) {
         let total = 0;
         console.log("chart id", chart_id, hr_set);
@@ -768,8 +797,11 @@ do not block good traffic before flipping the rule to block mode.
       */
 
       const request = async () => {
+        //if (document.readyState != "complete") { console.log("not complete!"); return; }
+        console.log(document.readyState);
         const response4 = await BitFire_api("get_valid_data", {});
         const data4 = await response4.json();
+        console.log(data4);
 
         //console.log("data4", data4);
 
@@ -870,14 +902,14 @@ function update_times() {
         let content = "";
         for (i=0; i<{{block_pages}}; i++) {
           let clazz = (i == {{block_page_num}}) ? "bg-secondary" : "";
-          content += "<li class='page-item'><a href='{{self}}&{{page}}=DASHBOARD&block_page_num="+i+"&alert_page_num={{alert_page_num}}' class='page-link "+clazz+"' role='button'>" + i + "</a></li>";
+          content += "<li class='page-item'><a href='{{self}}&{{page}}=DASHBOARD&block_page_num="+i+"&alert_page_num={{alert_page_num}}#block_table' class='page-link "+clazz+"' role='button'>" + i + "</a></li>";
         }
         GBI("block_page_list").innerHTML = content;
 
         content = "";
         for (i=0; i<{{report_pages}}; i++) {
           let clazz = (i == {{alert_page_num}}) ? "bg-secondary" : "";
-          content += "<li class='page-item'><a href='{{self}}&{{page}}=DASHBOARD&alert_page_num="+i+"&block_page_num={{block_page_num}}' class='page-link "+clazz+"' role='button'>" + i + "</a></li>";
+          content += "<li class='page-item'><a href='{{self}}&{{page}}=DASHBOARD&alert_page_num="+i+"&block_page_num={{block_page_num}}#alert_table' class='page-link "+clazz+"' role='button'>" + i + "</a></li>";
         }
         GBI("alert_page_list").innerHTML = content;
       }
@@ -938,7 +970,7 @@ function update_times() {
       }
 
 
-      request();
+      document.addEventListener("DOMContentLoaded", request);
       update_country();
       render_alerts();
       render_blocks();

@@ -6,31 +6,20 @@
     <meta name="description" content="BitFire PHP server Firewall" />
     
     <!-- Favicon -->
-    <link rel="shortcut icon" href="/bitfire/public/favicon.ico" type="image/x-icon"/>
+    <link rel="shortcut icon" href="{{public}}/favicon.ico" type="image/x-icon"/>
     
     <!-- Libs CSS -->
-    <link rel="stylesheet" href="/bitfire/public/vs2015.css" />
-    <link rel="stylesheet" href="/bitfire/public/prism.css" />
-    <link rel="stylesheet" href="/bitfire/public/theme.min.css" />
-    <link rel="stylesheet" href="/bitfire/public/theme.bundle.css" />
-    <link rel="stylesheet" href="/bitfire/public/feather.css" />
+    <link rel="stylesheet" href="{{public}}/vs2015.css" />
+    <link rel="stylesheet" href="{{public}}/prism.css" />
+    <link rel="stylesheet" href="{{public}}/theme.min.css" />
+    <link rel="stylesheet" href="{{public}}/theme.bundle.css" />
+    <link rel="stylesheet" href="{{public}}/feather.css" />
     
     <!-- Title -->
     <title>BitFire Dashboard</title>
     <style>body { font-size: 20px; } </style>
 
-    <script src="/bitfire/public/jquery-3.6.1.min.js"></script>
-    <script src="/bitfire/public/bootstrap.bundle.min.js"></script>
-    <script src="/bitfire/public/chart.min.js"></script>
-    <script src="/bitfire/public/difflib.js"></script>
-    <script src="/bitfire/public/pako.js"></script>
-    <script src="/bitfire/public/prism.js"></script>
-    
-    <script src="/bitfire/public/vendor.bundle.js"></script>
-    <script src="/bitfire/public/theme.bundle.js"></script>
-    <script src="/bitfire/public/dashkit.min.js"></script>
-    <script src="/bitfire/public/underscore.js"></script>
-
+    <script src="{{public}}/underscore.min.js"></script>
 
   </head>
   <body>
@@ -39,10 +28,24 @@
     <div class="main-content">
       {{maincontent}}
     </div>
-
+    
     <!-- Vendor JS -->
     <!--
-    <script src="/bitfire/public/vendor.bundle.min.js"></script>
+    <script src="{{public}}/vendor.bundle.min.js"></script>
     -->
+    <script src="{{public}}/jquery-3.6.1.min.js"></script>
+    <!--
+    <script src="{{public}}/bootstrap.bundle.min.js"></script>
+    -->
+    <script src="{{public}}/chart.min.js"></script>
+    <script src="{{public}}/difflib.js"></script>
+    <script src="{{public}}/pako.js"></script>
+    <script src="{{public}}/prism.js"></script>
+    
+    <script src="{{public}}/vendor.bundle.js"></script>
+    <script src="{{public}}/theme.bundle.js"></script>
+    <script src="{{public}}/dashkit.min.js"></script>
+
+
   </body>
 </html>
