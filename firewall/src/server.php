@@ -271,8 +271,13 @@ function upgrade_config() : Effect {
  */
 function update_config(string $ini_src) : Effect
 {
-    debug("update config");
+    // ugly af, but it works
+    $configured = $GLOBALS["bitfire_update_config"]??false;
     $e = Effect::new();
+    if ($configured) { debug("update config 2x skipped"); }
+    $GLOBALS["bitfire_update_config"] = true;
+    debug("update config");
+
     $ini_test = FileData::new($ini_src);
     // FILESYSTEM GUARDS
     if (! $ini_test->exists) { return $e->exit(false, STATUS_EEXIST, "$ini_src does not exist!"); }

@@ -600,8 +600,16 @@ function validate_raw(string $test_hmac, string $iv, string $time, string $secre
     assert(strlen($secret) > 20, "secret key is too short");
 
     $d3 = hash_hmac("sha256", "{$iv}.{$time}", $secret, false);
+    $d4 = hash_hmac("sha256", "{$iv}.{$time}", "default", false);
+
     $diff = time() - $time;
-    return ($diff) < (HOUR*6) && ($d3 === $test_hmac);
+    //debug("hmac check [$diff] $d3 == $test_hmac");
+
+    if ($diff > HOUR*6) {
+        debug("hmac expired (6 hour maximum) [$diff] $test_hmac");
+        return false;
+    }
+    return ($d4 === $test_hmac || $d3 === $test_hmac);
 }
 
 // validate $hash was generated with make_code($secret)
@@ -900,7 +908,7 @@ function api_call(Request $request) : Effect {
 
     if (trim($request->get["BITFIRE_API"]??"") != "send_mfa") {
         if (!validate_code($code, CFG::str("secret"))) {
-            return Effect::new()->exit(true, STATUS_EACCES, "invalid / expired security code: " . print_r($request->get["BITFIRE_API"]??"X", true));
+            return Effect::new()->api(false, "invalid code", ["error" => "invalid / expired code"])->exit(true);
         }
         trace("SMFA");
     }
