@@ -14,6 +14,7 @@ use const BitFire\WAF_ROOT;
 use function ThreadFin\func_name;
 use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\partial as BINDL;
+use function ThreadFin\utc_time;
 
 if (!defined("DUMP_FILE")) {
     if (defined("WAF_ROOT")) {
@@ -532,11 +533,67 @@ class SQL {
         return is_array($this->_x) ? count($this->_x) : ((empty($this->_x)) ? 0 : 1);
     }
     public function data() : ?array {
+        return $this->_data;
+    }
+    public function result() : ?array {
         return $this->_x;
     }
     public function __toString() : string {
         return (string)$this->_data;
     }
+}
+
+
+/**
+ * database backup checkpoint offset
+ * @package ThreadFinDB
+ */
+class Offset {
+    public string $table;
+    public int $limit_sz = 0;
+    public int $offset = 0;
+    const TABLE_COMPLETE = -1;
+
+    public function __construct(string $table, int $limit_sz = 300) {
+        $this->limit_sz = $limit_sz;
+        $this->table = $table;
+    }
+
+    /**
+     * update a table saved offset
+     * @param string $table 
+     * @param int $offset 
+     * @param int $limit 
+     * @return void 
+     */
+    public function set_check_point(int $offset) {
+        $this->offset = $offset;
+    }
+
+    /**
+     * @param string $table 
+     * @return bool true if the table is completely dumped, false if not or incomplete
+     */
+    public function is_table_complete() : bool {
+        return $this->offset == Offset::TABLE_COMPLETE;
+    }
+}
+
+/**
+ * function suitable for database dumping to gz compressed output file
+ * @param string $data 
+ * @param mixed $stream 
+ * @return int -1 on error, else total byte length written to stream across all writes
+ */
+function gz_output_fn(string $data, $stream) : int {
+    assert(is_resource($stream), "stream must be a resource");
+    static $total_bytes = 0;
+    $bytes = gzwrite($stream, $data);
+    if (!$bytes) {
+        return -1;
+    }
+    $total_bytes += $bytes;
+    return $total_bytes;
 }
 
 
@@ -547,71 +604,70 @@ class SQL {
  * @param mixed $row 
  * @return int number of uncompressed bytes written
  */
-function dump_table(DB $db, $out_fp, $row) : int {
-    $len = 0;
-    $db_name = $db->database;
-    $table = $row["Tables_in_$db_name"];
-
-    // drop table if it exists
-    $result = "DROP TABLE IF EXISTS `$table`;\n";
-
-    // add create statement
-    $create = $db->fetch("SHOW CREATE TABLE $table");
-    $result .= $create->col("Create Table")() . ";\n\n";
-
-    // add number of rows
-    $num_rows = intval($db->fetch("SELECT count(*) as count FROM $table")->col("count")());
-    $result .= "# $num_rows rows in $table\n";
-
-    // write the table header to the file
-    //file_put_contents($db_dump_file, $result, FILE_APPEND);
-    fwrite($out_fp, $result);
-    $len += strlen($result);
-    $result = "";
-
-
+function dump_table(DB $db, callable $write_fn, array $row) : ?Offset {
     $idx = 0;
     $limit = 300;
-    // insert 100 rows at a time
+    $db_name = $db->database;
+    $table = $row["Tables_in_$db_name"];
+    $offset = new Offset($table);
+
+    // find number of rows
+    $num_rows = intval($db->fetch("SELECT count(*) as count FROM $table")->col("count")());
+    // the create statement
+    $create = $db->fetch("SHOW CREATE TABLE $table");
+    // table header line
+    $write_fn("# Export of $table\n# $num_rows rows in $table\n");
+    // drop table if it exists
+    $write_fn("DROP TABLE IF EXISTS `$table`;\n");
+    // add create statement
+    $write_fn($create->col("Create Table")() . ";\n\n");
+
+    // insert $limit rows at a time
     while($idx < $num_rows) {
         $limit = min($limit, $num_rows - $idx);
         $rows = $db->fetch("SELECT * FROM $table LIMIT $limit OFFSET $idx", NULL, MYSQLI_NUM);
-        $result .= $rows->reduce(function($carry, $row) {
+        // create the output string
+        $result = $rows->reduce(function(string $carry, array $row) {
             return $carry . "(" . implode(",", array_map('\ThreadFinDB\quote', $row)) . "),\n";
         }, "INSERT INTO $table VALUES");
-        $result = substr($result, 0, -2) . ";\n\n"; 
+        // write to the output stream
+        $bytes_written = $write_fn(substr($result, 0, -2) . ";\n\n");
+        if ($bytes_written < 0 || $bytes_written > 1048576*20) {
+            return $offset;
+        }
 
-        //file_put_contents($db_dump_file, $result, FILE_APPEND);
-        //fwrite($out_fp, $result);
-        gzwrite($out_fp, $result);
-        $len += strlen($result);
-        $result = "";
-
+        // increment the offset by the limit
         $idx += $limit;
-        echo "$table: $idx/$num_rows\r\n";
-        flush();
-        usleep(10000);
-    }
+        $offset->set_check_point($idx);
 
-    return $len;
+        // let the database rest a second
+        usleep(100000);
+    }
+    $offset->set_check_point(Offset::TABLE_COMPLETE);
+
+    return $offset;
 }
 
-function dump_database(Credentials $cred, string $db_name, $dump_stream) : int {
+/**
+ * dump all database tables to the function $write_fn
+ * @param Credentials $cred Access credentials to the database
+ * @param string $db_name the name of the database (eg, wordpress)
+ * @param callable $write_fn a function that takes a string and 
+ *      writes it to the output stream (fwrite, gzwrite, etc)
+ * @return array of Offset objects. one for each table in $db_name
+ */
+function dump_database(Credentials $cred, string $db_name, callable $write_fn, int $max_bytes = 1024*1024*50) : array {
+    $header = "# Database export of ($db_name) began at UTC: " 
+            . date(DATE_RFC3339) . "\n# UTC tv: " . utc_time() . "\n\n";
+    $init_sql = "SET NAMES 'utf8'\n";
+
     $db = DB::cred_connect($cred);
-    $db->unsafe_raw("SET NAMES 'utf8'");
+    $db->unsafe_raw($init_sql);
     $tables = $db->fetch("SHOW TABLES");
-    //file_put_contents($db_dump_file, "# Database dump began at: " . date("Y-m-d H:i:s") . "\n# tv: " . time() . "\n\n");
-    $header = "# Database dump began at: " . date("Y-m-d H:i:s") . "\n# tv: " . time() . "\n\n";
-    //fwrite($dump_stream, $header);
-    gzwrite($dump_stream, $header);
+    $write_fn($header . $init_sql);
 
-    $t = BINDL('\ThreadFinDB\dump_table', $db, $dump_stream);
+    $t = BINDL('\ThreadFinDB\dump_table', $db, $write_fn);
     $tables->map($t);
-    $written = $tables->reduce(function($carry, $row) {
-        print_r($row);
-        return $carry;
-        //return $carry + $row;
-    }, 0);
-
-    return intval($written) + strlen($header);
+    $data = $tables->data();
+    return (!$data || empty($data) || !is_array($data)) ? [] : $data;
 }

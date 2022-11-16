@@ -312,7 +312,6 @@ function diff(\BitFire\Request $request) : Effect {
         $info = http2("GET", $url, "", [
             "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36",
             "Accept" => "*/*",
-            //"Accept-Encoding" => "gzip, deflate",
             "sec-ch-ua-platform" => "Linux",
             "upgrade-insecure-requests" => "1"]);
 
@@ -322,7 +321,6 @@ function diff(\BitFire\Request $request) : Effect {
             $info = http2("GET", $url2, "", [
                 "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36",
                 "Accept" => "*/*",//"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng",
-                //"Accept-Encoding" => "gzip, deflate",
                 "sec-ch-ua-platform" => "Linux",
                 "upgrade-insecure-requests" => "1"]);
 
@@ -336,9 +334,6 @@ function diff(\BitFire\Request $request) : Effect {
 
     $success = $info["success"] && $local_file->exists;
     $data = array("url" => $request->post['url'], "file_path" => $request->post['file_path'], "compressed" => false);
-    file_put_contents("/tmp/bitfire.log", 
-        "===========================\nrequest: " . print_r($request, true) . "\ndiff: " . print_r($data, true) . "\ncontent: " . print_r($info, true) . "\n----------------\n", 
-        FILE_APPEND);
     if (function_exists("zlib_encode")) {
         $data["zlib_local"] = base64_encode(zlib_encode($local, ZLIB_ENCODING_RAW));
         $data["zlib_orig"] = base64_encode(zlib_encode($info["content"], ZLIB_ENCODING_RAW));
@@ -381,10 +376,6 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         $decoded = un_json($result);
         $c1 = count($decoded);
         debug(" [%s] sent $num_files hashes received $c1 hashes", $plugin_name);
-        if ($plugin_name == "trackerly") {
-            //file_put_contents("/tmp/trackerly.json", "$h2\n", FILE_APPEND);
-            file_put_contents("/tmp/trackerly.json", "$result\n", FILE_APPEND);
-        }
 
         $dir_without_plugin_name = dirname($dir_path);
 

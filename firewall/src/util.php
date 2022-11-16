@@ -1134,7 +1134,6 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     trace("http2 $url");
     // fall back to non curl...
     if (!function_exists('curl_init')) {
-        debug("NO CURL!");
         $c = http($method, $url, $data, $optional_headers);
         $len = strlen($c);
         return ["content" => $c, "path" => $url, "headers" => ["http/1.1 200"], "length" => $len, "success" => ($len > 0)];
@@ -1166,13 +1165,12 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     
     // Receive server response ...
     \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    //\curl_setopt($ch, CURLINFO_HEADER_OUT, true);
+    \curl_setopt($ch, CURLINFO_HEADER_OUT, true);
     //curl_setopt($ch, CURLOPT_HEADER, true);
 
     $headers = [];
     // this function is called by curl for each header received
     \curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $header) use (&$headers) {
-        debug("header [$header]\n");
         $hdr = explode(':', $header, 2);
         $name = $hdr[0]??'empty';
         $value = $hdr[1]??'empty';
@@ -1196,8 +1194,6 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     $info["content"] = $server_output;//substr($server_output, $info["header_size"]);
     $info["headers"] = $headers;//substr($server_output, 0, $info["header_size"]);
     $info["length"] = strlen($server_output);
-
-    file_put_contents("/tmp/http.log", "-----------\n".print_r($info, true)."-----------\n");
 
     return $info;
 }

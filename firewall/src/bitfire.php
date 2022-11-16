@@ -20,6 +20,7 @@ use ThreadFin\MaybeBlock;
 use const ThreadFin\DAY;
 
 use function BitFire\Pure\json_to_file_effect;
+use function BitFirePlugin\is_admin;
 use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
@@ -633,31 +634,24 @@ class BitFire
         // build A WordPress Profile for REAL browsers only
         if (CFG::enabled("wp_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
             $wp_effect = cms_build_profile($this->_request, $wp_admin);
-            if (!defined("SAVEQUERIES") && CFG::enabled("audit_sql")) { define("SAVEQUERIES", true); } // feature toggle to log WP sql queries and audit
 
             register_shutdown_function(function() use ($wp_effect) {
                 // if we have wordpress db, and query data
-                if (isset($GLOBALS['wpdb']) && CFG::enabled("audit_sql")) {
-                    $db = $GLOBALS['wpdb'];
-                    if (isset($db->queries) && !empty($db->queries)) {
-                        // only keep the query string
-                        //$sql = array_map(function($x){return(isset($x[0]))?$x[0]:"";}, $db->queries);
-                        // append to the sql log file
-                        //$wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql.log", json_encode(["url" => $wp_effect->read_out(), "queries" => $sql]), FILE_W, 0, true));
-                        $log = "";
-                        foreach ($db->queries as $q) {
-                            $log .= str_replace("\n", " ", $q[0])."\n";
-                        }
-
-                        $wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql.log", $log, FILE_W, 0, true));
-                    }
+                if (CFG::enabled("audit_sql")) {
+                    $wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql_tx.log", CFG::str("tx_log"), FILE_W, 0, true));
                 }
                 $wp_effect->run();
                 if ($wp_effect->num_errors() > 0) {
-                    debug("effect errors [%s]", en_json($wp_effect->read_errors()));
+                    if (CFG::enabled("debug_file")) {
+                        debug("effect errors [%s]", en_json($wp_effect->read_errors()));
+                    }
+                    // append debug info for admins only
+                    else if (function_exists("BitFirePlugin\is_admin") && is_admin()) {
+                        printf("\n\n\n<!-- bitfire audit effect errors [%s] -->", en_json($wp_effect->read_errors(), true));
+                    }
                 }
             });
-        }
+       }
 
 
 
