@@ -392,7 +392,7 @@ function array_filter_modify(array $list, callable $filter_fn, callable $modify_
  * @param string $dirname to search
  * @return array 
  */
-function get_subdirs(string $dirname) : array {
+function get_sub_dirs(string $dirname) : array {
     $dirs = array();
     if (!file_exists($dirname)) { debug("unable to find subdirs [$dirname]"); }
 

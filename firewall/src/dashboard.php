@@ -173,18 +173,20 @@ function url_to_path($url)
 
 
 // find a plugin / theme version number located in $path
-function version_from_path(string $path) {
+function version_from_path(string $path, string $default_ver = "") {
     $package_fn = find_fn("package_to_ver");
-    $files = find_const_arr("PACKAGE_FILES");
+    $package_files = find_const_arr("PACKAGE_FILES");
+    $php_files = array_map('basename', glob($path."/*.php"));
+    $all_files = array_merge($package_files, $php_files);
 
-    foreach($files as $file) {
+    foreach($all_files as $file) {
         $file_path = "{$path}/{$file}";
         if (file_exists($file_path)) {
             $version = FileData::new($file_path)->read()->reduce($package_fn, "");
             if ($version) { return $version; }
         }
     }
-    return "";
+    return $default_ver;
 }
  
 function dump_dirs() : array {
@@ -196,9 +198,9 @@ function dump_dirs() : array {
     $dir_list_fn = find_fn("malware_scan_dirs");
     $all_paths = $dir_list_fn($root);
 
-    $dir_versions = array_add_value($all_paths, '\BitFire\version_from_path');
-    $dir_versions["{$root}wp-includes"] = $root_ver;
-    $dir_versions["{$root}wp-admin"] = $root_ver;
+    $dir_versions = array_add_value($all_paths, BINDR('\BitFire\version_from_path', ""));
+    $dir_versions["{$root}/wp-includes"] = $root_ver;
+    $dir_versions["{$root}/wp-admin"] = $root_ver;
     return $dir_versions;
 }
 

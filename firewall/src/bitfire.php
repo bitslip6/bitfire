@@ -524,10 +524,6 @@ class BitFire
     }
     
 
-    
-
-    
-
 
     /**
      * inspect a request and block failed requests
