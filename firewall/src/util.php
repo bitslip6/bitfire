@@ -1253,9 +1253,6 @@ function http(string $method, string $path, $data, array $optional_headers = nul
 
     $ctx = stream_context_create($params);
     $response = @file_get_contents($path, false, $ctx);
-    if (!contains($path, "bitfire.co")) {
-        file_put_contents("/tmp/http.log", "-----------\n$path\n".print_r($params, true)."...........\n".print_r($response, true)."-----------\n", FILE_APPEND);
-    }
     if ($response === false) {
         return debugF("http_resp [$path] fail");
     }
@@ -1568,7 +1565,7 @@ function parse_ini2(string $src) : array {
 function parse_ini(string $ini_src) : void {
     $config = CacheStorage::get_instance()->load_data("config.ini", []);
     $parsed_file = "$ini_src.php";
-    // prefeer cache storage as it is secure (not web readable) and widely available
+    // prefer cache storage as it is secure (not web readable) and widely available
     if (!empty($config)) {
         CFG::set($config);
         // we have config in cache. disallow world reading
@@ -1717,6 +1714,11 @@ function call_to_source(string $fn, array $x, string $cost = "wt") : array {
 }
 
 
+/**
+ * convert xhprof data into a call-grind file (/tmp/callgrind.out)
+ * @param null|array $data 
+ * @return void 
+ */
 function output_profile(?array $data) {
     $pre  = "version: 1\ncreator: https://bitfire.co\ncmd: BitFire\npart: 1\npositions: line\nevents: Time\nsummary: ";
 

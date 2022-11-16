@@ -4,9 +4,10 @@ namespace BitFirePlugin;
 
 use BitFire\Config AS CFG;
 
-use function ThreadFin\get_subdirs;
+use function ThreadFin\get_sub_dirs;
 use function BitFireSvr\get_wordpress_version;
 use function ThreadFin\contains;
+use function ThreadFin\debug;
 use function ThreadFin\ends_with;
 
 define("\BitFire\\CMS_INCLUDED", true);
@@ -72,10 +73,11 @@ function package_to_ver(string $carry, string $line) : string {
 }
 
 function malware_scan_dirs(string $root) : array {
+    debug("malware_scan (%s)", $root);
     if (!ends_with($root, "/")) { $root .= "/"; }
     $d1 = CFG::str("wp_contentdir")."/plugins";
     $d2 = CFG::str("wp_contentdir")."/themes";
-    return array_merge(get_subdirs($d1), get_subdirs($d2), ["{$root}wp-includes", "{$root}wp-admin"]);
+    return array_merge(get_sub_dirs($d1), get_sub_dirs($d2));//, ["{$root}wp-includes", "{$root}wp-admin"]);
 }
 
 
