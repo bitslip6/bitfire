@@ -301,11 +301,11 @@ function update_config(string $ini_src) : Effect
     // configure wordpress root path
     // TODO: move all of WordPress settings into the wordpress-plugin/bitfire-admin.php
     $root = cms_root();
-    $content_dir = cms_root() . "/wp-content"; // default fallback
+    $content_dir = "/wp-content"; // default fallback
     $scheme = filter_input(INPUT_SERVER, "REQUEST_SCHEME", FILTER_SANITIZE_SPECIAL_CHARS);
     $host = filter_input(INPUT_SERVER, "HTTP_HOST", FILTER_SANITIZE_URL);
 
-    $content_url = "{$_SERVER['REQUEST_SCHEME']}://$host/$content_dir";
+    $content_url = "$scheme://$host/$content_dir";
     if (!empty($root)) {
         $info["wp_root_path"] = $root;
 

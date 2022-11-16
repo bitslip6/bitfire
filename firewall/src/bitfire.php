@@ -321,10 +321,14 @@ function verify_admin_password() : Effect {
 
     // ensure that the server configuration is complete...
     if (CFG::disabled("configured")) { \BitFireSVR\bf_activation_effect()->run(); }
+    $effect = Effect::new();
+    // disable caching for auth pages
+    $effect->response_code(203);
 
     // run the initial password setup if the password is not configured
     if (CFG::str("password") == "configure") {
-        render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->exit()->run();
+        //return render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup");
+        return $effect;
     }
 
     $raw_pw = $_SERVER["PHP_AUTH_PW"]??'';
@@ -341,10 +345,7 @@ function verify_admin_password() : Effect {
         }
     }
 
-    $effect = Effect::new();
-    // disable caching for auth pages
-    $effect->response_code(203);
-
+    
     // prefer plugin authentication first
     if (function_exists("BitFirePlugin\is_admin") && \BitFirePlugin\is_admin()) {
         return $effect;

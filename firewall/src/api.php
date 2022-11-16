@@ -298,7 +298,8 @@ function diff(\BitFire\Request $request) : Effect {
     if (!ends_with($path, "php")) {
         return Effect::new()->api(false, "invalid file: $path");
     }
-    $local = FileData::new($path)->raw();
+    $local_file = FileData::new($path);
+    $local = $local_file->raw();
     $len = strlen($local);
     // hard coded WP files that are okay. todo: update with hashes
     if (
@@ -310,8 +311,8 @@ function diff(\BitFire\Request $request) : Effect {
     } else {
         $info = http2("GET", $url, "", [
             "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36",
-            "Accept" => "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng",
-            "Accept-Encoding" => "gzip, deflate",
+            "Accept" => "*/*",
+            //"Accept-Encoding" => "gzip, deflate",
             "sec-ch-ua-platform" => "Linux",
             "upgrade-insecure-requests" => "1"]);
 
@@ -320,8 +321,8 @@ function diff(\BitFire\Request $request) : Effect {
             $url2 = preg_replace("/\/tags\/[^\/]+\//", "/trunk/", $url);
             $info = http2("GET", $url2, "", [
                 "User-Agent" => "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36",
-                "Accept" => "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng",
-                "Accept-Encoding" => "gzip, deflate",
+                "Accept" => "*/*",//"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng",
+                //"Accept-Encoding" => "gzip, deflate",
                 "sec-ch-ua-platform" => "Linux",
                 "upgrade-insecure-requests" => "1"]);
 
@@ -333,8 +334,11 @@ function diff(\BitFire\Request $request) : Effect {
         }
     }
 
-    $success = $info["success"] && strlen($local) > 0;
+    $success = $info["success"] && $local_file->exists;
     $data = array("url" => $request->post['url'], "file_path" => $request->post['file_path'], "compressed" => false);
+    file_put_contents("/tmp/bitfire.log", 
+        "===========================\nrequest: " . print_r($request, true) . "\ndiff: " . print_r($data, true) . "\ncontent: " . print_r($info, true) . "\n----------------\n", 
+        FILE_APPEND);
     if (function_exists("zlib_encode")) {
         $data["zlib_local"] = base64_encode(zlib_encode($local, ZLIB_ENCODING_RAW));
         $data["zlib_orig"] = base64_encode(zlib_encode($info["content"], ZLIB_ENCODING_RAW));
@@ -693,19 +697,24 @@ function delete(\BitFire\Request $request) : Effect {
     if (strlen($f) > 1) {
         $out1 = $root . $f.".bak.".mt_rand(10000,99999);
         $src = $root . $f;
+
         if (!file_exists($src)) { return $effect->api(false, "refusing to delete relative path"); } 
 
         $quarantine_path = str_replace($root, \BitFire\WAF_ROOT."quarantine/", $out1);
+        debug("moving [%s] to [%s]", $src, $quarantine_path);
         make_dir($quarantine_path, FILE_EX);
+        if (!is_writable($src)) { chmod($src, FILE_RW); }
         if (is_writable($src)) {
             if (is_writeable($quarantine_path)) {
                 $r = rename($src, "{$quarantine_path}{$f}");
                 $effect->api(true, "renamed {$quarantine_path}{$f} ($r)");
             } else {
                 $r = unlink($src);
+                debug("unable to quarantine [$src] unlink:($r)");
                 $effect->api(true, "deleted {$src} ($r)");
             }
         } else {
+            debug("permission error quarantine [$src]");
             $effect->api(false, "delete permissions error '$src'");
         }
     } else {
@@ -880,7 +889,6 @@ function api_call(Request $request) : Effect {
         $auth_effect = (function_exists("\\BitFirePlugin\\verify_admin_effect"))
             ? \BitFirePlugin\verify_admin_effect($request) 
             : verify_admin_password($request);
-    
         $auth_effect->run();
     }
     

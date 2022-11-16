@@ -254,7 +254,9 @@ function dump_hashes()
 function serve_malware()
 {
     // authentication guard
-    validate_auth()->run();
+    $auth = validate_auth();
+    $auth->run();
+    if ($auth->read_status() == 302) { return; }
 
 
     // for reading php files
@@ -334,7 +336,15 @@ function dashboard_url() : string {
 function render_view(string $view_filename, string $page_name, array $variables = []) : Effect {
     
     $variables['self'] = find_fn("dashboard_url")();
-    $public = CFG::str("wp_contenturl")."/plugins/bitfire/public/";
+    //$public = realpath(__FILE__ . "/../public/");
+    $public = realpath(__DIR__ . "/../public/");
+    $public = str_replace($_SERVER['DOCUMENT_ROOT'], "", $public);
+    if (CFG::enabled("wp_root")) {
+        if (file_exists(CFG::str("wp_contentdir") . "/plugins/bitfire/public")) {
+            $public = "/wp-content/plugins/bitfire/public/";
+            $public = CFG::str("wp_contenturl")."/plugins/bitfire/public/";
+        }
+    }
 
     $is_free = (strlen(Config::str('pro_key')) < 20);
     // inject common variables and extract at the end
@@ -386,7 +396,10 @@ function render_view(string $view_filename, string $page_name, array $variables 
 
 function serve_settings() {
     // authentication guard
-    validate_auth()->run();
+    $auth = validate_auth();
+    $auth->run();
+    if ($auth->read_status() == 302) { return; }
+
 
     $view = (CFG::disabled("wizard", false)) ? "wizard.html" : "settings.html";
 
@@ -427,7 +440,7 @@ function validate_auth() : Effect {
 
     // run the initial password setup if the password is not configured
     if (CFG::str("password") == "configure") {
-        render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->run();
+        return render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup")->status(302);
     }
 
     return \BitFire\verify_admin_password();
@@ -533,13 +546,17 @@ function serve_exceptions() :void
 function serve_dashboard() :void
 {
     // handle dashboard wizard
+    /*
     if (CFG::disabled("wizard") && !isset($_GET['tooltip'])) {
        serve_settings();
        return;
     }
+    */
 
     // authentication guard
-    validate_auth()->run();
+    $auth = validate_auth();
+    $auth->run();
+    if ($auth->read_status() == 302) { return; }
     
     $block_page_num = intval($_GET["block_page_num"]??0);
     $alert_page_num = intval($_GET["alert_page_num"]??0);

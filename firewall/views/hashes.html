@@ -818,7 +818,6 @@
 		let ans = function (data) {
 			//if (!data.success) { console.log("ERROR DIFFING FILE", data); return; }
 
-			console.log("!! diff response: ", data);
 			// extract and decode the data...
 			if (data.data.compressed) {
 				var t1 = pako.inflateRaw(Uint8Array.from(atob(data.data.zlib_orig), c => c.charCodeAt(0)), {to:"string"});

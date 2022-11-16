@@ -1134,6 +1134,7 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     trace("http2 $url");
     // fall back to non curl...
     if (!function_exists('curl_init')) {
+        debug("NO CURL!");
         $c = http($method, $url, $data, $optional_headers);
         $len = strlen($c);
         return ["content" => $c, "path" => $url, "headers" => ["http/1.1 200"], "length" => $len, "success" => ($len > 0)];
@@ -1165,12 +1166,13 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     
     // Receive server response ...
     \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    \curl_setopt($ch, CURLINFO_HEADER_OUT, true);
+    //\curl_setopt($ch, CURLINFO_HEADER_OUT, true);
     //curl_setopt($ch, CURLOPT_HEADER, true);
 
     $headers = [];
     // this function is called by curl for each header received
     \curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($ch, $header) use (&$headers) {
+        debug("header [$header]\n");
         $hdr = explode(':', $header, 2);
         $name = $hdr[0]??'empty';
         $value = $hdr[1]??'empty';
@@ -1194,6 +1196,8 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     $info["content"] = $server_output;//substr($server_output, $info["header_size"]);
     $info["headers"] = $headers;//substr($server_output, 0, $info["header_size"]);
     $info["length"] = strlen($server_output);
+
+    file_put_contents("/tmp/http.log", "-----------\n".print_r($info, true)."-----------\n");
 
     return $info;
 }
@@ -1224,19 +1228,21 @@ function http(string $method, string $path, $data, array $optional_headers = nul
     trace("http $path");
     // build the post content paramater
     $content = (is_array($data)) ? http_build_query($data) : $data;
-    $params = http_ctx($method, 2);
+    $params = http_ctx($method, 5);
     if ($method === "POST") {
         $params['http']['content'] = $content;
         $optional_headers['Content-Length'] = strlen($content);
     } else { $path .= "?" . $content; }
     $path = trim($path, "?&");
 
+    /*
     if (!isset($optional_headers['Content-Type'])) {
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
 		$optional_headers['User-Agent'] = "BitFire WAF https://bitfire.co/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
     }
+    */
 
     
     $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
@@ -1247,6 +1253,9 @@ function http(string $method, string $path, $data, array $optional_headers = nul
 
     $ctx = stream_context_create($params);
     $response = @file_get_contents($path, false, $ctx);
+    if (!contains($path, "bitfire.co")) {
+        file_put_contents("/tmp/http.log", "-----------\n$path\n".print_r($params, true)."...........\n".print_r($response, true)."-----------\n", FILE_APPEND);
+    }
     if ($response === false) {
         return debugF("http_resp [$path] fail");
     }
@@ -1262,7 +1271,7 @@ function http_ctx(string $method, int $timeout) : array {
     return array('http' => array(
         'method' => $method,
         'timeout' => $timeout,
-        'max_redirects' => 4,
+        'max_redirects' => 5,
         'header' => ''
         ),
         'ssl' => array(
