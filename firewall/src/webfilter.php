@@ -101,13 +101,13 @@ class WebFilter {
             $c1 = count($keys); $c2 = count($values);
 
             if ($c1 <= 1 || $c2 <= 1) { update_raw($keyfile, $valuefile)->run(); }
-            if ($c1 <= 1) {
+            if ($c1 <= 5) {
                 // looks like encryption is broken here ...
                 $keys = \ThreadFin\recache2_file($keyfile);
                 trace("keys: " . count($keys));
                 $cache->save_data("webkeys2", $keys, DAY);
             }
-            if ($c2 <= 1) {
+            if ($c2 <= 5) {
                 $values = \ThreadFin\recache2_file($valuefile);
                 trace("values: " . count($values));
                 $cache->save_data("webvalues2", $values, DAY);
@@ -375,8 +375,8 @@ function generic_reducer(array $keys, array $values, $name, ?string $value) : Ma
 
     $c1 = count($keys);
     $c2 = count($values);
-    assert($c1 > 10, "unable to load keys");
-    assert($c2 > 60, "unable to load values");
+    assert($c1 > 10, "unable to load keys [$c1:$c2]");
+    assert($c2 > 60, "unable to load values [$c1:$c2]");
 
     return \BitFire\generic((string)$name, $value, $values, $keys);
 }
