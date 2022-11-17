@@ -7,6 +7,7 @@ use function ThreadFin\httpp;
 use function ThreadFin\parse_ini2;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\output_profile;
 use function ThreadFin\un_json;
 
 if (defined("BitFire\\WAF_ROOT")) { header("x-bitfire: inc 2x"); return; }
@@ -14,7 +15,9 @@ if (PHP_VERSION_ID < 70000) { header("x-bitfire: requires php >= 7.0"); return; 
 
 
 
-//xhprof_enable(XHPROF_FLAGS_CPU | XHPROF_FLAGS_MEMORY);
+if (function_exists('xhprof_enable')) {
+    xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
+}
 
 // system root paths and timing
 $start_time = microtime(true);
@@ -67,7 +70,7 @@ register_shutdown_function(function() {
 
 try {
     CFG::set(parse_ini2(\BitFire\WAF_INI));
-    debug("bitfire %s", BITFIRE_SYM_VER);
+    debug("bitfire %s [%s:%s] @%s", BITFIRE_SYM_VER, $_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI'], date('D M j G:i:s'));
         
     // handle IP level blocks, requires single stat call for test
     if (CFG::enabled("allow_ip_block")) {
@@ -79,7 +82,6 @@ try {
                 // ip is still blocked
                 if (filemtime($block_file) > time()) { 
                     $block = array("blocked IP address");
-                    header("");
                     exit(include \BitFire\WAF_ROOT."views/block.php");
                 }
                 // ip block has expired
@@ -141,13 +143,15 @@ catch (\Exception $e) {
 }
 
 $m1 = microtime(true);
-debug("bitfire [%dms] [%s]", round((($m1-$start_time)*1000),4), trace());//, utc_date("m/d @H.i.s"));
-//file_put_contents("/tmp/xhr_profile.json", json_encode(xhprof_disable(), JSON_PRETTY_PRINT));
-//output_profile(\xhprof_disable());
-//$data = \xhprof_disable();
-//$data = array_filter(\xhprof_disable(), function($elm) { return ($elm['wt'] > 100 || $elm['cpu'] > 100); }); 
-//uasort($data, '\ThreadFin\prof_sort');
-//file_put_contents("/tmp/prof2.pass.json", json_encode($data, JSON_PRETTY_PRINT));
+debug("bitfire [%.2fms] [%s]", (($m1-$start_time)*1000), trace());//, utc_date("m/d @H.i.s"));
+if (function_exists('xhprof_enable')) {
+    $data = xhprof_disable();
+    file_put_contents("/tmp/xhr_profile.json", json_encode($data, JSON_PRETTY_PRINT));
+    output_profile($data);
+    $data = array_filter($data, function($elm) { return ($elm['wt'] > 100 || $elm['cpu'] > 100); }); 
+    uasort($data, '\ThreadFin\prof_sort');
+    file_put_contents("/tmp/prof2.pass.json", json_encode($data, JSON_PRETTY_PRINT));
+}
 
 // clean up the error handler and assertion settings
 restore_error_handler();
