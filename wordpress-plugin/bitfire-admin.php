@@ -31,8 +31,10 @@ use function ThreadFin\dbg;
 use function ThreadFin\en_json;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\ends_with;
 use function ThreadFin\error;
 use function ThreadFin\partial as BINDL;
+use function ThreadFin\partial_right as BINDR;
 
 // we should have attempted load 2x before here
 // 1: for for auto laod, 2: plugin load, if it didn't load, something is wrong
@@ -145,6 +147,18 @@ function admin_init() {
 
     // the admin function to run
     $page = filter_input(INPUT_GET, "BITFIRE_WP_PAGE", FILTER_SANITIZE_SPECIAL_CHARS);
+
+    $rm_path = CFG::str("rm_bitfire");
+    if ($rm_path) {
+        debug("PURGE $rm_path");
+        // remove old bitfire directory, if it exists
+        if (ends_with($rm_path, "bitfire") && !contains(ini_get("auto_prepend_file"), $rm_path)) { 
+            debug("EXEC PURGE $rm_path");
+            file_recurse($rm_path, BINDR("chmod", FILE_RW));
+            //file_recurse($rm_path, "unlink");
+            //unlink($rm_path);
+        }
+    }
 
     
     // serve the requested page

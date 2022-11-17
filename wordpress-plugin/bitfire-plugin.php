@@ -34,6 +34,7 @@ use BitFire\MatchType;
 use BitFire\Request;
 use Exception;
 use RuntimeException;
+use ThreadFin\CacheStorage;
 use ThreadFin\Effect;
 use ThreadFin\FileData;
 use ThreadFin\FileMod;
@@ -177,6 +178,15 @@ function bitfire_menu_hit() {
  */
 function activate_bitfire() {
     trace("wp_act");
+    $file_name = ini_get("auto_prepend_file");
+    if (contains($file_name, "bitfire")) {
+        $base_dir = basename($file_name);
+        CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+        \BitFireSvr\uninstall()->run();
+        sleep(1);
+        \BitFireSvr\update_ini_value("rm_bitfire", $base_dir)->hide_output()->run();
+    }
+
     ob_start(function($x) { if(!empty($x)) { debug("PHP Warnings: [%s]\n", $x); } return $x; });
 
     // install data can be verbose, so redirect to install log

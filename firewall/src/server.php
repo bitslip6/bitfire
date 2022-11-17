@@ -594,7 +594,8 @@ function install() : Effect {
             $file = $hta;
         }
         // handle NGINX and other cases
-        $content = "auto_prepend_file = \"".\BitFire\WAF_ROOT."startup.php\"";
+        $root_path = dirname(__DIR__) . DS;
+        $content = "auto_prepend_file = \"{$root_path}startup.php\"";
         $status = (\BitFireSvr\install_file($ini, $content) ? true : false);
         $file = $ini;
         $extra = "This may take up to " . ini_get("user_ini.cache_ttl") . " seconds to take effect (cache clear time)";
