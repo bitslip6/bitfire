@@ -11,3 +11,7 @@ tests/*.txt
 test2/*
 bin/install_wordpress.sh
 firewall/developer-notes.txt
+pro.php
+proapi.php
+internal
+update.sh
