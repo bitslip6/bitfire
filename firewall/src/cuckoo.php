@@ -333,7 +333,7 @@ function cuckoo_find_header_for_read(array $ctx, string $key): ?array {
     if ($header['hash1'] !== $key_hashes[0] || $header['hash2'] !== $key_hashes[1]) {
         $header = cuckoo_read_header($ctx, $key_hashes[1]);
         if ($header['hash1'] !== $key_hashes[0] || $header['hash2'] !== $key_hashes[1]) {
-            // cache entry is missing, dont log it
+            // cache entry is missing, don't log it
             if ($header['hash1'] == 0) {
                 return null;
             }
