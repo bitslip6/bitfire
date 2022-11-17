@@ -42,6 +42,7 @@ use ThreadFin\FileMod;
 use const BitFire\APP;
 use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
+use const BitFire\FILE_RW;
 use const BitFire\FILE_W;
 use const BitFire\STATUS_EACCES;
 use const BitFire\WAF_ROOT;
@@ -74,15 +75,25 @@ if ( ! defined( "WPINC" ) ) { die(); }
 if (defined("BitFire\TYPE") && \BitFire\TYPE == "STANDALONE") { 
     require_once \BitFire\WAF_SRC."server.php";
     // load the old configuration if we have one
+    // TODO: move to a backup function
     $old_conf = WAF_ROOT."config.ini";
     $new_conf = __DIR__."/config.ini";
     if ($old_conf != $new_conf) {
-	chmod($old_conf, FILE_RW);
-	chmod($new_conf, FILE_RW);
-    	@copy($old_conf, $new_conf);
-	chmod($old_conf, FILE_W);
-	chmod($new_conf, FILE_W);
+        chmod($old_conf, FILE_RW);
+        chmod($new_conf, FILE_RW);
+        @copy($old_conf, $new_conf);
+        chmod($old_conf, FILE_W);
+        chmod($new_conf, FILE_W);
     }
+    $hash_file = WAF_ROOT."cache/hashes.json";
+    if (file_exists($hash_file)) {
+        @copy($hash_file, __DIR__."/cache/hashes.json");
+    }
+    $block_file = WAF_ROOT."cache/blocks.json";
+    $alert_file = WAF_ROOT."cache/alerts.json";
+    @copy($block_file, __DIR__."/cache/blocks.json");
+    @copy($alert_file, __DIR__."/cache/alerts.json");
+    @copy(WAF_ROOT."exceptions.json", __DIR__."exceptions.json");
     $effect = \BitFireSvr\uninstall()->hide_output();
     $effect->run();
 }
@@ -162,20 +173,13 @@ function find_cms_root() : ?string {
  * is also done in startup.php as a failsafe
  * @since    1.8.0
  */
-$ex1 = function_exists("BitFire\on_err");
-$ex2 = class_exists("BitFire\Config");
-$ex3 = defined("BitFire\WAF_ROOT");
-echo " $ex1 - $ex2 - $ex3 \n\n";
 
 if (!defined("\BitFire\WAF_ROOT") && !function_exists("\BitFire\on_err")) {
-    $bit = $GLOBALS['bitfire']??false;
-    if (!$bit) {
-        $f =  __DIR__ . "/startup.php";
-        if (file_exists($f)) {
-            include_once $f;
-        }
-        trace("wp");
+    $f =  __DIR__ . "/startup.php";
+    if (file_exists($f)) {
+        include_once $f;
     }
+    trace("wp");
 }
 
 
@@ -222,7 +226,7 @@ function activate_bitfire() {
  * toggle the firewall enable option, uninstall
  */
 function deactivate_bitfire() {
-    trace("wp_deact");
+    trace("deactivate");
     // install data can be verbose, so redirect to install log
     \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
     \BitFire\Config::set_value("debug_header", false);

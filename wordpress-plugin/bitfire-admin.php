@@ -22,11 +22,13 @@ use const BitFire\FILE_RW;
 use const BitFire\FILE_W;
 use const BitFire\WAF_INI;
 use const BitFire\WAF_ROOT;
+use const BitFire\WAF_SRC;
 use const ThreadFin\DAY;
 
 use function BitFireSvr\update_ini_value;
 use function ThreadFin\array_filter_modify;
 use function ThreadFin\contains;
+use function ThreadFin\file_recurse;
 use function ThreadFin\dbg;
 use function ThreadFin\en_json;
 use function ThreadFin\trace;
@@ -37,7 +39,7 @@ use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial_right as BINDR;
 
 // we should have attempted load 2x before here
-// 1: for for auto laod, 2: plugin load, if it didn't load, something is wrong
+// 1: for for auto load, 2: plugin load, if it didn't load, something is wrong
 if (!defined("BitFire\\WAF_ROOT")) {
     die("BitFire did not load correctly.  Please re-install.");
 }
@@ -150,13 +152,35 @@ function admin_init() {
 
     $rm_path = CFG::str("rm_bitfire");
     if ($rm_path) {
+        // need
         debug("PURGE $rm_path");
         // remove old bitfire directory, if it exists
+        // TODO: improve this....
         if (ends_with($rm_path, "bitfire") && !contains(ini_get("auto_prepend_file"), $rm_path)) { 
-            debug("EXEC PURGE $rm_path");
-            file_recurse($rm_path, BINDR("chmod", FILE_RW));
-            //file_recurse($rm_path, "unlink");
-            //unlink($rm_path);
+            if (file_exists($rm_path) && file_exists("{$rm_path}/startup.php")) {
+                debug("EXEC PURGE $rm_path");
+                file_recurse($rm_path, function($x) {
+                    if (is_dir($x)) {
+                        $r = chmod($x, 0775);
+                    } else {
+                        chmod($x, 0664);
+                        unlink($x);
+                    }
+                });
+                file_recurse($rm_path, function($x) {
+                    if (is_dir($x)) { rmdir($x); }
+                    else { unlink($x); } 
+                });
+                file_recurse($rm_path, function($x) {
+                    if (is_dir($x)) { rmdir($x); }
+                    else { unlink($x); } 
+                });
+                chmod($rm_path, 0775);
+                unlink($rm_path);
+                if (!file_exists($rm_path)) {
+                    update_ini_value("rm_bitfire", "")->run();
+                }
+            }
         }
     }
 
