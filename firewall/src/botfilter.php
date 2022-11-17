@@ -344,7 +344,7 @@ class BotFilter {
     public function __construct(CacheStorage $cache) {
         $this->cache = $cache;
         $this->_constraints = array(
-            FAIL_PHPUNIT => new MatchType(MatchType::CONTAINS, "path", '/phpunit', BLOCK_SHORT),
+            FAIL_PHP_UNIT => new MatchType(MatchType::CONTAINS, "path", '/phpunit', BLOCK_SHORT),
             FAIL_THRIVE_KRAKEN => new MatchType(MatchType::REGEX, "post_raw", '/td_option_webhook.*?kraked_url/', BLOCK_MEDIUM),
             FAIL_EVT_CAL => new MatchType(MatchType::REGEX, "post_raw", '/td_option_webhook.*?kraked_url/', BLOCK_MEDIUM),
             //FAIL_WP_ENUM => new MatchType(MatchType::CONTAINS, "path", '/wp-json/wp/v2/users', 0),

@@ -93,10 +93,10 @@ function cuckoo_find_free_mem($ctx, $size): array {
         return [null, null];
     }
 
-    // calculate a reasonable blocksize
+    // calculate a reasonable block-size
     $block_size = intval(ceil($size / $ctx['chunk_size']) * $ctx['chunk_size']);
     
-    // debug("shmop: blocksz [$block_size]\n");
+    // debug("shmop: block_size [$block_size]\n");
     // lock memory
     if (cuckoo_lock_for_write($ctx, $block_size)) {
         // find a location to allocate at the end of the stack, if full, defrag and return end of stack
@@ -109,7 +109,6 @@ function cuckoo_find_free_mem($ctx, $size): array {
         //debug("allocate PTR: [$ptr]");
         // if we have a location (not full and defrag successful), update pointer location
         if ($ptr !== null) {
-            //$mem = unpack("nitems/nsize/Lfree", shmop_read($ctx['rid'], ($ctx['mem_end']), 8));
             shmop_write($ctx['rid'], pack("nnL", $ctx['slots'], $ctx['chunk_size'], $ptr + $block_size), $ctx['mem_end']);
             cuckoo::update_free($ptr + $block_size);
         }

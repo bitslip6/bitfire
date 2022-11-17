@@ -28,7 +28,7 @@ const PACKAGE_FILES = ["readme.txt", "README.txt", "package.json"];
 
 /**
  * file_type is an enumeration of malware scan file types.  
- * These files are stored in seperate tables with the 
+ * These files are stored in separate tables with the 
  * file_type to table mapping function.
  * 
  * @param string $path the full path to the file
@@ -57,7 +57,7 @@ function type_to_table(string $type) : string {
 
 /**
  * convert a file path to a source path.  If the plugin has HTTP
- * access to originial source code, this function should return
+ * access to original source code, this function should return
  * an HTTP path to the source code.
  * 
  * If no such path exists, this function should return empty string.
@@ -66,7 +66,7 @@ function type_to_table(string $type) : string {
  *                         path, or the document root if no such path exists 
  * @param string $type     the file type as determined by file_type()
  * @param string $ver      the version of the plugin/theme/core as determined by
- *                         packge_to_ver()
+ *                         package_to_ver()
  * @param string $name     the plugin/theme/module name for the file 
  *                         (if available)
  * @return string - the url to the source code
@@ -76,10 +76,10 @@ function path_to_source(string $rel_path, string $type, string $ver, ?string $na
     $source = "";
     switch($type) {
         case "my_plugin":
-            $source = "plugin.svn.mycorp.com/{$name}/tags/{$ver}/{$rel_path}";
+            $source = "plugin.svn.my-corp.com/{$name}/tags/{$ver}/{$rel_path}";
             break;
         case "my_core":
-            $source = "core.svn.mycorp.com/tags/{$ver}/{$rel_path}";
+            $source = "core.svn.my-corp.com/tags/{$ver}/{$rel_path}";
             break;
     }
 
@@ -105,9 +105,9 @@ function path_to_source(string $rel_path, string $type, string $ver, ?string $na
 function package_to_ver(string $carry, string $line) : string {
     // If we have already identified a version number, use that number
     // (assumes first version number is correct).  Remove this
-    // line to take the last version number, or change to accpet any
+    // line to take the last version number, or change to accept any
     // version number based on any criteria you may have.  State can
-    // be stored in local scoped "static" variables (NOT RECOMMENED!).
+    // be stored in local scoped "static" variables (NOT RECOMMENDED!).
     if (!empty($carry)) { return $carry; }
 
     // matches VeRsIoN: "1.2.3.4"
@@ -118,7 +118,7 @@ function package_to_ver(string $carry, string $line) : string {
 
 /**
  * since many code bases have thousands of files, each top level module
- * directory is scanned indevidually. This function should return a list
+ * directory is scanned individually. This function should return a list
  * of directory paths to scan 1 at a time for malware.
  * 
  * @param string $root  - typically the DOCUMENT_ROOT (includes trailing slash)

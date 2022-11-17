@@ -128,7 +128,7 @@ function load_cms_profile(string $path) : array {
     if (empty($profile)) {
         if (file_exists($profile_path)) {
             // read the profile, unserizlize and return result or empty array
-            $profile = FileData::new($profile_path)->read()->unjson()->lines;
+            $profile = FileData::new($profile_path)->read()->un_json()->lines;
             if (!isset($profile["^a"])) { $profile = PROFILE_INIT; $profile['h'] = $_SERVER['HTTP_HOST']??'na'; }
         } else {
             $profile = PROFILE_INIT;

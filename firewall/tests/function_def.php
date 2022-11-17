@@ -1,4 +1,31 @@
 <?php
+const XHPROF_FLAGS_CPU = 1;
+const XHPROF_FLAGS_MEMORY = 2;
+const XHPROF_FLAGS_NO_BUILTINS = 3;
+
+define ("DB_USER", "");
+define ("DB_PASSWORD", "");
+define ("DB_NAME", "");
+define ("DB_HOST", "");
+
+function xhprof_disable() : array {
+    return [];
+}
+function xhprof_enable(int $options) : void {
+}
+
+function igbinary_serialize(mixed $item) : string {
+    return "";
+}
+function igbinary_unserialize(mixed $item) : string {
+    return "";
+}
+function msgpack_pack(mixed $item) : string {
+    return "";
+}
+function msgpack_unserialize(mixed $item) : string {
+    return "";
+}
 
 function acpu_store(string $key, $value, int $ttl) : bool {
     return true;
@@ -39,8 +66,13 @@ function current_user_can(string $capability) : bool {
 function wp_enqueue_script(string $handle, string $src) : void {
     //echo "wp_enqueue_script($handle, $src, $deps, $ver, $in_footer)";
 }
-
+function wp_get_current_user() : Object{
+    return new stdClass();
+}
 function is_user_logged_in() : bool {
+    return true;
+}
+function wp_mail($email, $subject, $message) : bool {
     return true;
 }
 
@@ -103,8 +135,8 @@ function get_bloginfo(string $type) : string {
 namespace BitFirePRO;
 
 use BitFire\Request;
-use TF\MaybeStr;
 use ThreadFin\Effect;
+use ThreadFin\MaybeStr;
 
 define("WP_CONTENT_DIR", "wp-content");
 define("WP_CONTENT_URL", content_url());
@@ -121,6 +153,7 @@ function send_pro_headers(Request $request, MaybeStr $cookies, ?string $agent) :
 function find_malware(array $lines) : ?array {
     return null;
 }
+
 
 function site_unlock() : void { }
 function site_lock() : void { }

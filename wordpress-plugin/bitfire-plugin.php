@@ -18,7 +18,7 @@
  * Plugin Name:       BitFire
  * Plugin URI:        https://bitfire.co/
  * Description:       Patented WordPress Firewall. Lock your php files from malware. Complete bot protection. Malware Recovery. plugin vulnerability alert, login protection, and more. 
- * Version:           2.22
+ * Version:           __VERSION__
  * Author:            BitFire.co
  * License:           AGPL-3.0+
  * License URI:       https://www.gnu.org/licenses/agpl-3.0.en.html
@@ -63,6 +63,7 @@ use function ThreadFin\en_json;
 use function ThreadFin\file_recurse;
 use function ThreadFin\http2;
 use function ThreadFin\httpp;
+use function ThreadFin\icontains;
 use function ThreadFin\ip_to_country;
 use function ThreadFin\un_json;
 
@@ -79,7 +80,6 @@ if (defined("BitFire\TYPE") && \BitFire\TYPE == "STANDALONE") {
  * @since 1.9.0 
  */
 function dashboard_url() : string {
-    trace("wpself");
     return \admin_url("admin.php?page=bitfire_admin");
 }
 
@@ -118,23 +118,23 @@ function verify_admin_effect(Request $request) : Effect {
  */
 function find_cms_root() : ?string {
     // prefer code
-    if (function_exists('get_home_path')) { trace("HOMEPATH"); $root = \get_home_path(); }
+    if (function_exists('get_home_path')) { trace("HOME_PATH"); $root = \get_home_path(); }
     // then constant
-    if (defined("ABSPATH")) { trace("ABSPATH"); $root = ABSPATH; }
+    if (defined("ABSPATH")) { trace("ABS_PATH"); $root = ABSPATH; }
     // fall back to config file if we are running in front of WordPress 
     // could be dead code here...
     $cfg_path = CFG::str("wp_root");
-    if (contains($cfg_path, $_SERVER["DOCUMENT_ROOT"]) && file_exists("$cfg_path/wp-config.php")) { trace("CFGPATH"); return $cfg_path; }
+    if (contains($cfg_path, $_SERVER["DOCUMENT_ROOT"]) && file_exists("$cfg_path/wp-config.php")) { trace("CFG_PATH"); return $cfg_path; }
     $files = file_recurse($_SERVER["DOCUMENT_ROOT"], function($path) {
         if (file_exists($path)) {
-            trace("FINDPATH");
+            trace("FIND_PATH");
             return dirname($path);
         }
     }, "/wp-config.php/", [], 1);
     debug("files [%s]", print_r($files, true));
 
     if (isset($files[0]) && file_exists($files[0])) {
-        trace("UPDATEPATH");
+        trace("UPDATE_PATH");
         update_ini_value("wp_root", $files[0])->run();
         return $files[0];
     }
@@ -158,21 +158,6 @@ if (!defined("BitFire\WAF_ROOT")) {
     trace("wp");
 }
 
-function query_filter(string $query) : string {
-    /*
-    $q = strtolower($query);
-    $p = explode("where", $q);
-    if (!$p || count($p) < 0) {
-        $p = explode("values", $q);
-    }
-
-    $key = crc32($p[0])??0;
-    $value = crc32($p[1])??00;
-    $len = strlen($p[1])??00;
-    debug("SQL [%s] (%d/%d/%d)" , $query, $key, $value, $len);
-    */
-    return $query;
-}
 
 /**
  * called when left nav menu is clicked
@@ -482,7 +467,10 @@ function add_nonce_attr(string $nonce, array $attributes) : array {
 \add_action("wp_loaded", "BitFirePlugin\bitfire_init");
 // update logout function to remove our cookie as well
 \add_action("wp_logout", function() { \ThreadFin\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), null, -1); });
-// \add_filter("query", "BitFirePlugin\query_filter");
+// keep the db transaction log up to date for differential database backups
+if (CFG::enabled("audit_sql") && function_exists("\BitFirePRO\query_filter")) {
+    \add_filter("query", "BitFirePRO\query_filter");
+}
  
 
 \register_activation_hook(__FILE__, 'BitFirePlugin\activate_bitfire');

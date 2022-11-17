@@ -31,6 +31,7 @@ use const BitFire\STATUS_ENOENT;
 use const BitFire\STATUS_OK;
 use const BitFire\STATUS_FAIL;
 use const ThreadFin\DAY;
+use const ThreadFin\DS;
 
 use function BitFirePlugin\find_cms_root;
 use function ThreadFin\contains;

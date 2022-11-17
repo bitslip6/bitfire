@@ -83,7 +83,7 @@ function rem_api_exception(\BitFire\Request $r) : Effect {
 
     // load exceptions from disk
     $file = \BitFire\WAF_ROOT."exceptions.json";
-    $exceptions = FileData::new($file)->read()->unjson();
+    $exceptions = FileData::new($file)->read()->un_json();
     $removed = array_filter($exceptions(), function ($x) use ($uuid) {
         return ($x['uuid'] != $uuid);
     });
@@ -142,7 +142,7 @@ function add_api_exception(\BitFire\Request $r) : Effect {
 
     // load exceptions from disk
     $file = \BitFire\WAF_ROOT."exceptions.json";
-    $exceptions = FileData::new($file)->read()->unjson()->map('\BitFire\map_exception');
+    $exceptions = FileData::new($file)->read()->un_json()->map('\BitFire\map_exception');
 
     // add new exception (will not double add)
     $updated_exceptions = add_exception_to_list($ex, $exceptions());
@@ -233,28 +233,6 @@ function malware_files(\BitFire\Request $request) : Effect {
 
 function archive_source(\BitFire\Request $request) : Effect {
     $effect = Effect::new();
-    /*
-    $root = CFG::str("wp_root");
-    if ($root == "" || !contains($root, $_SERVER['DOCUMENT_ROOT'])) {
-        return $effect->api(false, "wordpress root not set");
-    }
-    $content = CFG::str("wp_contentdir");
-    if ($root == "" || !contains($content, $_SERVER['DOCUMENT_ROOT'])) {
-        return $effect->api(false, "wordpress content root not set");
-    }
-    if (!class_exists("ZipArchive")) {
-        return $effect->api(false, "zip extension not installed");
-    }
-    */
-    //die("ARCHIVE !\n\n\n\n\n\n\n\n\n");
-
-    //$fh = fopen("bitfire.sql", "w+");
-    $fh = gzopen("bitfire.sql.gz", "w6");
-    //$fh = fopen("php://stdout", "w+");
-    //ob_start("ob_gzhandler", 6);
-    //fwrite($fh, "\x1f\x8b\x08\x00\x00\x00\x00\x00");
-    //stream_filter_append($fh, "bzip2.compress", STREAM_FILTER_WRITE, ["level" => 6, "window" => 15]);
-    //stream_filter_append($fh, "zlib.deflate", STREAM_FILTER_WRITE, ["level" => 6, "window" => 15]);
     include_once WAF_SRC . "db.php";
     if (!defined("DB_USER")) {
         @include_once CFG::str("wp_root") . "wp-config.php";
@@ -264,10 +242,12 @@ function archive_source(\BitFire\Request $request) : Effect {
 	$db_name     = defined( 'DB_NAME' ) ? DB_NAME : '';
 	$db_host     = defined( 'DB_HOST' ) ? DB_HOST : '';
     $credentials = new \ThreadFinDB\Credentials($db_user, $db_password, $db_host, $db_name);
-    \ThreadFinDB\dump_database($credentials, $db_name, $fh);
-    //fclose($fh);
-    gzclose($fh);
-    $effect->api(true, "");
+    $out_stream = gzopen("bitfire.sql.gz", "wb6");
+    $out_fn = BINDR('\ThreadFinDB\gz_output_fn', $out_stream);
+    \ThreadFinDB\dump_database($credentials, $db_name, $out_fn);
+    gzclose($out_stream);
+    $num_bytes = $out_fun();
+    $effect->api(true, "output $num_bytes bytes of SQL", ["bytes" => $num_bytes, "out_file" => "bitfire.sql.gz"]);
     return $effect;
 }
 
@@ -357,7 +337,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         $ver = trim($request->post['ver'], '/');
         $dir_path = realpath($request->post['dir']);
         $plugin_name = basename($dir_path);
-        //FileData::new("{$dirpath}/readme.txt")->read()->apply_ln()
+        //FileData::new("{$dir_path}/readme.txt")->read()->apply_ln()
 
         $type_fn = find_fn("file_type");
         $hash_fn = BINDR('\BitFireSvr\hash_file2', $dir_path, $plugin_name, $type_fn);
@@ -380,7 +360,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         $dir_without_plugin_name = dirname($dir_path);
 
 
-        $allowed = FileData::new(\BitFire\WAF_ROOT."cache/hashes.json")->read()->unjson()->lines;
+        $allowed = FileData::new(\BitFire\WAF_ROOT."cache/hashes.json")->read()->un_json()->lines;
         $allow_map = [];
         foreach ($allowed as $file) { $allow_map[$file["trim"]] = true; }
 
@@ -611,7 +591,7 @@ function validate_code(string $hash, string $secret) : bool {
 
     $validator = MaybeStr::of($hash)
     ->then(BINDL("explode", "."))
-    ->keep_if(BINDR("\ThreadFin\arraylen", 3))
+    ->keep_if(BINDR("\ThreadFin\array_len", 3))
     ->then($validate_fn, true);
 
     return ($validator->value("bool") || false);
@@ -839,7 +819,7 @@ function allow(\BitFire\Request $request) : Effect {
     // load data and filter out this hash
     $file = FileData::new($file_name)
         ->read()
-        ->unjson()
+        ->un_json()
         ->filter(function($x) use ($trim, $path) { 
             return $x['path'] != $path && $x['trim'] != $trim;
         });

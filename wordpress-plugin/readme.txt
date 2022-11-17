@@ -3,7 +3,7 @@ Contributors: BitSlip6, LLC
 Donate link: http://bitfire.co/pricing
 Tags: security, firewall, waf, malware scanner, anti-virus, antivirus, secure, virus
 Requires at least: 4.0.1
-Tested up to: 6.1.0
+Tested up to: 6.1.1
 Stable tag: __VERSION__
 License: AGPLv3 or later
 License URI: https://www.gnu.org/licenses/agpl-3.0.en.html

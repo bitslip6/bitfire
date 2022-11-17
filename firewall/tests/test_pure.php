@@ -84,7 +84,7 @@ function test_load_exceptions_unit() : void {
     $file = \BitFire\WAF_ROOT."exceptions.json";
     FileData::mask_file($file, $d);
 
-    $exceptions = FileData::new($file)->read()->unjson();
+    $exceptions = FileData::new($file)->read()->un_json();
     assert_gt(count($exceptions()), 1, "unable to load exceptions from $file");
 }
 
@@ -93,7 +93,7 @@ function test_load_exceptions_unit() : void {
  */
 function test_load_exceptions_int() : void {
     $file = \BitFire\WAF_ROOT."exceptions.json";
-    $exceptions = FileData::new($file)->read()->unjson();
+    $exceptions = FileData::new($file)->read()->un_json();
     assert_gt(count($exceptions()), 1, "unable to load exceptions from $file");
 }
 

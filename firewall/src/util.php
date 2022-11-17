@@ -194,7 +194,7 @@ class FileData {
      * MUTATE $lines
      * @return FileData with lines joined and json decoded
      */
-    public function unjson() : FileData {
+    public function un_json() : FileData {
         // UGLY, refactor this
         if (count($this->lines) > 0) {
             $data = join("\n", $this->lines);
@@ -298,7 +298,7 @@ class FileData {
     
     
 
-// developer debug functons
+// developer debug functions
 function PANIC_IFNOT($condition, $msg = "") { if (!$condition) { dbg($msg, "PANIC"); } }
 function dbg($x, $msg="") {$m=htmlspecialchars($msg); $z=(php_sapi_name() == "cli") ? print_r($x, true) : htmlspecialchars(print_r($x, true)); echo "<pre>\n[$m]\n$z" . join("\n", debug(null)) . "\n" . debug(trace(null)); ;die("\nFIN"); }
 function nop() { return null; }
@@ -361,7 +361,7 @@ function compact_array(array $in) : array { $result = []; foreach ($in as $x) { 
 
 function either($a, $b) { return ($a) ? $a : $b; }
 function either_lb(callable $a, callable $b) { $x = $a(); if (!empty($x)) { return $x; } return $b(); }
-function arraylen($x, int $len) { return is_array($x) && count($x) == $len; }
+function array_len($x, int $len) { return is_array($x) && count($x) == $len; }
 
 // find the first match (preg_match) of matches in $input, or null
 function find_match(string $input, array $matches) : ?array {
@@ -463,7 +463,7 @@ function fn_reverse(callable $function) {
 }
 
 /**
- * pipeline a series of callables in reverse order
+ * pipeline a series of callable in reverse order
  */
 function pipeline(callable $a, callable $b) {
     $list = func_get_args();
@@ -1028,7 +1028,7 @@ function decrypt_ssl(string $password, ?string $cipher) : MaybeStr {
 
     $a = MaybeStr::of($cipher)
         ->then(BINDL("explode", "."))
-        ->keep_if(BINDR("\ThreadFin\arraylen", 2))
+        ->keep_if(BINDR("\ThreadFin\array_len", 2))
         ->then($decrypt_fn, true);
     return $a;
 }
@@ -1441,20 +1441,6 @@ function file_replace(string $filename, string $find, string $replace, int $mode
     //$x = FileData::new($filename)->read()->map($fn)->file_mod($mode);
     $file_mod = FileData::new($filename)->read()->map($fn)->file_mod($mode);
     return Effect::new()->file($file_mod);
-
-    /*
-    depricated
-    $in = file_get_contents($filename);
-    debug("file replace [%s]",$filename);
-    debug("find [%s]", $find);
-    debug("replace [%s]", $replace);
-    debug("src len [%d]", strlen($in));
-    // regex
-    $fn = ($find[0] == "/") ? "preg_replace" : "str_replace";
-    $out = $fn($find, $replace, $in);
-    debug("out len [%d]", strlen($out));
-    return Effect::new()->file(new FileMod($filename, $out, $mode));
-    */
 }
 
 // boolean to string (true|false) 

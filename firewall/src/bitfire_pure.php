@@ -108,7 +108,7 @@ function match_block_exception(?Block $block, \BitFire\Exception $exception, str
  */
 function load_exceptions() : array {
     $file = \BitFire\WAF_ROOT."exceptions.json";
-    return FileData::new($file)->read()->unjson()->map('\BitFire\map_exception')();
+    return FileData::new($file)->read()->un_json()->map('\BitFire\map_exception')();
 }
 
 function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) : bool {

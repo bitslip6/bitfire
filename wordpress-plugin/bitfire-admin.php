@@ -491,7 +491,7 @@ function dashboard_content() {
     $malware_file = WAF_ROOT . "/cache/malware_files.json";
     $malware = FileData::new($malware_file);
     if ($malware->exists) {
-        $malware_data = $malware->read()->unjson()->lines;
+        $malware_data = $malware->read()->un_json()->lines;
         $seconds = time() - $malware_data['time'];
         $days = floor($seconds / DAY);
         $malware_good = "#36d638";

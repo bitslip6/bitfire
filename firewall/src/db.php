@@ -585,14 +585,17 @@ class Offset {
  * @param mixed $stream 
  * @return int -1 on error, else total byte length written to stream across all writes
  */
-function gz_output_fn(string $data, $stream) : int {
+function gz_output_fn(?string $data = "", $stream) : int {
     assert(is_resource($stream), "stream must be a resource");
     static $total_bytes = 0;
-    $bytes = gzwrite($stream, $data);
-    if (!$bytes) {
-        return -1;
+
+    if ($data && strlen($data) > 0) {
+        $bytes = gzwrite($stream, $data);
+        if (!$bytes) {
+            return -1;
+        }
+        $total_bytes += $bytes;
     }
-    $total_bytes += $bytes;
     return $total_bytes;
 }
 

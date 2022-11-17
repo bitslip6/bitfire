@@ -229,7 +229,7 @@ function dump_hashes()
     // decode the result of the server test
     $decoded = un_json($result);
 
-    $allowed = FileData::new(\BitFire\WAF_ROOT."cache/hashes.json")->read()->unjson()->lines;
+    $allowed = FileData::new(\BitFire\WAF_ROOT."cache/hashes.json")->read()->un_json()->lines;
     $allow_map = [];
     foreach ($allowed as $file) { $allow_map[$file["trim"]] = $file["path"]; }
 
@@ -499,7 +499,7 @@ function enrich_alert(array $report, array $exceptions, array $whitelist) : arra
 function serve_exceptions() :void
 {
     $file_name = \BitFire\WAF_ROOT."exceptions.json";
-    $exceptions = FileData::new($file_name)->read()->unjson()->map(function ($x) {
+    $exceptions = FileData::new($file_name)->read()->un_json()->map(function ($x) {
         $class = (floor($x["code"] / 1000) * 1000);
         $x["message"] = MESSAGE_CLASS[$class];
         if (!$x["parameter"]) {

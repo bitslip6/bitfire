@@ -549,9 +549,9 @@ class BitFire
         if (!isset($_SERVER['REQUEST_URI'])) { trace("local"); return $block; }
 
         // block from the htaccess file
-        if (isset($this->_request->get['_bfblock'])) {
+        if (isset($this->_request->get['_bf_block'])) {
             trace("htaccess");
-            return BitFire::new_block(28001, "_bfblock", "url", $this->_request->get['_bfblock'], 0);
+            return BitFire::new_block(28001, "_bf_block", "url", $this->_request->get['_bf_block'], 0);
         }
 
         
