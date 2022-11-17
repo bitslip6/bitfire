@@ -2,11 +2,13 @@
 const XHPROF_FLAGS_CPU = 1;
 const XHPROF_FLAGS_MEMORY = 2;
 const XHPROF_FLAGS_NO_BUILTINS = 3;
+const DISABLE_NAG_NOTICES = 99;
 
 define ("DB_USER", "");
 define ("DB_PASSWORD", "");
 define ("DB_NAME", "");
 define ("DB_HOST", "");
+define ("WP_CONTENT_DIR", "/var/www/wordpress/wp-content");
 
 function xhprof_disable() : array {
     return [];
@@ -63,6 +65,16 @@ function current_user_can(string $capability) : bool {
     return true;
 }
 
+function wp_add_dashboard_widget(string $widget_name, string $description, callable $fn) : void { };
+function get_admin_url() : string { return "http://localhost/wp-admin"; }
+function _wp_specialchars(string $input) : string { return htmlspecialchars($input); }
+function update_user_meta(int $my_id, string $meta_name, string $meta_value): bool { return true; }
+function get_user_meta(int $my_id, string $meta_name) { return ""; }
+function get_userdata(int $user_id) : StdClass { return new StdClass; }
+function get_current_user_id() : int { return 1; }
+function wp_register_style(string $handle, string $src, ?array $deps = [], string $ver = "1.0") { }
+function wp_enqueue_scripts(string $handle, string $src, ?array $deps = [], string $ver = "1.0", bool $in_footer = false) { }
+function wp_enqueue_style(string $handle, string $src, ?array $deps = [], string $ver = "1.0", bool $in_footer = false) { }
 function wp_enqueue_script(string $handle, string $src) : void {
     //echo "wp_enqueue_script($handle, $src, $deps, $ver, $in_footer)";
 }
@@ -100,59 +112,8 @@ function login_footer(string $input_id = 'Log In') : string { return $input_id; 
 function esc_html(string $text) : string { return $text; }
 function esc_url(string $text) : string { return $text; }
 function wp_login_url(string $url) : string { return $url; }
+function wp_register_script(string $name, string $file_path, ?array $deps =[], string $ver="1.0", bool $in_footer = false) { };
 
-
-
-function register_activation_hook(string $path, callable $fn) : void {
-
-}
-
-function register_deactivation_hook(string $path, callable $fn) : void {
-}
-
-function esc_attr(string $x) : string { 
-    return $x;
-}
-function get_the_author_meta(string $name, $id) : string {
-    return "";
-}
-function get_user_meta(int $id, string $field, bool $single = false) : string {
-    return "";
-}
-function get_userdata($user_id) : Object {
-    return new stdClass(); 
-}
-function update_user_meta(int $user_id, string $name, string $value) {
-}
-function get_current_user_id() : int { return 1; }
-function get_user_by(string $method, string $username) : stdClass {
-    return new stdClass();
-}
-function get_bloginfo(string $type) : string {
-    return $type;
-}
-
-namespace BitFirePRO;
-
-use BitFire\Request;
-use ThreadFin\Effect;
-use ThreadFin\MaybeStr;
-
-define("WP_CONTENT_DIR", "wp-content");
-define("WP_CONTENT_URL", content_url());
-define("ABSPATH", "/var/www/wordpress");
-
-function send_pro_mfa(Request $request) {
-
-}
-
-function send_pro_headers(Request $request, MaybeStr $cookies, ?string $agent) : Effect { 
-    return Effect::new();
-}
-
-function find_malware(array $lines) : ?array {
-    return null;
-}
 
 
 function site_unlock() : void { }

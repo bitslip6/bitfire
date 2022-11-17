@@ -57,7 +57,7 @@ function send_security_headers(\BitFire\Request $request, MaybeStr $cookies, ?Us
  * @return Effect 
  */
 function core_headers(?UserAgent $agent) : Effect {
-    // seems excesive to add effect support for removing headers
+    // seems excessive to add effect support for removing headers
     header_remove('X-Powered-By');
     header_remove('Server');
 

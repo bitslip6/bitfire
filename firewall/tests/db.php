@@ -497,7 +497,6 @@ class SQL {
      */
     public function reduce(callable $fn, $initial = "") {
         if (is_array($this->_x) && !empty($this->_x)) {
-            echo "<pre>". print_r($this->_x);
             return array_reduce($this->_x, $fn, $initial);
         } else {
             $this->_errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);

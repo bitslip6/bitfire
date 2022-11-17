@@ -2,7 +2,9 @@
 namespace BitFireWP;
 
 use BitFire\Request;
-use TF\MaybeA;
+use ThreadFin\MaybeA;
+use ThreadFinDB\Credentials;
+use ThreadFinDB\DB;
 
 use const BitFire\DS;
 
@@ -67,23 +69,23 @@ function define_to_array(array $input, $define_line) : array {
 }
 
 // turn define array into credentials
-function array_to_creds(?array $defines) : ?\DB\Creds {
-    $creds = NULL;
+function array_to_creds(?array $defines) :?Credentials {
+    $credentials = NULL;
     if ($defines && count($defines) > 5) {
-        $creds = new \DB\Creds($defines['DB_USER']??'', $defines['DB_PASSWORD']??'', $defines['DB_HOST']??'', $defines['DB_NAME']??'', $defines['prefix']??'wp_');
+        $credentials = new Credentials($defines['DB_USER']??'', $defines['DB_PASSWORD']??'', $defines['DB_HOST']??'', $defines['DB_NAME']??'', $defines['prefix']??'wp_');
     }
-    return $creds;
+    return $credentials;
 }
 
 
 // parse wp-config into db credentials
-function wp_parse_credentials(string $root) : ?\DB\Creds {
-    $creds = NULL;
+function wp_parse_credentials(string $root) : ?Credentials {
+    $credentials = NULL;
     $defines = wp_parse_define($root);
     if (isset($defines["SECURE_AUTH_KEY"])) {
-        $creds = array_to_creds($defines);
+        $credentials = array_to_creds($defines);
     }
-    return $creds;
+    return $credentials;
 }
 
 // parse out all defines from the wp-config
@@ -104,7 +106,7 @@ function wp_parse_define(string $root) : array {
 function wp_fetch_salt(string $root, string $scheme) : string {
 	$scheme = strtoupper($scheme);
 	$defines = wp_parse_define($root);
-	if (!isset($defines["{$scheme}_KEY"])) { \TF\debug("auth define [$scheme] missing"); return ""; }
+	if (!isset($defines["{$scheme}_KEY"])) { debug("auth define [$scheme] missing"); return ""; }
 	return $defines["{$scheme}_KEY"] . $defines["{$scheme}_SALT"];
 }
 
@@ -112,9 +114,9 @@ function wp_fetch_salt(string $root, string $scheme) : string {
 function wp_validate_cookie(string $cookie, string $root) : bool {
     $data = Parts::of("|", $cookie)->name("username", "exp", "token", "hmac");
     $creds = wp_parse_credentials($root);
-    $db = \DB\DB::cred_connect($creds);
+    $db = DB::cred_connect($creds);
     $sql = $db->fetch("SELECT SUBSTRING(user_pass, 9, 4) AS pass FROM " . $creds->prefix . "users WHERE user_login = {login} LIMIT 1", array("login" => $data->at("username")));
-    if ($sql->empty()) { \TF\debug("wp-auth failed to load db user data"); return false; }
+    if ($sql->empty()) { debug("wp-auth failed to load db user data"); return false; }
     $key_src = concat_fn("|")($data->at("username"), $sql->col("pass"), $data->at("exp"), $data->at("token"));
 
     // first try to auth with data from the config file
@@ -122,7 +124,7 @@ function wp_validate_cookie(string $cookie, string $root) : bool {
     foreach ($key_list as $name) {
         $key = hash_hmac('md5', $key_src, wp_fetch_salt($root, $name));
         $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
-        if (hash_equals($hash, $data->at("hmac"))) { \TF\debug("config key wp match [%s]", $name); return true; }
+        if (hash_equals($hash, $data->at("hmac"))) { debug("config key wp match [%s]", $name); return true; }
     }
 
     // that failed, lets try the db salt and key (may need to try logged_in_key/salt also)
@@ -135,11 +137,11 @@ function wp_validate_cookie(string $cookie, string $root) : bool {
             $full_key = $key . $salt;
             $key = hash_hmac('md5', $key_src, $full_key);
             $hash = hash_hmac(function_exists('hash')?'sha256':'sha1', concat_fn("|")($data->at("username"), $data->at("exp"), $data->at("token")), $key);
-            if (hash_equals($hash, $data->at("hmac"))) { \TF\debug("db key wp match [%s]", $name); return true; }
+            if (hash_equals($hash, $data->at("hmac"))) { debug("db key wp match [%s]", $name); return true; }
         }
     }
 
-    \TF\debug("wp auth failed");
+    debug("wp auth failed");
     return false;
 }
 
@@ -171,7 +173,7 @@ function wp_enrich_wordpress_hash_diffs(string $ver, string $doc_root, array $ha
 {
     if (!isset($hash['path'])) { return $hash; }
     $paths = explode('/', $hash['path']);
-    $out = '/' . trim($doc_root, '/') . ($hash['path'][0] != \TF\DS) ? \TF\DS : '' . $hash['path'];
+    $out = '/' . trim($doc_root, '/') . ($hash['path'][0] != DS) ? DS : '' . $hash['path'];
     $path = "https://core.svn.wordpress.org/tags/{$ver}{$hash['path']}";
     if (strpos($doc_root, '/plugins') !== false) {
         $path = "https://plugins.svn.wordpress.org/{$hash['name']}/tags/{$ver}/{$hash['path']}";
@@ -202,15 +204,15 @@ function wp_enrich_wordpress_hash_diffs(string $ver, string $doc_root, array $ha
  * @param string $content_path relative path under wp-root
  */
 function temp_lock_dir(string $content_path) {
-    \TF\debug("update wp");
+    debug("update wp");
     if (function_exists("\BitFire\lock_site_dir")) {
         \BitFire\lock_site_dir($content_path, false);
         register_shutdown_function(function() use($content_path) {
-            \TF\debug("shutdown called re-lock: [$content_path]");
+            debug("shutdown called re-lock: [$content_path]");
             \BitFire\lock_site_dir($content_path, true);
         });
     }
-    else { \TF\debug("no lock site dir"); }
+    else { debug("no lock site dir"); }
 
 }
 
@@ -220,11 +222,11 @@ function temp_lock_dir(string $content_path) {
  * @param MaybeA $cookie 
  * @return void 
  */
-function wp_handle_admin(\BitFire\Request $request, \TF\MaybeA $cookie) {
-    \TF\debug("wp_handle_admin");
+function wp_handle_admin(\BitFire\Request $request, MaybeA $cookie) {
+    debug("wp_handle_admin");
     $root = \BitFire\Config::str("wp_root");
-    if (empty($root)) { \TF\debug("no wp_root"); return; }
-    if (strpos($request->path, "/wp-admin/") === false) { \TF\debug("no wp-admin"); return; }
+    if (empty($root)) { debug("no wp_root"); return; }
+    if (strpos($request->path, "/wp-admin/") === false) { debug("no wp-admin"); return; }
     if ($request->post['action']??'' === "heartbeat") { return; }
-    \TF\debug("wp admin request %s", $request->path);
+    debug("wp admin request %s", $request->path);
 }

@@ -26,6 +26,7 @@ use BitFire\Config as CFG;
 use BitFire\Request;
 use Exception;
 use RuntimeException;
+use ThreadFin\CacheStorage;
 use ThreadFin\Effect;
 
 use const BitFire\APP;
@@ -219,6 +220,11 @@ function activate_bitfire() {
 /**
  * The code that runs during plugin deactivation.
  * toggle the firewall enable option, uninstall
+ * TODO: on upgrade from standalone to plugin. we should
+ *   take care to handle the case where the cache_key
+ *   may be different between the two configurations.
+ *   In that case the uninstall function may not fully
+ *   delete the shmop cache.
  */
 function deactivate_bitfire() {
     trace("DEACTIVATE");
@@ -230,6 +236,11 @@ function deactivate_bitfire() {
     \BitFire\Config::set_value("debug_header", false);
     $effect = \BitFireSvr\bf_deactivation_effect();
     $effect->hide_output()->run();
+
+    // remove all stored cache data if we have any...
+    // this should also have been done in the uninstall step...
+    CacheStorage::get_instance()->delete();
+
     \BitFire\Config::set_value("debug_file", $debug_file);
     httpp(APP."zxf.php", \ThreadFin\en_json(["action" => "deactivate", "name" => $_SERVER['SERVER_NAME']??"na"]));
 
