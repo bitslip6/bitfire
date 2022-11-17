@@ -16,13 +16,6 @@ use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\utc_time;
 
-if (!defined("DUMP_FILE")) {
-    if (defined("WAF_ROOT")) {
-        define("DUMP_FILE", WAF_ROOT . "cache/dump.txt");
-    } else {
-        define("DUMP_FILE", sys_get_temp_dir() . "/dump.txt");
-    }
-}
 
 class Credentials {
     public $username;
