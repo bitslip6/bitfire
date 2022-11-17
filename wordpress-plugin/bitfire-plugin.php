@@ -70,8 +70,19 @@ use function ThreadFin\un_json;
 
 // If this file is called directly, abort.
 if ( ! defined( "WPINC" ) ) { die(); }
+// upgrade from standalone to plugin
 if (defined("BitFire\TYPE") && \BitFire\TYPE == "STANDALONE") { 
     require_once \BitFire\WAF_SRC."server.php";
+    // load the old configuration if we have one
+    $old_conf = WAF_ROOT."config.ini";
+    $new_conf = __DIR__."/config.ini";
+    if ($old_conf != $new_conf) {
+	chmod($old_conf, FILE_RW);
+	chmod($new_conf, FILE_RW);
+    	@copy($old_conf, $new_conf);
+	chmod($old_conf, FILE_W);
+	chmod($new_conf, FILE_W);
+    }
     $effect = \BitFireSvr\uninstall()->hide_output();
     $effect->run();
 }
