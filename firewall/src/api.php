@@ -779,7 +779,10 @@ function uninstall(\BitFire\Request $request) : Effect {
 
 function toggle_config_value(\BitFire\Request $request) : Effect {
     // handle fixing write permissions
-    if ($request->post["param"] == "unlock_config") { chmod(\BitFire\WAF_INI, 0664); return Effect::new()->api(true, "updated"); }
+    if ($request->post["param"] == "unlock_config") {
+        $result = chmod(\BitFire\WAF_INI, 0664);
+        return Effect::new()->api(true, "updated 2", ["file" => WAF_INI, "mode" => 0664, "result" => $result]);
+    }
     // ugly fix for missing valid domain line
     $config = FileData::new(WAF_INI)->read()->filter(function($line) {
         return contains($line, "valid_domains[] = \"\"");

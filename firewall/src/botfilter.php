@@ -778,7 +778,7 @@ function verify_bot_ip(string $remote_ip, string $network_regex) : bool {
     if ($ip_matches) { return true; }
 
     // fwd and reverse lookup
-    $ip = \BitFire\reverse_ip_lookup($remote_ip)
+    $ip = \ThreadFin\MaybeStr::of(\BitFire\reverse_ip_lookup($remote_ip))
         ->then(function($value) use ($ip_checks) {
             return array_reduce($ip_checks, find_regex_reduced($value), NULL);
         })->then('BitFire\fast_ip_lookup');
@@ -1142,12 +1142,6 @@ function send_browser_verification(\BitFire\IPData $ip_data, \BitFire\Request $r
         "</head><body id='body'></body></html>"
         : "%s";
 
-        /*
-        $js = make_js_script($ip_data->op1, $ip_data->op2, $ip_data->oper, CFG::str("csp_nonce"));
-        echo "<pre>\n[$document]\n[$js]\n";
-        $foo = sprintf($document, $js);
-        echo "\nfoo: [$foo]\n</pre>";
-        */
     $effect = Effect::new()
         ->response_code(303)
         ->update(new CacheItem(
