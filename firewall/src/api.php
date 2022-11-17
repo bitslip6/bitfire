@@ -897,7 +897,7 @@ function api_call(Request $request) : Effect {
         ? $post[BITFIRE_INTERNAL_PARAM]
         : $request->get[BITFIRE_INTERNAL_PARAM]??"";;
 
-    if (trim($request->get["BITFIRE_API"]??"") != "send_mfa") {
+    if (trim($request->get["BITFIRE_API"]??"") != "send_mfa" && CFG::str("password") != "configure") {
         if (!validate_code($code, CFG::str("secret"))) {
             return Effect::new()->api(false, "invalid code", ["error" => "invalid / expired code"])->exit(true);
         }

@@ -19,6 +19,7 @@ use const BitFire\FILE_R;
 use const BitFire\FILE_RW;
 use const BitFire\FILE_W;
 use const BitFire\STATUS_OK;
+use const BitFire\WAF_ROOT;
 
 use \BitFire\Config as CFG;
 use \BitFire\Block as Block;
@@ -1201,8 +1202,8 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
 
 
 
-function httpg(string $path, $data, array $opts = null)  { return http("GET", $path, $data, $opts); }
-function httpp(string $path, $data, array $opts = null)  { return http("POST", $path, $data, $opts); }
+function httpg(string $path, $data, array $opts = [])  { return http("GET", $path, $data, $opts); }
+function httpp(string $path, $data, array $opts = [])  { return http("POST", $path, $data, $opts); }
 
 
 /**
@@ -1220,9 +1221,9 @@ function httpp(string $path, $data, array $opts = null)  { return http("POST", $
  * @throws HttpTimeoutException if the connection times out
  * @return string the server response.
  */
-function http(string $method, string $path, $data, array $optional_headers = null) {
+function http(string $method, string $path, $data, ?array $optional_headers = []) {
     trace("http $path");
-    // build the post content paramater
+    // build the post content parameter
     $content = (is_array($data)) ? http_build_query($data) : $data;
     $params = http_ctx($method, 5);
     if ($method === "POST") {
@@ -1231,17 +1232,19 @@ function http(string $method, string $path, $data, array $optional_headers = nul
     } else { $path .= "?" . $content; }
     $path = trim($path, "?&");
 
-    /*
+    if (!$optional_headers) { $optional_headers = []; }
+
     if (!isset($optional_headers['Content-Type'])) {
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
 		$optional_headers['User-Agent'] = "BitFire WAF https://bitfire.co/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
     }
-    */
 
     
-    $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
+    if ($optional_headers && count($optional_headers) > 0) {
+        $params['http']['header'] = map_reduce($optional_headers, function($key, $value, $carry) { return "$carry$key: $value\r\n"; }, "" );
+    }
 
     if (function_exists('curl_init')) {
         return bit_curl($method, $path, $data, $optional_headers);
@@ -1516,7 +1519,9 @@ function parse_ini2(string $src) : array {
     // read the ini then protect it
     else {
         $ini_type = "nop";
-        @include \BitFire\WAF_ROOT . "ini_info.php";
+        if (file_exists(WAF_ROOT . "ini_info.php")) {
+            include WAF_ROOT . "ini_info.php";
+        }
         trace($ini_type);
 
         $load_fn = load_ini_fn($src);

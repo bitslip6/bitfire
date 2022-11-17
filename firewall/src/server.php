@@ -314,6 +314,7 @@ function update_config(string $ini_src) : Effect
     if (!empty($root)) {
         $info["wp_root_path"] = $root;
         $content_dir = $root . $content_path;
+        $wp_version = get_wordpress_version($root);
 
         // defaults if loading outside WordPress (example WordPress is corrupted)
         if (function_exists("content_url")) {
@@ -323,6 +324,7 @@ function update_config(string $ini_src) : Effect
         $e->chain(update_ini_value("wp_root", $root, ""));
         $e->chain(update_ini_value("wp_contentdir", $content_dir, ""));
         $e->chain(update_ini_value("wp_contenturl", $content_url, ""));
+        $e->chain(update_ini_value("wp_version", $wp_version, ""));
         $info['assets'] = $content_url;
         // we won't be using passwords since we will check WordPress admin credentials
         if (defined("WPINC")) {

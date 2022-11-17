@@ -548,12 +548,10 @@ function serve_exceptions() :void
 function serve_dashboard() :void
 {
     // handle dashboard wizard
-    /*
     if (CFG::disabled("wizard") && !isset($_GET['tooltip'])) {
        serve_settings();
        return;
     }
-    */
 
     // authentication guard
     $auth = validate_auth();

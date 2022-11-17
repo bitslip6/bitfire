@@ -446,11 +446,21 @@ function cuckoo_read(array $ctx, string $key) {
 
         // we have a header we can write cache data to...
         if (function_exists('\igbinary_serialize')) {
-            $x = \igbinary_unserialize($data);
+            $x = @\igbinary_unserialize($data);
         } else if (function_exists('\msgpack_pack')) {
-            $x = \msgpack_unserialize($data);
+            $x = @\msgpack_unserialize($data);
         } else {
             $x = unserialize($data);
+        }
+        // unable to read the cache data, clear the slot!
+        if ($x == false && $header['len'] > 0) {
+            trace("ERR:{$key}");
+            $header['expires'] = $ctx['now'] - 3600;
+            $header['len'] = 0;
+            $header['hash1'] = 0;
+            $header['hash2'] = 0;
+            $header['flags'] = CUCKOO_LOW;
+            cuckoo_write_header($ctx, $header);
         }
 
         if (is_array($x)) {
