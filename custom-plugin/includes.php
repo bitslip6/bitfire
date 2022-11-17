@@ -4,7 +4,7 @@ namespace BitFirePlugin;
 
 use BitFire\Config AS CFG;
 
-use function BitFire\get_subdirs;
+use function ThreadFin\get_sub_dirs;
 use function ThreadFin\contains;
 
 define("\BitFire\\CMS_INCLUDED", true);
@@ -128,7 +128,7 @@ function malware_scan_dirs(string $root) : array {
     $plugin_dir = "{$root}modules";
 
     return array_merge(
-        get_subdirs($plugin_dir),
+        get_sub_dirs($plugin_dir),
         ["{$root}includes", "{$root}admin"]);
 }
 
