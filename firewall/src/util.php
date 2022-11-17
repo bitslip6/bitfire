@@ -139,13 +139,20 @@ class FileData {
                     $s = @stat($this->filename);
                     $disabled = $s['mode']??FILE_W;
                     @chmod($this->filename, FILE_RW);
+                    usleep(1000);
                 }
 
                 // split raw reads by line, and read in files line by line if no content
                 $mode = ($with_newline) ? 0 : FILE_IGNORE_NEW_LINES;
                 $this->lines = file($this->filename, $mode);
-                // count lines...
-                $this->num_lines = count($this->lines);
+                // count lines and handle any error cases...
+                if ($this->lines === false) {
+                    debug("unable to read %s", $this->filename);
+                    $this->lines = [];
+                    $this->num_lines = 0;
+                } else {
+                    $this->num_lines = count($this->lines);
+                }
                 //debug(basename($this->filename) . " read num lines: " . $this->num_lines);
 
                 if ($this->debug) {
