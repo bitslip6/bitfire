@@ -259,19 +259,18 @@ function search_short_sql(string $name, string $value) : MaybeA {
  * this could be way more functional, but it would be slower, choices...
  */
 function search_sql(string $name, string $value, ?array $counts) : MaybeA {
-    // block union select - super basic
-    $find = function(string $search) use ($value) : callable {
-        return function(?int $offset) use ($value, $search) : int {
-            return strpos($value, $search, $offset);
-        };
-    };
-
-    $maybe_found = MaybeA::of(0)->then($find("union"))->then($find("select"))->then($find("from"));
-    if ($maybe_found->value('int') > 12) {
-        return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'sql identified', 0);
+    $p1 = strpos($value, "union");
+    if ($p1 !== false) {
+        $p2 = strpos($value, "select", $p1);
+        if ($p2 > $p1) {
+            $p3 = strpos($value, "from", $p2);
+            if ($p3 > $p2) {
+                return BitFire::new_block(FAIL_SQL_UNION, $name, $value, 'union SQL injection', 0);
+            }
+        }
     }
 
-    //if (preg_match('/(select\s+[\@\*])/sm', $value, $matches) || preg_match('/(select\s+.*?from)/sm', $value, $matches)) {
+
     if (preg_match('/(select\s+[\@\*])/sm', $value, $matches)) {
         return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }

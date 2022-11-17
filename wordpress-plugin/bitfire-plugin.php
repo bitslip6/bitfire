@@ -151,12 +151,20 @@ function find_cms_root() : ?string {
  * is also done in startup.php as a failsafe
  * @since    1.8.0
  */
-if (!defined("BitFire\WAF_ROOT")) {
-    $f =  __DIR__ . "/startup.php";
-    if (file_exists($f)) {
-        include_once $f;
+$ex1 = function_exists("BitFire\on_err");
+$ex2 = class_exists("BitFire\Config");
+$ex3 = defined("BitFire\WAF_ROOT");
+echo " $ex1 - $ex2 - $ex3 \n\n";
+
+if (!defined("\BitFire\WAF_ROOT") && !function_exists("\BitFire\on_err")) {
+    $bit = $GLOBALS['bitfire']??false;
+    if (!$bit) {
+        $f =  __DIR__ . "/startup.php";
+        if (file_exists($f)) {
+            include_once $f;
+        }
+        trace("wp");
     }
-    trace("wp");
 }
 
 
@@ -178,9 +186,10 @@ function bitfire_menu_hit() {
  */
 function activate_bitfire() {
     trace("wp_act");
+    include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
     $file_name = ini_get("auto_prepend_file");
     if (contains($file_name, "bitfire")) {
-        $base_dir = basename($file_name);
+        $base_dir = realpath(dirname($file_name));
         CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
         \BitFireSvr\uninstall()->run();
         sleep(1);
@@ -192,7 +201,6 @@ function activate_bitfire() {
     // install data can be verbose, so redirect to install log
     \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
     \BitFire\Config::set_value("debug_header", false);
-    include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
     $effect = \BitfireSvr\bf_activation_effect()->hide_output()->run();
     debug(trace());
     @chmod(\BitFire\WAF_INI, FILE_W);
@@ -479,6 +487,7 @@ function add_nonce_attr(string $nonce, array $attributes) : array {
 \add_action("wp_logout", function() { \ThreadFin\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), null, -1); });
 // keep the db transaction log up to date for differential database backups
 if (CFG::enabled("audit_sql") && function_exists("\BitFirePRO\query_filter")) {
+    die("query filter");
     \add_filter("query", "BitFirePRO\query_filter");
 }
  
@@ -488,36 +497,37 @@ if (CFG::enabled("audit_sql") && function_exists("\BitFirePRO\query_filter")) {
 
 $i = BitFire::get_instance();
 $r = $i->_request;
-$br = $i->bot_filter->browser;
+if ($i->bot_filter) {
+    $br = $i->bot_filter->browser;
+    /**
+     * if browser verification is in reporting mode, we need to append the JavaScript
+     * and NOT block the request.
+     */
+    if (!$br->bot && CFG::is_report(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
+        if ($br->valid < 2) {
+            debug("Bot Checking: [%s/%s] (%d)", $br->browser, $br->ver, $br->valid);
+            // we may have to check this here if we are not running in always on mode
+            if (isset($r->post['_bfxa']) || (strlen($r->post_raw) > 20 && contains($r->post_raw, '_bfxa'))) {
+                $effect = verify_browser_effect($r, $i->bot_filter->ip_data, $i->cookie)->exit(false);
+                $effect->run();
+            }
 
-/**
- * if browser verification is in reporting mode, we need to append the JavaScript
- * and NOT block the request.
- */
-if (!$br->bot && CFG::is_report(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
-    if ($br->valid < 2) {
-        debug("Bot Checking: [%s/%s] (%d)", $br->browser, $br->ver, $br->valid);
-        // we may have to check this here if we are not running in always on mode
-        if (isset($r->post['_bfxa']) || (strlen($r->post_raw) > 20 && contains($r->post_raw, '_bfxa'))) {
-            $effect = verify_browser_effect($r, $i->bot_filter->ip_data, $i->cookie)->exit(false);
-            $effect->run();
+            // effect contains the inline javascript and cache entry updates
+            // run(print) the challenge effect at the bottom of the <body> tag
+            add_action("wp_footer", function() { 
+                // make the challenge and send the cookie here (before headers are sent)
+                // this function will split up the normal blocking effect into two parts
+                // the first cookie effect will be run here, the second will be run in the action
+                echo "<!-- BitFire wp_footer -->\n";
+                make_js_challenge_effect()->run();
+            });
         }
-
-        // effect contains the inline javascript and cache entry updates
-        // run(print) the challenge effect at the bottom of the <body> tag
-        add_action("wp_footer", function() { 
-            // make the challenge and send the cookie here (before headers are sent)
-            // this function will split up the normal blocking effect into two parts
-            // the first cookie effect will be run here, the second will be run in the action
-            echo "<!-- BitFire wp_footer -->\n";
-            make_js_challenge_effect()->run();
-        });
-    }
-    // don't challenge if the browser is already valid
-    else {
-        add_action("wp_footer", function() {
-            echo "<!-- BitFire browser verification passed -->\n";
-        });
+        // don't challenge if the browser is already valid
+        else {
+            add_action("wp_footer", function() {
+                echo "<!-- BitFire browser verification passed -->\n";
+            });
+        }
     }
 }
 

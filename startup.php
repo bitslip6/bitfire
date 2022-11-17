@@ -1,6 +1,7 @@
 <?php
 namespace BitFire;
 use \BitFire\Config as CFG;
+use ThreadFin\MaybeBlock;
 
 use function ThreadFin\en_json;
 use function ThreadFin\httpp;
@@ -10,7 +11,10 @@ use function ThreadFin\debug;
 use function ThreadFin\output_profile;
 use function ThreadFin\un_json;
 
-if (defined("BitFire\\WAF_ROOT")) { header("x-bitfire: inc 2x"); return; }
+if (defined("BitFire\\WAF_ROOT")) {
+    header("x-bitfire: plug inc 2x");
+    return;
+}
 if (PHP_VERSION_ID < 70000) { header("x-bitfire: requires php >= 7.0"); return; }
 
 
@@ -110,15 +114,20 @@ try {
         }
     }
 
+
+
+
+
     $bitfire = \Bitfire\BitFire::get_instance(); 
     $bitfire->inspect()
-        ->then(function (\BitFire\Block $block) use ($bitfire) {
+        ->then(function ($block) use ($bitfire) {
+            if ($block instanceof MaybeBlock) { $block = $block(); }
             debug("block 1");
             $ip_data = ($bitfire->bot_filter !== null) ? $bitfire->bot_filter->ip_data : null;
             register_shutdown_function('\BitFire\post_request', $bitfire->_request, $block, $ip_data);
             \BitFire\block_ip($block, $bitfire->_request)->run();
-            return $block;
-        })->then(function(\BitFire\Block $block) use ($bitfire) {
+        })->then(function($block) use ($bitfire) {
+            if ($block instanceof MaybeBlock) { $block = $block(); }
             if ($block->code > 0) {
                 //debug("block 2 [%s]", print_r($bitfire->bot_filter->browser, true));
                 if ($bitfire->bot_filter->browser->valid > 1 && CFG::enabled("dynamic-exceptions")) {
