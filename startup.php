@@ -3,6 +3,7 @@ namespace BitFire;
 use \BitFire\Config as CFG;
 use ThreadFin\MaybeBlock;
 
+use function BitFirePlugin\is_admin;
 use function ThreadFin\en_json;
 use function ThreadFin\httpp;
 use function ThreadFin\parse_ini2;
@@ -107,14 +108,12 @@ try {
     }
 
 
+   
     if (strlen(CFG::str("pro_key"))>20) {
         if (file_exists(\BitFire\WAF_SRC."pro.php")) { 
             @include_once \BitFire\WAF_SRC . "pro.php";
-            if (cfg::enabled("site_lock") && function_exists('BitFirePRO\site_lock')) { \BitFirePRO\site_lock(); }
         }
     }
-
-
 
 
 
@@ -126,6 +125,7 @@ try {
             $ip_data = ($bitfire->bot_filter !== null) ? $bitfire->bot_filter->ip_data : null;
             register_shutdown_function('\BitFire\post_request', $bitfire->_request, $block, $ip_data);
             \BitFire\block_ip($block, $bitfire->_request)->run();
+            return $block;
         })->then(function($block) use ($bitfire) {
             if ($block instanceof MaybeBlock) { $block = $block(); }
             if ($block->code > 0) {
@@ -146,6 +146,22 @@ try {
                 exit(include \BitFire\WAF_ROOT."views/block.php");
             }
         });
+
+        if (cfg::enabled("site_lock") && function_exists('BitFirePRO\site_lock')) {
+            // don't site lock administrators
+            if (function_exists('BitFirePlugin\is_admin') && !is_admin()) {
+                // don't site lock cached administrators
+                if ($bitfire->cookie && $bitfire->cookie->extract("wp") < 2) {
+                    // don't site lock updates
+                    if ($bitfire->_request->path != "/wp-admin/update.php") {
+                        \BitFirePRO\site_lock();
+                    }
+                }
+            }
+            //\BitFirePRO\site_lock();
+        }
+
+
 }
 catch (\Exception $e) {
     \BitFire\on_err($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
