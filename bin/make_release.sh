@@ -58,7 +58,7 @@ mkdir -p bitfire/cache/profile
 
 sed -i "s/__VERSION__/$1/g" bitfire/readme.txt
 sed -i "s/__VERSION__/$1/g" bitfire/wordpress-plugin/bitfire-plugin.php
-sed -i "s/__TYPE__/WORDPRESS/g" bitfire/startup.php
+sed -i "s/__TYPE__/STANDALONE/g" bitfire/startup.php
 sed -i "s/9.9.9/$1/g" bitfire/src/const.php
 sed -i "s/999/$2/g" bitfire/src/const.php
 
