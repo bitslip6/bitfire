@@ -24,6 +24,7 @@ use function ThreadFin\memoize;
 use function ThreadFin\str_reduce;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\ends_with;
 use function ThreadFin\un_json;
 use function ThreadFin\utc_date;
 
@@ -389,7 +390,7 @@ class BotFilter {
         trace("BV".$this->browser->valid." SV". $this->ip_data->valid);
 
         // handle wp-cron and other self requested pages
-        if (CFG::enabled("skip_local_bots") && (\BitFireBot\is_local_request($request))) {
+        if (CFG::enabled("skip_local_bots", true) && (\BitFireBot\is_local_request($request))) {
             return $block;
         }
 
@@ -467,11 +468,8 @@ class BotFilter {
         // lastly verify, real browsers
         // set browser validity to cookie value or server ip data
         if (!$this->browser->bot && CFG::enabled(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
-            if (!$this->browser->whitelist) {
+            if (!$this->browser->whitelist && !ends_with($request->path, "admin-ajax.php")) {
                 $effect = $this->verify_browser($request, $maybe_bot_cookie);
-                if (CFG::is_block(CONFIG_REQUIRE_BROWSER)) {
-                    $effect->exit(true);
-                }
                 $effect->run();
             }
         }
@@ -500,7 +498,8 @@ class BotFilter {
                 }
                 return $effect;
             } else {
-                return send_browser_verification($this->ip_data, $request);
+                $exit = (CFG::is_block(CONFIG_REQUIRE_BROWSER)) ? true : false;
+                return send_browser_verification($this->ip_data, $request)->exit($exit);
             }
         } else {
             trace("valid");
@@ -741,6 +740,7 @@ function is_local_request(\BitFire\Request $request) : bool {
     // can probably remove this after completing above TODO
     if (strstr($request->agent, 'wordpress/'.CFG::str('wp_version')) != false && 
         (ends_with($request->path, '/wp-cron.php')
+        || (strlen($request->path) < 2)
         || ends_with($request->path, '/admin-ajax.php'))) {
         debug("local request");
         return true;
