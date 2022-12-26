@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Request blocked by BitFire</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, follow">
+    <style>
+body { font-family: 'Lato', sans-serif; }
+*{-webkit-box-sizing:border-box;box-sizing:border-box}
+body{padding:0;margin:0}
+#block{position:relative;height:100vh}
+#block .block-bg{position:absolute;width:100%;height:100%;background-size:cover}
+#block .block-bg:after{content:'';position:absolute;width:100%;height:100%;background-color:rgba(0,0,0,.25)}
+#block .block{position:absolute;left:50%;top:50%;-webkit-transform:translate(-50%,-50%);-ms-transform:translate(-50%,-50%);transform:translate(-50%,-50%)}
+#block .block:after{content:'';position:absolute;left:50%;top:50%;-webkit-transform:translate(-50%,-50%);-ms-transform:translate(-50%,-50%);transform:translate(-50%,-50%);width:100%;height:600px;background-color:rgba(255,255,255,.7);-webkit-box-shadow:0 0 0 30px rgba(255,255,255,.7) inset;box-shadow:0 0 0 30px rgba(255,255,255,.7) inset;z-index:-1}
+.block{max-width:600px;width:100%;text-align:center;padding:30px;line-height:1.4}
+.block .block-err{position:relative;height:160px}
+.block .block-err h1{font-family:passion one,sans-serif;position:absolute;left:50%;top:40%;-webkit-transform:translate(-50%,-50%);-ms-transform:translate(-50%,-50%);transform:translate(-50%,-50%);font-size:70px;margin:0;color:#222225;text-transform:uppercase}
+.block h2{font-family:muli,sans-serif;font-size:26px;font-weight:400;text-transform:uppercase;color:#222225;margin-top:26px;margin-bottom:20px}
+.block-search{position:relative;padding-right:120px;max-width:420px;width:100%;margin:30px auto 20px}
+.block-search input{font-family:muli,sans-serif;width:100%;height:40px;padding:3px 15px;color:#fff;font-weight:400;font-size:18px;background:#222225;border:none}
+button#review{font-family:muli,sans-serif;width:180px;height:50px;text-align:center;border:none;background:#f008c4;cursor:pointer;padding:0;color:#fff;font-weight:400;font-size:16px;text-transform:uppercase}
+button#home{font-family:muli,sans-serif;width:220px;height:50px;text-align:center;border:none;background:#223;cursor:pointer;padding:0;color:#fff;font-weight:400;font-size:16px;text-transform:uppercase}
+.block a{font-family:muli,sans-serif;display:inline-block;font-weight:400;text-decoration:none;background-color:transparent;color:#222225;text-transform:uppercase;font-size:14px}
+.block-social{margin-bottom:15px}
+.block-social>a{display:inline-block;height:40px;line-height:40px;width:40px;font-size:14px;color:#fff;background-color:#222225;margin:3px;-webkit-transition:.2s all;transition:.2s all}
+.block h2{font-size:32px}
+.nor{font-weight:normal;font-size:24px;}
+.hidden{visibility: none;display:none;}
+#attribute{position: fixed; bottom: 0; left: 0; width: 100%; background: #000; color: #fff; padding: 10px; text-align: center; font-size: 14px;}
+#attribute span{padding: 0 100px;}
+@media only screen and (max-width:480px){
+    .block .block-err{height:146px}
+    .block .block-err h1{font-size:146px}
+    </style>
+</head>
+<body>
+<div class="hidden" id="root">
+<div class="hidden" id="block"><div id="the-bg" class="block-bg"></div> <div class="block"> <div class="block-err"> <h1>Verifying...</h1> </div>
+<h2>Verifying your browser</h2>
+<p class="nor">This site is protected by BitFire WAF.  <br>
+    If you are seeing this page it means that your browser does not support JavaScript.
+</p>
+<p class="nor">Please enable JavaScript and try again.<br> Reference ID <i>__UUID__</i></p>
+<!--a href="#" id="review"> <button type="button" id="review">Request Review</button> </a-->
+<a href="/"> <button type="button" id="home">Back To Homepage</button> </a>
+</div> </div>
+<div id="attribute"><p>
+    <span> Powered by: <a href="https://bitfire.co" rel="nofollow sponsored" target="_blank" style="color: #fff;">BitFire</a></span>
+    <span> Photo by: <a href="https://www.pexels.com/@joshsorenson/" rel="nofollow ugc" target="_blank" style="color: #fff;">@joshsorenson</a> </span>
+</p></div>
+</div>
+<script>
+function xhr(params) {
+console.log("XHR", params);
+
+window.setTimeout(function() {
+const form = document.createElement('form'); form.method = "POST"; form.action = "/";
+for (const key in params) { if (params.hasOwnProperty(key)) {
+const hiddenField = document.createElement('input');
+hiddenField.type = 'hidden'; hiddenField.name = key;
+hiddenField.value = params[key]; form.appendChild(hiddenField);
+} } document.body.appendChild(form); form.submit(); }, 50);
+
+}
+
+__JS__
+
+window.setTimeout(function(){
+document.getElementById("the-bg").style.backgroundImage = 'url("https://images.pexels.com/photos/1154510/pexels-photo-1154510.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2")';
+document.getElementById("block").classList.remove("hidden");
+document.getElementById("root").classList.remove("hidden");
+}, 1500);
+
+/*
+document.getElementById("review").addEventListener("click", function () {
+let e=window.event; let data={"uuid":'<?php echo $uuid;?>',"x":e.clientX,"y":e.clientY}; console.log(data);
+const response = fetch("/?BITFIRE_API=review", {
+method:'POST',mode:'no-cors',cache:'no-cache',credentials:'omit',headers:{'Content-Type': 'application/json'},redirect:'follow',referrerPolicy:'unsafe-url',body:JSON.stringify(data)
+});
+}
+*/
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+<?php $ini_type = "opcache";

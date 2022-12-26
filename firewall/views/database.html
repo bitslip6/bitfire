@@ -1,0 +1,653 @@
+<style>
+  {{ custom_css }}
+
+  .card { max-width: 100% !important; }
+  .txt-n { font-size: 1em; font-weight: bold; }
+  .sm>* { padding: .25rem !important; }
+  .bt-0 { border-top: 0 !important; }
+  .table-sm>:not(caption)>*>* { padding: 0.5rem !important; }
+  /*
+  .h-pause>* { animation-play-state: paused !important; }
+  */
+  .h-pause:hover { animation-play-state: running !important; }
+
+
+
+  .c1 { color: #60c0e7; }
+  .c2 { color: #489bbc; }
+  .c3 { color: #86d9fa; }
+  .c4 { color: #aae5fd;  text-shadow: 0 0 1px #aae5fd; font-weight: 100; }
+  .c5 { color: #3dc0f4; }
+  .c6 { color: #329bc4; }
+  .c7 { color: #5deff4; }
+  .c8 { color: #edde52; text-shadow: 0 0 2px #b9c84a; }
+
+  .selectable { cursor: pointer; }
+  .selectable:hover {
+    background-color: rgba(246, 195, 67, .3);
+    border-radius: 0.25rem;
+  }
+  .selected { background-color: rgba(246, 195, 67, 0.8) !important; border-radius: 0.25rem; }
+  .bg-secondary { background-color: #6E84A3 !important; }
+
+  #search-icon.static {
+    position: absolute;
+    left:-8px;
+    top:-10px;
+  }
+
+  #search-icon.animate {
+    animation: search 3s linear infinite;
+  }
+
+  @keyframes search {
+    from { transform: rotate(0deg) translateX(10px) rotate(0deg); }
+    to { transform: rotate(360deg) translateX(10px) rotate(-360deg); }
+  }
+
+  #demo i { font-style: normal; }
+  #demo {
+    background-color: #28484F;
+    padding:2rem;
+    overflow: hidden;
+    display: flex;
+    position: relative;
+    z-index: 1;
+  }
+  .scroller { 
+    animation: scroll 120s linear infinite;
+    display: flex;
+  }
+  @keyframes scroll {
+    from { transform: translateX(2%); }
+    to { transform: translateX(-100%); }
+  }
+  /*
+    animation: glow 1.4s ease-in-out infinite alternate;
+ , 0 0 3px #4dc5e7, 0 0 4px #296f82;
+, 0 0 3px #4dc5e7, 0 0 4px #296f82;
+  @keyframes glow { from { text-shadow: 0 0 0px #fff; } to { text-shadow: 0 0 1px #fff; }
+          <img src="{{public}}img/search.jpg" alt="database card cover" class="card-img-top">
+ */
+
+ #search-cover { 
+  animation-play-state: paused;
+  width: 100%;
+  height: 100px; 
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  background-image: url('{{public}}img/nodes2.jpg');
+  background-size: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  position: absolute;
+  top:0;
+  left:0;
+  right:0;
+  overflow: hidden;
+  animation: move1 230s ease-out infinite;
+}
+@keyframes move1 { 
+  0% {  background-position-y:20%; background-size: 100%; }
+  50% { background-position-y:90%; background-size: 135%; }
+  10% {  background-position-y:20%; background-size: 100%; }
+}
+
+.spin {
+  animation: db-spin 2s ease-out infinite;
+}
+@keyframes db-spin {
+  0% { transform: rotate(0deg); }
+  85% { transform: rotate(360deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.table-sm td {
+  overflow: hidden;
+  word-break: break-all;
+  word-wrap: break-word;
+}
+
+.mup:before, .mup:after {
+  content: '';
+  position: absolute;
+  top: 0.75rem;
+  left: 0;
+  width:100%;
+  text-align: left;
+  transition: 0.4s;
+}
+
+.mup:after {
+  opacity: 0;
+  content: attr(data-hover);
+  transform: translate(0%,-3rem);
+  overflow: scroll;
+  padding-left: 20px;
+}
+
+.mup {
+  display: block;
+  position: relative;
+  opacity: 1;
+}
+.mup:hover:after {
+  opacity: 1;
+  transform: translate(0,0);
+  transition: 0.4s;
+  transition-delay: 0.2s;
+}
+.mup span {
+  position: absolute;
+  padding-left: 1rem;
+  top: 0.75rem;
+}
+
+.mup:hover span {
+  opacity: 1;
+  background-color: #FF7;
+  transform: translate(-150%,0);
+  transition: 0.4s;
+  background-color: #CCC;
+}
+.mup i { margin-top: 15px; top: 15px; }
+
+#database-title { padding-left: 1rem; }
+#dot1, #dot2, #dot3 { visibility: hidden; }
+.dots > #dot1 { visibility:visible !important; animation: dots1 3s linear infinite; }
+.dots > #dot2 { visibility:visible !important; animation: dots2 3s linear infinite; }
+.dots > #dot3 { visibility:visible !important; animation: dots3 3s linear infinite; }
+@keyframes dots1 {
+ 0% { opacity: 1; }
+ 65% { opacity: 1; }
+ 66% { opacity: 0; }
+ 100% { opacity: 0; }
+}
+
+@keyframes dots2 {
+ 0% { opacity: 0; }
+ 21% { opacity: 0; }
+ 22% { opacity: 1; }
+ 65% { opacity: 1; }
+ 66% { opacity: 0; }
+ 100% { opacity: 0; }
+}
+
+@keyframes dots3 {
+ 0% { opacity: 0; }
+ 43% { opacity: 0; }
+ 44% { opacity: 1; }
+ 65% { opacity: 1; }
+ 66% { opacity: 0; }
+ 100% { opacity: 0; }
+}
+
+</style>
+    
+
+<!-- server side template -->
+{{ template:malware_row "data" }}
+<tr data-domain="{{-data.domain}}">
+  <td scope="row">{{data.id}}</td>
+  <td scope="row">{{-data.title}}</td>
+  <td scope="row">{{-data.days}} days ago</td>
+  <td scope="row" data-hover="{{-data.markup}}" class="mup"><i class="text-secondary fe fe-info"></i><span>{{-data.domain}}</span></td>
+  <td scope="row" data-post-id="{{-data.id}}" data-domain="{{-data.domain}}" data-type="{{data.type}}">
+    <span title="delete entire post" class="lift btn btn-secondary fe fe-trash-2"></span>
+    <span title="remove link only" class="lift btn btn-secondary fe fe-delete"></span>
+    <span title="allow links to this domain" class="lift btn btn-success fe fe-check-square"></span>
+  </td>
+</tr>
+{{ end template }}
+
+{{ template:restore_points "point" }}
+<li class="pr-4 selectable" style="float:left;" data-time="{{+point.time}}" data-posts="{{+point.posts}}" data-comments="{{+point.comments}} style="display:inline"> {{%d point.time}}: <span class="badge bg-secondary">{{+point.posts}} posts</span>, </li>
+{{ end template }}
+
+
+<!-- client side template -->
+<script type="text/template" id="malware_template">
+<tr data-domain="<%-domain%>">
+  <td scope="row"><%=id %></td>
+  <td scope="row"><%-title%></td>
+  <td scope="row"><%-days%> days ago</td>
+  <td scope="row" data-hover="<%-markup%>" class="mup"><i class="text-danger fe fe-alert-triangle"></i><span><%-domain%></span></td>
+  <td scope="row" data-post-id="<%-id%>" data-domain="<%-domain%>" data-type="<%=type%>">
+    <span title="delete entire post" class="lift btn btn-secondary fe fe-trash-2"></span>
+    <span title="remove link only" class="lift btn btn-secondary fe fe-delete"></span>
+    <span title="allow links to this domain" class="lift btn btn-success fe fe-check-square"></span>
+  </td>
+</tr>
+
+</script>
+
+<div class="main-content" id="self_content">
+    
+  {{> header.html plugin_alerts=""}}
+
+  <!-- CARDS -->
+  <div class="container-fluid">
+    <div class="row justify-content-center">
+
+      <div class="">
+
+        <div class="header">
+          <div class="">
+            <h1 class="header-title tdc"> Database Recovery </h1>
+            <p class="header-subtitle tdc">Create offline backups of your database and restore them.
+              Search your WordPress database for spam links to over 2 million known malware sites.</p>
+          </div>
+        </div>
+
+<div class="row">
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card p-0" style="justify-content: space-evenly;">
+      <img src="{{public}}img/servers.jpg" alt="database card cover" class="card-img-top">
+      <div class="card-body text-center" style="margin-top:-4rem;">
+        <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+          <img id="database-icon" src="{{public}}img/database.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+        </div>
+        <h2 style="margin-top:-1rem;" class="card-title" id="database-title">
+          <span class="tdc">Database Backups</span>
+          <span id="dot1">.</span><span id="dot2">.</span><span id="dot3">.</span>
+        </h2>
+      </div>
+
+      <table class="table table-sm table-nowrap table-hover mb-0">
+        <tr class="sm">
+          <td class="text-muted ml-4 bt-0" style="width:40%"><span class="tdc pl-4">Last full backup:</span></td>
+          <td class="bt-0"><strong class="ml-4 text-primary badge {{backup-age-badge}} txt-n">{{%d backup-age-sec}}</strong></td>
+        </tr>
+        <tr class="sm">
+          <td class="text-muted pl-4"><span class="tdc pl-4">Available Storage:</span></td>
+          <td><strong class="ml-4 text-primary badge {{backup-storage-badge}} txt-n">{{ backup-storage}}</strong></td>
+        </tr>
+      </table>
+
+      <div class="card-footer card-footer-boxed" style="height:70px;">
+        <div class="row align-items-center justify-content-between">
+          <div class="col-auto">
+            <span class="text-{{backup_status.online_class}}">●</span> <small class="tdc"> Offsite Backups {{backup_status.online_text}} </small>
+          </div>
+          <div class="col-auto">
+            <button id="backup_button" class="lift btn btn-sm btn-primary"> 
+              <span class="fe fe-save"></span>
+              <span id="backup_button_text" class="tdc">Create Full Backup</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card p-0" style="justify-content: space-evenly;">
+      <img src="{{public}}img/pages2.jpg" alt="database card cover" class="card-img-top">
+      <div class="card-body text-center" style="margin-top:-4rem;">
+        <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+          <img src="{{public}}img/file-text.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+        </div>
+        <h2 style="margin-top:-1rem;" class="card-title tdc">Available Restore Points</h2>
+      </div>
+
+      <ul style="height:130px;">
+        {{ render:restore_points points }}
+      </ul>
+
+      <!--
+      <table class="table table-sm table-nowrap table-hover mb-0">
+        <tr class="sm">
+          <td class="text-muted bt-0" style="width:40%"><span class="pl-4 tdc"># Posts not backed-up:</span></td>
+          <td class="bt-0"><strong class="ml-4 text-primary badge {{backup-age-badge}} txt-n">{{+backup-posts}}</strong></td>
+        </tr>
+      </table>
+
+      <div class="card-footer card-footer-boxed" style="height:70px;">
+        <div class="row align-items-center justify-content-between">
+          <div class="col-auto">&nbsp;
+            <small> <span class="text-{{backup_status.online_class}}">●</span> Incremental Backups Offline </small>
+          </div>
+          <div class="col-auto">&nbsp;
+            <a id="" href="#" class="disabled lift btn btn-sm btn-primary tdc"> <span class="fe fe-save"></span> Backup </a>
+          </div>
+        </div>
+      </div>
+      -->
+
+    </div>
+  </div>
+
+
+  <div class="col-12 col-md-6 col-xl-4">
+    <div class="card p-0" style="justify-content: space-evenly;">
+      <img src="{{public}}img/green_db.jpg" alt="database card cover" class="card-img-top">
+      <div class="card-body text-center" style="margin-top:-4rem;">
+        <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+          <img src="{{public}}img/download2.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+        </div>
+        <h2 style="margin-top:-1rem;" class="card-title tdc">Database Restore</h2>
+      </div>
+
+      <table class="table table-sm table-nowrap table-hover mb-0">
+        <tr class="sm">
+          <td class="text-muted ml-4 bt-0" style="width:40%"><span class="tdc pl-4">Selected Restore Point:</span></td>
+          <td class="bt-0"><strong class="ml-4 text-primary txt-n" id="selected-time"></strong></td>
+          <!--
+          <td class="bt-0"><strong class="ml-4 text-primary badge {{backup-age-badge}} txt-n">{{%d backup-age-days}}</strong></td>
+          -->
+        </tr>
+        <tr class="sm">
+          <td class="text-muted pl-4"><span class="tdc pl-4">Posts / Comments:</span></td>
+          <td class="bt-0"><strong class="ml-4 txt-n" id="selected-time">
+            <span class="badge badge-secondary" id="selected_posts"></span>
+            <span class="badge badge-secondary" id="selected_comments"></span>
+          </strong></td>
+          <!--
+          <td><strong class="ml-4 text-primary badge {{backup-storage-badge}} txt-n">{{backup-storage}}</strong></td>
+          -->
+        </tr>
+      </table>
+
+      <div class="card-footer card-footer-boxed" style="height:70px;">
+        <div class="row align-items-center justify-content-between">
+          <div class="col-auto">
+            <span class="text-{{restore-class}}">●</span> <small class="tdc"> Offsite Backups {{restore-available}} </small>
+          </div>
+          <div class="col-auto">
+            <a id="" href="#" class="{{restore_disabled}} lift btn btn-sm btn-primary"> <span class="fe fe-download"></span> <span class="tdc">Restore Full Backup</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    </div>
+        <div class="card h-pause">
+          <div id="search-cover"></div>
+          <div class="card-body text-center" style="margin-top:1.5rem;">
+            <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+              <img id="" src="{{public}}img/search.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card"> <img id="search-icon" src="{{public}}img/search.png" class="static">
+            </div>
+            <h2 style="margin-top:-1rem;" class="card-title">
+              <button id="scan_malware" class="lift btn btn-sm btn-primary left" id="search-btn" style="text-align:left;display:inline-block;width:150px;">
+                <span class="fe fe-search"></span> Scan for Malware </button>
+                <span class="tdc" style="margin-left:-150px">
+                  Scan for Spam and Malware in {{num-posts}} posts and {{num-comments}} comments
+                </span>
+            </h2>
+          </div>
+
+          <div class="card-body mb-4">
+            <div class="table-responsive">
+            <table class="table table-sm table-nowrap table-striped table-hover">
+              <caption class="tdc">List of malware links</caption>
+              <thead class="thead-dark">
+                <tr>
+                  <th scope="col tdc">Post ID</th>
+                  <th scope="col tdc">Title</th>
+                  <th scope="col tdc">Date</th>
+                  <th scope="col tdc">Linked Malware Markup</th>
+                  <th scope="col tdc">Action</th>
+                </tr>
+              </thead>
+              <tbody id="malware_list">
+              </tbody>
+
+            </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!--
+    <h2>demo</h2>
+    <pre id="demo">
+      <div class="scroller" id="searcher">
+      </div>
+    </pre>
+                  {{ r3nder:malware_row "malware" }}
+  -->
+
+  </div>
+</div>
+
+    
+<script type="text/javascript">
+  window.BITFIRE_NONCE = '{{api_code}}';
+  window.NUM_POSTS = {{+num-posts}};
+  window.NUM_COMMENTS = {{+num-comments}};
+
+// generate a random string of length (length), updated input with name config_name+_text
+function rand_string(config_name, length = 32) {
+    let result           = '';
+    let characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for ( var i = 0; i < length; i++ ) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    let e = GBI(config_name+"_text");
+    if (e) { e.value = result; }
+    update_str(config_name);
+}
+
+function r_num(min, max) {
+  return min + Math.floor(Math.random() * (max - min));
+}
+
+function random_colors(input) {
+  output = "";
+  input = input.replace(/\n/gm, '');
+  input = input.replace(/\s+/gm, ' ');
+
+  let off = 0;
+  let ctr = 0;
+  while (off < input.length && ctr++ <200) {
+
+    //let c_len = input.indexOf('"', off) - off;
+    let c_len = input.slice(off).search(/[<\w+]/);
+    if (c_len < 0) { break; } 
+    console.log("offset: " + off, "c_len: " + c_len);
+    let add = 0;
+    while(c_len+add < 4) {
+      add++;
+      c_len = input.slice(off+add).search(/["'\<\>]/) - off;
+    }
+    c_len += add;
+    c_len++;
+    console.log("   skipped: " + add, " c_len: " + c_len);
+    /*
+    if (c_len < 5 || c_len > 22) {
+      c_len = r_num(8,22);
+      //console.log("override to: ", c_len);
+    }
+    */
+    if (off+c_len > input.length) { c_len = input.length - off; console.log("shorten to", c_len); }
+
+    let chunk = (input.substring(off, off+c_len));
+    console.log("chunk", off + " - " + (off+c_len), add, chunk);
+    //let chunk = "<i class='c"+r_num(1,8)+"'>" +html_escape(input.substring(off, off+c_len)) + "</i>";
+    let clazz = "c" + r_num(1,9);
+    if (chunk.length > 30) {
+      clazz="c4";
+    }
+    output += "<i class='"+clazz+"'>"+html_escape(chunk)+"</i>";
+    off += c_len;
+  }
+
+  return output;
+}
+
+function createClass(name,rules){
+  console.log("create class", "name> " +name, "rules> " +rules);
+    var style = document.createElement('style');
+    style.type = 'text/css';
+    document.getElementsByTagName('head')[0].appendChild(style);
+    if(!(style.sheet||{}).insertRule) 
+        (style.styleSheet || style.sheet).addRule(name, rules);
+    else
+        style.sheet.insertRule(name+"{"+rules+"}",0);
+}
+
+window.MAX_AJAX = 50;
+function handle_malware(response) {
+  // dont go past 50 requests in case something really off happens.  failsafe...
+  if (window.MAX_AJAX-- < 0) { return; }
+  /*
+  console.log("handle", response);
+  console.log("data", response.data);
+  console.log(response.data.hrefs);
+  */
+  let elm = GBI("malware_list");
+
+  let line_e = GBI("malware_template");
+  let compiled = _.template(line_e.innerText);
+  let markup = "";
+  for (const [key, value] of Object.entries(response.data.hrefs)) {
+    console.log("render", key, value);
+    markup += compiled(value);
+  }
+  elm.innerHTML += markup;
+
+  if (response.data.next_offset > 0) {
+    BitFire_api("scan_malware", 
+      {"type": "post", "side": "left", "offset": response.data.next_offset})
+      .then(response => response.json())
+      .then( r => { handle_malware(r);  } );
+  } else {
+    GBI("search-icon").classList.remove("animate");
+    GBI("scan_malware").innerText = _text("Scan Complete");
+    GBI("scan_malware").setAttribute("disabled", "disabled");
+  }
+
+  add_button_listeners();
+}
+
+function scan_malware() {
+  GBI("search-icon").classList.add("animate");
+
+  BitFire_api("scan_malware", 
+    {"type": "post", "side": "left", "offset": 0})
+    .then(response => response.json())
+    .then( r => { handle_malware(r);  } );
+}
+
+GBI("scan_malware").addEventListener("click", scan_malware);
+
+function add_button_listeners() {
+  console.log("add listeners");
+  let buttons = document.querySelectorAll(".fe-trash-2");
+  for (let i = 0; i < buttons.length; i++) {
+    if (buttons[i].getAttribute("data-listener") != "true") {
+      buttons[i].addEventListener("click", function(evt, arg1) {
+        let parent = evt.target.parentNode;
+
+        BitFire_api("clean_post", {"type": parent.getAttribute("data-type"), "fix": "delete", "id": parent.getAttribute("data-post-id")})
+          .then(response => response.json())
+          .then( r => {
+            let selector = "tr[data-domain='"+parent.getAttribute("data-domain")+"']";
+            console.log("deleted", selector, r);
+            document.body.querySelector(selector).forEach(elm => { elm.remove(); });
+        } );
+      });
+      buttons[i].setAttribute("data-listener", "true");
+    }
+  }
+
+
+  buttons = document.querySelectorAll(".fe-delete");
+  for (let i = 0; i < buttons.length; i++) {
+    if (buttons[i].getAttribute("data-listener") != "true") {
+      buttons[i].addEventListener("click", function(evt, arg1) {
+        let parent = evt.target.parentNode;
+
+        BitFire_api("clean_post", {"type": parent.getAttribute("data-type"), "link": parent.getAttribute("data-domain"),"fix": "clean", "id": parent.getAttribute("data-post-id")})
+          .then(response => response.json())
+          .then( r => { 
+            let selector = "tr[data-domain='"+parent.getAttribute("data-domain")+"']";
+            console.log("cleaned", selector, r);
+            document.body.querySelector(selector).forEach(elm => { elm.remove(); });
+          } );
+      });
+      buttons[i].setAttribute("data-listener", "true");
+    }
+  }
+
+  buttons = document.querySelectorAll(".fe-check-square");
+  for (let i = 0; i < buttons.length; i++) {
+    if (buttons[i].getAttribute("data-listener") != "true") {
+      buttons[i].addEventListener("click", function(evt, arg1) {
+        let parent = evt.target.parentNode;
+
+        BitFire_api("clean_post", {"type": parent.getAttribute("data-type"), "link": parent.getAttribute("data-domain"),"fix": "allow"})
+          .then(response => response.json())
+          .then( r => {
+            alert("domain allowed and excluded from next scan.");
+            console.log("allow", r, parent);
+          } );
+      });
+      buttons[i].setAttribute("data-listener", "true");
+    }
+  }
+}
+
+function do_backup() {
+  console.log("do backup");
+
+  GBI("database-icon").classList.toggle("spin");
+  GBI("database-title").innerText = _text("Backing up database");
+  GBI("database-title").classList.add("dots");
+  BitFire_api("backup_database", {})
+      .then(response => response.json())
+      .then( r => {
+        console.log("backup", r);
+        GBI("database-icon").classList.toggle("spin");
+        GBI("database-title").classList.remove("dots");
+        GBI("database-title").innerText = _text("Database Backups");
+        let e = GBI("backup_button");
+        e.setAttribute("disabled", "disabled");
+        e.classList.remove("btn-primary");
+        e.classList.remove("lift");
+        if (r.success) {
+          GBI("backup_button_text").innerText = _text("Backup Complete");
+          e.classList.add("btn-success");
+        }
+        else {
+          GBI("backup_button_text").innerText = _text("Backup Error");
+          e.classList.add("btn-danger");
+          alert(r.note + " errors: " + r.errors.toString());
+        }
+    });
+}
+
+// MAIN
+document.addEventListener("DOMContentLoaded", function () {
+  add_button_listeners();
+
+  let e = document.getElementById("backup_button");
+  e.addEventListener("click", do_backup);
+
+  var elements = document.getElementsByClassName("selectable");
+  for (var i=0; i<elements.length; i++) {
+    elements[i].addEventListener("click", function(e) {
+      let elm= e.target;
+      // if we click on the badge, we want to select the parent
+      if (elm.classList.contains("badge")) { elm = elm.parentNode; }
+      var e2 = document.getElementsByClassName("selectable");
+      for (var i=0; i<e2.length; i++) {
+        e2[i].classList.remove("selected");
+      }
+      elm.classList.add("selected");
+    });
+  }
+});
+
+/*
+let elm = document.getElementById("self_content");
+let c = elm.innerHTML;
+let colored = random_colors(c);
+console.log(colored);
+document.getElementById("searcher").innerHTML = colored;
+*/
+
+</script>

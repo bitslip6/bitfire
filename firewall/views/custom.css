@@ -1,0 +1,94 @@
+/** CUSTOM CSS */
+.card { max-width: 100%; }
+.left { float: left; }
+.right { float: right; }
+.spinner-border { margin-left: -110px; }
+.pointer { cursor: pointer; }
+.wrap { white-space: break-spaces; line-break: anywhere; }
+.nowrap { white-space: nowrap; }
+.hidden { display: none; }
+.grow { flex-grow: 1; }
+.slide-up { height: 0px; transition: height 0.25s linear;}
+.slide-up.open { height: auto; transition: height 0.5s linear;}
+.zup { z-index: 100 }
+/*
+.secondary { filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%); }
+.success { filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%); }
+.warning { filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%); }
+*/
+
+/* Tooltip text */
+.tooltipA .tooltip-text {
+  visibility: hidden;
+  width: 100%;
+  background-color: rgba(0,0,0,0.8);
+  color: #DDD;
+  text-align: center;
+  padding: .5em;
+  border-radius: 6px;
+  top: -110px;
+ 
+  position: absolute;
+  z-index: 1;
+}
+.tooltipA {
+  position: relative;
+}
+.zup.tooltipA .tooltip-text {
+  visibility: visible !important;
+}
+
+.dropdown-toggle { width: 65px; }
+.card-body { padding: 0.5rem !important; }
+.header-body { padding: 24px 0; }
+.form-check .form-switch { width: 80px; margin-left: -80px; }
+.form-switch { min-height: 1.5rem; padding-left: 1.5rem; }
+.form-switch .form-check-input:checked { background-position: 100%; }
+.form-check-input { cursor: pointer; position: absolute; vertical-align: top; background-color: #e3ebf6; background-repeat: no-repeat; background-size: contain; border: transparent; appearance: none;}
+.form-check-input:checked[type=checkbox] {
+    background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='M6 10l3 3 6-6'/%3E%3C/svg%3E");
+    background-position: 100%;
+}
+/*
+.form-check-input.successfully { background-color: #00d97e; border-color: #00d97e; }
+*/
+
+.form-check-input[type=checkbox] {
+    background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3E%3Ccircle r='3' fill='%23fff'/%3E%3C/svg%3E");
+    background-position: 0%;
+    background-repeat: no-repeat; 
+    width: 3rem;
+    margin: 0;
+    margin-left: -3.5rem;
+    border-radius: 3rem;
+    transition: background-position .15s ease-in-out;
+    height: 1.5rem;
+    border-color:rgb(140, 143, 148) !important;
+}
+.success:checked { background-color: #00d97e; border-color: #00d97e; border: 1px solid rgb(140, 143, 148); }
+.warning:checked { background-color: #f6c343; border-color: #f6c343; border: 1px solid rgb(140, 143, 148); }
+
+
+a.nav-link { color: #2c7be5 !important;}
+a.nav-link:hover { text-decoration: underline; }
+
+svg { fill: #977; }
+img.red { filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%); }
+h6 { text-transform: uppercase; line-height: 1.5;color: rgb(149, 170, 201); font-family: "Cerebri Sans", sans-serif; font-weight: 400; }
+input { overflow: visible; }
+input[type=checkbox] { box-sizing: border-box; padding: 0; }
+input[type=checkbox]:checked::before { content: ''; }
+input[type=checkbox], input[type=radio] { box-sizing: border-box; padding: 0; }
+
+@font-face {
+  font-family: 'Feather';
+  src:
+    url('{{public}}Feather.ttf?sdxovp') format('truetype'),
+    url('{{public}}Feather.woff?sdxovp') format('woff'),
+    url('{{public}}Feather.svg?sdxovp#Feather') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.avatar:after{content:"";position:absolute;width:0;height:0;background-image:url({{public}}avatar-status.svg),url({{public}}/avatar-group.svg),url({{public}}/avatar-group-hover.svg),url({{public}}/avatar-group-hover-last.svg)}
+.avatar-img{width:100%;height:100%;-o-object-fit:cover;object-fit:cover}.avatar-title{display:flex;align-items:center;justify-content:center;width:100%;height:100%;line-height:0;background-color:#b1c2d9;color:#fff}.avatar-offline:before,.avatar-online:before{content:"";position:absolute;bottom:5%;right:5%;width:20%;height:20%;border-radius:50%}.avatar-offline .avatar-img,.avatar-online .avatar-img{-webkit-mask-image:url({{public}}avatar-status.svg);mask-image:url({{public}}avatar-status.svg);-webkit-mask-size:100% 100%;mask-size:100% 100%}.avatar-online:before{background-color:#00d97e}.avatar-offline:before{background-color:#b1c2d9}.avatar-xs{width:1.625rem;height:1.625rem;font-size:.54167rem}.avatar-sm{width:2.5rem;height:2.5rem;font-size:.83333rem}.avatar-lg{width:4rem;height:4rem;font-size:1.33333rem}.avatar-xl,.avatar-xxl{width:5.125rem;height:5.125rem;font-size:1.70833rem}@media (min-width:768px){.avatar-xxl{width:8rem;height:8rem;font-size:2.66667rem}}.avatar.avatar-4by3{width:4rem}.avatar-xs.avatar-4by3{width:2.16667rem}.avatar-sm.avatar-4by3{width:3.33333rem}.avatar-lg.avatar-4by3{width:5.33333rem}.avatar-xl.avatar-4by3{width:6.83333rem}.avatar-xxl.avatar-4by3{width:10.66667rem}.avatar-group{display:inline-flex}.avatar-group .avatar+.avatar{margin-left:-.75rem}.avatar-group .avatar-xs+.avatar-xs{margin-left:-.40625rem}.avatar-group .avatar-sm+.avatar-sm{margin-left:-.625rem}.avatar-group .avatar-lg+.avatar-lg{margin-left:-1rem}.avatar-group .avatar-xl+.avatar-xl{margin-left:-1.28125rem}.avatar-group .avatar-xxl+.avatar-xxl{margin-left:-2rem}.avatar-group .avatar:not(:last-child){-webkit-mask-image:url({{public}}avatar-group.svg);mask-image:url({{public}}avatar-group.svg);-webkit-mask-size:100% 100%;mask-size:100% 100%}.avatar-group .avatar:hover{-webkit-mask-image:none;mask-image:none;z-index:1}.avatar-group .avatar:hover+.avatar{-webkit-mask-image:url({{public}}avatar-group-hover.svg);mask-image:url({{public}}avatar-group-hover.svg);-webkit-mask-size:100% 100%;mask-size:100% 100%}.avatar-group .avatar:hover+.avatar:last-child{-webkit-mask-image:url({{public}}avatar-group-hover-last.svg);mask-image:url({{public}}avatar-group-hover-last.svg)}
