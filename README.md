@@ -37,29 +37,31 @@ enterprise class security for everyone
 <details open="open">
   <summary>Table of Contents</summary>
   <ol>
+    <li> <a href="#about-the-project">About BitFire</a> </li>
+    <ul>
+    <li>  <a href="#Video-Demonstration">Video Demonstration</a></li>
+    </ul>
+    <li>  <a href="#filesystem-rasp">File-System Protection RASP</a></li>
+    <li>  <a href="#database-rasp">Database Protection RASP</a> </li>
+    <li>   <a href="#bot-protect-rasp">Automated Bot Protection RASP</a> </li>
     <li>
-      <a href="#about-the-project">About BitFire</a>
-      <a href="#Video-Demonstration">Video Demonstration</a>
-      <a href="#filesystem-rasp">File-System Protection RASP</a>
-      <a href="#database-rasp">Database Protection RASP</a>
-      <a href="#bot-protect-rasp">Automated Bot Protection RASP</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
+    <a href="#getting-started">Getting Started</a>
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
       </ul>
     </li>
+  <li>
+    <a href="#">Additional Information</a>
+      <ul>
+    <li><a href="#built-with">Built With</a></li>
     <li><a href="#usage">Usage</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgements">Acknowledgements</a></li>
+      </ul>
   </ol>
 </details>
 
