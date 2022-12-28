@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://bitfire.co/">
     <img src="firewall/views/bitslip.png" alt="Logo" width="80" height="80">
-  <h3 align="center">BitFire</h3> </a>
+  <h2 align="center">BitFire RASP Firewall for PHP</h2> </a>
 
 
   <p align="center">
@@ -62,19 +62,90 @@ enterprise class security for everyone
 
 
 <!-- ABOUT THE PROJECT -->
-## About BitFire
+## Runtime Application Self Protection firewall for PHP
 
-![BitFire Screen Shot](https://bitfire.co/assets/img/dash_1.webp)
+<p align="center">
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=kX1Z9qHrS6Y
+" target="_blank"><img src="http://img.youtube.com/vi/kX1Z9qHrS6Y/0.jpg" 
+alt="BitFire Intro Video" width="540" height="420" border="0" /></a>
+</p>
 
-There are many choices for PHP firewalls to protect your webservers, most can be easily bypassed.
+
+BitFire is a Runtime Application Self Protection ( RASP) based firewall for PHP servers. BitFire's RASP for PHP works differently than a traditional Web Application Firewall (WAF), by providing a security sandbox for all database and filesystem access, BitFire can prevent malware infections *and* account takeover for vulnerable plugins, themes and custom PHP code, regardless of of the stack.
+
+
+#### Prevent all malware infections with FileSystem RASP
+
+**Consider the following PHP vulnerability:**
+This vulnerability allows uploading or overwriting any PHP file.
+
+```php
+<?php
+file_put_contents($_GET['filename'], $_GET['content']);
+```
+
+BitFire's RASP filesystem sandbox runs for all non-administrator users and will intercept this file write, and check both `$_GET['filename']` and  `$_GET['content']` for any attempt to access a php file. When detected the malware infection fails and a blocking page is immediately displayed.
+
+*BitFire natively understands WordPress administrators, and you can add support for any CMS by implementing this simple function:*
+```php
+namespace BitFire\Plugin
+
+function is_admin() : bool {
+  if (my_custom_acl_check($_COOKIE)) { 
+    return true;
+  }
+  return false;
+
+  // OR simply: 
+  return my_custom_acl_check();
+}
+```
+
+#### Prevent Privilege Escalation with Database-RASP
+
+Hacker's exploit security vulnerabilities to create backdoor administrator accounts. These accounts are then used later to install malware or other spam content. BitFire secures this vulnerability by inspecting all database updates and checking for privilege escalation.
+
+**Consider the following wordpress vulnerability:**
+This vulnerability can allow an attacker to set privilege level to any value including "administrator" without any verification.
+```php
+$user = get_current_user();
+$user->setRole($_GET['user_role']);
+```
+
+ When the BitFire Database sandbox inspects the underlying database update, it will compare the user privilege being set against the the user privilege making the change. If the user does not have the permission to grant administrator access, the database write is denied and a block page is served to the user.
+
+BitFire comes pre-configured for popular CMS's including WordPress, Joomla and Drupal.
+
+***You can implement your own database checks as well:***
+
+```php
+QueryBlockList::new("table_name", "insert/update/delete", ["matching", "query", "criteria"], 'privilege_check_function');
+```
+
+This would trigger on any update of the table_name table with matching criteria to authenticate the SQL query using the PHP function privilege_check_function().
+
+***Example query blocked:***
+```sql
+UPDATE table_name SET wp_capabilities = 'a:1:{s:13:"administrator";b:1;}' WHERE umeta_id = 20;
+```
+
+#### Prevent Automated Bot Access with RASP-Bot-Protect
+
+99% of web attacks come from automated scripts. BitFire RASP protects your site from automated attacks in 2 ways. First, it allows good bots like google and bing by authenticating their network origin. Google bot only connects from google owned IP addresses, and bing from Microsoft. BitFire has a list of over 150 known and approved bots, SEO tools and their origin networks.
+
+Second, for web browsers like Chrome, Safari, etc, BitFire sends a transparent JavaScript challenge. This JavaScript challenge takes only milliseconds to complete and verifies that the client is a real browser and not a hacking tool. This way your website only sees the verified browser traffic. This is similar to Cloudflare's Super Bot Fight Mode.
+
+** **
+
+![BitFire Screen Shot](https://bitfire.co/assets/img/dash_1b.webp)
 
 Here's How BitFire is different:
 * ![speed](https://fonts.gstatic.com/s/i/materialicons/speed/v6/24px.svg) Speed. <2 ms block times - BitFire is up to 100x faster than the most popular PHP Firewalls
 * ![bot](https://fonts.gstatic.com/s/i/materialicons/dns/v6/24px.svg) Bot authentication. Authenticates good bots like google, facebook, bing, ahrefs, by source network
-* ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparant JavaScript browser verification ensures user's are real
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/computer/v6/24px.svg) Browser verification. Transparent JavaScript browser verification ensures user's are real
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/policy/v6/24px.svg) Client Integrity. Automatically generate browser policy preventing browser takeover
 * ![browser](https://fonts.gstatic.com/s/i/materialicons/lock/v6/24px.svg) Server Integrity. Authenticated file access prevents server code modification 
-* ![browser](https://fonts.gstatic.com/s/i/materialicons/text_rotation_none/v6/24px.svg) Grammer based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
+* ![browser](https://fonts.gstatic.com/s/i/materialicons/text_rotation_none/v6/24px.svg) Grammar based firewall.  Parses SQL, HTTP, HTML for the most accurate blocking
 
 
 ### Built With
@@ -82,19 +153,19 @@ Here's How BitFire is different:
 BitFire is built from pure PHP and has no external dependencies.  BitFire can take advantage of several PHP shared memory caches including APCu, SHM, shmop and OpCache
 * [PHP](https://php.com)
 * [TinyTest](https://github.com/bitslip6/tinytest)
-* [APCu](https://pecl.php.net/package/APCU)
 
 
 
-<!-- GETTING STARTED -->
+<!-- 
 ## Getting Started
 
 Security from F to A in 5 minutes https://www.youtube.com/watch?v=DHhEW2otdng
 Install Guide: https://bitfire.co/bitfire-install
+GETTING STARTED -->
 
 ### Prerequisites
 
-You will need: a webserver (apache, nginx), PHP >= 7.1, a login, and a text editor.
+You will need: a web-server (apache, nginx), PHP >= 7.1, a login, and a text editor.
 
 
 ### Installation
@@ -109,11 +180,9 @@ You will need: a webserver (apache, nginx), PHP >= 7.1, a login, and a text edit
    composer require bitslip6/bitfire
    add: auto_prepend_file = "/path/to/bitfire/startup.php" to root .user.ini file
    ```
-- *Bitfire is now installed!* The default config will not block anything until enabled.  set *_bitfire_enabled_* in `bitfire/config.ini` and see the quickstart in this readme.
-   ```ini
-   bitfire_enabled = true;
-   ```
-- Congratulations! Time for a beer
+- *Bitfire is now installed!* Open the configuration wizard to enable the firewall by visiting /bitfire/startup.php in your web browser. If you installed BitFire outside your web_root, you can access the dashboard by visiting the url /bitfire-admin which is defined in /bitfire/config.ini.
+
+- **Congratulations! Time for a beer**
 
 
 
@@ -122,21 +191,12 @@ Detailed configuration and installation is available on our [Support Center](htt
 
 
 <!-- SETUP -->
-## Setup / Configuration Quickstart
+## Setup / Configuration Quick-start
 
-The default configuration is very conservative and will only block
-bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire
-home directory (your github checkout location, or for composer vendor/bitslip6/bitfire/config.ini)
-
-You can configure blocking by setting the dashboard_path and password ini configuration in config.ini.
-This file is made write only on first page view so you may need to update permission to allow read
-and write.
-
-dashboard = "/bitfire_dashboard";
-password = "aStrongSecurePassword";
+The default configuration is very conservative and will only block bots identifying themselves as malicious scripts. The configuration is stored in `config.ini` in the BitFire home directory (for composer: vendor/bitslip6/bitfire/config.ini)
 
 Now visit your website at path "your_domain.com/bitfire_dashboard"
-enter the password when prompted, then click on "Settings" and configure the settings you want to use
+enter the password when prompted, then click on "Settings" and configure the settings you want to use.
 
 On first page view BitFire will auto configure itself for your server and rarely needs to be adjusted.
 
