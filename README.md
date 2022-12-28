@@ -39,6 +39,10 @@ enterprise class security for everyone
   <ol>
     <li>
       <a href="#about-the-project">About BitFire</a>
+      <a href="#Video-Demonstration">Video Demonstration</a>
+      <a href="#filesystem-rasp">File-System Protection RASP</a>
+      <a href="#database-rasp">Database Protection RASP</a>
+      <a href="#bot-protect-rasp">Automated Bot Protection RASP</a>
       <ul>
         <li><a href="#built-with">Built With</a></li>
       </ul>
@@ -64,6 +68,10 @@ enterprise class security for everyone
 <!-- ABOUT THE PROJECT -->
 ## Runtime Application Self Protection firewall for PHP
 
+
+BitFire is a Runtime Application Self Protection (RASP) based firewall for PHP servers. BitFire's RASP for PHP works differently than a traditional Web Application Firewall (WAF), by providing a security sandbox for all database and filesystem access, BitFire can prevent malware infections *and* account takeover for vulnerable plugins, themes and custom PHP code, regardless of of the stack.
+
+#### Video Demonstration:
 <p align="center">
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=kX1Z9qHrS6Y
 " target="_blank"><img src="http://img.youtube.com/vi/kX1Z9qHrS6Y/0.jpg" 
@@ -71,10 +79,8 @@ alt="BitFire Intro Video" width="540" height="420" border="0" /></a>
 </p>
 
 
-BitFire is a Runtime Application Self Protection ( RASP) based firewall for PHP servers. BitFire's RASP for PHP works differently than a traditional Web Application Firewall (WAF), by providing a security sandbox for all database and filesystem access, BitFire can prevent malware infections *and* account takeover for vulnerable plugins, themes and custom PHP code, regardless of of the stack.
 
-
-#### Prevent all malware infections with FileSystem RASP
+#### FileSystem RASP
 
 **Consider the following PHP vulnerability:**
 This vulnerability allows uploading or overwriting any PHP file.
@@ -101,7 +107,7 @@ function is_admin() : bool {
 }
 ```
 
-#### Prevent Privilege Escalation with Database-RASP
+#### Database RASP
 
 Hacker's exploit security vulnerabilities to create backdoor administrator accounts. These accounts are then used later to install malware or other spam content. BitFire secures this vulnerability by inspecting all database updates and checking for privilege escalation.
 
@@ -129,7 +135,7 @@ This would trigger on any update of the table_name table with matching criteria 
 UPDATE table_name SET wp_capabilities = 'a:1:{s:13:"administrator";b:1;}' WHERE umeta_id = 20;
 ```
 
-#### Prevent Automated Bot Access with RASP-Bot-Protect
+#### Bot Protect RASP
 
 99% of web attacks come from automated scripts. BitFire RASP protects your site from automated attacks in 2 ways. First, it allows good bots like google and bing by authenticating their network origin. Google bot only connects from google owned IP addresses, and bing from Microsoft. BitFire has a list of over 150 known and approved bots, SEO tools and their origin networks.
 
