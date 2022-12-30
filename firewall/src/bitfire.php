@@ -21,6 +21,7 @@ use const ThreadFin\DAY;
 
 use function BitFire\Pure\json_to_file_effect;
 use function BitFirePlugin\is_admin;
+use function BitFireSvr\authenticate_tech;
 use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
@@ -29,6 +30,7 @@ use function ThreadFin\httpp;
 use function ThreadFin\random_str;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\get_public;
 use function ThreadFin\partial_right;
 use function ThreadFin\un_json;
 use function ThreadFin\utc_date;
@@ -193,6 +195,7 @@ class Block {
     public $pattern;
     public $block_time; // set to -1 for warning, 0 = block this request, 1 = short, 2 = medium 3 = long
     public $skip_reporting = false;
+    public $uuid;
 
     public function __construct(int $code, string $parameter, string $value, string $pattern, int $block_time = 0) {
         $this->code = $code;
@@ -200,6 +203,12 @@ class Block {
         $this->value = $value;
         $this->pattern = $pattern;
         $this->block_time = $block_time;
+        $this->uuid = strtoupper(random_str(8));
+    }
+    
+    public function __toString() : string {
+        $class = intval(floor($this->code/1000)*1000);
+        return \BitFire\FEATURE_NAMES[$class]??"Unclassified:{$this->code}";
     }
 }
 
@@ -272,7 +281,7 @@ class Config {
             $found = false;
             if (!empty($ini)) {
                 if ($_SERVER['IS_WPE']??false || CFG::enabled("emulate_wordfence")) {
-                    $file = CFG::str("wp_root")."/wordfence-waf.php";
+                    $file = CFG::str("cms_root")."/wordfence-waf.php";
                     if (file_exists($file)) {
                         $s = @stat($file); // cant read this file on WPE, check the size
                         $found = ($s['size']??9999 < 256);
@@ -299,13 +308,13 @@ class Config {
     }
 
     public static function enabled(string $name, bool $default = false) : bool {
-        if (!isset(Config::$_options[$name])) { return $default; }
-        if (Config::$_options[$name] === "block" || Config::$_options[$name] === "report" || Config::$_options[$name] == true) { return true; }
-        return (bool)Config::$_options[$name];
+        $value = self::$_options[$name]??$default;
+        if ($value === "block" || $value === "report" || $value == true) { return true; }
+        return $default;
     }
 
     public static function disabled(string $name, bool $default = true) : bool {
-        return !Config::enabled($name, $default);
+        return !Config::enabled($name, !$default);
     }
 
     public static function file(string $name) : string {
@@ -328,14 +337,20 @@ function verify_admin_password() : Effect {
 
     // run the initial password setup if the password is not configured
     if (CFG::str("password") == "configure") {
-        //return render_view(\BitFire\WAF_ROOT."views/setup.html", "BitFire Setup");
         return $effect;
+    }
+
+    // allow 
+    if (CFG::enabled("bitfire_tech_allow") && $_COOKIE['_bitfire_tech']??false) {
+        if (authenticate_tech($_COOKIE['_bitfire_tech'])->compare("allow")) {
+            return $effect;
+        } 
     }
 
     $raw_pw = $_SERVER["PHP_AUTH_PW"]??'';
     // read any recovery passwords
     $password = CFG::str("password");
-    $files = glob(CFG::str("wp_root")."/bitfire.recovery.*");
+    $files = glob(CFG::str("cms_root")."/bitfire.recovery.*");
     foreach ($files as $file) {
         if (filemtime($file) < time() - 3600) {
             unlink($file);
@@ -422,19 +437,12 @@ class BitFire
 
         $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE); // filter out all request data for parsed use
 
-       
         // handle a common case urls we never care about
+        /*
         if (in_array($this->_request->path, CFG::arr("urls_not_found"))) {
             http_response_code(404); die();
         }
-       
-        if (Config::enabled(CONFIG_ENABLED)) {
-            $this->uid = substr(\uniqid(), 5, 8);
-
-            if (function_exists('\BitFirePRO\send_pro_mfa')) {
-                \BitFirePRO\send_pro_mfa($this->_request);
-            }
-        }
+        */
     }
     
     /**
@@ -471,6 +479,7 @@ class BitFire
 
     /**
      * create a new block, returns a maybe of a block, empty if there is an exception for it
+     * TODO: add blocking exception filtering here so code can know if the block was executed
      */
     public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null) : MaybeBlock {
         if ($code === FAIL_NOT) { return Maybe::$FALSE; }
@@ -545,6 +554,19 @@ class BitFire
             return Maybe::$FALSE;
         }
 
+        // 1% cleanup old cache files
+        if (mt_rand(0, 100) < 2) {
+            $cache_file_list = glob(WAF_ROOT."/cache/objects/*");
+            array_walk($cache_file_list, function ($file) {
+                $success = false;
+                @include ($file);
+                if (!$success) {
+                    @unlink($file);
+                }
+            });
+        }
+
+
         // don't inspect local commands, this will skip command line access in case we are running via auto_prepend
         if (!isset($_SERVER['REQUEST_URI'])) { trace("local"); return $block; }
 
@@ -563,6 +585,14 @@ class BitFire
         $this->cookie = $maybe_bot_cookie;
         //debug("cookie %s", print_r($maybe_bot_cookie, true));
 
+ 
+        // if we have an api command and not running in WP, execute it. we are done!
+        if ((isset($this->_request->get[BITFIRE_COMMAND]) || isset($this->_request->post[BITFIRE_COMMAND])) && !isset($this->_request->get['plugin'])) {
+            require_once WAF_SRC."api.php";
+            api_call($this->_request)->run();
+        }
+
+
 
         // if we are not running inside of Wordpress, then we need to load the page here.
         // if running inside of WordPress, bitfire-admin.php will load the admin pages, so
@@ -571,8 +601,9 @@ class BitFire
         $dash_path = contains($no_slash_fn($this->_request->path), ['bitfire/startup.php', $no_slash_fn(CFG::str("dashboard_path"))]);
         if ($dash_path && (
             !isset($this->_request->get['BITFIRE_PAGE']) && !isset($this->_request->get['BITFIRE_API']))) {
-            $this->_request->get['BITFIRE_PAGE'] = 'dashboard';
+            $this->_request->get['BITFIRE_PAGE'] = 'DASHBOARD';
         }
+
         if (isset($this->_request->get['BITFIRE_PAGE'])) {
             require_once \BitFire\WAF_SRC."dashboard.php";
 
@@ -589,20 +620,16 @@ class BitFire
             else if ($p === "EXCEPTIONS") {
                 serve_exceptions();
             }
+            else if ($p === "DATABASE") {
+                serve_database();
+            }
             else {
-                serve_dashboard($this->_request->path);
+                serve_dashboard();
             }
             exit;
         }
 
-        
-        // if we have an api command and not running in WP, execute it. we are done!
-        if (isset($this->_request->get[BITFIRE_COMMAND]) && !isset($this->_request->get['plugin'])) {
-            require_once WAF_SRC."api.php";
-            api_call($this->_request)->run();
-        }
-
-        
+               
         // quick approx stats occasionally
         if (random_int(1, 100) == 81) {
             trace("stat");
@@ -632,22 +659,24 @@ class BitFire
         $wp_admin = ($maybe_bot_cookie->extract("wp")() > 1);
 
         // build A WordPress Profile for REAL browsers only
-        if (CFG::enabled("wp_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
-            $wp_effect = cms_build_profile($this->_request, $wp_admin);
+        if (CFG::enabled("cms_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
 
+            $wp_effect = cms_build_profile($this->_request, $wp_admin);
             register_shutdown_function(function() use ($wp_effect) {
+
                 // if we have wordpress db, and query data
                 if (CFG::enabled("audit_sql")) {
-                    $wp_effect->file(new FileMod(\BitFire\WAF_ROOT."/cache/sql_tx.log", CFG::str("tx_log"), FILE_W, 0, true));
+                    $tx_log = CFG::str("tx_log");
+                    if (strlen($tx_log) > 0) {
+                        $wp_effect->file(
+                            new FileMod(\BitFire\WAF_ROOT."/cache/sql_tx.log", 
+                            CFG::str("tx_log"), FILE_W, 0, true));
+                    }
                 }
                 $wp_effect->run();
                 if ($wp_effect->num_errors() > 0) {
                     if (CFG::enabled("debug_file")) {
                         debug("effect errors [%s]", en_json($wp_effect->read_errors()));
-                    }
-                    // append debug info for admins only
-                    else if (function_exists("BitFirePlugin\is_admin") && is_admin()) {
-                        printf("\n\n\n<!-- bitfire audit effect errors [%s] -->", en_json($wp_effect->read_errors(), true));
                     }
                 }
             });
@@ -690,3 +719,37 @@ class BitFire
             Config::str(CONFIG_RATE_LIMIT_ACTION) !== '');
     }
 }
+
+/**
+ * called to handle some internal setup
+ * @return void 
+ */
+function bitfire_init() {
+    if (strlen(CFG::str('pro_key')) > 20) {
+        if (file_exists(\BitFire\WAF_SRC . 'pro.php')) {
+            @include_once \BitFire\WAF_SRC . 'pro.php';
+        }
+    }
+}
+
+/**
+ * create  an effect that will render the block page
+ * @param int $code the unique code for this line of code
+ * @param string $parameter the parameter name where the issue was detected
+ * @param string $value  the value of the detected parameter
+ * @param string $pattern  the pattern that was matched
+ * @param int $block_time one of BLOCK_SHORT, BLOCK_MEDIUM, BLOCK_LONG
+ * @param null|Request $req the offending request
+ * @return Effect 
+ */
+function block_now(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null) : Effect {
+    $block = BitFire::new_block($code, $parameter, $value, $pattern, $block_time, $req);
+    if (!$block->empty()) {
+        $block = $block();
+        $error_css = get_public("error.css");
+        ob_start();
+        require WAF_ROOT."views/block.php";
+        return Effect::new()->out(ob_get_clean())->exit(true);
+    }
+}
+

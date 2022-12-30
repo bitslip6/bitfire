@@ -13,6 +13,7 @@ namespace BitFire;
 
 use ThreadFin\CacheStorage;
 use BitFire\Config as CFG;
+use RuntimeException;
 use ThreadFin\Effect;
 use ThreadFin\FileMod;
 use ThreadFin\Maybe;
@@ -21,6 +22,7 @@ use ThreadFin\MaybeBlock;
 
 use const ThreadFin\DAY;
 
+use function ThreadFin\dbg;
 use function ThreadFin\ends_with;
 use function ThreadFin\http2;
 use function ThreadFin\trace;
@@ -132,21 +134,16 @@ class WebFilter {
         }
 
 
-        // no easy way to pass these three parameters, a bit ugly for now...
+        // SQL injection filter
         if (Config::enabled(CONFIG_SQL_FILTER)) {
-            $check = true;
-            //if (function_exists("\BitFirePlugin\is_author")) {
-            //    $check = !\BitFirePlugin\is_author();
-            //}
-            if ($check) {
-                $block = $block->do_if_not('\BitFire\sql_filter', $request);
-            }
+            $block = $block->do_if_not('\BitFire\sql_filter', $request);
         }
 
 
         if (Config::enabled(CONFIG_FILE_FILTER)) {
-            $x = $cookie->extract("u")->value("int");
-            if (empty($x) || intval($x) <= 2) {
+            $a = $cookie->extract("wp")->value("int");
+            // don't block core wordpress updates
+            if ((empty($a) || intval($a) <= 2) && !ends_with($request->path, "admin/update.php")) {
                 $block->do_if_not('\\BitFire\\file_filter', $_FILES);
             }
         }
@@ -177,12 +174,13 @@ function sql_filter(\BitFire\Request $request) : MaybeBlock {
  */
 function file_filter(array $files) : MaybeBlock { 
     $block = Maybe::$FALSE;
-    trace("file");
+    trace("file1:".count($files).":".$block->empty());
     
     foreach ($files as $file) {
-        $block->do('\BitFire\check_ext_mime', $file);
+        $block->do_if_not('\BitFire\check_ext_mime', $file);
         $block->do_if_not('\BitFire\check_php_tags', $file);
     }
+    trace("file2:".count($files).":".$block->empty());
 
     return $block;
 }
@@ -192,6 +190,7 @@ function file_filter(array $files) : MaybeBlock {
  */
 function check_php_tags(array $file) : MaybeA {
     // check for <?php tags
+    if (empty($file['tmp_name'])) { return Maybe::$FALSE; }
     $data = file_get_contents($file["tmp_name"]);
     if (stripos($data, "<?php") !== false) {
         if (preg_match('/<\?php\s/i', $data)) {
@@ -206,19 +205,25 @@ function check_php_tags(array $file) : MaybeA {
     return Maybe::$FALSE;
 }
 
+// basic file upload checks
 function check_ext_mime(array $file) : MaybeA {
-     // check file extensions...
-    $info = pathinfo($file["tmp_name"]);
-    if (ends_with(strtolower($file["name"]), "php") ||
-        in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
-        return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
-    }
-        
-    // check mime types
-    $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
-    $info = finfo_file($ctx, $file["tmp_name"]);
-    if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
-        return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+
+    // dbg($file, "FILE");
+    
+    if (!empty($file["tmp_name"]??"")) {
+        // check file extensions...
+        $info = pathinfo($file["tmp_name"]);
+        if (ends_with(strtolower($file["name"]), "php") ||
+            in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
+            return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        }
+            
+        // check mime types
+        $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
+        $info = finfo_file($ctx, $file["tmp_name"]);
+        if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
+            return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        }
     }
 
     return Maybe::$FALSE;
@@ -444,12 +449,18 @@ function sum_sql_control_chars(array $counts) : int {
     return array_sum(array_intersect_key($counts, SQL_CONTROL_CHARS));
 }
 
+/**
+ * update encoded data files
+ * @param string $keyfile 
+ * @param string $valuefile 
+ * @return Effect 
+ */
 function update_raw(string $keyfile, string $valuefile) : Effect {
     trace("up_raw");
-    $keydata = (http2("GET", APP."encode.php", array("v" => 0, "md5"=>sha1(CFG::str("encryption_key")))));
-    $valuedata = (http2("GET", APP."encode.php", array("v" => 1, "md5"=>sha1(CFG::str("encryption_key")))));
+    $key_data = (http2("GET", APP."encode.php", array("v" => 0, "md5"=>sha1(CFG::str("encryption_key")))));
+    $value_data = (http2("GET", APP."encode.php", array("v" => 1, "md5"=>sha1(CFG::str("encryption_key")))));
     return Effect::new()
-        ->file(new FileMod($keyfile, $keydata["content"]??""))
-        ->file(new FileMod($valuefile, $valuedata["content"]??""));
+        ->file(new FileMod($keyfile, $key_data["content"]??""))
+        ->file(new FileMod($valuefile, $value_data["content"]??""));
 }
 

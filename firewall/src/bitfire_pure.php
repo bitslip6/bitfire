@@ -58,7 +58,7 @@ function is_report(Block $block) : bool {
     assert(isset(FEATURE_CLASS[$class]), "missing $class from FEATURE_CLASS");
 
     $value = Config::str(FEATURE_CLASS[$class]);
-    assert($value != "", "missing " . FEATURE_CLASS[$class] . " from config.ini");
+    if (empty($value)) { return false; }
 
     $r = (substr($value, 0, 6) === "report" || substr($value, 0, 5) === "alert");
     return $r;
@@ -107,7 +107,7 @@ function match_block_exception(?Block $block, \BitFire\Exception $exception, str
  * @return array of \BitrFire\Exception
  */
 function load_exceptions() : array {
-    $file = \BitFire\WAF_ROOT."exceptions.json";
+    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
     return FileData::new($file)->read()->un_json()->map('\BitFire\map_exception')();
 }
 
@@ -124,7 +124,7 @@ function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) : boo
  * remove an exception from the list
  */
 function remove_exception(\BitFire\Exception $ex) : Effect {
-    $filename = \BitFire\WAF_ROOT."exceptions.json";
+    $filename = \BitFire\WAF_ROOT."cache/exceptions.json";
     $exceptions = array_filter(load_exceptions(), function(\BitFire\Exception $test) use ($ex) { return ($ex->uuid === $test->uuid) ? false : true; }); 
     $effect = Effect::new(new FileMod($filename, json_encode($exceptions, JSON_PRETTY_PRINT), FILE_W));
     return $effect;
@@ -209,9 +209,16 @@ function process_ip(array $server) : string {
 function freq_map(array $inputs) : array {
     $r = array();
     foreach($inputs as $key => $value) {
-        $r[$key] = (is_array($value)) ? 
-            array_reduce($value, '\\BitFire\\get_counts_reduce', []) :
-            get_counts($value);
+        if (is_string($value)) {
+            $r[$key] = get_counts($value);
+            continue;
+        }
+        else if (is_array($value)) {
+            $r[$key] = array_reduce($value, '\\BitFire\\get_counts_reduce', []);
+            continue;
+        } 
+        // probably an int, so we wont have any counts...
+        $r[$key] = [];
     }
     return $r;
 }
@@ -227,12 +234,14 @@ function process_request2(array $get, array $post, array $server, array $cookies
     if ($server["REQUEST_METHOD"] === "POST") {
         $request->post_raw = file_get_contents("php://input");
         // handle json encoded post data
-        if ($server["CONTENT_TYPE"] === "application/json") {
+        if ($server["CONTENT_TYPE"]??"" === "application/json" && !empty($request->post_raw)) {
             $x = un_json($request->post_raw);
-            $p = map_mapvalue($x, $fn);
-            $request->post = array_merge($request->post, un_json($request->post_raw));
-        } else {
-            $request->post = map_mapvalue($post, $fn);
+            if (is_array($x)) {
+                trace("CT:AJOK");
+                $request->post = array_merge($request->post, $x);
+            } else {
+                trace("CT:AJERR");
+            }
         }
         $request->post_freq = freq_map($request->post);
     } else {
@@ -263,7 +272,7 @@ function flatten($data) : string {
 
 function each_input_param($in, bool $block_profanity) : ?string {
     // we don't inspect numeric values because they would pass all tests
-    if (is_numeric($in)) { return NULL; }
+    if (is_numeric($in)) { return $in; }
 
     // flatten arrays
     if (is_array($in)) { $in = flatten($in); }
@@ -453,7 +462,7 @@ function make_log_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_dat
         "match" => $block->value,
         "ver" => BITFIRE_VER,
         "pass" => $block->code === 0 ? true : false,
-        "refid" => \BitFire\BitFire::get_instance()->uid
+        "refid" => $block->uuid
     );
     if (isset($_SERVER['HTTP_REFERER'])) {
         $data["referer"] = $_SERVER['HTTP_REFERER'];

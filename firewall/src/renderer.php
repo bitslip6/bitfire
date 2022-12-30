@@ -4,149 +4,332 @@
  * Author: BitFire (BitSlip6 company)
  * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
  * Please report issues to: https://github.com/bitslip6/bitfire/issues
- * 
+ *
  * HTML/JS Recursive Renderer and minifier.
  * TODO: Refactor to use FileData and Effect abstractions.
  */
+namespace ThreadFin\view;
 
-namespace BitFire;
+use const ThreadFin\DAY;
 
-use function ThreadFin\ends_with;
-use function ThreadFin\file_recurse;
-use function ThreadFin\trace;
+// polly-fill for gettext
+if (!function_exists("_")) { function _(string $in) : string { return $in; } }
+
+/**
+ * take a unix timestamp and return localized string for number of days ago
+ * @param string $epoch 
+ * @return string 
+ */
+function days_format(string $epoch) : string {
+	$t = intval($epoch);
+	if ($t > 1) {
+		$diff = time() - $t;
+		$r = floor($diff / DAY);
+		if ($r == 0) { return _("today"); }
+		if ($r > 0 && $r < 1024) { return  $r . _(" days ago"); }
+	}
+	return _("never");
+}
+
+
+/**
+ * @param string $text 
+ * @return string returns the unmodified $text
+ */
+function identity(string $text) : string {
+	return $text;
+}
+
+/**
+ * escape user input for display on rendered page
+ * @param string $text 
+ * @param null|callable $next_fn 
+ * @return string 
+ */
+function escape(string $text) : string {
+	return htmlspecialchars($text, ENT_QUOTES, 'UTF-8', false);
+}
+
+
+
+namespace ThreadFin;
+
+use DOMDocument;
+use DOMNode;
+use DOMXPath;
+use ThreadFin\Effect;
+use ThreadFin\FileData;
+use ThreadFin\FileMod;
+
+use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\debug;
+use function ThreadFin\icontains;
+use BitFire\Config as CFG;
 
-const MAX_VAR_REPLACEMENT = 100;
-const MISSING_VALUE = '';
-const SRC_ROOT = "src";
-const DOMINIFY = false;
+const NOT_MINIFY_EXTENSIONS = ["svg", "min"];
+const MODIFIER_MAPPING = [
+	"-" => "\ThreadFin\\view\\escape",
+	"+" => "intval",
+	"%d" => "\ThreadFin\\view\\days_format",
+	"%u" => "strtoupper",
+	"%U" => "ucfirst"
+];
+// CHAR FORMAT matches single character modifiers
+const CHAR_FORMAT = "[+-]";
+const MAX_VAR_REPLACEMENT = 1000;
+const DO_MINIFY = true;
 
+
+/**
+ * extract innerHTML from a node
+ * @param DOMNode $element 
+ * @return string 
+ */
+function inner_html(DOMNode $element) : string {
+    $innerHTML = "";
+    $children  = $element->childNodes;
+
+    foreach ($children as $child) {
+        $innerHTML .= $element->ownerDocument->saveHTML($child);
+    }
+
+    return $innerHTML;
+}
+
+
+/**
+ * pure function to minify HTML.
+ * This will remove all newlines excess whitespace and comments.
+ * @param string $in 
+ * @return string 
+ */
 function minify_str(string $in) : string {
-	$t1 = preg_replace("/[\s\n]+/m", " ", $in);
-	$t2 = preg_replace("/>\s+</", "><", $t1);
-	$t3 = preg_replace("/<!--.*?-->/", "", $t2);
+	//$t1 = preg_replace("/[\s\n]+/m", " ", $in);
+	//$t2 = preg_replace("/>\s+</", "><", $t1);
+	//$t3 = preg_replace("/<!--.*?-->/", "", $t2);
+	$t3 = $in;
+	if (empty($t3)) { return ""; }
+
+	libxml_use_internal_errors(false);
+
+	// load XML
+	$doc = new DOMDocument();
+	if (CFG::enabled("debug_file")) {
+		$doc->preserveWhiteSpace = false;
+		$doc->formatOutput = true;
+	}
+	$doc->loadHTML($t3, LIBXML_NOWARNING | LIBXML_NOERROR | LIBXML_NOCDATA | LIBXML_NONET);
+	foreach (libxml_get_errors() as $error) {
+		debug("libxml: %s:%d [%s]", $error->file, $error->line, $error->message);
+	}
+	
+	// find all content to translate
+	libxml_clear_errors();
+	$xpath = new DOMXpath($doc);
+	$elms = $xpath->query("//*[contains(@class,'tdc')]");
+	debug("translating " . $elms->count() . " tags\n");
+	for ($i = 0; $i < $elms->count(); $i++) {
+		$in = trim(inner_html($elms->item($i)));
+		$translated = _($in);
+		$t3 = str_replace($in, $translated, $t3);
+	}
+
 	return $t3;
 }
 
-//TODO: return the minified version here!
-function minify(string $filename) : string {
-	if (ends_with($filename, ".min")) { $filename = str_replace(".min", "", $filename); } // don't double minify svg...
-	$min = "";
-	$minfile = $filename;
+/**
+ * add a new string modifier to the list of available view modifiers
+ * if $modifier_fn is NULL returns the modifier already mapped to $modifier_name
+ * @param null|string $modifier_name 
+ * @param null|callable $modifier_fn 
+ * @return array 
+ */
+function view_modifier(string $modifier_name, ?callable $modifier_fn = null) : ?Callable {
+	static $mapping = MODIFIER_MAPPING;
 
-	if (!ends_with($filename, "svg") && !ends_with($filename, "min") && DOMINIFY) { 
-		debug("x-minify [%s]", $filename);
-		$minfile = "{$filename}.min";
-		
-		if (!file_exists($minfile) || filemtime($filename) > filemtime($minfile)) {
-			$in = file_get_contents($filename);
-			$min = minify_str($in);
-			file_put_contents($minfile, $min, LOCK_EX);
+	//die("333 mod ($modifier_name) fn ($modifier_fn)\n");
+
+	if ($modifier_fn === NULL) {
+		$modifiers = explode("|", $modifier_name);
+		$idx = 0;
+		$fn = $mapping[$modifiers[0]]??NULL;
+		while(isset($modifiers[++$idx])) {
+			//echo "CHAIN $fn = {$modifiers[$idx]}\n";
+			$fn = chain($fn, $mapping[$modifiers[$idx]]??NULL);
 		}
+		return $fn;
 	}
-	if (empty($min)) {
-		$min = file_get_contents($minfile);
-	}
-
-	return $min;
+	$mapping[$modifier_name] = $modifier_fn;
+	return NULL;
 }
 
-// locate sub views...
-function make_finder(string $search_file, bool $ext_pos) : callable {
-	if ($ext_pos !== false) {
-		return function ($x) use ($search_file) : ?string {
-			if (is_file($x) && ends_with($x, $search_file)) { return $x; }
-			return NULL;
-		};
-	}
-
-	return function ($x) use ($search_file): ?string {
-		if (!is_file($x)) { return NULL;}
-		$ext_pos = strrpos($x, ".");
-
-		if ($ext_pos > 1) {
-			$x2 = substr($x, 0, $ext_pos);
-			if (ends_with($x2, $search_file)) {
-				return $x;
-			}
-		}
-		else if (ends_with($x, $search_file)) { return $x; }
-		return NULL;
-	};
-};
-
-// map input name to source file
-function find_source(string $src, string $src_root, bool $prefer_amp) : ?string {
-	// does the 
-	$file = file_get_contents("file_cache.json");
-
-	$cache = json_decode($file, true);
-	if (!isset($cache[$src])) {
-		$finder = make_finder($src, (bool)strrpos($src, "."));
-		$found = file_recurse($src_root, $finder, NULL, array(), true);
-		if (!isset($found[0])) { die ("unable to find [$src] in [$src_root]\n"); }
-		$tmp = $found[0]??'NANA';
-		$cache[$src] = $tmp;
-		file_put_contents("file_cache.json", json_encode($cache));
-	}
-	
-	$file = $cache[$src];
-	$parts = explode(".", $file);
-	$ampfile = $parts[0].".amp";
-
-	$file = ($prefer_amp && file_exists($ampfile)) ? $ampfile : $cache[$src];
-	minify($file);
-	return "{$file}.min";
-}
-
-function render_static(string $src, array $replacements = array(), $src_root = SRC_ROOT) : string {
-	$src2 = find_source($src, $src_root, $replacements['isamp']);
-	if (empty($src2)) { die ("src [$src] -> [$src2] [$src_root]"); }
-	if (is_dir($src2)) { die ("is dir ($src2)\n"); }
-
-	$src2 = str_replace("EN", $replacements['lang'], $src2);
-	return process_line(minify($src2), $replacements);
-}
 
 /**
- * render the file source with any replacements, src_root unused
+ * pure function to minify HTML files.
+ * 
+ * @param string $filename 
+ * @return Effect 
+ */
+function minify(string $filename) : Effect {
+	$effect  = Effect::new();
+
+	$extension = pathinfo($filename, PATHINFO_EXTENSION);
+	// just serve minified files directly
+	if ($extension === "min") {
+		$effect->out(
+			FileData::new($filename)->raw()
+		);
+	}
+	// if the file is minify-able
+	else if (DO_MINIFY && ! icontains($extension, NOT_MINIFY_EXTENSIONS)) {
+		$min_filename = "{$filename}.min";
+		$min_file = FileData::new($min_filename);
+		// if we have a minified version on disk, serve that
+
+		if ($min_file->exists && filemtime($min_filename) > filemtime($filename)) {
+			$effect->out($min_file->raw());
+		}
+		// read the raw file, minify it and return an effect to write the
+		// minified file to disk
+		else {
+			//echo "<h1>$filename</h1>\n";
+			$source_content = FileData::new($filename)->raw();
+			$min_content = minify_str($source_content);
+			$effect->out($min_content);
+			$effect->file(new FileMod($min_filename, $min_content, \BitFire\FILE_RW));
+		}
+	}
+
+	return $effect;
+}
+
+
+/**
+ * pure function to render the file source with any replacements, src_root unused
  */
 function render_file(string $src2, array $replacements = array()) : string {
-	return process_line(minify($src2), $replacements);
+	$min_effect = minify($src2);
+	$content = $min_effect->read_out(true);
+	$min_effect->run();
+	$rendered = process_line($content, $replacements);
+	return $rendered;
 }
 
+
+
 /**
- * return array of key/value pairs from passed string a=b x=y 
+ * the view variable replacement code.  
+ * supports string, array and object access with the dot operator
+ * @param array $x 
+ * @param array $replacements 
+ * @return string 
  */
-function parse_vars(string $in) : array {
-	$vars = explode(" ", $in);
-	return array_reduce($vars, function ($carry, $x) {
-		// split key/value on euqals
-		$pos = strpos($x, "=");
-		$key = substr($x, 0, $pos);
-		$value = substr($x, $pos+1);
-		// trim any quotes on value
-		$carry[$key] = trim($value, '"\'');
-		return $carry;
-	}, []);
+function content_replacement(array $x, array $replacements) {
+	$mod_fn = NULL;
+	if (!empty($x[1])) {
+		$mod_fn = view_modifier($x[1]);
+	}
+	$primary = $x[2];
+	$secondary = $x[3]??"";
+
+	// replace content.  apply any view modifiers
+	if (isset($replacements[$primary])) {
+		$return = $replacements[$primary];
+		if (!empty($secondary)) {
+			if (is_object($return)) {
+				if (isset($return->$secondary)) {
+					$value = $return->$secondary;
+				}
+			}
+			else if (is_array($return)) {
+				if (isset($return[$secondary])) {
+					$value = $return[$secondary];
+				}
+			}
+			else {
+				$value = (string)$return;	
+			}
+		}
+		else {
+			$value = (string)$return;	
+		}
+		if (!isset($value)) {
+			debug("VIEW VAR MISSING $primary.$secondary ($value)");
+		}
+		return ($mod_fn == NULL) ? $value : $mod_fn($value);
+	}
+
+	debug("unset view variable [$primary]");
+	return "undefined [{$primary}.{$secondary}]";
+}
+
+function template_replacement_min(string $template_markup, string $template_var, string $var_name, array $replacements) : string {
+	$content = "";
+	foreach($replacements[$var_name] as $item) {
+		$replacements[$template_var] = $item;
+		$content .= process_line($template_markup, $replacements);
+	}
+	return $content;
 }
 
 /**
- * replace all variables in line with data from repleacements, sub render any included content
+ * 
+ */
+function template_replacement(array $x, array $replacements, array $templates) {
+	$template_name = $x[1];
+	$var_name = $x[2];
+	$content = "";
+	$template_arr = $templates[$template_name]??[];
+	$template_var = $template_arr[0]??$var_name;
+	$template_markup = $template_arr[1]??"";
+	if (isset($replacements[$var_name]) && count($replacements[$var_name]) > 0) {
+		foreach($replacements[$var_name] as $item) {
+			$replacements[$template_var] = $item;
+			$content .= process_line($template_markup, $replacements);
+		}
+	}
+	return $content;
+}
+
+
+/**
+ * replace all variables in a line with data from replacements, sub render any included content
+ * and templates
  */
 function process_line(string $line, array $replacements) : string {
-	$line = preg_replace_callback("/{{(\w+)}}/", function($x) use ($replacements) { return $replacements[$x[1]]??MISSING_VALUE; }, $line, MAX_VAR_REPLACEMENT);
+	// internal templates
+	$templates = [];
+
+	//extract inline templates
+	$line = preg_replace_callback(
+		"/{{\s*template\s*:\s*(\w+)[\s\:]+[\'\"]?(\w+)[\'\"]?\s*}}\s*(.*?){{\s*end[\s\:]+template\s*}}/mis",
+		function($x) use (&$templates) {
+			$templates[$x[1]] = [$x[2], $x[3]];
+			return "";
+	}, $line);
+
+	// replace variable substitution
+	$line = preg_replace_callback("/{{\s*(\%[a-zA-Z]|".CHAR_FORMAT.")?\s*([_\w-]+)\.?([_\w-]*)\s*}}/", 
+	BINDR("ThreadFin\\content_replacement", $replacements), $line, MAX_VAR_REPLACEMENT);
+
+	// replace inline templates
+	$line = preg_replace_callback("/{{\s*render[\s:]+(\w+)\s+[\'\"]?(\w+)[\'\"]?\s*}}/",
+	BINDR("ThreadFin\\template_replacement", $replacements, $templates), $line, MAX_VAR_REPLACEMENT);
+
+	// include sub templates, params will be injected into view variables
+	// {{> path/to/view param1="value" param2="value" }}
 	$line = preg_replace_callback("/{{>\s*([^\s}]+)\s*([^}]*)}}/", 
 		function ($x) use ($replacements) {
-			preg_match_all("/(\w+)\s*=\s*\"([^\"]*)/", $x[2], $matches);
+			preg_match_all("/([_\w]+)\s*=\s*\"([^\"]*)/", $x[2], $matches);
 			$params = array();
 			for ($i=0,$m=count($matches[1]);$i<$m;$i++) {
 				$params[$matches[1][$i]] = $matches[2][$i];
 			}
 
 			$replacements = array_merge($replacements, $params);
-			return render_static($x[1], $replacements);
+			return render_file(VIEW_ROOT . DS . $x[1], $replacements);
 		 }, $line, MAX_VAR_REPLACEMENT);
 
 	return $line;
 }
+

@@ -1,5 +1,6 @@
 <?php
 /**
+ * TODO: remove bitfire specific code, refactor into bitfire utils 
  * BitFire PHP based Firewall.
  * Author: BitFire (BitSlip6 company)
  * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
@@ -20,6 +21,7 @@ use const BitFire\FILE_RW;
 use const BitFire\FILE_W;
 use const BitFire\STATUS_OK;
 use const BitFire\WAF_ROOT;
+use const BitFire\WAF_SRC;
 
 use \BitFire\Config as CFG;
 use \BitFire\Block as Block;
@@ -43,7 +45,7 @@ const ENCODE_SPECIAL=2;
 const ENCODE_HTML=3;
 const ENCODE_BASE64=4;
 
-
+require_once WAF_SRC . "const.php";
 
 /**
  * Complete filesystem abstraction
@@ -57,6 +59,7 @@ class FileData {
     /** @var array $lines - file content array of lines */
     public $lines = array();
     public $debug = false;
+    public $size = 0;
     public $content = "";
     /** @var bool $exists - true if file or mocked content exists */
     public $exists = false;
@@ -99,10 +102,14 @@ class FileData {
         $this->filename = $filename;
         if (isset(FileData::$fs_data[$filename])) {
             $this->exists = $this->writeable = $this->readable = true;
+            $this->size = strlen(FileData::$fs_data[$filename]);
         } else {
             $this->exists = file_exists($filename);
             $this->writeable = is_writable($filename);
             $this->readable = is_readable($filename);
+            if ($this->exists) {
+                $this->size = filesize($filename);
+            }
         }
     }
 
@@ -135,16 +142,32 @@ class FileData {
             $disabled = false;
             if ($this->exists) {
                 $size = filesize($this->filename);
-                if (!is_readable($this->filename)) {
-                    $s = @stat($this->filename);
-                    $disabled = $s['mode']??FILE_W;
-                    @chmod($this->filename, FILE_RW);
-                    usleep(1000);
+                if ($size > 1024*1024*10) {
+                    $this->errors[] = "File too large to read: $this->filename";
+                    return $this;
                 }
 
+                $s = @stat($this->filename);
+                $ctr = 0;
                 // split raw reads by line, and read in files line by line if no content
                 $mode = ($with_newline) ? 0 : FILE_IGNORE_NEW_LINES;
-                $this->lines = file($this->filename, $mode);
+                $done = false;
+
+                while (!is_readable($this->filename) && $ctr++ < 10) {
+                    usleep(2000);
+                    $disabled = $s['mode']??FILE_W;
+                    @chmod($this->filename, FILE_RW);
+                }
+
+                $ctr = 0;
+                while (!$done && $ctr++ < 10) {
+                    $this->lines = @file($this->filename, $mode);
+                    if ($this->lines === false) {
+                        usleep(2000);
+                        @chmod($this->filename, FILE_RW);
+                    } else { $done = true; }
+                }
+
                 // count lines and handle any error cases...
                 if ($this->lines === false) {
                     debug("unable to read %s", $this->filename);
@@ -160,12 +183,14 @@ class FileData {
                 }
 
                 // make sure lines is a valid value
-                if ($size > 0 && $this->num_lines < 1) { error("reading %s, no lines", $this->filename); $this->lines = array(); }
+                if ($size > 0 && $this->num_lines < 1) { debug("empty file %s", $this->filename); $this->lines = array(); }
                 if ($disabled !== false) {
-                    @chmod($this->filename, $disabled);
+                    if (!chmod($this->filename, $disabled)) {
+                        debug("unable to set permission on %s to [%d]", $this->filename, $disabled);
+                    }
                 }
             } else {
-                error("FS(r) [%s] does not exist", $this->filename);
+                debug("file does not exist: %s", $this->filename);
                 $this->errors[] = "unable to read, file does not exist";
             }
         }
@@ -268,7 +293,7 @@ class FileData {
             $this->lines = array_map($fn, $this->lines);
             $this->num_lines = count($this->lines);
         } else {
-            error("unable to map empty file");
+            debug("unable to map empty file");
         }
         return $this;
     }
@@ -307,8 +332,8 @@ class FileData {
 
 // developer debug functions
 function PANIC_IFNOT($condition, $msg = "") { if (!$condition) { dbg($msg, "PANIC"); } }
-function dbg($x, $msg="") {$m=htmlspecialchars($msg); $z=(php_sapi_name() == "cli") ? print_r($x, true) : htmlspecialchars(print_r($x, true)); echo "<pre>\n[$m]\n$z" . join("\n", debug(null)) . "\n" . debug(trace(null)); ;die("\nFIN"); }
-function nop() { return null; }
+function dbg($x, $msg="") {$m=htmlspecialchars($msg); $z=(php_sapi_name() == "cli") ? print_r($x, true) : htmlspecialchars(print_r($x, true)); echo "<pre>\n[$m]\n($z)\n" . join("\n", debug(null)) . "\n" . debug(trace(null)); debug_print_backtrace(); die("\nFIN"); }
+function nop(...$args) { if (isset($args[0])) { return $args[0]; } return null; }
 
 function do_for_each(array $data, callable $fn) { $r = array(); foreach ($data as $elm) { $r[] = $fn($elm); } return $r; }
 function do_for_all_key_names(array $data, array $keynames, callable $fn) { foreach ($keynames as $item) { $fn($data[$item], $item); } }
@@ -321,9 +346,9 @@ function find_regex_reduced($value) : callable { return function($initial, $argu
 function starts_with(string $haystack, string $needle) { return (substr($haystack, 0, strlen($needle)) === $needle); } 
 function ends_with(string $haystack, string $needle) { return strrpos($haystack, $needle) === \strlen($haystack) - \strlen($needle); } 
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
-function un_json(?string $data="") : array {
-    $d = trim($data, "\n\r,"); $j = json_decode($d, true, 20); $r = []; if (is_array($j)) { $r = $j; }
-    else { error("json decode error"); } return $r; }
+function un_json(?string $data="") : ?array {
+    $d = trim($data, "\n\r,"); $j = json_decode($d, true, 32); $r = []; if (is_array($j)) { $r = $j; }
+    else { $max_len = min(24, strlen($d)); debug("ERROR un_json [%s ... %s]", substr($d, 0, $max_len), substr($d, -$max_len)); return null; } return $r; }
 function en_json($data, $pretty = false) : string { $mode = $pretty ? JSON_PRETTY_PRINT : 0; $j = json_encode($data, $mode); return ($j == false) ? "" : $j; }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
@@ -339,7 +364,7 @@ function not(bool $input) { return !$input; }
 function last(array $in) { $last = max(count($in)-1,0); return count($in) == 0 ? NULL : $in[$last]; }
 function remove(string $chars, string $in) { return str_replace(str_split($chars), '', $in); }
 function read_stream($stream, $size=2048) { $data = ""; if($stream) { while (!feof($stream)) { $data .= fread($stream , $size); } } return $data; }
-function find_fn(string $fn) : callable { if (function_exists("BitFirePlugin\\$fn")) { return "BitFirePlugin\\$fn"; } return "BitFire\\$fn"; }
+function find_fn(string $fn) : callable { if (function_exists("BitFirePlugin\\$fn")) { return "BitFirePlugin\\$fn"; } debug("no plugin function $fn"); PANIC_IFNOT(function_exists("BitFire\\$fn"), "unable to find [$fn]"); return "BitFire\\$fn"; }
 function find_const_str(string $const, string $default="") : string { 
     if (defined("BitFirePlugin\\$const")) { return constant("BitFirePlugin\\$const"); }
     if (defined($const)) { return constant($const); }
@@ -402,7 +427,7 @@ function array_filter_modify(array $list, callable $filter_fn, callable $modify_
  */
 function get_sub_dirs(string $dirname) : array {
     $dirs = array();
-    if (!file_exists($dirname)) { debug("unable to find subdirs [$dirname]"); }
+    if (!file_exists($dirname)) { debug("unable to find sub-dirs [$dirname]"); return $dirs; }
 
     if ($dh = \opendir($dirname)) {
         while(($file = \readdir($dh)) !== false) {
@@ -521,8 +546,8 @@ function memoize(callable $fn, string $key, int $ttl) : callable {
 /**
  * functional helper for partial application
  * lock in left parameter(s)
- * $logit = partial("log_to", "/tmp/log.txt"); // function log_to($file, $content)
- * assert_eq($logit('the log line'), 12, "partial app log to /tmp/log.txt failed");
+ * $log_it = partial("log_to", "/tmp/log.txt"); // function log_to($file, $content)
+ * assert_eq($log_it('the log line'), 12, "partial app log to /tmp/log.txt failed");
  */
 function partial(callable $fn, ...$args) : callable {
     return function(...$x) use ($fn, $args) { return $fn(...array_merge($args, $x)); };
@@ -538,6 +563,16 @@ function partial_right(callable $fn, ...$args) : callable {
     return function(...$x) use ($fn, $args) { return $fn(...array_merge($x, $args)); };
 }
 
+function chain(callable $fn1, ?callable $fn2 = NULL) : callable {
+    return function (...$x) use ($fn1, $fn2) {
+        $result = $fn1(...$x);
+        if ($fn2 != NULL) {
+            $result = $fn2($result);
+        }
+        return $result;
+    };
+}
+
 /**
  * Effect runner helper
  */
@@ -551,13 +586,13 @@ class FileMod {
     public $filename;
     public $content;
     public $write_mode = FILE_RW;
-    public $modtime;
+    public $mod_time;
     public $append;
-    public function __construct(string $filename, string $content, int $write_mode = 0, int $modtime = 0, bool $append = false) {
+    public function __construct(string $filename, string $content, int $write_mode = 0, int $mod_time = 0, bool $append = false) {
         $this->filename = $filename;
         $this->content = $content;
         $this->write_mode = $write_mode;
-        $this->modtime = $modtime;
+        $this->mod_time = $mod_time;
         $this->append = $append;
     }
 }
@@ -608,7 +643,7 @@ class Effect {
     // remove any response headers
     public function clear_headers() : Effect { $this->headers = array(); return $this; }
     // response cookie effect
-    public function cookie(string $value, string $id = "") : Effect { debug("set cookie(%s): [%s]", $id, $value); $this->cookie = $value; return $this; }
+    public function cookie(string $value, string $id = "") : Effect { $this->cookie = $value; return $this; }
     // response code effect
     public function response_code(int $code) : Effect { $this->response = $code; return $this; }
     // update cache entry effect
@@ -676,7 +711,7 @@ class Effect {
     // return true if the effect will exit 
     public function read_exit() : bool { return $this->exit; }
     // return the effect content
-    public function read_out() : string { return $this->out; }
+    public function read_out(bool $clear = false) : string { $t = $this->out; if ($clear) { $this->out = ""; } return $t; }
     // return the effect headers
     public function read_headers() : array { return $this->headers; }
     // return the effect cookie (only 1 cookie supported)
@@ -706,8 +741,8 @@ class Effect {
         // cookies
         if (CFG::enabled(CONFIG_COOKIES) && !empty($this->cookie)) {
             if (!headers_sent($file, $line)) {
+                debug("runner send cookie [%s]", $this->cookie);
                 cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), $this->cookie), DAY); 
-                debug("send cookie [%s]", $this->cookie);
                 // reassign the cookie to the new value
                 \BitFire\BitFire::get_instance()->cookie = MaybeA::of(un_json($this->cookie));
             } else {
@@ -763,7 +798,7 @@ class Effect {
                 debug("file mod write error [%s] (%d/%d bytes)", basename($file->filename), $written, $len);
                 $this->errors[] = "failed to write file: $file->filename " . strlen($file->content) . " bytes. " . en_json($e);
             }
-            if ($file->modtime > 0) { if (!touch($file->filename, $file->modtime)) { $this->error[] = "unable to set {$file->filename} modtime to: " . $file->modtime; } }
+            if ($file->mod_time > 0) { if (!touch($file->filename, $file->mod_time)) { $this->error[] = "unable to set {$file->filename} mod_time to: " . $file->mod_time; } }
             if ($file->write_mode > 0) { if (!chmod($file->filename, $file->write_mode)) { $this->error[] = "unable to chmod {$file->filename} perm: " . $file->write_mode; } }
             else if ($perm != -1)  { if (!chmod($file->filename, $perm)) { $this->error[] = "unable to restore chmod: {$file->filename} perm: {$perm}"; } }
         }
@@ -893,7 +928,7 @@ class MaybeA implements MaybeI {
     public function do_if_not(callable $fn, ...$args) : MaybeI { if (empty($this->_x)) { $this->assign($fn(...$args)); } return $this; }
     public function empty() : bool { return empty($this->_x); } // false = true
     public function errors() : array { return $this->_errors; }
-    public function value(string $type = null) : mixed { 
+    public function value(string $type = null) { 
         $result = $this->_x;
 
         switch($type) {
@@ -931,16 +966,16 @@ class MaybeA implements MaybeI {
     public function isa(string $type) : bool { return $this->_x instanceof $type; }
     public function __toString() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
     public function __isset($object) : bool { debug("isset"); if ($object instanceof MaybeA) { return (bool)$object->empty(); } return false; }
-    public function __invoke(string $type = null) : mixed { return $this->value($type); }
+    public function __invoke(string $type = null) { return $this->value($type); }
 }
 class Maybe extends MaybeA {
-    public function __invoke(string $type = null) : mixed { return $this->value($type); }
+    public function __invoke(string $type = null) { return $this->value($type); }
 }
 class MaybeBlock extends MaybeA {
-    public function __invoke(string $type = null) : mixed { return $this->_x; }
+    public function __invoke(string $type = null) { return $this->_x; }
 }
 class MaybeStr extends MaybeA {
-    public function __invoke(string $type = null) : mixed { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
+    public function __invoke(string $type = null) { if (empty($this->_x)) { return ""; } return is_array($this->_x) ? $this->_x : (string)$this->_x; }
     public function compare(string $test) : bool { return (!empty($this->_x)) ? $this->_x == $test : false; }
 }
 Maybe::$FALSE = MaybeBlock::of(NULL);
@@ -1078,6 +1113,8 @@ function map_whilenot(array $map, callable $fn, $input) {
  */
 function map_mapvalue(?array $map, callable $fn) : array {
     $result = array();
+    if (empty($map)) { return $result; }
+
     $filtered = CFG::arr("filtered_logging");
     foreach($map as $key => $value) {
         if (! in_array($key, $filtered, true)) {
@@ -1128,7 +1165,7 @@ function bit_curl(string $method, string $url, $data, array $optional_headers = 
     
     $server_output = \curl_exec($ch);
     if (!empty($server_output)) {
-        debug("curl returned: [%d] bytes", strlen($server_output));
+        debug("curl %s = [%d] bytes", $url, strlen($server_output));
     }    
     curl_close($ch);
     
@@ -1259,7 +1296,8 @@ function http(string $method, string $path, $data, ?array $optional_headers = []
 
     $ctx = stream_context_create($params);
     $response = @file_get_contents($path, false, $ctx);
-    if ($response === false) {
+    // log failed requests, but not failed requests to wordpress source code
+    if ($response === false && !contains($path, "wordpress.org")) {
         return debugF("http_resp [$path] fail");
     }
 
@@ -1373,33 +1411,53 @@ function debug(?string $fmt, ...$args) : ?array {
     static $idx = 0;
     static $len = 0;
     static $log = [];
-    if (empty($fmt)) { return $log; } // retrieve log lines
+    static $early_exit = -1; 
 
-    foreach ($args as &$arg) { if (is_array($arg)) { $arg = "ARRAY!!!!" . json_encode($arg); } }
+    // first call, figure out if we are exiting early. this executes 1 time
+    if ($early_exit === -1) {
+        $early_exit = (CFG::disabled("debug_file") && CFG::disabled("debug_header")) ? 1 : 0;
+    }
+    // if we are not debugging, return early
+    if ($early_exit === 1 || empty($fmt)) {
+        return (empty($fmt)) ? $log : null;
+    }
 
-    // format line
-    $line = str_replace(array("\r","\n",":"), array(" "," ",";"), sprintf($fmt, ...$args));
-    $log[] = $line;
+    // format any objects or arrays for debug
+    foreach ($args as &$arg) { 
+        if (is_array($arg) || is_object($arg)) { $arg = json_encode($arg, JSON_PRETTY_PRINT); }
+    }
+
+    $line = "";
     // write to file
     if (CFG::enabled("debug_file")) {
+        $line = sprintf($fmt, ...$args);
         $f = CFG::file("debug_file");
         if ($f) {
+            if (starts_with($fmt, "ERROR")) { 
+                $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
+                $b1 = isset($bt[2]) ? $bt[2]['function'].':'.$bt[2]['line'] : '';
+                $b2 = isset($bt[3]) ? $bt[3]['function'].':'.$bt[3]['line'] : '';
+                $line = "$line\n$b1\n$b2";
+            }
             // if the file is >1MB overwrite it, else append
-            $mode = (file_exists($f) && filesize($f) > 1048576) ? FILE_W : FILE_APPEND;
+            $mode = (file_exists($f) && filesize($f) > 1024*1024*4) ? FILE_W : FILE_APPEND;
             file_put_contents($f, "$line\n", $mode);
         }
     }
     // write debug to headers for quick debug
     if (CFG::enabled("debug_header")) {
+        $line = str_replace(array("\r","\n",":"), array(" "," ",";"), sprintf($fmt, ...$args));
         if (!headers_sent() && $idx < 24) {
-            $s = sprintf("x-bitfire-%02d: %s", $idx, substr($line, 0, 2048));
+            $s = sprintf("x-bf-%02d: %s", $idx, substr($line, 0, 1024));
             $len += strlen($s);
-            if ($len < 8192) {
+            if ($len < 4000) {
                 header($s);
             }
             $idx++;
         }
     }
+
+    if (!empty($line)) { $log[] = $line; }
     return null;
 }
 
@@ -1474,7 +1532,7 @@ function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
 function load_ini_fn(string $src) : callable {
     // returns an array, first entry is the ini data, second is the mtime
     return function() use ($src) : array {
-        @chmod($src, FILE_R);
+        @chmod($src, FILE_RW);
         debug("inidisk");
         $result = parse_ini_file($src, false, INI_SCANNER_TYPED);
         @chmod($src, FILE_W);
@@ -1511,6 +1569,7 @@ function parse_ini2(string $src) : array {
     // try and load from cache, if we can't load from cache. make 
     // read the ini then protect it
     else {
+        // BOOT STRAP THE CACHE HERE BEFORE WE HAVE CACHE CONFIG
         $ini_type = "nop";
         if (file_exists(WAF_ROOT . "ini_info.php")) {
             include WAF_ROOT . "ini_info.php";
@@ -1685,6 +1744,7 @@ function decrypt_tracking_cookie(?string $cookie_data, string $encrypt_key, stri
     return $r;
 }
 
+
 // ugly but compatible with all versions of php
 function call_to_source(string $fn, array $x, string $cost = "wt") : array {
     $file = '<internal>'; $line = -1;
@@ -1713,7 +1773,7 @@ function call_to_source(string $fn, array $x, string $cost = "wt") : array {
  * @param null|array $data 
  * @return void 
  */
-function output_profile(?array $data) {
+function output_profile(?array $data, string $out_file = "/tmp/callgrind.out") : void {
     $pre  = "version: 1\ncreator: https://bitfire.co\ncmd: BitFire\npart: 1\npositions: line\nevents: Time\nsummary: ";
 
     $fn_list = array();
@@ -1740,6 +1800,28 @@ function output_profile(?array $data) {
         $out .= "\n";
     });
 
-    file_put_contents("/tmp/callgrind.out", $pre . $sum . "\n\n". $out);
+    file_put_contents($out_file, $pre . $sum . "\n\n". $out);
     return;
+}
+
+/**
+ * @depends CFG:cms_root, cms_content_dir, cms_content_url, _SERVER: DOCUMENT_ROOT
+ * @return string URL path to the public folder
+ */
+function get_public(?string $path = null) : string {
+    // try and find the path to the public folder ourself (for standalone installs)
+    $public = realpath(__DIR__ . "/../public/$path").DS;
+    $public = str_replace($_SERVER['DOCUMENT_ROOT']??"", "", $public);
+    // if we have a cms configuration, use that
+    if (CFG::enabled("cms_root")) {
+        $path = ($path === null) ? "" : $path;
+        if (file_exists(CFG::str("cms_content_dir") . "/plugins/bitfire/public/$path")) {
+            $public = CFG::str("cms_content_url")."/plugins/bitfire/public/$path";
+        }
+    }
+    return $public;
+}
+
+function _b(string $text, $before = "") : string {
+    return (string)$before . _($text);
 }

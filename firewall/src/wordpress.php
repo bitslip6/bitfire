@@ -6,25 +6,23 @@ use ThreadFin\MaybeA;
 use ThreadFinDB\Credentials;
 use ThreadFinDB\DB;
 
+use function ThreadFin\dbg;
+use function ThreadFin\trace;
+use BitFire\Config as CFG;
+
 use const BitFire\DS;
+use const BitFire\WAF_SRC;
 
-use function TF\PANIC_IFNOT;
-use function \TF\partial_right AS CAPR;
-require_once WAF_DIR . "src/db.php";
+require_once WAF_SRC . "db.php";
 
 
-function list_of_root_wordpress_files() : array {
- return [
-"index.php", "wp-activate.php", "wp-blog-header.php", "wp-comments-post.php", "wp-config.php", "wp-config-sample.php", "wp-cron.php", "wp-links-opml.php", "wp-load.php", "wp-login.php", "wp-mail.php", "wp-settings.php", "wp-signup.php", "wp-trackback.php", "xmlrpc.php"
-];
-}
 
 class Parts {
     private $_x;
     private $_names = array();
-    public static function of(string $seperator, string $data) {
+    public static function of(string $separator, string $data) {
         $p = new Parts();
-        $p->_x = explode($seperator, $data);
+        $p->_x = explode($separator, $data);
         return $p;
     } 
 
@@ -56,23 +54,23 @@ function concat_fn(string $bind_char) : callable {
 
 
 // take a single line and return the define value, suitable for array_reduce function
-function define_to_array(array $input, $define_line) : array {
+function define_to_array(array $input, string $define_line) : array {
     
     if (preg_match("/define\s*\(\s*['\"]([a-zA-Z_]+)['\"]\s*,\s*['\"]([^'\"]+)['\"]/", $define_line, $matches)) {
         $input[$matches[1]] = $matches[2];
     }
-    if (preg_match("/table_prefix\s*=\s*['\"]([a-z0-9A-Z_]+)/", $define_line, $matches)) {
-        $input["prefix"] = $matches[1];
+    if (preg_match("/\\$([\w_]+)\s*=\s*['\"]?([a-z0-9A-Z_\.-]+)/", $define_line, $matches)) {
+        $input[$matches[1]] = $matches[2];
     }
 
     return $input;
 }
 
 // turn define array into credentials
-function array_to_creds(?array $defines) :?Credentials {
+function array_to_credentials(?array $defines) :?Credentials {
     $credentials = NULL;
     if ($defines && count($defines) > 5) {
-        $credentials = new Credentials($defines['DB_USER']??'', $defines['DB_PASSWORD']??'', $defines['DB_HOST']??'', $defines['DB_NAME']??'', $defines['prefix']??'wp_');
+        $credentials = new Credentials($defines['DB_USER']??'', $defines['DB_PASSWORD']??'', $defines['DB_HOST']??'', $defines['DB_NAME']??'', $defines['table_prefix']??'wp_');
     }
     return $credentials;
 }
@@ -81,21 +79,20 @@ function array_to_creds(?array $defines) :?Credentials {
 // parse wp-config into db credentials
 function wp_parse_credentials(string $root) : ?Credentials {
     $credentials = NULL;
-    $defines = wp_parse_define($root);
+    $defines = wp_parse_define("$root/wp-config.php");
     if (isset($defines["SECURE_AUTH_KEY"])) {
-        $credentials = array_to_creds($defines);
+        $credentials = array_to_credentials($defines);
     }
     return $credentials;
 }
 
 // parse out all defines from the wp-config
-function wp_parse_define(string $root) : array {
-    static $defines = array();
-    if (count($defines) < 1) {
-        $config_file = "$root/wp-config.php";
-        $data = file($config_file);
+function wp_parse_define(string $file) : array {
+    $defines = [];
+    if (file_exists($file)) {
+        $data = file($file);
         if (!empty($data)) {
-            $defines = array_reduce($data, '\BitFireWP\define_to_array', array());
+            $defines =  array_reduce($data, '\BitFireWP\define_to_array', []);
         }
     }
 	return $defines;
@@ -105,7 +102,7 @@ function wp_parse_define(string $root) : array {
 // fetch an auth "salt" for a particular "scheme"
 function wp_fetch_salt(string $root, string $scheme) : string {
 	$scheme = strtoupper($scheme);
-	$defines = wp_parse_define($root);
+	$defines = wp_parse_define("$root/wp-config.php");
 	if (!isset($defines["{$scheme}_KEY"])) { debug("auth define [$scheme] missing"); return ""; }
 	return $defines["{$scheme}_KEY"] . $defines["{$scheme}_SALT"];
 }
@@ -113,9 +110,9 @@ function wp_fetch_salt(string $root, string $scheme) : string {
 // validate an auth cookie
 function wp_validate_cookie(string $cookie, string $root) : bool {
     $data = Parts::of("|", $cookie)->name("username", "exp", "token", "hmac");
-    $creds = wp_parse_credentials($root);
-    $db = DB::cred_connect($creds);
-    $sql = $db->fetch("SELECT SUBSTRING(user_pass, 9, 4) AS pass FROM " . $creds->prefix . "users WHERE user_login = {login} LIMIT 1", array("login" => $data->at("username")));
+    $credentials = wp_parse_credentials($root);
+    $db = DB::cred_connect($credentials);
+    $sql = $db->fetch("SELECT SUBSTRING(user_pass, 9, 4) AS pass FROM " . $credentials->prefix . "users WHERE user_login = {login} LIMIT 1", array("login" => $data->at("username")));
     if ($sql->empty()) { debug("wp-auth failed to load db user data"); return false; }
     $key_src = concat_fn("|")($data->at("username"), $sql->col("pass"), $data->at("exp"), $data->at("token"));
 
@@ -128,9 +125,9 @@ function wp_validate_cookie(string $cookie, string $root) : bool {
     }
 
     // that failed, lets try the db salt and key (may need to try logged_in_key/salt also)
-    $db_salt = $db->fetch("SELECT option_value FROM " . $creds->prefix . "options where option_name = 'auth_salt'");
+    $db_salt = $db->fetch("SELECT option_value FROM " . $credentials->prefix . "options where option_name = 'auth_salt'");
     if (!$db_salt->empty()) {
-        $db_key = $db->fetch("SELECT option_value FROM " . $creds->prefix . "options where option_name = 'auth_key'");
+        $db_key = $db->fetch("SELECT option_value FROM " . $credentials->prefix . "options where option_name = 'auth_key'");
         if (!$db_salt->empty()) {
             $salt = $db_salt->col('option_value')();
             $key = $db_key->col('option_value')();
@@ -200,7 +197,7 @@ function wp_enrich_wordpress_hash_diffs(string $ver, string $doc_root, array $ha
 }
 
 /**
- * unlock core / themes or plugins and relock after this request
+ * unlock core / themes or plugins and re-lock after this request
  * @param string $content_path relative path under wp-root
  */
 function temp_lock_dir(string $content_path) {
@@ -224,9 +221,38 @@ function temp_lock_dir(string $content_path) {
  */
 function wp_handle_admin(\BitFire\Request $request, MaybeA $cookie) {
     debug("wp_handle_admin");
-    $root = \BitFire\Config::str("wp_root");
-    if (empty($root)) { debug("no wp_root"); return; }
+    $root = \BitFire\Config::str("cms_root");
+    if (empty($root)) { debug("no cms_root"); return; }
     if (strpos($request->path, "/wp-admin/") === false) { debug("no wp-admin"); return; }
     if ($request->post['action']??'' === "heartbeat") { return; }
     debug("wp admin request %s", $request->path);
+}
+
+function get_credentials() : ?Credentials {
+    if (defined("WPINC") && defined("DB_USER")) {
+        $credentials = new Credentials(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME);
+        if (isset($GLOBALS['wpdb'])) {
+            trace("WPDB");
+            $credentials->prefix = $GLOBALS['wpdb']->prefix;
+            return $credentials;
+        }
+    } else {
+        trace("BITDB");
+        $credentials = wp_parse_credentials(CFG::str("cms_root"));
+        $defs = wp_parse_define(CFG::str("cms_root")."/wp-config.php");
+        $credentials->prefix = $defs["table_prefix"]??"wp_";
+        return $credentials;
+    }
+
+    return NULL;
+}
+
+function get_db_connection() : ?DB {
+    $credentials = get_credentials();
+
+    if ($credentials) {
+        return DB::cred_connect($credentials);
+    }
+
+    return NULL;
 }

@@ -66,7 +66,7 @@ function core_headers(?UserAgent $agent) : Effect {
     $effect->header("Referrer-Policy", "no-referrer-when-downgrade");
     $effect->header("X-Frame-Options", "deny");
     $effect->header("X-Content-Type-Options", "nosniff");
-    //$effect->header("Referrer-Policy", "strict-origin-when-cross-origin");
+    $effect->header("Referrer-Policy", "strict-origin-when-cross-origin");
 
     // only turn on the XSS auditor for older browsers
     if ($agent) {

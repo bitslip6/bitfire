@@ -13,6 +13,8 @@ namespace BitFireSvr;
 
 use BitFire\Config;
 use BitFire\Config as CFG;
+use Exception;
+use SodiumException;
 use ThreadFin\Effect as EF;
 use ThreadFin\CacheItem;
 use ThreadFin\CacheStorage;
@@ -20,6 +22,7 @@ use ThreadFin\FileData;
 use ThreadFin\FileMod;
 use ThreadFin\Effect;
 use ThreadFin\Maybe;
+use ThreadFin\MaybeStr;
 
 use const BitFire\APP;
 use const BitFire\BITFIRE_SYM_VER;
@@ -30,6 +33,7 @@ use const BitFire\STATUS_EEXIST;
 use const BitFire\STATUS_ENOENT;
 use const BitFire\STATUS_OK;
 use const BitFire\STATUS_FAIL;
+use const BitFire\WAF_ROOT;
 use const ThreadFin\DAY;
 use const ThreadFin\DS;
 
@@ -59,7 +63,7 @@ const ACCESS_HOST = 11;
 const ACCESS_URL_METHOD = 12;
 const ACCESS_URL_URI = 13;
 
-const CONFIG_KEY_NAMES = [ "bitfire_enabled","allow_ip_block","security_headers_enabled","enforce_ssl_1year","csp_policy_enabled","csp_default","csp_policy","csp_uri","pro_key","site_lock","max_cache_age","web_filter_enabled","spam_filter_enabled","xss_block","sql_block","file_block","block_profanity","filtered_logging","allowed_methods","whitelist_enable","blacklist_enable","require_full_browser","honeypot_url","check_domain","valid_domains","valid_domains[]","ignore_bot_urls","rate_limit","rr_5m","cache_type","cookies_enabled","wordfence_emulation","report_file","block_file","debug_file","debug_header","send_errors","dashboard_usage","browser_cookie","dashboard_path","encryption_key","secret","password","wp_root","wp_contenturl","wp_contentdir","debug","skip_local_bots","response_code","ip_header","dns_service","short_block_time","medium_block_time","long_block_time","cache_ini_files","root_restrict","configured" ];
+const CONFIG_KEY_NAMES = [ "bitfire_enabled","allow_ip_block","security_headers_enabled","enforce_ssl_1year","csp_policy_enabled","csp_default","csp_policy","csp_uri","pro_key","rasp_filesystem","max_cache_age","web_filter_enabled","spam_filter_enabled","xss_block","sql_block","file_block","block_profanity","filtered_logging","allowed_methods","whitelist_enable","blacklist_enable","require_full_browser","honeypot_url","check_domain","valid_domains","valid_domains[]","ignore_bot_urls","rate_limit","rr_5m","cache_type","cookies_enabled","wordfence_emulation","report_file","block_file","debug_file","debug_header","send_errors","dashboard_usage","browser_cookie","dashboard_path","encryption_key","secret","password","cms_root","cms_content_url","cms_content_dir","debug","skip_local_bots","response_code","ip_header","dns_service","short_block_time","medium_block_time","long_block_time","cache_ini_files","root_restrict","configured" ];
 
 
 // helpers
@@ -79,13 +83,12 @@ class FileHash {
 }
 
 /**
- * special handling of WordPress DOCUMENT_ROOT
+ * special handling of WordPress DOCUMENT_ROOT - requested by WP team
  */
 function doc_root() : string {
     static $root = "/";
-    if ($root == "/") { 
+    if ($root === "/") { 
         $root = filter_input(INPUT_SERVER, "DOCUMENT_ROOT");
-        if (!file_exists($root)) { \BitFire\on_err(PCNTL_ENFILE, "DOCUMENT_ROOT not found", __FILE__, __LINE__); }
     }
     return $root;
 }
@@ -104,8 +107,8 @@ function cms_root() : string {
     else if (CFG::enabled("cms_root")) {
         $root = CFG::str("cms_root");
     }
-    else if (CFG::enabled("wp_root")) { // backward compatibility
-        $root = CFG::str("wp_root");
+    else if (CFG::enabled("cms_root")) { // backward compatibility
+        $root = CFG::str("cms_root");
     }
     if (strlen($root) < strlen(doc_root())) { 
         debug("error finding doc_root [%s]", $root);
@@ -129,7 +132,7 @@ function need_quote(string $data) : bool {
  * @param string $filename 
  */
 function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI, bool $append = false) : EF {
-    //assert(file_exists($filename), "$filename does not exist.  please create it.");
+    assert(file_exists($filename), "$filename does not exist.  please create it.");
 
     $effect = EF::new();
 
@@ -148,9 +151,9 @@ function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI, bool $
 
 
     $is = is_array($new_config);
-    if ($is) {
+    if ($new_config != false && $is) {
         // set status to success if the file has a reasonable size still...
-        if ($new_config != false && $x2 >= $x1) {
+        if ($new_config != false && $x1 > 10 && $x2 >= $x1) {
             // update the file abstraction with the edit, this will allow us 
             // to update the file multiple times, and not read from the FS multiple times
             FileData::mask_file($filename, $raw);
@@ -166,7 +169,6 @@ function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI, bool $
         }
     }
     if (!$is || $new_config == false) {
-        file_put_contents("/tmp/whitelist.ini", print_r($file, true));
         $effect->exit(false, STATUS_FAIL, "an error occurred updating $filename, [$x1/$x2] (is: $is) please repair with original file");
     }
 
@@ -262,7 +264,7 @@ function add_ini_value(string $param, string $value, ?string $default = NULL, st
 // TODO: implement me to add new options to config.ini on upgrade
 // TODO: add function to add new config item if it does not exist.
 function upgrade_config() : Effect {
-    // add dashboard-usage, dynamic-exceptions, nag_ignore, wizard
+    // add dashboard-usage, dynamic_exceptions, nag_ignore, wizard
     return Effect::$NULL;
 }
 
@@ -313,7 +315,7 @@ function update_config(string $ini_src) : Effect
 
     $content_url = "$scheme://$host/$content_path";
     if (!empty($root)) {
-        $info["wp_root_path"] = $root;
+        $info["cms_root_path"] = $root;
         $content_dir = $root . $content_path;
         $wp_version = get_wordpress_version($root);
 
@@ -322,9 +324,9 @@ function update_config(string $ini_src) : Effect
             $content_url = \content_url();
         } else if (defined("WP_CONTENT_URL")) { $content_url = \WP_CONTENT_URL; }
 
-        $e->chain(update_ini_value("wp_root", $root, ""));
-        $e->chain(update_ini_value("wp_contentdir", $content_dir, ""));
-        $e->chain(update_ini_value("wp_contenturl", $content_url, ""));
+        $e->chain(update_ini_value("cms_root", $root, ""));
+        $e->chain(update_ini_value("cms_content_dir", $content_dir, ""));
+        $e->chain(update_ini_value("cms_content_url", $content_url, ""));
         $e->chain(update_ini_value("wp_version", $wp_version, ""));
         $info['assets'] = $content_url;
         // we won't be using passwords since we will check WordPress admin credentials
@@ -332,7 +334,7 @@ function update_config(string $ini_src) : Effect
             $e->chain(update_ini_value("password", "disabled"));
         }
     } else {
-        $info["wp_root"] = "WordPress not found.";
+        $info["cms_root"] = "WordPress not found.";
     }
 
     // WPEngine fixes
@@ -355,7 +357,8 @@ function update_config(string $ini_src) : Effect
         $e->chain(update_ini_value("cache_type", "apcu", "nop"));
         $info["cache_type"] = "apcu";
     } else {
-        $info["cache_type"] = "nop";
+        $e->chain(update_ini_value("cache_type", "opcache", "nop"));
+        $info["cache_type"] = "opcache";
     }
 
 
@@ -402,9 +405,9 @@ function update_config(string $ini_src) : Effect
     }
 
     // configure dynamic exceptions
-    if (CFG::enabled("dynamic-exceptions")) {
+    if (CFG::enabled("dynamic_exceptions")) {
         // dynamic exceptions are enabled, but un-configured (true, not time).  Set for 5 days
-        $e->chain(update_ini_value("dynamic-exceptions", time() + (DAY * 5), "true"));
+        $e->chain(update_ini_value("dynamic_exceptions", time() + (DAY * 5), "true"));
     }
 
     require_once \BitFire\WAF_SRC . "bitfire.php";
@@ -413,7 +416,7 @@ function update_config(string $ini_src) : Effect
     if (function_exists("plugin_dir_url")) {
         $assets = \plugin_dir_url(dirname(__FILE__, 2)) . "public/";
     } else if (!empty($root)) {
-        $assets = CFG::str("wp_contenturl") . "/plugins/bitfire/public";
+        $assets = CFG::str("cms_content_url") . "/plugins/bitfire/public";
     } else {
         $assets = "https://bitfire.co/assets";
     }
@@ -422,8 +425,6 @@ function update_config(string $ini_src) : Effect
 
     debug("replacing assets ($assets)");
     $z = file_replace(\BitFire\WAF_ROOT . "public/theme.bundle.css", "/url\(([a-z\.-]+)\)/", "url({$assets}$1)")->run();
-    if ($z->num_errors() > 0) { debug("ERROR [%s]", en_json($z->read_errors())); }
-    $z = file_replace(\BitFire\WAF_ROOT . "public/theme.min.css",    "/url\(([a-z\.-]+)\)/", "url({$assets}$1)")->run();
     if ($z->num_errors() > 0) { debug("ERROR [%s]", en_json($z->read_errors())); }
 
     $alert = '{"time":"'.utc_date('r').'","tv":'.utc_time().',"exec":"0.001557 sec","block":{"code":26001,"parameter":"REQUEST_RATE","value":"41","pattern":"40","block_time":2},"request":{"headers":{"requested_with":"","fetch_mode":"","accept":"","content":"","encoding":"","dnt":"","upgrade_insecure":"","content_type":"text\/html"},"host":"unit_test","path":"\/","ip":"127.0.0.1","method":"GET","port":8080,"scheme":"http","get":[],"get_freq":[],"post":[],"post_raw":"","post_freq":[],"cookies":[],"agent":"test request rate alert","referer":null},"http_code":404},';
@@ -549,13 +550,13 @@ function install() : Effect {
     // force WordFence compatibility mode if running on WP ENGINE and WordFence is not installed, emulate WordFence
     // don't run this check if we are being run from the activation page (request will be null)
     if (CFG::enabled("wordfence_emulation")) {
-        $wp_root = cms_root();
-        $waf_load = "$wp_root/wordfence-waf.php";
+        $cms_root = cms_root();
+        $waf_load = "$cms_root/wordfence-waf.php";
         $effect->exit(false, STATUS_EEXIST, "WPEngine hosting. UNINSTALL WordFence before enabling always on.");
         // we are on wordpress, found the dir and it exists
-        if (!empty($wp_root) && file_exists($wp_root)) {
+        if (!empty($cms_root) && file_exists($cms_root)) {
             // wordfence is not installed, and the autoload file does not exist, lets inject ours
-            if (!file_exists(CFG::str("wp_contentdir")."plugins/wordfence") && !file_exists($waf_load)) {
+            if (!file_exists(CFG::str("cms_content_dir")."plugins/wordfence") && !file_exists($waf_load)) {
                 $self = dirname(__DIR__) . "/startup.php";
                 if (file_exists($self)) {
                     $effect->file(new FileMod($waf_load, "<?php include_once '$self'; ?>\n"))
@@ -573,6 +574,7 @@ function install() : Effect {
     // NOT WPE
     else {
         // handle Apache
+        /*
         if ($apache) {
             $preamble = '
             # block directory listing
@@ -593,6 +595,7 @@ function install() : Effect {
             $status = (\BitFireSvr\install_file($hta, "$preamble\n<IfModule mod_php.c>\n  php_value auto_prepend_file \"%s\"\n</IfModule>\n<IfModule mod_php7.c>\n  php_value auto_prepend_file \"%s\"</IfModule>\n") ? true : false);
             $file = $hta;
         }
+        */
         // handle NGINX and other cases
         $root_path = dirname(__DIR__) . DS;
         $content = "auto_prepend_file = \"{$root_path}startup.php\"";
@@ -618,7 +621,7 @@ function install() : Effect {
  * @return Effect 
  */
 function make_config_loader() : Effect {
-    $markup = '<?php $ini_type = "nop";';
+    $markup = '<?php $ini_type = "opcache";';
     if (function_exists("shmop_open")) {
         $markup = '<?php $ini_type = "shmop";';
     } else if (function_exists("apcu_store")) {
@@ -643,8 +646,8 @@ function uninstall() : \ThreadFin\Effect {
     // attempt to uninstall emulated wordfence if found
     $is_wpe = isset($_SERVER['IS_WPE']);
     if (Config::enabled("wordfence_emulation") || $is_wpe) {
-        $wp_root = cms_root();
-        $waf_load = "$wp_root/wordfence-waf.php";
+        $cms_root = cms_root();
+        $waf_load = "$cms_root/wordfence-waf.php";
         // auto load file exists
         if (file_exists($waf_load)) {
             $c = file_get_contents($waf_load);
@@ -738,11 +741,10 @@ function hash_file2(string $path, string $root_dir, string $name, callable $type
     $hash->type = $type_fn($realpath);
     $hash->name = $name;
     $hash->size = filesize($realpath);
-    if ($hash->crc_trim == 1162311920) { return null; }
 
     // HACKS AND FIXES
-    if (stristr($realpath, "/wp-includes/") !== false) { $hash->rel_path = "/wp-includes".$hash->rel_path; }
-    else if (stristr($realpath, "/wp-admin/") !== false) { $hash->rel_path = "/wp-admin".$hash->rel_path; }
+    if (stripos($realpath, "/wp-includes/") !== false) { $hash->rel_path = "/wp-includes".$hash->rel_path; }
+    else if (stripos($realpath, "/wp-admin/") !== false) { $hash->rel_path = "/wp-admin".$hash->rel_path; }
 
     $hash->crc_path = crc32($hash->rel_path);
     return $hash;
@@ -770,7 +772,7 @@ function hash_file(string $filename, string $root_dir, string $plugin_id, string
 
     $shortname = str_replace($root_dir, "", $filename);
     $shortname = str_replace("//", "/", $shortname);
-    $wp_base = basename(CFG::str("wp_contentdir"));
+    $wp_base = basename(CFG::str("cms_content_dir"));
     if (strpos($filename, $wp_base)) {
         if (strpos($filename, "/plugins/") !== false) {
             $shortname = '/'.str_replace("$root_dir", "", $filename);
@@ -797,6 +799,29 @@ function hash_file(string $filename, string $root_dir, string $plugin_id, string
 }
 
 
+
+
+function hash_dir(string $dir): array
+{
+    return file_recurse($dir, function ($file) use ($dir): ?array {
+
+        if (is_link($file)) {
+            return NULL;
+        }
+        $wp_base = basename(CFG::str("cms_content_dir"));
+        if (strpos($file, $wp_base) !== false) {
+            if (preg_match('#$wp_base/(plugins|themes)/([^\/]+)#', $file, $matches)) {
+                $type = strpos($file, '/plugins/') !== false ? 1 : 2;
+                return hash_file($file, $dir, $type, $matches[2]);
+            }
+            return NULL;
+        }
+
+        return hash_file($file, $dir, 0, "");
+    }, "/.*\.php$/");
+}
+
+
 /**
  * get the wordpress version from a word press root directory
  */
@@ -810,26 +835,6 @@ function get_wordpress_version(string $root_dir): string
     return trim_off($wp_version, "-");
 }
 
-
-function hash_dir(string $dir): array
-{
-    return file_recurse($dir, function ($file) use ($dir): ?array {
-
-        if (is_link($file)) {
-            return NULL;
-        }
-        $wp_base = basename(CFG::str("wp_contentdir"));
-        if (strpos($file, $wp_base) !== false) {
-            if (preg_match('#$wp_base/(plugins|themes)/([^\/]+)#', $file, $matches)) {
-                $type = strpos($file, '/plugins/') !== false ? 1 : 2;
-                return hash_file($file, $dir, $type, $matches[2]);
-            }
-            return NULL;
-        }
-
-        return hash_file($file, $dir, 0, "");
-    }, "/.*\.php$/");
-}
 
 
 /**
@@ -980,6 +985,21 @@ function process_access_line(string $line): ?\BitFire\Request
     return $data->empty() ? NULL : $data->value();
 }
 
+/**
+ * authenticate a BitFire tech support user
+ * @param string $signed_message 
+ * @return MaybeStr 
+ * @throws SodiumException 
+ */
+function authenticate_tech(string $signed_message) : MaybeStr {
+    try {
+        $tech_public_key = hex2bin(CFG::str("tech_public_key")); 
+        return MaybeStr::of(sodium_crypto_sign_open($signed_message, $tech_public_key));
+    } catch (Exception) {
+        return MaybeStr::of(false); 
+    } 
+}
+
 
 
 function is_browser_request(?\BitFire\Request $request) : bool
@@ -1006,10 +1026,12 @@ function bf_activation_effect() : Effect {
     $effect->chain(update_config(\BitFire\WAF_INI));
     // make sure we run auto configure and install auto start
     // TODO: this logic is WP specific.  move to WP plugin
+    /*
     if (CFG::str("auto_start") != "on" && CFG::enabled("configured")) {
         debug("is configured or auto_start is off, installing");
         $effect->chain(\BitFireSvr\install());
     }
+    */
     // update configured after check for install.  allows install on deactivate - activate
     $effect->chain(update_ini_value("configured", "true")); // MUST SYNC WITH UPDATE_CONFIG CALLS (WP)
     // in case of upgrade, run the config updater to add new config parameters
@@ -1057,3 +1079,156 @@ function bf_deactivation_effect() : Effect {
 }
 
 
+/** @return EF  */
+function standalone_to_wordpress() : Effect {
+    // load the old configuration if we have one
+    // TODO: move to a backup function
+    $old_conf = WAF_ROOT."config.ini";
+    $new_conf = __DIR__."/config.ini";
+    if ($old_conf != $new_conf) {
+        chmod($old_conf, FILE_RW);
+        chmod($new_conf, FILE_RW);
+        @copy($old_conf, $new_conf);
+        chmod($old_conf, FILE_W);
+        chmod($new_conf, FILE_W);
+    }
+    $hash_file = WAF_ROOT."cache/hashes.json";
+    if (file_exists($hash_file)) {
+        @copy($hash_file, __DIR__."/cache/hashes.json");
+    }
+    $block_file = WAF_ROOT."cache/blocks.json";
+    $alert_file = WAF_ROOT."cache/alerts.json";
+    @copy($block_file, __DIR__."/cache/blocks.json");
+    @copy($alert_file, __DIR__."/cache/alerts.json");
+    @copy(WAF_ROOT."cache/exceptions.json", __DIR__."cache/exceptions.json");
+    $effect = \BitFireSvr\uninstall()->hide_output();
+    return $effect;
+}
+
+namespace BitFireChars;
+
+use ThreadFin\Effect;
+
+use const BitFire\STATUS_EEXIST;
+
+use function ThreadFin\contains;
+use function ThreadFin\icontains;
+
+const LOWER = 0.04;
+const UPPER = 0.96;
+const RISKY_FN = ['base64_decode', 'uudecode', 'hebrev', 'hex2bin', 'str_rot13', 'eval', 'proc_open', 'pcntl_exec', 'exec', 'shell_exec', 'call_user_func', 'call_user_func_array', 'system', 'passthru', 'shell_exec', 'move_uploaded_file', 'stream_wrapper_'];
+
+
+/**
+ * create the initial frequency array
+ * @return array 
+ */
+function init_frequency() : array {
+    for ($i = 0; $i < 128; $i++) {
+        $freq[$i] = [];
+    }
+    return $freq;
+}
+
+/**
+ * take the total frequency counts and turn it into final count
+ * @param array $frequency 
+ * @return array 
+ */
+function finalize_frequency(array $frequency) : array {
+    $final = [];
+    foreach ($frequency as $index => $list) {
+        $num = count($list);
+        // skip characters that don't appear enough
+        if ($num < 10) { continue; }
+
+        // find the lower and upper boundaries
+        sort($list);
+        $lower = round((LOWER * $num), 0);
+        $upper = round((UPPER * $num), 0);
+        $l_min = max(0, $lower - 1);
+        $l_up = max(0, $upper - 1);
+        $l = (floor($lower) == $lower) ? $list[$l_min] : ($list[$l_min] + $list[$lower+1])/2;
+        $u = (floor($upper) == $upper) ? $list[$l_up] : ($list[$l_up] + $list[$upper+1])/2;
+        $final[$index] = ["lower" => $l, "upper" => $u];
+    }
+    return $final;
+}
+
+/**
+ * calculate character frequency for a single file if it is risky
+ * @param string $path - assumes $path exists
+ * @param bool $final
+ * @return null|array 
+ */
+function update_freq(string $path) : ?array {
+    static $file_map = [];
+    assert(file_exists($path), "can't update character frequency if the file doesn't exist: $path");
+
+    $content = file_get_contents($path);
+    // skip the file if it doesn't contain any of the risky functions, or dynamic functions
+    if (! icontains($content, RISKY_FN)) {
+        if (!preg_match("/\$[a-zA-Z0-9_]+\s*\(/", $content)) {
+            return null;
+        }
+    }
+
+    // ignore paths we have looked at before
+    $file_name = dirname($path) . "/" . basename($path);
+    if (isset($file_map[$file_name])) { return null; }
+
+    $file_map[$file_name] = true;
+
+    return find_freq($content, false);
+}
+
+
+/**
+ * calculate character frequency on single file
+ * @param string $content - the file content to inspect
+ * @param bool $final - flag to return the final frequency
+ * @return null|array 
+ */
+function find_freq(string $content, bool $final = false) : ?array {
+    static $global_frequency = null;
+    if ($global_frequency === null) {
+        $global_frequency = init_frequency();
+    }
+    if ($final) { return $global_frequency; }
+
+    $frequency = count_chars($content, 1);
+    $semi = $frequency[59]??0;
+    $lines = $frequency[10]??1;
+    //$opens = $frequency[40]??0;
+    //$concat = $frequency[46]??0;
+    // skip short files
+    if ($semi < 10) {
+        return null;
+    }
+
+    foreach ($frequency as $index => $count) {
+        // skip bells and other control characters
+        if ($index < 5) { continue; }
+        // count ascii characters, and their frequency vs lines
+        if ($index <= 127) {
+            $global_frequency[$index][] = $count;
+            $global_frequency[$index+128][] = round(($count/$lines), 4);
+        }
+    }
+
+    return null;
+}
+
+/**
+ * analyze a directory recursively and create a frequency table
+ * @param string $root_dir 
+ * @return null|array 
+ */
+function create_frequency_table(string $root_dir) : ?array {
+    if (!file_exists($root_dir)) {
+        return null;
+    }
+    file_recurse($root_dir, 'BitFireChars\update_freq', "/\.php$/", [], 50000);
+    $final_frequency = finalize_frequency(find_freq("", true));
+    return $final_frequency;
+}

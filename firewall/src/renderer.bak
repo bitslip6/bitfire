@@ -1,0 +1,290 @@
+<?php
+/**
+ * BitFire PHP based Firewall.
+ * Author: BitFire (BitSlip6 company)
+ * Distributed under the AGPL license: https://www.gnu.org/licenses/agpl-3.0.en.html
+ * Please report issues to: https://github.com/bitslip6/bitfire/issues
+ *
+ * HTML/JS Recursive Renderer and minifier.
+ * TODO: Refactor to use FileData and Effect abstractions.
+ */
+
+namespace ThreadFin;
+
+use ThreadFin\Effect;
+use ThreadFin\FileData;
+use ThreadFin\FileMod;
+
+use const ThreadFin\ENCODE_RAW;
+
+use function ThreadFin\ends_with;
+use function ThreadFin\file_recurse;
+use function ThreadFin\partial_right as BINDR;
+use function ThreadFin\debug;
+use function ThreadFin\icontains;
+
+const NOT_MINIFY_EXTENSIONS = ["svg", "min"];
+const MAX_VAR_REPLACEMENT = 1000;
+const MISSING_VALUE = '';
+const SRC_ROOT = "src";
+const DO_MINIFY = true;
+
+/**
+ * pure function to minify HTML.
+ * This will remove all newlines excess whitespace and comments.
+ * @param string $in 
+ * @return string 
+ */
+function minify_str(string $in) : string {
+	$t1 = preg_replace("/[\s\n]+/m", " ", $in);
+	$t2 = preg_replace("/>\s+</", "><", $t1);
+	$t3 = preg_replace("/<!--.*?-->/", "", $t2);
+	return $t3;
+}
+
+
+/**
+ * pure function to minify HTML files.
+ * 
+ * @param string $filename 
+ * @return Effect 
+ */
+function minify(string $filename) : Effect {
+	$effect  = Effect::new();
+
+	$extension = pathinfo($filename, PATHINFO_EXTENSION);
+	// just serve minified files directly
+	if ($extension === "min") {
+		$effect->out(
+			FileData::new($filename)->raw()
+		);
+	}
+	// if the file is minify-able
+	else if (DO_MINIFY && ! icontains($extension, NOT_MINIFY_EXTENSIONS)) {
+		$min_filename = "{$filename}.min";
+		$min_file = FileData::new($min_filename);
+		// if we have a minified version on disk, serve that
+		if ($min_file->exists) {
+			$effect->out($min_file->raw());
+		}
+		// read the raw file, minify it and return an effect to write the
+		// minified file to disk
+		else {
+			$source_content = FileData::new($filename)->raw();
+			$min_content = minify_str($source_content);
+			$effect->out($min_content);
+			$effect->file(new FileMod($min_filename, $min_content, FILE_RW));
+		}
+	}
+
+	return $effect;
+}
+
+/**
+ * pure function to find search_file.  function returns true
+ * when the input filename matches the search_file and the
+ * file exists.  function will return NULL if no match
+ * 
+ * @param string $search_file - the file to search for 
+ * @return string 
+ */
+function make_file_finder(string $search_file) : callable {
+ 	$has_extension = (bool)strrpos($search_file, ".");
+
+	// if the search_file has an extension, just make sure it exists
+	if ($has_extension !== false) {
+		return function ($x) use ($search_file) : ?string {
+			if (is_file($x) && ends_with($x, $search_file)) { return $x; }
+			return NULL;
+		};
+	}
+
+	// match everything up to the extension
+	return function ($x) use ($search_file): ?string {
+		if (!is_file($x)) { return NULL;}
+		$ext_pos = strrpos($x, ".");
+
+		if ($ext_pos > 1) {
+			$x2 = substr($x, 0, $ext_pos);
+			if (ends_with($x2, $search_file)) {
+				return $x;
+			}
+		}
+		else if (ends_with($x, $search_file)) { return $x; }
+		return NULL;
+	};
+}
+
+/**
+ * not pure function to map input name to source file
+ */
+function find_source(string $src, string $src_root, bool $prefer_amp) : ?string {
+	// search the cache before searching the file system 
+	$file = file_get_contents("file_cache.json");
+	$cache = json_decode($file, true);
+
+	// if we don't know the path to the file use the finder to locate it
+	if (!isset($cache[$src])) {
+		$finder = make_file_finder($src);
+		$found = file_recurse($src_root, $finder, NULL, array(), true);
+		if (!isset($found[0])) { die ("unable to find [$src] in [$src_root]\n"); }
+		$tmp = $found[0]??'NA';
+		$cache[$src] = $tmp;
+		// update the cache
+		file_put_contents("file_cache.json", json_encode($cache));
+	}
+	
+	// find the amp version of the file
+	$file = $cache[$src];
+	$parts = explode(".", $file);
+	$amp_file = $parts[0].".amp";
+
+	// use the amp version if it exists
+	$file = ($prefer_amp && file_exists($amp_file)) ? $amp_file : $cache[$src];
+	//$min_effect = minify($file);
+	//$min_effect->out("", ENCODE_RAW, true);
+	// write the minified version to disk
+	//$min_effect->run();
+	
+
+	return $file . (DO_MINIFY) ?  "min" : "";
+}
+
+/**
+ * render static content file recursively finding files anywhere in src_root
+ * @param string $src t
+ * @param array $replacements 
+ * @param string $src_root 
+ * @return string 
+ */
+function render_static(string $src, array $replacements = array(), $src_root = SRC_ROOT) : string {
+	$src2 = find_source($src, $src_root, $replacements['isamp']);
+	assert(!empty($src2), "src [$src] -> [$src2] [$src_root]");
+	assert(!is_dir($src2), "is dir ($src2)");
+
+	$src2 = str_replace("EN", $replacements['lang'], $src2);
+	$min_effect = minify($src2);
+	$content = $min_effect->read_out();
+	$min_effect->out("", ENCODE_RAW, true);
+	$min_effect->run();
+	return process_line($content, $replacements);
+}
+
+/**
+ * render the file source with any replacements, src_root unused
+ */
+function render_file(string $src2, array $replacements = array()) : string {
+	$min_effect = minify($src2);
+	$content = $min_effect->read_out();
+	$min_effect->out("", ENCODE_RAW, true);
+	$min_effect->run();
+	return process_line($content, $replacements);
+}
+
+
+/**
+ * the view variable replacement code.  
+ * supports string, array and object access with the dot operator
+ * @param mixed $x 
+ * @param mixed $replacements 
+ * @return mixed 
+ */
+function content_replacement($x, $replacements) {
+	$escape = ($x[1] === "-") ? true : false;
+	$primary = $x[2];
+	$secondary = $x[3]??"";
+
+	// replace content.  encode html if {{- is used
+	if (isset($replacements[$primary])) {
+		$return = $replacements[$primary];
+		if (!empty($secondary)) {
+			if (is_object($return)) {
+				if (isset($return->$secondary)) {
+					$value = $return->$secondary;
+				}
+			}
+			else if (is_array($return)) {
+				if (isset($return[$secondary])) {
+					$value = $return[$secondary];
+				}
+			}
+			else {
+				$value = (string)$return;	
+			}
+		}
+		else {
+			$value = (string)$return;	
+		}
+		return ($escape) ? htmlspecialchars($value) : $value;
+	} else {
+		debug("unset view variable [$primary]");
+	}
+}
+
+function template_replacement_min(string $template_markup, string $template_var, string $var_name, array $replacements) : string {
+	$content = "";
+	foreach($replacements[$var_name] as $item) {
+		$replacements[$template_var] = $item;
+		$content .= process_line($template_markup, $replacements);
+	}
+	return $content;
+}
+
+/**
+ * 
+ */
+function template_replacement(array $x, array $replacements, array$templates) {
+	$template_name = $x[1];
+	$var_name = $x[2];
+	$content = "";
+	$template_arr = $templates[$template_name]??[];
+	$template_var = $template_arr[0]??$var_name;
+	$template_markup = $template_arr[1]??"";
+	foreach($replacements[$var_name] as $item) {
+		$replacements[$template_var] = $item;
+		$content .= process_line($template_markup, $replacements);
+	}
+	return $content;
+}
+
+
+/**
+ * replace all variables in a line with data from replacements, sub render any included content
+ * and templates
+ */
+function process_line(string $line, array $replacements) : string {
+	// internal templates
+	$templates = [];
+
+	//extract inline templates
+	$line = preg_replace_callback(
+		"/{{\s*template\s*:\s*(\w+)[\s\:]+[\'\"]?(\w+)[\'\"]?\s*}}\s*(.*?){{\s*end[\s\:]+template\s*}}/mis",
+		function($x) use (&$templates) {
+			$templates[$x[1]] = [$x[2], $x[3]];
+			return "";
+	}, $line);
+
+	// replace variable substitution
+	$line = preg_replace_callback("/{{(-?)\s*(\w+)\.?(\w*)\s*}}/", 
+	"ThreadFin\content_replacement", $line, MAX_VAR_REPLACEMENT);
+
+	// replace inline templates
+	$line = preg_replace_callback("/{{\s*render[\s:]+(\w+)\s+[\'\"]?(\w+)[\'\"]?\s*}}/",
+	BINDR("ThreadFin\\template_replacement", $replacements, $templates), $line, MAX_VAR_REPLACEMENT);
+
+	// include sub templates
+	$line = preg_replace_callback("/{{>\s*([^\s}]+)\s*([^}]*)}}/", 
+		function ($x) use ($replacements) {
+			preg_match_all("/(\w+)\s*=\s*\"([^\"]*)/", $x[2], $matches);
+			$params = array();
+			for ($i=0,$m=count($matches[1]);$i<$m;$i++) {
+				$params[$matches[1][$i]] = $matches[2][$i];
+			}
+
+			$replacements = array_merge($replacements, $params);
+			return render_static($x[1], $replacements);
+		 }, $line, MAX_VAR_REPLACEMENT);
+
+	return $line;
+}
+

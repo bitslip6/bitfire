@@ -57,11 +57,14 @@ class CacheStorage implements Storage {
     public function delete() {
         // remove semaphores
         $opt = (PHP_VERSION_ID >= 80000) ? true : 1;
-        $sem = sem_get(0x228AAAE7, 1, 0660, $opt);
-        if ($sem) { sem_remove($sem); }
+        if (function_exists('sem_get')) {
+            $sem = sem_get(0x228AAAE7, 1, 0660, $opt);
+            if ($sem) { sem_remove($sem); }
+        }
 
         // remove any old op cache
         do_for_each(glob(WAF_ROOT."cache/*.profile", GLOB_NOSORT), 'unlink');
+        do_for_each(glob(WAF_ROOT."cache/objects/*", GLOB_NOSORT), 'unlink');
 
         include_once \BitFire\WAF_ROOT."src/cuckoo.php";
         if (class_exists("\BitFire\Cuckoo")) {
@@ -100,14 +103,16 @@ class CacheStorage implements Storage {
             $this->_shm = new shm();
             self::$_type = $type;
         }
-        else { self::$_type = 'nop'; }
+        else {
+            self::$_type = $type;
+        }
     }
 
     /**
      * @return string opcode cache file path for a given key
      */
     protected function key2name(string $key) : string {
-        return \BitFire\WAF_ROOT . "cache/{$key}.profile";
+        return \BitFire\WAF_ROOT . "cache/objects/$key";
     }
 
     /**
@@ -127,6 +132,9 @@ class CacheStorage implements Storage {
                 if ($seconds < 1) { return \apcu_delete("_bitfire:$key_name"); }
                 return (bool)\apcu_store("_bitfire:$key_name", $storage, $seconds);
             case "opcache":
+                // don't op cache metrics
+                if (strpos($key_name, "metric") !== false) { return false; }
+
                 $s = var_export($storage, true);
                 $exp = time() + $seconds; 
                 $data = "<?php \$value = $s; \$priority = $priority; \$success = (time() < $exp);";
@@ -187,6 +195,7 @@ class CacheStorage implements Storage {
         $value = null;
         $success = false;
 
+        $t = self::$_type;
         switch (self::$_type) {
             case "shm":
                 $tmp = $this->_shm->read($key_name);
@@ -202,7 +211,14 @@ class CacheStorage implements Storage {
                 $value = \apcu_fetch("_bitfire:$key_name", $success);
                 break;
             case "opcache":
-                @include($this->key2name($key_name));
+                $file = $this->key2name($key_name);
+                if (file_exists($file)) {
+                    @include($this->key2name($key_name));
+                    // remove expired data
+                    if (!$success) {
+                        @unlink($file);
+                    }
+                }
                 break;
             default: 
                 break;
@@ -219,6 +235,7 @@ class CacheStorage implements Storage {
             }
         }
 
+        trace("MISS[$key_name]");
         return $init;
     }
 
