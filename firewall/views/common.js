@@ -2,7 +2,7 @@
 async function BitFire_api(url = '', api_method = '', data = {}) {
     // Default options are marked with *
     data.BITFIRE_API = api_method;
-    data.BITFIRE_NONCE = window.BitFireApiCode;
+    data.BITFIRE_NONCE = window.BITFIRE_NONCE;
     const response = await fetch(url, {
     method: 'POST',
     mode: 'cors',
@@ -16,7 +16,7 @@ async function BitFire_api(url = '', api_method = '', data = {}) {
     return response;
 }
 
-// doucment.getElementById()
+// document.getElementById()
 function GBI(name) { return document.getElementById(name); }
 
 // generate a random string of length (length), updated input with name config_name+_text

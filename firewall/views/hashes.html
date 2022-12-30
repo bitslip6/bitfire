@@ -1,260 +1,15 @@
-<style>{{theme_css}}</style>
 <style>
-	/* global bitfire styles, TODO: move to include from disk... */
-	.right {
-		float: right;
-	}
-	.zup { z-index: 100; }
-
-	div.evil {
-		background-color: rgb(255, 210, 220);
+{{custom_css}}
+</style>
+<style>
+	#footer-thankyou, #footer-upgrade { display: none; }
+	.evil {
+		background-color: rgba(255, 128, 128, 0.3) !important;
 		color: #111 !important;
 	}
-
-	.left {
-		float: left;
-	}
-
-	.card-body {
-		padding: 0.5rem !important;
-	}
-
-	.secondary {
-		filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%);
-	}
-
-	.success {
-		filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%);
-	}
-
-	.warning {
-		filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%);
-	}
-
-	.danger {
-		filter: invert(29%) sepia(81%) saturate(2221%) hue-rotate(330deg) brightness(94%) contrast(91%);
-	}
-
-	.blue {
-		fill: #30b7e5;
-		color: #30b7e5;
-	}
-
-	img.red {
-		filter: invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%);
-	}
-
-	img.grey_blue {
-		filter: invert(82%) sepia(15%) saturate(597%) hue-rotate(184deg) brightness(89%) contrast(86%);
-	}
-
-	img.orange {
-		filter: invert(83%) sepia(34%) saturate(523%) hue-rotate(336deg) brightness(98%) contrast(92%);
-	}
-
-	.avatar {
-		position: relative;
-		margin-left: -.40625rem
-	}
-
-	h6 {
-		text-transform: uppercase;
-		line-height: 1.5;
-		color: rgb(149, 170, 201);
-		font-family: "Cerebri Sans", sans-serif;
-		font-weight: 400;
-	}
-
 	.header-body {
 		padding: 24px 0;
 	}
-
-
-	.wrap {
-		white-space: break-spaces;
-		line-break: anywhere;
-	}
-
-	.nowrap {
-		white-space: nowrap;
-	}
-
-	.hidden {
-		display: none;
-	}
-	.cover-over { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; opacity: 0.8; background-color: #000; }
-
-	.country {
-		float: right;
-		display: block;
-	}
-
-	.btn-sm {
-		padding: 0.1rem .5rem !important;
-		font-size: .4rem !important;
-		font-weight: bold;
-	}
-
-	.btn-group-tiny>.btn {
-		padding: .075rem .25rem;
-		font-size: .4rem;
-		line-height: 1.0;
-		border-radius: .25rem;
-	}
-
-	.dropdown-toggle {
-		width: 65px;
-	}
-
-	.navbar-vertical.navbar-expand-md .navbar-nav .nav .nav-link {
-		padding-left: .5rem;
-		padding-right: 0rem;
-	}
-	a.nav-link { color: #2c7be5 !important;}
-	a.nav-link:hover { text-decoration: underline; }
-
-
-	thead.details th,
-	th {
-		font-size: 12px;
-	}
-
-	.tbalt {
-		color: #333;
-		overflow: hidden;
-		background-color: #EFEFEF;
-		font-family: monospace;
-	}
-
-	.tbalt td {
-		border-bottom: 1px solid #CCC;
-	}
-
-	.table-sm th {
-		padding: .5rem .25rem;
-	}
-
-	span.method {
-		padding: .45rem .75rem;
-		font-weight: bold;
-		color: #111;
-	}
-
-	tr.inforow td {
-		background-image: linear-gradient(to bottom, rgba(240, 240, 240, 0), 92%, rgba(240, 240, 240, 1)100%);
-	}
-
-	@font-face {
-		font-family: Cerebri Sans;
-		src: url({{font_path}}/cerebrisans-regular.eot);
-		src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),
-		url({{font_path}}/cerebrisans-regular.woff) format("woff"),
-		url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
-		font-weight: 400;
-		font-style: normal;
-	}
-
-	@font-face {
-		font-family: Cerebri Sans;
-		src: url({{font_path}}/cerebrisans-medium.eot);
-		src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),
-		url({{font_path}}/cerebrisans-medium.woff) format("woff"),
-		url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
-		font-weight: 500;
-		font-style: normal;
-	}
-
-	@font-face {
-		font-family: Cerebri Sans;
-		src: url({{font_path}}/cerebrisans-semibold.eot);
-		src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),
-		url({{font_path}}/cerebrisans-semibold.woff) format("woff"),
-		url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
-		font-weight: 600;
-		font-style: normal;
-	}
-
-	@font-face {
-		font-family: Feather;
-		src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),
-		url({{font_path}}/Feather.woff?sdxovp) format("woff");
-		font-weight: 400;
-		font-style: normal;
-	}
-.tooltipA {
-  position: relative;
-}
-
-.alert-secondary {
-  padding: 0.35em 0.65em 0.35em 0.55em;
-  top: 20px
-}
-
-.arrow {
-  transform: rotateY( 45deg );
-  top: 74px;
-  left: 50%;
-}
-.arrow:after {
-  background-color: rgba(0,0,0,0.8) !important;
-}
-
-/* Tooltip text */
-.tooltipA .tooltiptext {
-  visibility: hidden;
-  width: 80%;
-  background-color: rgba(0,0,0,0.8);
-  color: #DDD;
-  text-align: center;
-  padding: .5em;
-  border-radius: 6px;
-  top: -110px;
- 
-  /* Position the tooltip text - see examples below! */
-  position: absolute;
-  z-index: 1;
-}
-
-.zup.tooltipA .tooltiptext {
-  visibility: visible !important;
-}
-
-</style>
-
-
-<style>
-	/* loading spinners */
-	.lds-dual-ring {
-		display: inline-block;
-		width: 64px;
-		height: 64px;
-		margin-top: -48px;
-		margin-right: 128px;
-	}
-
-	.lds-dual-ring:after {
-		content: " ";
-		display: block;
-		width: 64px;
-		height: 64px;
-		margin: 8px;
-		border-radius: 50%;
-		border: 6px solid #fff;
-		border-color: #1657af transparent #1657af transparent;
-		animation: lds-dual-ring 1.2s linear infinite;
-	}
-
-	@keyframes lds-dual-ring {
-		0% {
-			transform: rotate(0deg);
-		}
-
-		100% {
-			transform: rotate(360deg);
-		}
-	}
-
-
 	.add {
 		background-color: rgba(0, 240, 0, 0.2);
 	}
@@ -263,10 +18,9 @@
 	.remove {
 		background-color: rgba(240, 0, 0, 0.2);
 	}
+	pre { padding: 0 !important; margin: 0 !important; }
 
-	/* diff line removed */
-
-	/* diff line nubmers */
+	/* diff line numbers */
 	.line_nums {
 		width: 50px;
 		float: left;
@@ -274,16 +28,12 @@
 		padding: 1 0 0 0;
 		font-size: 15px;
 		line-height: 22.5px;
-		margin-top:34px;
+		margin-top:.5rem;
 	}
 
 	.alert-teal {
 		background-color: #02a8b5;
 	}
-
-.tooltipA {
-  position: relative;
-}
 
 .alert-secondary {
   padding: 0.35em 0.65em 0.35em 0.55em;
@@ -299,28 +49,35 @@
   background-color: rgba(0,0,0,0.8) !important;
 }
 
-/* Tooltip text */
-.tooltipA .tooltiptext {
-  visibility: hidden;
-  width: 80%;
-  background-color: rgba(0,0,0,0.8);
-  color: #DDD;
-  text-align: center;
-  padding: .5em;
-  border-radius: 6px;
-  top: -110px;
- 
-  /* Position the tooltip text - see examples below! */
+.secondary { filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%); }
+.success { filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%); }
+.warning { filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%); }
+
+#status_line {
+	display: flex;
+	flex-direction: row;
+	justify-content: flex-start;
+}
+#status_line > span {
+	flex-grow: 1;
+}
+.cover.malware { background-image: url('{{public}}img/malware.jpg'); }
+.cover { 
+  width: 100%;
+  height: 100px; 
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  background-size: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.9;
   position: absolute;
-  z-index: 1;
+  top:0;
+  left:0;
+  right:0;
+  overflow: hidden;
 }
 
-.zup.tooltipA .tooltiptext {
-  visibility: visible !important;
-}
-
-
-	/* wordpress integrity banner */
 </style>
 
 <script type="text/javascript">
@@ -330,30 +87,6 @@
 	window.isf = {{is_free}};
 	const VERSION_STR = "{{version_str}}";
 	const LLANG = "{{llang}}";
-	function GBI(name) { return document.getElementById(name); }
-
-	async function BitFire_api(api_method = '', data = {}, fn = null) {
-		console.log("api ", api_method);
-		url = "{{self}}&BITFIRE_API=" + api_method;
-		data.BITFIRE_API = api_method;
-		data.BITFIRE_NONCE = "{{api_code}}";
-		data.ts = Date.now();
-		const response = await fetch(url, {
-			method: 'POST',
-			mode: 'cors',
-			cache: 'no-cache',
-			credentials: 'same-origin',
-			headers: { 'Content-Type': 'application/json' },
-			redirect: 'follow',
-			referrerPolicy: 'same-origin',
-			body: JSON.stringify(data)
-		})
-		.then(r => { return r.json() })
-		.then(result => {
-			if (fn != null) { fn(result, data); }
-		});
-  	}
-
 </script>
 
 
@@ -363,139 +96,72 @@
 
 <div class="main-content">
 
-	<!-- HEADER -->
-	<div class="header">
-		<div class="container-fluid">
-
-			<!-- Body -->
-			<div class="header-body">
-
-
-
-				<div class="row align-items-end">
-					<div class="left">
-						<!-- Pretitle -->
-						<h6 class="header-pretitle">
-							{{release}}
-						</h6>
-						<!--
-						<p style="font-size:.75rem;color:#666;">
-						<div class="{{showfree_class}}">
-							PHP malware can be prevented by <a href="https://bitfire.co/pricing" target="_blank">enabling File-Locking</a>
-						</div>
-						</p>
-					-->
-
-		<div class="row {{showfree_class}}">
-			<div class="col-12">
-				<div class="card-body bg-warning-soft mb-4" style="border: solid 1px #e63757">
-					<h3 class="card-header-title">Limited Signature Library</h3>
-					<br>
-					<small class="text-muted">
-						This free version of BitFire can only detect modified file hashes and potential malware.
-						Access machine learning signatures and automatically repair files by upgrading.
-						<a href="https://bitfire.co/pricing" target="_blank" class="right mb-2" style="text-decoration: underline">
-							Upgrade to BitFire PRO.
-							<span class='fe fe-external-link'></span>
-						</a>
-					</small>
-				</div>
-			</div>
-		</div>
-
-
-					</div>
-				</div> <!-- row -->
-
-
-				<div class="row align-items-center">
-					<div class="col">
-
-						<!-- Nav -->
-						<ul class="nav nav-tabs header-tabs">
-				  <li class="nav-item">
-                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
-                      Dashboard
-                    </a>
-                  </li>
-                  <li class="nav-item {{has_scanner}}">
-                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
-                      Malware Scan
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
-                      Settings
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
-                      Exceptions
-                    </a>
-                  </li>
-                  <li class="nav-item {{hidefree_class}}">
-                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
-                      Advanced
-                    </a>
-                  </li>
-
-
-						</ul>
-					</div>
-				</div>
-			</div> <!-- / .header-body -->
-
-		</div>
-	</div> <!-- / .header -->
-
+	{{header}}
 
 	<div class="container-fluid">
 		
 
+
+
 		<div class="card card-fill zup tooltipA sp1 hidden" id="malware_tooltip">
             <a id="block_by_country_tip" style="scroll-margin-top:300px;"></a>
-            <div class="tooltiptext">
+            <div class="tooltip-text">
                 <span id="malware_message">
-                <p class="">The Malware Scan tab verifies the integrity of all program files in use on your web server faster than any other scanner available.</p> <p>Click "Scan All Files" to start a new scan.</p>
+					<p class="tdc">The Malware Scan tab verifies the integrity of all program files in use on your web server faster than any other scanner available.</p> <p>Click "Scan All Files" to start a new scan.</p>
                 </span>
                 <div class="right">
-                <button class="alert-secondary alert nxt" id="malware_next">Next
-                    <span class="fe fe-skip-forward" class="mt-4"></span>
-                </button>
+					<button class="alert-secondary alert nxt" id="malware_next"><span class="tdc">Next</span>
+						<span class="fe fe-skip-forward" class="mt-4"></span>
+					</button>
                 </div>
             </div>
         </div>
 
 
 
-		<button class="mt-2 mb-2 ml-2 btn btn-primary d-md-inline-block" id="scan_button" title="Click to begin scanning for malware">
-			Scan All Files <span class='fe fe-chevron-right'></span>
-		</button>
 
 
 		<div class="row">
 			<div class="col-12">
 
-				<div class="card-header">
 
-					<h4 class="card-header-title">
-						Wordpress version {{wp_ver}} :
-						<span id="count_files" class="text-muted" data-mod="0" data-total="{{total_files}}"
-							data-count="{{file_count}}">({{file_count}}) 
-							Scanned Files </span>
-						<span id="num_files" class="text-muted ml-4" data-num="0">(.) Changed Files </span>
-						<span id="un_files" class="text-muted ml-4" data-num="0">(.) Unknown Files </span>
-						<div id="files_spin" class="spinner-border text-secondary spinner-border-sm mt-1 ml-4 hidden"
-							role="status">
-						</div>
-						<span id="status_amt" class="ml-4">2%</span> <span class="text-muted"> scanned <span id="status_time"></span></span>
-
-					</h4>
-
+			<div class="card">
+			<div class="cover malware"></div>
+			<div class="card-body" style="margin-top:1.5rem;">
+				<div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+				<img id="" src="{{public}}img/virus.png" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
 				</div>
-				<div class="card-body hidden" id="results">
+				<h2 style="margin-top:-1rem;" class="card-title">
+				<strong>
+					<span class="tdc alt1">
+					BitFire Malware Scanner
+					</span>
+				</strong>
+				<small class="text-muted"><i>(click Scan Files Now to begin)</i></small>
+				</h2>
+			</div>
 
-					<div class="alert alert-teal" role="alert" id="status_alert"><span id="status">Wordpress integrity check: </span> 					</div>
+
+			<div class="card-body">
+
+				<button class="mt-2 mb-2 ml-2 btn btn-primary d-md-inline-block" id="scan_button" title="Click to begin scanning for malware">
+					<span class="tdc"> Scan Files Now</span><span class='fe fe-chevron-right'></span>
+				</button>
+
+				<h4 class="card-header-title mt-4 mb-4" id="status_line">
+					Wordpress version {{wp_ver}} :
+					<span id="count_files" class="text-muted" data-mod="0" data-total="{{total_files}}"
+						data-count="{{file_count}}">({{file_count}} / {{total_files}}) 
+						Scanned Files </span>
+					<span id="mal_files" class="text-muted ml4" data-num="0">(.) Malware Files </span>
+					<div id="files_spin" class="spinner-border text-secondary spinner-border-sm mt-1 ml-4 hidden mb-2" role="status">
+					</div>
+					<span id="status_amt" class="ml-4 text-secondary">2%</span> <span class="text-muted tdc"> scanned </span><span id="status_time"></span>
+				</h4>
+
+				<div class="" attr="hidden" id="results">
+
+					<div class="alert alert-teal" style="margin-bottom: 2rem;" role="alert" id="status_alert"><span id="status">Wordpress integrity check: </span> 					</div>
 
 					<!-- List -->
 					<ul class="list-group list-group-lg list-group-flush list my-n4" id="files_ul">
@@ -503,11 +169,9 @@
 
 				</div>
 			</div>
-
-		</div>
-	</div> <!-- / .row -->
-</div>
-
+			</div>
+		</div> <!-- / .row -->
+	</div>
 </div><!-- / .main-content -->
 
 
@@ -516,12 +180,13 @@
 <script type="text/template" id="hash_template">
 	<div class="row align-items-center" id="info<%=crc_trim%>">
 		<div class="col-auto">
-			<img id="icon<%=crc_trim%>" src="{{assets}}/php-file.png" width="32" height="32" />
+			<img id="icon<%=crc_trim%>" src="{{assets}}/malware.png" width="32" height="32" />
 		</div>
 		<div class="col ms-n2">
 
 			<h4 class="mb-1 name">
 				<%=table%> <a href="#!"><%=name%> <%=rel_path%></a>
+				<small class="text-muted pl-4"><span class="tdc pl-4">Character Frequency Analysis:</span> <%=malware[0].frequency%></small>
 			</h4>
 
 			<p class="card-text small text-muted mb-1">
@@ -546,18 +211,18 @@
 		<div class="col-auto" id="action_list<%=crc_trim%>">
 
 				<% if (window.isf) { %>
-				<button style="font-size:.75rem;" onclick="alert('Upgrade to PRO to access 10,000,000 WordPress file datapoints and auto repair this file.');"
+				<button style="font-size:.75rem;" id="repair<%=crc_trim%>" onclick="alert('Upgrade to PRO to access 10,000,000 WordPress file data-points and auto repair this file.');"
 				class="lift btn btn-white d-md-inline-block {{showfree_class}}" title="replace this file with the master copy from wordpress.org">
 				<% } else { %>
-				<button style="font-size:.75rem;" onclick="BitFire_api('repair', {'filename':'<%=file_path%>','url':'<%=url%>', 'id':'<%=crc_trim%>'}, repaired);"
+				<button style="font-size:.75rem;" id="repair<%=crc_trim%>" onclick="repair_file('<%=file_path%>', '<%=url%>', <%=crc_trim%>, <%=found%>);"
 				class="lift btn btn-white  d-md-inline-block" title="replace this file with the master copy from wordpress.org">
 				<% } %>
-				<img src="{{assets}}check-square.svg" class="success"> Repair
+					<img src="{{assets}}check-square.svg" class="success"> Repair
 				</button>
 
-				<button style="font-size:.75rem;" onclick="BitFire_api('allow', {'path':'<%=crc_path%>', 'filename':'<%=rel_path%>', 'trim':'<%=crc_trim%>'}, allowed);"
+				<button style="font-size:.75rem;" onclick="BitFire_api_call('allow', {'path':'<%=crc_path%>', 'filename':'<%=file_path%>', 'trim':'<%=crc_trim%>'}, allowed);"
 				class="lift btn btn-white  d-md-inline-block" title="Mark this exact file as fine and remove this version from future scans">
-				<img src="{{assets}}check-square.svg" class="warning"> Allow
+					<img src="{{assets}}check-square.svg" class="warning"> Allow
 				</button>
 
 				<a style="font-size:.75rem;" href="<%=self_url%>&filename=<%=rel_path%>&BITFIRE_API=download&BITFIRE_NONCE={{secret}}"
@@ -566,7 +231,7 @@
 				</a>
 				
 				<button style="font-size:.75rem;" role="button" title="show diff for this file"
-				onclick="showdiff('<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', true)" class="lift btn btn-white d-md-inline-block">
+				onclick="show_diff('<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', true)" class="lift btn btn-white d-md-inline-block">
 					<img src="{{assets}}copy.svg" class="secondary"> Diff
 				</button>
 
@@ -578,8 +243,9 @@
 		</div>
 	</div>
 	<div class="row diffrow collapse" id="diff_cont<%=crc_trim%>" style="padding:0">
-		<pre id="line_data<%=crc_trim%>" class="mb-0 line_nums"></code></pre>
-		<div id="diff_data<%=crc_trim%>" style="width:93%; overflow-wrap:anywhere;float:left;" class="mb-0 language-php"></div>
+		<pre id="line_data<%=crc_trim%>" class="mb-0 line_nums"></pre>
+		<!-- HERE WE NEED TO INJECT malware[1] - highlight malware[3]-->
+		<div id="diff_data<%=crc_trim%>" style="width:93%; overflow-wrap:anywhere;float:left;" class="mb-0 language-php"><%=markup%></div>
 		<svg style="float:right;cursor:pointer;" title="collapse this diff view" onclick="classtoggle('collapse', '<%=crc_trim%>')" class=""
 		width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="collapse code diff view">
 		<g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x="11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><rect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g>
@@ -588,8 +254,35 @@
 </script>
 
 
+<script type="text/template" id="good_template">
+	<div class="row align-items-center bg-success-soft" style="padding:0.5rem;border-left:4px solid #00d97e;" >
+		<div class="col-auto">
+			<span class="dashicons dashicons-plugins-checked"></span>
+		</div>
+		<div class="col ms-n2">
+
+			<h4 class="mb-1 name">
+				<%=table%>: <a href="#!"><%=name%></a>
+			</h4>
+
+			<p class="card-text small text-muted mb-1">
+				<span style="margin-right:50px;">
+					<span class='badge bg-success'>
+						Malware Scan Clean
+					</span> Number Scanned Files:
+				</span>
+				<span class="text-primary"><%=num_files%></span> 
+			</p>
+
+		</div>
+	</div>
+</script>
+
+
+
 
 <script type="text/javascript">
+    window.BITFIRE_NONCE = '{{api_code}}';
 
 	/** called after reapir pro api call */
 	function repaired(response) {
@@ -638,21 +331,39 @@
 	}
 
 
+	function render_malware(c) {
+		let result = "";
+		result.markup += "<pre><code class='language-php'>" + htmlEscape(c.pre_text) + "</code></pre>";
+		result.markup += "<pre class='evil'><code class='language-php'>🦠 1" + htmlEscape(c.content) + "</code></pre>";
+		result.markup += "<pre><code class='language-php'>" + htmlEscape(c.post_text) + "</code></pre><br><hr><br>";
+		return result;
+	}
+
 	// render the list of files generated on the page
 	var diffed = {};
 	var surl = '{{self}}';
 	var file_list = {{file_list_json}};
 	var num_files = 0;
+	var G_CHANGED = {"total": {{file_count}}, "malware": 0, "total_files": {{total_files}} };
 
-	var content = GBI("hash_template");
-	var hash_renderer = _.template(content.innerText);
+	var hash_content = GBI("hash_template");
+	var hash_renderer = _.template(hash_content.innerText);
+	var good_content = GBI("good_template");
+	var good_renderer = _.template(good_content.innerText);
+	var list_elms = [];
 	console.log("list: ", file_list);
 
-	//<li class="list-group-item " id="file<%=crc_trim%>" name="an<%=crc_trim%>">
-	//</li>
+	// map the list of root files to a list of li elements
+	document.addEventListener("DOMContentLoaded", function() {
 	var list_elms = _.map(file_list, function (x) {
 		x.self_url = surl;
-		console.log(x);
+		console.log("init file", x.malware.length);
+		G_CHANGED.malware++;
+		x.markup = "";
+		for (let i = 0; i < x.malware.length; i++) {
+			x.markup += render_malware(x.malware[i]);
+		}
+		console.log(x.markup);
 		html = hash_renderer(x);
 		let li = document.createElement("li")
 		li.id = "file" + x.crc_trim;
@@ -661,44 +372,64 @@
 		li.innerHTML = html;
 		return li;
 	});
-	let frag = new DocumentFragment();
-	console.log(list_elms);
-	console.log(frag);
-	for (let i=0; i<list_elms.length; i++) {
-		let elm=list_elms[i];
-
-		console.log(elm);
-		frag.appendChild(elm);
+	// append the elements to the ul.  TODO: clean up with more functional pattern
+	if (list_elms) {
+		console.log("list_elms", list_elms);
+		let frag = new DocumentFragment();
+		for (let i=0; i<list_elms.length; i++) {
+			let elm=list_elms[i];
+			if (elm != null) {
+				frag.appendChild(elm);
+			}
+		}
+		if (frag.childElementCount == 0 && file_list.length > 0) {
+			console.log("0 child elements");
+			let li = document.createElement("li")
+			li.innerHTML = good_renderer(file_list[0]);
+			console.log("rendered li", file_list, li);
+			frag.appendChild(li);
+		}
+		GBI("files_ul").appendChild(frag);
 	}
-	console.log(frag);
 
-	GBI("files_ul").appendChild(frag);//
 
-	// diff each file ...
+
+	});
+
+		// diff each file ...
 	_.each(file_list, (elm) => {
-		console.log("show diff", elm);
+		console.log("show orig diff", elm);
+		/* TODO: clean me
 		if (elm.r == "MISS") {
 			let u = GBI("un_files");
 			let n = parseInt(u.getAttribute("data-num"));
 			n++;
 			u.setAttribute("data-num", n);
 			u.innerText = " (" + n + ") Unknown Files"
+			//elm.url = "";
 		}
-		showdiff(elm.file_path, elm.url, elm.crc_trim);
+		*/
+		// this calls diff function and displays the result.
+		// we only want to diff files that have malware
+		// show_diff(elm.file_path, elm.url, elm.crc_trim, elm.malware); 
 	});
 
 	var dir_ver = {{dir_ver_json}};
 	var dirs = {{dir_list_json}};
+
 	var dir_idx = 0;
 
-	var testans = function (response) {
+	var hash_dir_handler = function (response) {
 
-		console.log("test ans", response);
-
-		if (response.code && response.message) { alert(response.message); return; }
-
+		console.log("hash handler", response);
 		let new_files = JSON.parse(atob(response.data.data));
-		console.log("new files ", new_files);
+
+		G_CHANGED.total += response.data.file_count;
+		G_CHANGED.malware += new_files.length;
+		/*
+		if (response.known) {
+			G_CHANGED["changed-ok"] = response.data.file_count - new_files.length;
+		}
 
 		let cf = GBI("count_files"); // todo fix small bypass here
 		if (cf) {
@@ -713,134 +444,277 @@
 				}
 			}
 		} else {
-			console.log("FAIL NO count_files element", cf);
+			console.error("FAIL NO count_files element", cf);
 		}
+		*/
 
-
-		filter_files = new_files.filter(function (x) {
-			if (x.info && x.info.includes("name not found")) { return false; }
-			return true;
+		/*
+		// TODO: replace the info includes to a bool test
+		unknown_files = new_files.filter(function (x) {
+			return (x.r == "MISS") ? false : true;
 		});
-		if (filter_files.length < new_files) { alert("unknown plugin: " + response.basename); }
-
+		if (unknown_files.length < new_files) { alert("unknown plugin: " + response.basename); }
+		*/
 
 
 		let content = GBI("hash_template");
 		let hash_renderer = _.template(content.innerText);
-		//console.log(new_files.files);
-		//var output = _.map(new_files, hash_renderer).join("");
-		var list_elms = _.map(new_files, function (x) {
-			x.self_url = surl;
-			console.log(x);
-			let html = hash_renderer(x);
-			let li = document.createElement("li")
-			li.id = "file" + x.crc_trim;
-			li.name = "an" + x.crc_trim;
-			li.classList.add("list-group-item");
-			li.innerHTML = html;
-			return li;
-
-		});
-
 		let frag = new DocumentFragment();
-		console.log(list_elms);
-		console.log(frag);
-		for (let i=0; i<list_elms.length; i++) {
-			let elm=list_elms[i];
 
-			console.log(elm);
-			frag.appendChild(elm);
+		if (response.data.hit_count == 0) { 
+			type = "core";
+			if (response.data.dir.indexOf("/plugins/") > 1) { type = "plugin"; }
+			else if (response.data.dir.indexOf("/themes/") > 1) { type = "theme"; }
+			//alert("unknown "+ type + " file found: " + response. data.basename);
 		}
-		console.log(frag);
+		if (new_files && new_files.length > 0) {
+
+			var list_elms = _.map(new_files, function (x) {
+				x.self_url = surl;
+				// console.log(x);
+
+		G_CHANGED.malware++;
+		x.markup = "";
+		for (let i = 0; i < x.malware.length; i++) {
+			let c = x.malware[i];
+			let p = Prism.highlight(c.pre_text, Prism.languages.php).replaceAll("\n", "<br>");
+			let e = Prism.highlight(c.content, Prism.languages.php).replaceAll("\n", "<br>");
+			let r = Prism.highlight(c.post_text, Prism.languages.php).replaceAll("\n", "<br>");
+
+			x.markup += "<span>" + p + "</span><span class='evil'>🦠"+e+"</span><span>"+r+"</span><br><hr>\n";
+		}
+
+
+				let html = hash_renderer(x);
+				let li = document.createElement("li")
+				li.id = "file" + x.crc_trim;
+				li.name = "an" + x.crc_trim;
+				li.classList.add("list-group-item");
+				li.innerHTML = html;
+				return li;
+
+			});
+
+			//console.log(list_elms);
+			//console.log(frag);
+			for (let i=0; i<list_elms.length; i++) {
+				let elm=list_elms[i];
+
+				//console.log(elm);
+				frag.appendChild(elm);
+			}
+		} else {
+			console.log("dump hash dir good hashes");
+
+			var good_content = GBI("good_template");
+			var good_renderer = _.template(good_content.innerText);
+			var good_plugin = {"table":"plugin", "name":response.data.basename, "num_files": response.data.file_count};
+
+			let li = document.createElement("li")
+			li.innerHTML = good_renderer(good_plugin);
+			frag.appendChild(li);
+		}
+		//console.log(frag);
 
 		GBI("files_ul").appendChild(frag);
-		// CONTINUE HERE
+		update_times();
 
 
+		/*
 		_.each(new_files, (elm) => {
-			//console.log("ELM", elm);
-			showdiff(elm.file_path, elm.url, elm.crc_trim);
+			// console.log("New item line ELM", elm);
+			//show_diff(elm.file_path, elm.url, elm.crc_trim);
+			let html = malware_to_html(elm.malware);
+			update_diff(html, "", elm.crc_trim, true);
 		});
+		*/
 
 		if (++dir_idx < dirs.length) {
 			// console.log("reload ", dir_idx, dirs, dirs[dir_idx]);
-			BitFire_api("dump_hash_dir", 
+			BitFire_api_call("dump_hash_dir", 
 				{"dir": dirs[dir_idx], "ver": dir_ver[dirs[dir_idx]] },
-				testans);
+				hash_dir_handler);
 		}
 		// all done!
 		else {
 			GBI("files_spin").classList.add("hidden"); 
 			GBI("status_amt").innerText = "100 %";
 
-			let num = GBI("num_files").getAttribute("data-num");
-			if (num == 0) {
+			if (G_CHANGED.malware == 0) {
 				GBI("status").innerHTML = "Wordpress integrity check: <strong>File Integrity 100%</strong>";
 				GBI("status_alert").classList.remove("alert-teal");
 				GBI("status_alert").classList.add("alert-success");
 			} else {
 				GBI("status").innerHTML = "Wordpress integrity check: <strong>Complete</strong>";
 			}
+
+			//let un = parseInt(GBI("un_files").getAttribute("data-num"));
+			GBI("count_files").innerText = G_CHANGED.total + " / " + C_CHANGED.total_files + " Scanned Files";
+			GBI("mal_files").innerText = G_CHANGED.malware + " Malware Files";
+			BitFire_api_call("malware_files", {"total":G_CHANGED.total, "malware":G_CHANGED.malware});
 			window.clearInterval(window.SCAN_TIMER);
+			console.log("stats", G_CHANGED);
 		}
 
-		update_times();
 	};
 
+	/**
+	 * convert a malware array to some usable HTML
+	 */
+	function malware_to_html(response) {
+		html = "";
+		if (response[1] <= 0.01) {
+			return "";
+		}
+		else {
+			console.log("mal_2_html: unknown file frequency: ", response[1]);
+			for (let i=0; i<response[0].length && i<10; i++) {
+				malware = response[0][i];
+				let malware_check = malware[3].substr(2, 24);
+				let malware_text = malware[3].substr(0, 80);
+				html += "// Local File Contains Possible Malware Code: <strong>" + malware_text+ "</strong><br>\n";
+				html2 = "";
+				//console.log("render", malware);
+				let lines = malware[1].split("\n");
+				for (let k=0; k<lines.length; k++) {
+					let line = lines[k];
+					let evil_line = line.indexOf(malware_check) >= 0;
+					let markup = Prism.highlight(line, Prism.languages.php, 'php') + "<br />\n";
+					html2 += (evil_line) ? "<div class='evil'>🦠 " + markup + "</div>" : markup;
+				}
+				is_evil = true;
+				html += "<div class='add'>" + html2 + "\n</div>\n";
+			}
+		}
+		return html;
+	}
 
+	/**
+	 * called when the "scan all files" button is clicked
+	 */
 	function begin_scanning() {
+		console.log("begin scanning");
 		window.START_TIME = Math.floor(Date.now() / 1000);
 		window.SCAN_TIMER = window.setInterval(function() { 
 			let t = Math.floor(Date.now() / 1000);
 			let diff = t - window.START_TIME;
-			GBI("status_time").innerText = "scanned in " + diff + " seconds";
-		});
+			GBI("status_time").innerText = " in " + diff + " seconds";
+			//console.log(G_CHANGED);
+			GBI("mal_files").innerText = G_CHANGED.malware  + " Malware Files";
+			GBI("count_files").innerText = G_CHANGED.total  + " Scanned Files";
+			let per = G_CHANGED.total / G_CHANGED.total_files;
+			GBI("status_amt").innerText = " " + (per * 100).toPrecision(4) + "%";
+		}, 1000);
 		GBI("scan_button").setAttribute("disabled", "disabled");
 		GBI("files_spin").classList.remove("hidden"); 
 		GBI("results").classList.remove("hidden");
-		BitFire_api("dump_hash_dir",
+		console.log("dump hash dir ", dirs[dir_idx]);
+		BitFire_api_call("dump_hash_dir",
 			{"dir": dirs[dir_idx],"ver": dir_ver[dirs[dir_idx]]},
-			testans);
+			hash_dir_handler);
 	}
 	GBI("scan_button").addEventListener("click", begin_scanning);
 
+	function update_diff(html, line_nums, id, is_evil) {
+		let e = document.getElementById("diff_data" + id);
+		let e2 = document.getElementById("line_data" + id);
+		num_files++;
+		e.innerHTML = html;
+		e2.innerHTML = line_nums.trim();
+
+		if (is_evil) {
+			document.getElementById("icon" + id).src = "https://bitfire.co/assets/malware.png";
+			/*
+			if (!do_toggle) {
+				console.log("DC1", id);
+				let e = document.getElementById("diff_cont" + id);
+				if (e) { e.classList.remove("collapse"); }
+				else { console.error("DC1 unable to load", "dis_cont" + id); }
+			}
+			*/
+			let e = document.getElementById("info" + id);
+			if (e) { e.classList.add("bg-danger-soft"); }
+			else { console.error("DC2 unable to load", "info" + id); }
+		}
+		else {
+			let cf = GBI("count_files");
+			if (cf) {
+				let mod = parseInt(cf.getAttribute("data-mod"));
+				mod++;
+				cf.setAttribute("data-mod", mod);
+			}
+		}
+	}
 
 
-	function showdiff(path, url, id, do_toggle = false) {
 
-		console.log("showdiff", url, path, id);
-		if (do_toggle) { document.getElementById("diff_cont" + id).classList.toggle("collapse"); }
+	function show_diff(path, url, id, do_toggle = false, malware = false) {
+
+		// console.log("show diff func", url, path, id);
+		if (do_toggle) { console.log("toggle"); document.getElementById("diff_cont" + id).classList.toggle("collapse"); }
 		if (diffed[id]) { console.log("diffed!"); return; }
 		diffed[id] = true;
 
 		
 
+		// todo: needs TLC
 		let ans = function (data) {
-			//if (!data.success) { console.log("ERROR DIFFING FILE", data); return; }
+			//if (!data.success) { console.error("ERROR DIFFING FILE", data); return; }
+			// console.log("diff ans", data);
 
+			let line_nums = "\n";
+			let html = "";
+			let has_diff = false;
+			let is_evil = false;
+			let e = document.getElementById("diff_data" + id);
+			let e2 = document.getElementById("line_data" + id);
 			// extract and decode the data...
 			if (data.data.compressed) {
 				var t1 = pako.inflateRaw(Uint8Array.from(atob(data.data.zlib_orig), c => c.charCodeAt(0)), {to:"string"});
 				var t2 = pako.inflateRaw(Uint8Array.from(atob(data.data.zlib_local), c => c.charCodeAt(0)), {to:"string"});
+				// console.log("inflated", t1.length, t2.length);
 			} else if (data.data.length > 0) {
+				var t1 = "";
+				if (data && data.data && data.data.orig) { t1 = atob(data.data.orig); }
 				var t1 = atob(data.data.orig);
 				var t2 = atob(data.data.local);
-			} else {
-				console.log("ERROR RESPONSE, last showdiff");
-				return;
+				// console.log("static", t1.length, t2.length);
 			}
+			if (data.data.malware) {
+				// console.error("show_diff error follows:", id);
+				// console.log(data);
+				if (data.data.frequency <= 0.01) {
+					//console.log("SKIP!", data);
+				}
+				else {
+					console.log("unknown file frequency: "+  data.data.frequency);
+					for (let i=0; i<data.data.malware.length && i<10; i++) {
+						malware = data.data.malware[i];
+						let malware_check = malware[3].substr(2, 24);
+						let malware_text = malware[3].substr(0, 80);
+						html += "// Unknown Local File Contains Possible Malware Code: <strong>" + malware_text+ "</strong><br>\n";
+						html2 = "";
+						//console.log("render", malware);
+						let lines = malware[1].split("\n");
+						for (let k=0; k<lines.length; k++) {
+							let line = lines[k];
+							let evil_line = line.indexOf(malware_check) >= 0;
+							line_nums += "\n";
+							let markup = Prism.highlight(line, Prism.languages.php, 'php') + "<br />\n";
+							html2 += (evil_line) ? "<div class='evil'>🦠 " + markup + "</div>" : markup;
+						}
+						is_evil = true;
+						html += "<div class='add'>" + html2 + "\n</div>\n";
+					}
+					if (data.data.malware.length > 0) { has_diff = true; }
+				}
+			} else {
 
 			let l1 = difflib.stringAsLines(t1);
 			let l2 = difflib.stringAsLines(t2);
 			let sm = new difflib.SequenceMatcher(l1, l2);
 			let ops = sm.get_opcodes();
-			let e = document.getElementById("diff_data" + id);
-			let e2 = document.getElementById("line_data" + id);
-			let html = ""
-			let line_nums = ""
-			let has_diff = false;
-			let is_evil = false;
-			console.log("diff ops", ops);
+			// console.log("diff ops", ops);
 			for (i = 0; i < ops.length; i++) {
 				if (ops[i][0] == "insert") {
 					num_replace = 0;
@@ -855,7 +729,7 @@
 							if (num_replace++ < 100 || evil_line) {
 								line_nums += j + "\n";
 								let markup = Prism.highlight(l2[j], Prism.languages.php, 'php') + "<br />\n";
-								html2 += (evil_line) ? "<div class='evil'>" + markup + "</div>" : markup;
+								html2 += (evil_line) ? "<div class='evil'>🦠 " + markup + "</div>" : markup;
 							}
 							is_evil |= evil_line;
 						}
@@ -911,34 +785,12 @@
 					console.log("diff ops", ops[i]);
 				}
 			}
+			}
+
+
 			// console.log(has_diff, html);
 			if (has_diff) {
-				num_files++;
-				e.innerHTML = html;
-				e2.innerHTML = line_nums.trim();
-
-				if (is_evil) {
-					document.getElementById("icon" + id).src = "https://bitfire.co/assets/malware.png";
-					/*
-					if (!do_toggle) {
-						console.log("DC1", id);
-						let e = document.getElementById("diff_cont" + id);
-						if (e) { e.classList.remove("collapse"); }
-						else { console.error("DC1 unable to load", "dis_cont" + id); }
-					}
-					*/
-					let e = document.getElementById("info" + id);
-					if (e) { e.classList.add("bg-danger-soft"); }
-					else { console.error("DC2 unable to load", "info" + id); }
-				}
-				else {
-					let cf = GBI("count_files");
-					if (cf) {
-						let mod = parseInt(cf.getAttribute("data-mod"));
-						mod++;
-						cf.setAttribute("data-mod", mod);
-					}
-				}
+				update_diff(html, line_nums, id, is_evil);
 
 				if (do_toggle) {
 					let e = document.getElementById("diff_cont" + id);
@@ -949,26 +801,23 @@
 				let e = document.getElementById("file" + id);
 				if (e) { e.classList.add("collapse"); }
 				else { console.error("DC4 unable to load", "file" + id); }
-				console.log("FILE IDENTICAL", data.file_path);
-
-				/*
-				postData("https://bitfire.co/stow.php",
-					{
-						"url": data.url,
-						"file_path": data.file_path,
-						"crctrim": id,
-						"content": data.local
-					});
-				*/
 			}
 			GBI("num_files").innerText = " (" + num_files + ") Changed Files"
 			GBI("num_files").setAttribute("data-num", num_files);
+			return;
 		}
 
-		console.log("bitapi diff");
-		BitFire_api("diff",
+		// console.log("bitapi diff", path);
+		if (path.length < 1) {
+			console.error("bitfire api diff path too short", path, url);
+			return;
+		}
+
+		/* TEMP
+		BitFire_api_call("diff",
 			{"url": url, "file_path": path},
 			ans);
+			*/
 		return;
 	}
 
@@ -1001,11 +850,20 @@
 		let r = /\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff\]\[\'\"]*\s*\(/;
 		if (r.exec(line)) { console.log("php var fn"); return true; }
 		if (line.includes("location") && line.includes("header")) { console.log("found redirect"); return true; }
-		let funcs = ['base64_decode', 'uudecode', 'ord', 'hebrev', 'hex2bin', 'str_rot13', 'chr', 'eval', 'proc_open', 'pcntl_exec', 'exec', 'shell_exec', 'call_user_func', 'call_user_func_array', 'system', 'passthru', 'shell_exec', 'copy', 'uploaded_file', 'stream_wrapper_'];
+		let content = ['document[_0x', 'String[_0x', 'TG9jYXRpb246IA=='];
+		let funcs = ['wp_create_user', 'base64_decode', 'uudecode', 'ord', 'hebrev', 'hex2bin', 'str_rot13', 'chr', 'eval', 'proc_open', 'pcntl_exec', 'exec', 'shell_exec', 'call_user_func', 'call_user_func_array', 'system', 'fromCharCode', 'passthru', 'shell_exec', 'copy', 'uploaded_file', 'stream_wrapper_'];
 		let result = funcs.reduce((val, e) => {
-			let reg = new RegExp(e + '\\s*\\(', 'i');
-			if (reg.exec(line)) { console.log("found fn ", e); val = true; } return val;
+			let regex = '[^a-zA-Z]' + e + '\\s*\\(';
+			let reg = new RegExp(regex, 'i');
+			if (reg.exec(line)) {
+				console.warn("found fn "); console.log(e, line, regex); val = true; }
+			return val;
 		}, false);
+		if (!result) {
+			result = content.reduce((val, e) => {
+				if (line.indexOf(e) > 0) { console.warn("found content ", e); val = true; } return val;
+			}, false);
+		}
 		if (result) {
 			console.log("evil detected", line);
 			let s = GBI("status");
@@ -1047,33 +905,6 @@
 		location.hash = "#an" + id;
 	}
 
-	function toggle(elm, type) {
-		var e = GBI(elm);
-		console.log("toggle elm", e);
-		e.innerText = cap(type);
-		BitFire_api("toggle_config_value", {"param": elm, "value": type})
-		.then(e => {
-			console.log(e);
-			if (!e.success) { alert(e.note); }
-		});
-
-		if (type == "block" || type == "on" || type == "true") {
-			e.classList.remove("btn-warning");
-			e.classList.remove("btn-secondary");
-			e.classList.add("btn-success");
-		} else if (type == "report" || type == "alert") {
-			e.classList.remove("btn-success");
-			e.classList.remove("btn-secondary");
-			e.classList.add("btn-warning");
-		} else {
-			e.classList.remove("btn-success");
-			e.classList.remove("btn-warning");
-			e.classList.add("btn-secondary");
-		}
-	}
-
-
-
 
 	function fp(info, ...parts) {
 		return parts.reduce((accumulator, value) => {
@@ -1086,9 +917,17 @@
 		}, "");
 	}
 
+
+	function repair_file(filename, url, id, found) {
+		if (!found) {
+			alert("BitFire can only auto-repair files from the official WordPress repository. This file must be  manually repaired.");
+			return;
+		}
+		BitFire_api_call('repair', {'filename':filename,'url':url, 'id':id}, repaired);
+	}
 	/*
 	file_list.forEach(elm => {
-	  showdiff(elm['path'], elm['url'], elm['actual']);
+	  show_diff(elm['path'], elm['url'], elm['actual']);
 	  document.getElementById("file"+elm['actual']).classList.remove("collapse");
 	});
 	*/

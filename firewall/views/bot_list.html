@@ -1,0 +1,134 @@
+<style>
+      {{custom_css}}
+</style>
+    
+<script type="text/javascript">
+</script>
+
+    <script type="text/template" id="alert_template">
+      <div class="alert alert-warning alert-dismissible fade show">
+        {{text}}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </script>
+
+{{ template:bot_row "data" }}
+<li class="list-group-item">
+  <div class="row align-items-center">
+    <div class="col-auto">
+      <a href="#!" class="avatar avatar-lg">
+        <img src="{{-data.homepage}}/favicon.ico" alt="{{-data.vendor}}" class="avatar-img rounded">
+      </a>
+    </div>
+    <div class="col ms-n2">
+
+      <!-- Title -->
+      <h4 class="mb-1 name">
+        <a href="{{-data.family_homepage}}" target="_blank">{{-data.name}}</a>
+      </h4>
+
+      <!-- Text -->
+      <p class="card-text small text-muted mb-1">
+        {{-data.ua_string}}
+      </p>
+
+      <!-- Time -->
+      <p class="card-text small text-muted">
+        <span class="tdc">First seen on </span><time class="text-primary" data-offset="{{page_tz}}" data-mtime="{{data.mtime}}" datetime="{{data.machine_date}}"></time>
+      </p>
+
+    </div>
+    <div class="col-auto">
+      <p class="card-text small tdc">Unique IPs: {{+data.number_ips}}</p>
+      <p class="card-text small tdc">Source Domain: {{-data.domain}}</p>
+      <p class="card-text small tdc">Category: {{-data.category}}</p>
+    </div>
+    <div class="col-auto">
+
+      <div class="col-auto tog" id="bitfire_enabled_con" data-enabled="{{data.enabled}}" data-title="Turn on to allow {{data.vendor}} bots" data-toggle="true">
+      </div>
+
+    </div>
+  </div> 
+</li>
+{{ end template }}
+
+
+    <div class="main-content">
+      
+      {{header}}
+    
+
+      <!-- CARDS -->
+      <div class="container-fluid">
+        <div class="row justify-content-center">
+
+          <div class="col-12 col-lg-10 col-xl-8" id="alert_block">
+          </div>
+
+          <div class="col-12 col-lg-10 col-xl-8">
+
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-header-title text-primary">
+                  {{title}}
+                </h3>
+              </div>
+              <div class="card-body mb-4" style="padding:1rem !important">
+                {{body}}
+
+
+                <div class="card">
+                  <div class="card-header">
+    
+                    <!-- Title -->
+                    <h4 class="card-header-title">
+                      Allowed Bots
+                    </h4>
+                        
+                  </div>
+                  <!--
+                  <div class="card-header">
+    
+                    <form>
+                      <div class="input-group input-group-flush input-group-merge input-group-reverse">
+    
+                        <input class="form-control list-search" type="search" placeholder="Search">
+    
+                        <div class="input-group-text">
+                          <span class="fe fe-search"></span>
+                        </div>
+    
+                      </div>
+                    </form>
+    
+                  </div>
+                  -->
+
+                  <div class="card-body">
+    
+                    <!-- List -->
+                    <ul class="list-group list-group-lg list-group-flush list my-n4">
+
+                      {{ render:bot_row "found_bots" }}
+                    </ul>
+    
+                  </div>
+                </div>
+
+
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    
+  <script type="text/javascript">
+      window.BITFIRE_NONCE = '{{api_code}}';
+  </script>
+
+    
+  {{gtag}}

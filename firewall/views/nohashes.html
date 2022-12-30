@@ -136,7 +136,7 @@ input[type=checkbox], input[type=radio] {
 
 @font-face {
   font-family: Feather;
-  src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),url({{font_path}}/Feather.woff?sdxovp) format("woff"),url({{font_path}}/Feather.svg?sdxovp#Feather) format("svg");
+  src: url({{font_path}}/Feather-wtf.ttf?wtf) format("truetype"),url({{font_path}}/Feather.woff?wtf2) format("woff"),url({{font_path}}/Feather.svg?wtf3#Feather) format("svg");
   font-weight: 400;
   font-style: normal;
 }
@@ -180,18 +180,7 @@ input[type=checkbox], input[type=radio] {
                 
         const VERSION = {{version}};
         const VERSION_STR = "{{sym_version}}";
-        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
-        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
-        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
-        window.CTR = 0;
         
-        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
-
-        function min(numbers) { return numbers.reduce(min_reducer); }
-        function max(numbers) { return numbers.reduce(max_reducer); }
-        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
-
-
         function set_config(id, value) {
           console.log("set config", id, value);
         }
@@ -205,7 +194,7 @@ input[type=checkbox], input[type=radio] {
           BitFire_api("toggle_config_value", {"param":config,"value":value})
             .then(r => r.json())
             .then(data => {
-              window.location="{{self}}&{{page}}=DASHBOARD";
+              window.location="{{self}}?page=bitfire";
             });
         }
 
@@ -253,7 +242,7 @@ input[type=checkbox], input[type=radio] {
                 <!-- Nav -->
                 <ul class="nav nav-tabs header-tabs">
                   <li class="nav-item">
-                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
+                    <a href="{{self}}?page=bitfire" class="nav-link grow" title="view blocked traffic">
                       Dashboard
                     </a>
                   </li>
@@ -315,7 +304,7 @@ input[type=checkbox], input[type=radio] {
 
     
   <script type="text/javascript">
-
+    window.BITFIRE_NONCE = '{{api_code}}';
   </script>
 
     

@@ -11,21 +11,67 @@
     <!-- Libs CSS -->
     <link rel="stylesheet" href="{{public}}/vs2015.css" />
     <link rel="stylesheet" href="{{public}}/prism.css" />
+    <!--
     <link rel="stylesheet" href="{{public}}/theme.min.css" />
+    -->
     <link rel="stylesheet" href="{{public}}/theme.bundle.css" />
     <link rel="stylesheet" href="{{public}}/feather.css" />
     
     <!-- Title -->
     <title>BitFire Dashboard</title>
-    <style>body { font-size: 20px; } </style>
+    <style>body { font-size: 20px; } .main-content { margin: 2rem; } </style>
 
     <script src="{{public}}/underscore.min.js"></script>
+    <script src="{{public}}/internal.js"></script>
 
   </head>
   <body>
 
     <!-- MAIN CONTENT -->
     <div class="main-content">
+
+        <div class="row align-items-center">
+          <div class="col left">
+
+            <!-- Nav -->
+            <ul class="nav nav-tabs header-tabs">
+              <li class="nav-item">
+                <a href="{{self}}?BITFIRE_PAGE=DASHBOARD" class="nav-link grow" title="view blocked traffic">
+                  Dashboard
+                </a>
+              </li>
+              <li class="nav-item {{has_scanner}}">
+                <a href="{{self}}?BITFIRE_PAGE=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
+                  Malware Scan
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{self}}?BITFIRE_PAGE=SETTINGS" class="nav-link grow" title="adjust firewall settings">
+                  Settings
+                </a>
+              </li>
+              <li class="nav-item {{has_scanner}}">
+                <a href="{{self}}?BITFIRE_PAGE=DATABASE" class="nav-link grow" title="edit site blocking exceptions">
+                  Database Recovery
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{self}}?BITFIRE_PAGE=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
+                  Exceptions
+                </a>
+              </li>
+
+              <li class="nav-item {{hidefree_class}}">
+                <a href="{{self}}?BITFIIRE_PAGE=ADVANCED" class="nav-link grow" title="enable PRO features">
+                  Advanced
+                </a>
+              </li>
+
+            </ul>
+          </div>
+        </div>
+
+
       {{maincontent}}
     </div>
     
@@ -34,9 +80,6 @@
     <script src="{{public}}/vendor.bundle.min.js"></script>
     -->
     <script src="{{public}}/jquery-3.6.1.min.js"></script>
-    <!--
-    <script src="{{public}}/bootstrap.bundle.min.js"></script>
-    -->
     <script src="{{public}}/chart.min.js"></script>
     <script src="{{public}}/difflib.js"></script>
     <script src="{{public}}/pako.js"></script>

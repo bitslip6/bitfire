@@ -1,7 +1,7 @@
     <style>
-      {{theme_css}}
-    </style>
-    <style>
+      {{custom_css}}
+
+      /* IMPORTED STYLES */
       .card { max-width: 100%; }
       .right { float: right; }
       /*
@@ -126,50 +126,35 @@ input[type=checkbox], input[type=radio] {
 }
 .form-check-input { cursor: pointer; vertical-align: top; background-size: contain; border: transparent; appearance: none; position: absolute; }
 
-      /*
-      ul.navbar-nav li.nav-item ul.nav li.nav-item { margin-bottom: -30px; }
-      */
-      /*
-      .dropdown-menu { margin-top: -20px; }
-      */
-@font-face {
-  font-family: Cerebri Sans;
-  src: url({{font_path}}/cerebrisans-regular.eot);
-  src: url({{font_path}}/cerebrisans-regular.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-regular.woff) format("woff"),url({{font_path}}/cerebrisans-regular.ttf) format("truetype");
-  font-weight: 400;
-  font-style: normal;
+.cover.system { background-image: url('{{public}}img/system-low.jpg'); }
+.cover.shield { background-image: url('{{public}}img/shield1.jpg'); }
+.cover.robot { background-image: url('{{public}}img/robot-low.jpg'); }
+.cover.server { background-image: url('{{public}}img/server-low.jpg'); }
+.cover.server-red { background-image: url('{{public}}img/server-red.jpg'); }
+.cover { 
+  width: 100%;
+  height: 100px; 
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0.5rem;
+  background-size: 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.9;
+  position: absolute;
+  top:0;
+  left:0;
+  right:0;
+  overflow: hidden;
 }
+.header-icon { position: absolute; left:16px; top:12px; font-size: 48px; }
+.card-title { margin-top: -1rem; border-bottom: 1px solid #DDD; padding-bottom: 1rem; }
+.alt1,h2,h4 { color: #3b506c; }
 
-@font-face {
-  font-family: Cerebri Sans;
-  src: url({{font_path}}/cerebrisans-medium.eot);
-  src: url({{font_path}}/cerebrisans-medium.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-medium.woff) format("woff"),url({{font_path}}/cerebrisans-medium.ttf) format("truetype");
-  font-weight: 500;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: Cerebri Sans;
-  src: url({{font_path}}/cerebrisans-semibold.eot);
-  src: url({{font_path}}/cerebrisans-semibold.eot?#iefix) format("embedded-opentype"),url({{font_path}}/cerebrisans-semibold.woff) format("woff"),url({{font_path}}/cerebrisans-semibold.ttf) format("truetype");
-  font-weight: 600;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: Feather;
-  src: url({{font_path}}/Feather.ttf?sdxovp) format("truetype"),url({{font_path}}/Feather.woff?sdxovp) format("woff"),url({{font_path}}/Feather.svg?sdxovp#Feather) format("svg");
-  font-weight: 400;
-  font-style: normal;
-}
-
-      
+  
     </style>
     
     <script type="text/javascript">
         window.CONFIG_LIST = {};
-        window.ERROR = [];
-        function GBI(name) { return document.getElementById(name); }
 
 
         function rand_string(config_name, length = 32) {
@@ -221,40 +206,10 @@ input[type=checkbox], input[type=radio] {
           });
         }
 
-        async function BitFire_api(api_method = '', data = {}) {
-          url = "{{self}}&BITFIRE_API=" + api_method;
-          data.BITFIRE_API = api_method;
-          data.BITFIRE_NONCE = "{{api_code}}";
-          data.ts = Date.now();
-          const response = await fetch(url, {
-          method: 'POST',
-          mode: 'cors',
-          cache: 'no-cache',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          redirect: 'follow',
-          referrerPolicy: 'same-origin',
-          body: JSON.stringify(data)
-          });
-          return response; // parses JSON response into native JavaScript objects
-        }
-
-
-
                 
         const VERSION = {{version}};
+        window.BITFIRE_NONCE = '{{api_code}}';
         const VERSION_STR = "{{sym_version}}";
-        const min_reducer = (accumulator, currentValue) => accumulator < currentValue ? accumulator : currentValue;
-        const max_reducer = (accumulator, currentValue) => accumulator >= currentValue ? accumulator : currentValue;
-        const cap = (s) => { if (typeof s !== 'string') return s; return s.charAt(0).toUpperCase() + s.slice(1); }
-        
-        function clamp(input, min, max) { return Math.min(Math.max(input, min), max); }
-
-        function min(numbers) { return numbers.reduce(min_reducer); }
-        function max(numbers) { return numbers.reduce(max_reducer); }
-        function avg(numbers) { return numbers.reduce((a, b) => (a + b)) / numbers.length; }
-
-
         function set_config(id, value) {
           console.log("set config", id, value);
         }
@@ -368,99 +323,7 @@ input[type=checkbox], input[type=radio] {
 
     <div class="main-content">
       
-      <!-- HEADER -->
-      <div class="header">
-        <div class="container-fluid">
-
-          <!-- Body -->
-          <div class="header-body">
-            <div class="row align-items-end">
-              <div class="left">
-                <!-- Pretitle -->
-                <h6 class="header-pretitle">
-                  {{release}}
-                </h6>
-                <!--
-                <p style="font-size:.75rem;color:#666;">
-                  <div class="{{showfree_class}}">
-                  <a href="https://bitfire.co/pricing" target="_blank">Upgrade to <span class="blue font-weight-bold">PRO</span></a> to enable File-Lock to prevent file modification, WordPress integrity check, Redirect protection and Multi Factor Authentication
-                  </div>
-                </p>
-              -->
-
-                <!-- Title 
-                <h1 class="header-title">
-                  <img src="{{assets}}shield.png" width="24" class="navbar-brand-img mx-auto" alt="...">
-                  {{page_name}}
-                </h1>
-              -->
-
-<div class="row {{showfree_class}}">
-			<div class="col-12">
-				<div class="card-body bg-warning-soft mb-4" style="border: solid 1px #e63757">
-					<h3 class="card-header-title">Filesystem is not locked</h3>
-					<br>
-					<p>
-            <a href="https://bitfire.co/pricing" target="_blank" class="right mb-2" style="text-decoration: underline">
-            Upgrade BitFire <span class='fe fe-external-link'></span>
-						</a>
-            to enable File-Lock and prevent malware infections, add Redirect protection and Multi Factor Authentication
-							Upgrade to BitFire PRO.
-					</p>
-
-				</div>
-			</div>
-		</div>
-
-
-
-
-              </div>
-            </div> <!-- / .row -->
-
-
-            <div class="row align-items-center">
-              <div class="col">
-
-                <!-- Nav -->
-                <ul class="nav nav-tabs header-tabs">
-
-                  <li class="nav-item">
-                    <a href="{{self}}&{{page}}=DASHBOARD" class="nav-link grow" title="view blocked traffic">
-                      Dashboard
-                    </a>
-                  </li>
-                  <li class="nav-item {{has_scanner}}">
-                    <a href="{{self}}&{{page}}=MALWARESCAN" class="nav-link grow" title="scan your website for malware">
-                      Malware Scan
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a href="{{self}}&{{page}}=SETTINGS" class="nav-link grow" title="adjust firewall settings">
-                      Settings
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a href="{{self}}&{{page}}=EXCEPTIONS" class="nav-link grow" title="edit site blocking exceptions">
-                      Exceptions
-                    </a>
-                  </li>
-                  <li class="nav-item {{hidefree_class}}">
-                    <a href="{{self}}&{{page}}=ADVANCED" class="nav-link grow" title="enable PRO features">
-                      Advanced
-                    </a>
-                  </li>
-
-
-                </ul>
-              </div>
-            </div>
-          </div> <!-- / .header-body -->
-
-        </div>
-      </div> <!-- / .header -->
-
-    
+    {{header}}      
 
   <!-- CARDS -->
   <div class="container-fluid" id="full_container">
@@ -468,6 +331,27 @@ input[type=checkbox], input[type=radio] {
       <div class="col-12 col-lg-10 col-xl-8">
 
         <div class="card">
+
+          <div class="cover server"></div>
+          <div class="card-body" style="margin-top:1.5rem;">
+            <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+              <img id="" src="{{public}}img/search.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+              <span class="fe alt1 header-icon fe-settings"></span>
+            </div>
+            <h2 style="margin-top:-1rem;" class="card-title">
+              <strong>
+                <span class="tdc alt1">
+                  BitFire Server Settings
+                </span>
+              </strong>
+              <span class="card-header-title text-secondary right">Enable</span>
+              <small class="text-muted"><i>(block automated scanners)</i></small>
+            </h2>
+          </div>
+
+
+
+          <!--
           <div class="card-header">
 
             <h4 class="card-header-title">
@@ -479,6 +363,7 @@ input[type=checkbox], input[type=radio] {
             <h4 class="card-header-title text-secondary">Enable</h4>
 
           </div>
+        -->
           <div class="card-body">
 
             <div class="list-group list-group-flush my-n3">
@@ -594,17 +479,26 @@ input[type=checkbox], input[type=radio] {
 
 
         <div class="card">
-          <div class="card-header">
-
-            <h4 class="card-header-title" id="bot_handling">
-              Bot Handling
-            <small class="text-muted ml-4">
-              <a href="https://bitfire.co/bot_blocking" target="_blank">Learn about bot blocking <span class="fe fe-external-link"></span></a>
-            </small>
-            </h4>
-            <h4 class="card-header-title text-secondary">Alert / Block</h4>
-
+          <div class="cover robot"></div>
+          <div class="card-body" style="margin-top:1.5rem;">
+            <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+              <img id="" src="{{public}}img/robot.png" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+              <!--
+              <span class="fe alt1 header-icon fe-server"></span>
+              -->
+            </div>
+            <h2 style="margin-top:-1rem;" class="card-title">
+              <strong>
+                <span class="tdc alt1">
+                  BitFire Bot Blocking
+                </span>
+              </strong>
+              <span class="card-header-title text-secondary right">Alert / Block</span>
+              <small class="text-muted"><i>(block automated scanners)</i></small>
+            </h2>
           </div>
+
+
           <div class="card-body">
 
             <div class="list-group list-group-flush my-n3">
@@ -763,18 +657,25 @@ input[type=checkbox], input[type=radio] {
         <hr class="my-5">
 
         <div class="card">
-          <div class="card-header">
 
-            <h4 class="card-header-title">
-              Generic Blocking
-            <small class="text-muted ml-4">
-              <a href="https://bitfire.co/web-blocking" target="_blank">Learn about web blocking <span class="fe fe-external-link"></span></a>
-            </small>
-            </h4>
-            <h4 class="card-header-title text-secondary">Alert / Block</h4>
-
+          <div class="cover shield"></div>
+          <div class="card-body" style="margin-top:1.5rem;">
+            <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+              <img id="" src="{{public}}img/search.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+              <span class="fe alt1 header-icon fe-shield"></span>
+            </div>
+            <h2 style="margin-top:-1rem;" class="card-title">
+              <strong>
+                <span class="tdc alt1">
+                  Web Application Firewall Features
+                </span>
+              </strong>
+              <span class="card-header-title text-secondary right">Alert / Block</span>
+              <small class="text-muted"><i>(block automated scanners)</i></small>
+            </h2>
           </div>
-          <div class="card-body">
+
+         <div class="card-body">
             <div class="list-group list-group-flush my-n3">
 
 
@@ -856,16 +757,23 @@ input[type=checkbox], input[type=radio] {
         <hr class="my-5">
 
         <div class="card">
-          <div class="card-header">
-
-            <h4 class="card-header-title">
-              System Settings
-              <small class="text-muted ml-4">
-                <a href="https://bitfire.co/system_settings">Learn about BitFire System Settings</a>
-              </small>
-            </h4>
-
+          <div class="cover system"></div>
+          <div class="card-body" style="margin-top:1.5rem;">
+            <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+              <img id="" src="{{public}}img/search.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+              <span class="fe alt1 header-icon fe-database"></span>
+            </div>
+            <h2 style="margin-top:-1rem;" class="card-title">
+              <strong>
+                <span class="tdc alt1">
+                  Server Configuration
+                </span>
+              </strong>
+              <small class="text-muted"><i>(PHP hosting settings)</i></small>
+            </h2>
           </div>
+
+
           <div class="card-body">
             <div class="row">
 
@@ -1005,6 +913,7 @@ input[type=checkbox], input[type=radio] {
 
         <hr class="my-5">
 
+        <!--
         <div class="card">
           <div class="card-header">
 
@@ -1052,10 +961,10 @@ input[type=checkbox], input[type=radio] {
                   </label>
                   <small class="form-text text-muted">Leave blank if not WordPress</small>
 
-    <div id="wp_root_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
+    <div id="cms_root_spin" class="spinner-border text-success spinner-border-sm left mt-1 mr-2 hidden" role="status">
       <span class="xvisually-hidden">Saving...</span>
     </div>
-    <input type="text" class="form-control txtin" id="dashboard_path_text" autocomplete="off" onchange="update_str('wp_root')" value="{{wp_root}}">
+    <input type="text" class="form-control txtin" id="dashboard_path_text" autocomplete="off" onchange="update_str('cms_root')" value="{{cms_root}}">
                 </div>
               </div>
 
@@ -1091,20 +1000,26 @@ input[type=checkbox], input[type=radio] {
             </div>
           </div>
         </div>
+        -->
 
-        <hr class="my-5">
 
         <div class="card">
-          <div class="card-header">
 
-            <h4 class="card-header-title">
-              PRO / PREMIUM licensing 
-              <small class="text-muted ml-4">
-                <a href="https://bitfire.co/pricing" target="_blank">Register for PRO / PREMIUM license <span class="fe fe-external-link"></span></a>
-              </small>
-            </h4>
-
+          <div class="cover server-red"></div>
+          <div class="card-body" style="margin-top:1.5rem;">
+            <div class="avatar avatar-xl card-avatar card-avatar-top" style="margin-top:1rem;">
+              <img id="" src="{{public}}img/search.jpg" style="background-color:#FFF;" class="avatar-img rounded-circle border-card">
+              <span class="fe alt1 header-icon fe-cpu"></span>
+            </div>
+            <h2 style="margin-top:-1rem;" class="card-title">
+              <strong>
+                <span class="tdc alt1">
+                  BitFire PRO / PREMIUM Licensing
+                </span>
+              </strong>
+            </h2>
           </div>
+
           <div class="card-body">
             <div class="row">
 
@@ -1129,6 +1044,8 @@ input[type=checkbox], input[type=radio] {
             </div>
           </div>
         </div>
+
+        <hr class="my-5 mt-4 mb-4">
 
         <div class="card">
           <div class="card-header">
@@ -1391,7 +1308,7 @@ function toggle_features() {
         update_str('pro_key');
         window.setTimeout(function() {
           alert("BitFire Pro license installed.  Click OK to edit advanced-settings.");
-          window.location = "{{self}}&{{page}}=ADVANCED";
+          window.location = "{{self}}?page=bitfire_advanced";
         }, 1000);
       }
 
@@ -1425,12 +1342,15 @@ function toggle_features() {
 
       }
 
+  // MAIN
+  document.addEventListener("DOMContentLoaded", function () {
       let e2 = GBI("gopro");
       e2.addEventListener("click", gopro);
       e2 = GBI("unlock_config");
       e2.addEventListener("click", unlock_config);
       e2 = GBI("uninstall");
       e2.addEventListener("click", uninstall);
+  });
 
       
     </script>
