@@ -17,7 +17,7 @@
  * @wordpress-plugin
  * Plugin Name:       BitFire
  * Plugin URI:        https://bitfire.co/
- * Description:       Patented WordPress Firewall. Lock your php files from malware. Complete bot protection. Malware Recovery. plugin vulnerability alert, login protection, and more. 
+ * Description:       Only RASP firewall for WordPress. Stop malware, redirects, back-doors and account takeover. 100% bot blocking, backups, malware cleaner.
  * Version:           __VERSION__
  * Author:            BitFire.co
  * License:           AGPL-3.0+
@@ -45,16 +45,20 @@ use const BitFire\CONFIG_USER_TRACK_COOKIE;
 use const BitFire\FILE_RW;
 use const BitFire\FILE_W;
 use const BitFire\STATUS_EACCES;
+use const BitFire\WAF_INI;
 use const BitFire\WAF_ROOT;
 use const ThreadFin\ENCODE_RAW;
 
+use function BitFire\make_sane_path;
 use function BitFire\verify_browser_effect;
 use function BitFireBot\send_browser_verification;
 use function BitFirePRO\wp_requirement_check;
 use function BitFireSvr\bf_deactivation_effect;
 use function BitFireSvr\doc_root;
+use function BitFireSvr\standalone_to_wordpress;
 use function BitFireSvr\update_ini_value;
 use function ThreadFin\contains;
+use function ThreadFin\cookie;
 use function ThreadFin\dbg;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial_right as BINDR;
@@ -63,6 +67,8 @@ use function ThreadFin\debug;
 use function ThreadFin\do_for_each;
 use function ThreadFin\en_json;
 use function ThreadFin\file_recurse;
+use function ThreadFin\find_const_arr;
+use function ThreadFin\find_fn;
 use function ThreadFin\http2;
 use function ThreadFin\httpp;
 use function ThreadFin\icontains;
@@ -71,39 +77,43 @@ use function ThreadFin\un_json;
 
 // If this file is called directly, abort.
 if ( ! defined( "WPINC" ) ) { die(); }
-// upgrade from standalone to plugin
+
+// upgrade from standalone firewall to plugin
 if (defined("BitFire\TYPE") && \BitFire\TYPE == "STANDALONE") { 
     require_once \BitFire\WAF_SRC."server.php";
-    // load the old configuration if we have one
-    // TODO: move to a backup function
-    $old_conf = WAF_ROOT."config.ini";
-    $new_conf = __DIR__."/config.ini";
-    if ($old_conf != $new_conf) {
-        chmod($old_conf, FILE_RW);
-        chmod($new_conf, FILE_RW);
-        @copy($old_conf, $new_conf);
-        chmod($old_conf, FILE_W);
-        chmod($new_conf, FILE_W);
-    }
-    $hash_file = WAF_ROOT."cache/hashes.json";
-    if (file_exists($hash_file)) {
-        @copy($hash_file, __DIR__."/cache/hashes.json");
-    }
-    $block_file = WAF_ROOT."cache/blocks.json";
-    $alert_file = WAF_ROOT."cache/alerts.json";
-    @copy($block_file, __DIR__."/cache/blocks.json");
-    @copy($alert_file, __DIR__."/cache/alerts.json");
-    @copy(WAF_ROOT."exceptions.json", __DIR__."exceptions.json");
-    $effect = \BitFireSvr\uninstall()->hide_output();
-    $effect->run();
+    standalone_to_wordpress()->run();
 }
+
+/**
+ * Begins BitFire firewall, respects bitfire_enabled flag in config.ini
+ * We might have already run the firewall if we are auto_prepend, so
+ * check if we have loaded and do not double load.  This check
+ * is also done in startup.php as a failsafe
+ * @since    1.8.0
+ */
+if (!defined("\BitFire\WAF_ROOT") && !function_exists("\BitFire\on_err")) {
+    $f =  __DIR__ . "/startup.php";
+    if (file_exists($f)) {
+        include_once $f;
+    } else {
+        return;
+    }
+    if (function_exists("\ThreadFin\\trace")) {
+        trace("wp");
+    } else {
+        return;
+    }
+}
+
+
 
 /**
  * @OVERRIDE dashboard url
  * @since 1.9.0 
  */
-function dashboard_url() : string {
-    return \admin_url("admin.php?page=bitfire_admin");
+function dashboard_url(string $page_name) : string {
+    $url = \admin_url("admin.php?page=$page_name");
+    return $url;
 }
 
 /**
@@ -117,12 +127,35 @@ function is_admin() : bool {
             return true;
         }
     }
+    // delegate to bitfire if WordPress is not yet loaded...
+    $bitfire = BitFire::get_instance();
+    if (isset($bitfire->cookie) && $bitfire->cookie->extract('wp')->value('int') > 1) {
+        return true;
+    }
     return false;
 }
 
-function is_author() : bool {
-    return \current_user_can("edit_posts");
+
+/**
+ * when a new admin user id added, set the mfa number to the current user until is is updated
+ * @param mixed $user_id 
+ * @return void 
+ */
+function user_add($user_id) {
+    if (user_has_role($user_id, "Super Admin") || user_has_role($user_id, "Administrator")) {
+        $my_id = get_current_user_id();
+        $tel = get_user_meta($my_id, "bitfire_mfa_tel");
+        user_edit($user_id, $tel);
+    }
 }
+
+function user_has_role($user_id, $role_name) {
+    $user_meta = get_userdata($user_id);
+    $user_roles = $user_meta->roles;
+    return in_array($role_name, $user_roles);
+}
+
+
 
 /**
  * create effect with error action if user is not admin
@@ -143,10 +176,10 @@ function find_cms_root() : ?string {
     // prefer code
     if (function_exists('get_home_path')) { trace("HOME_PATH"); $root = \get_home_path(); }
     // then constant
-    if (defined("ABSPATH")) { trace("ABS_PATH"); $root = ABSPATH; }
+    if (defined("ABSPATH")) { trace("ABS_PATH"); $root = \ABSPATH; }
     // fall back to config file if we are running in front of WordPress 
     // could be dead code here...
-    $cfg_path = CFG::str("wp_root");
+    $cfg_path = CFG::str("cms_root");
     if (contains($cfg_path, $_SERVER["DOCUMENT_ROOT"]) && file_exists("$cfg_path/wp-config.php")) { trace("CFG_PATH"); return $cfg_path; }
     $files = file_recurse($_SERVER["DOCUMENT_ROOT"], function($path) {
         if (file_exists($path)) {
@@ -156,9 +189,15 @@ function find_cms_root() : ?string {
     }, "/wp-config.php/", [], 1);
     debug("files [%s]", print_r($files, true));
 
+    // order all found wp-config files by directory length.
+    // this can happen when a user backups a old wordpress install INSIDE
+    // the current wordpress install.  We want to find the most recent
+    usort($files, function($a, $b) { return strlen($a) <=> strlen($b); });
+
     if (isset($files[0]) && file_exists($files[0])) {
+        foreach ($files as $file)
         trace("UPDATE_PATH");
-        update_ini_value("wp_root", $files[0])->run();
+        update_ini_value("cms_root", $files[0])->run();
         return $files[0];
     }
 
@@ -166,38 +205,13 @@ function find_cms_root() : ?string {
 }
 
 
-/**
- * Begins BitFire firewall, respects bitfire_enabled flag in config.ini
- * We might have already run the firewall if we are auto_prepend, so
- * check if we have loaded and do not double load.  This check
- * is also done in startup.php as a failsafe
- * @since    1.8.0
- */
 
-if (!defined("\BitFire\WAF_ROOT") && !function_exists("\BitFire\on_err")) {
-    $f =  __DIR__ . "/startup.php";
-    if (file_exists($f)) {
-        include_once $f;
-    }
-    trace("wp");
-}
-
-
-/**
- * called when left nav menu is clicked
- * @return void 
- * @throws RuntimeException 
- */
-function bitfire_menu_hit() {
-    trace("wp_menu");
-    include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
-    \BitFirePlugin\admin_init();
-}
 
 /**
  * The code that runs during plugin activation.
  * enable the firewall enable option, and install always on protection
  * on second activation (this is by design and based on "configured" flag)
+ * TODO: move this code to -admin
  */
 function activate_bitfire() {
     trace("wp_act");
@@ -213,6 +227,10 @@ function activate_bitfire() {
 
     ob_start(function($x) { if(!empty($x)) { debug("PHP Warnings: [%s]\n", $x); } return $x; });
 
+    if (function_exists("BitFirePlugin\upgrade")) {
+        \BitFirePlugin\upgrade();
+    }
+
     // install data can be verbose, so redirect to install log
     \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
     \BitFire\Config::set_value("debug_header", false);
@@ -224,6 +242,7 @@ function activate_bitfire() {
 /**
  * The code that runs during plugin deactivation.
  * toggle the firewall enable option, uninstall
+ * TODO: move this code to -admin
  */
 function deactivate_bitfire() {
     trace("deactivate");
@@ -236,36 +255,13 @@ function deactivate_bitfire() {
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
 
-/**
- * The code that runs during plugin deactivation.
-    @chmod(\BitFire\WAF_INI, FILE_W);
-}
 
 
-/**
- * Register a custom admin menu page.
- */
-function bitfire_add_menu() {
-    $alerts = create_plugin_alerts();
-    $base_num = count($alerts);
-    $title = ($base_num > 0) ? "Vulnerable Plugins, " : "";
-    $base_num += (CFG::disabled("whitelist_enable") || CFG::disabled("require_full_browser")) ? 1 : 0;
-    $title = ($base_num > 0) ? "Bot Blocking Disabled, " : "";
-    $base_num += (CFG::disabled("auto_start")) ? 1 : 0;
-    $title = ($base_num > 0) ? "Always On Disabled" : "";
-    \add_menu_page(
-        "BitFire",
-        "BitFire <span class='update-plugins count-$base_num' title='$title'><span class='plugin-count'>$base_num</span></span>",
-        "manage_options",
-        "bitfire_admin",
-        "\BitFirePlugin\bitfire_menu_hit",
-        "dashicons-shield",
-        66
-    );
-}
+
 
 /**
  * render the MFA page and exit script execution
+ * TODO: refactor with a view
  * @param string $msg 
  * @return void 
  */
@@ -340,9 +336,30 @@ function make_js_challenge_effect() : Effect {
     return $alert_effect;
 }
 
+// find a plugin / theme version number located in $path
+function version_from_path(string $path, string $default_ver = "") {
+    $package_fn = find_fn("package_to_ver");
+    $package_files = find_const_arr("PACKAGE_FILES");
+    $php_files = array_map('basename', glob($path."/*.php"));
+    $all_files = array_merge($package_files, $php_files);
+
+    foreach($all_files as $file) {
+        $file_path = "{$path}/{$file}";
+        if (file_exists($file_path)) {
+            $version = FileData::new($file_path)->read()->reduce($package_fn, "");
+            if ($version) { return $version; }
+        }
+    }
+    return $default_ver;
+}
+
+
+/**
+ * todo: move to -admin or server.php
+ */
 function bitfire_plugin_check() {
-    $all_dirs = malware_scan_dirs(CFG::str("wp_content"));
-    file_put_contents("/tmp/plugin_check.txt", print_r($all_dirs, true), FILE_APPEND);
+    @include_once WAF_ROOT . "includes.php";
+    $all_dirs = malware_scan_dirs(CFG::str("cms_content"));
 
     $plugins = [];
     foreach ($all_dirs as $dir) {
@@ -369,7 +386,7 @@ function bitfire_plugin_check() {
 
     $encoded = base64_encode(en_json($plugins));
     $result = http2("POST", APP."cve_check.php", $encoded, ["Content-Type: application/json"]);
-    $content_dir = CFG::str("wp_contentdir");
+    $content_dir = CFG::str("cms_content_dir");
     if ($content_dir == "" && defined(WP_CONTENT_DIR)) {
         $content_dir = WP_CONTENT_DIR;
     }
@@ -388,13 +405,14 @@ function bitfire_init() {
     }
 
     if (is_user_logged_in()) {
-        trace("admin");
+        trace("lgnin");
         include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
 
         // make sure we have authentication correct
         bf_auth_effect()->run();
     }
 
+    // TODO: move this to -admin
     if (CFG::enabled("pro_mfa") && function_exists("\BitFirePRO\sms")) {
         function mfa_field($user) { echo \BitFirePRO\wp_render_user_form($user); }
         // mfa field display
@@ -406,8 +424,6 @@ function bitfire_init() {
         add_action("user_register", "\BitFirePlugin\user_add");
     }
 
-
-
     // we want to run API function calls here AFTER loading.
     // this ensures that all overrides are loaded before we run the API
     if (isset($_REQUEST[\BitFire\BITFIRE_COMMAND])) {
@@ -418,7 +434,7 @@ function bitfire_init() {
         \BitFire\api_call($request)->exit(true)->run();
     }
 
-
+    // MFA authentication, but only on the login page
     $path = BitFire::get_instance()->_request->path;
     if (contains($path, "wp-login.php")) {
         // show the MFA form if we are on the login page and we are configured to use MFA
@@ -429,11 +445,6 @@ function bitfire_init() {
         add_action("check_password", "\BitFirePlugin\user_login", 100, 4);
     }
 
-    /*
-    if (CFG::enabled("debug_header")) {
-        debug("PLUGIN TRACE: " . trace(null));
-    }
-    */
 }
 
 /**
@@ -487,26 +498,44 @@ function add_nonce_attr(string $nonce, array $attributes) : array {
     return $attributes;
 }
 
+/**
+ * @param array<bool> $all_caps 
+ * @param array<string> $caps 
+ * @param array $args 0 - string requested cap, 1 - int user id, 2 - int object id
+ * @param WP_User $user  the user being checked
+ * @return array 
+ */
+function check_user_cap(?array $all_caps = null, ?array $caps = null, ?array $args = null, $user = null) : array {
+    static $checks = [];
+
+    if ($caps && count($caps) > 0) {
+        $checks = array_merge($checks, $caps);
+    }
+
+    return ($all_caps != null) ? $all_caps : $checks;
+}
 
 
 /**
  * BEGIN MAIN PLUGIN CODE
  */
 
-
-// add the menu, 
-\add_action("admin_menu", "BitFirePlugin\bitfire_add_menu");
 // plugin run once wordpress is loaded
 \add_action("wp_loaded", "BitFirePlugin\bitfire_init");
 // update logout function to remove our cookie as well
 \add_action("wp_logout", function() { \ThreadFin\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), null, -1); });
 // keep the db transaction log up to date for differential database backups
-if (CFG::enabled("audit_sql") && function_exists("\BitFirePRO\query_filter")) {
-    die("query filter");
+if (CFG::enabled("rasp_db") && function_exists("\BitFirePRO\query_filter")) {
     \add_filter("query", "BitFirePRO\query_filter");
 }
+// disable xmlrpc
+if (CFG::enabled("block_xmlrpc")) {
+    \add_filter("xmlrpc_enabled", function(){ return false; });
+}
+// make sure users have the correct capabilities
+add_filter("user_has_cap", "BitFirePlugin\check_user_cap", 10, 4);
  
-
+// todo: move this to -admin
 \register_activation_hook(__FILE__, 'BitFirePlugin\activate_bitfire');
 \register_deactivation_hook(__FILE__, 'BitFirePlugin\deactivate_bitfire');
 
@@ -525,17 +554,29 @@ if ($i->bot_filter) {
             if (isset($r->post['_bfxa']) || (strlen($r->post_raw) > 20 && contains($r->post_raw, '_bfxa'))) {
                 $effect = verify_browser_effect($r, $i->bot_filter->ip_data, $i->cookie)->exit(false);
                 $effect->run();
-            }
+                // the request is an xmlhttp request, so we need to exit here
+                if ($r->post['_fn'] === 'bfxa') {
+                    debug("FN = BFXA");
+                    exit();
+                }
+            } else {
 
+            // this is ugly.  maybe a helper function to make this easier?
+            // we need to send the cookie here, before the headers are sent
+            // make_js_challenge will send the correct auth cookie here
+            $js_challenge = make_js_challenge_effect();
+
+            // now we print the <script> contents later inside the wp_footer action
             // effect contains the inline javascript and cache entry updates
             // run(print) the challenge effect at the bottom of the <body> tag
-            add_action("wp_footer", function() { 
+            add_action("wp_footer", function() use ($js_challenge) { 
                 // make the challenge and send the cookie here (before headers are sent)
                 // this function will split up the normal blocking effect into two parts
                 // the first cookie effect will be run here, the second will be run in the action
                 echo "<!-- BitFire wp_footer -->\n";
-                make_js_challenge_effect()->run();
+                $js_challenge->run();
             });
+            }   
         }
         // don't challenge if the browser is already valid
         else {
@@ -564,5 +605,47 @@ if (function_exists('BitFirePRO\wp_requirement_check') && !wp_requirement_check(
 
     BitFire::new_block(31001, "referer", $request->headers->referer, "new-user.php", 0);
     die("Invalid request");
+}
+
+if (isset($_GET['backup'])) {
+    $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
+    mkdir(CFG::str("cms_content_dir") . "/bitfire", 0775, true);
+    array_walk($backup_list, function($x) {
+        $dst = CFG::str("cms_content_dir") . "/bitfire/" . basename($x);
+        copy($x, $dst);
+    });
+}
+
+// todo: move to -admin
+// if the plugin is updating, make sure the files are readable and configs are backed up
+if (isset($_POST['action']) && isset($_POST['slug']) && $_POST['action'] == "update-plugin" && $_POST['slug'] == "bitfire") {
+    // only allow making files readable if upgrading and user is an admin
+    if (is_admin()) {
+        $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
+        array_walk($backup_list, function($x) {
+            $dst = CFG::str("cms_content_dir") . "/bitfire/" . basename($x);
+            copy($x, $dst);
+    });
+
+        debug("prep bitfire permissions for upgrade");
+        \ThreadFin\file_recurse(WAF_ROOT, function($file) {
+            $st = stat($file);
+            $hex = dechex($st['mode']);
+            $read = is_readable($file);
+            $write = is_writable($file);
+            if (!$read || !$write) {
+                $result = chmod($file, 0664);
+                debug("prep file [%s] = %d", $file, $result);
+            }
+        });
+
+        $backup_list = [WAF_ROOT."config.ini", WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
+        mkdir(CFG::str("cms_content_dir") . "/bitfire", 0775, true);
+        array_walk($backup_list, function($x) { copy($x, CFG::str("cms_content_dir") . "/bitfire/" . basename($x)); });
+
+        usleep(10000);
+    } else {
+        debug("only admins can prep bitfire permissions");
+    }
 }
 

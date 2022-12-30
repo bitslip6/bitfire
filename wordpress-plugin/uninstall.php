@@ -35,7 +35,8 @@ if ($_REQUEST['slug'] === "bitfire") {
 		// make sure we don't delete if the auto prepend is still active!
 		$file = ini_get("auto_prepend_file");
 		if (!empty($file) && contains($file, "bitfire")) {
-			$seconds = $exp - time();
+			$seconds = -1;//$exp - time();
+			if ($seconds < 0 || $seconds > 10000) { $seconds = 300; }
 			die("must wait up to $seconds seconds for user.ini cache to expire, or restart php process.");
 		}
 

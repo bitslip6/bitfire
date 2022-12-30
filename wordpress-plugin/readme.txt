@@ -1,58 +1,115 @@
-=== BitFire ===
+=== BitFire Security - RASP Firewall & Malware Cleaner ===
 Contributors: BitSlip6, LLC
 Donate link: http://bitfire.co/pricing
-Tags: security, firewall, waf, malware scanner, anti-virus, antivirus, secure, virus
+Tags: security, firewall, malware scanner, waf, rasp, anti-virus, antivirus, secure, virus, hacked, authentication, backups
 Requires at least: 4.0.1
 Tested up to: 6.1.1
 Stable tag: __VERSION__
+Requires PHP: 7.1
 License: AGPLv3 or later
 License URI: https://www.gnu.org/licenses/agpl-3.0.en.html
 
-
+Best RASP firewall for WordPress. Stop malware, redirects, back-doors and account takeover. 100% bot blocking, backups, malware cleaner.
 
 == Description ==
 
-Only patented WordPress Firewall locks your php files from malware. Complete protection from bots. 
-Recover hacked sites. Identify plugin vulnerabilities, 100 MFA, SQLi, XSS, CSRF, LFI firewall  
+### DON'T JUST SCAN FOR MALWARE. PREVENT IT INFECTING YOUR SITE. ###
 
-Website security that works. Don't just scan for malware. Stop it from ever infecting your site.
+Protect yourself from 0-day threats with security processes, not just signatures.
 
-BitFire integrates your website and server operating system to make website hacks, redirect attacks and account takeover impossible.
+BitFire integrates WordPress directly with your operating system to add native security checks for security sensitive operations across all plugins and themes. BitFire makes it impossible for non-administrators to alter your PHP files no matter how bad the security flaws on your website. BitFire also monitors database access preventing unauthorized account take over and permission exploitation.
 
-Don't just scan for attacks after they happen; actively prevent them.
+BitFire RASP also monitors which plugin actions are correctly doing permission checks to dynamically add the correct permission checks and patch plugin vulnerabilities that are currently unknown.
 
-There are many Web Firewalls available. Only BitFire has 100% Free bot Blocking, Site Restore, Vulnerability Detection, File Locking, Redirect Protection, and a money-back guarantee for PRO customers.
+Armed with the fastest malware scanner available today and the most complete bad bot blocking available for WordPress, BitFire is the next generation security plugin that actually prevents your site from falling victim to the next WordPress hack.
 
-BitFire brings new security capabilities to your website you won't find anywhere else.
-In addition to the standard Protection offered by similar solutions, BitFire has 4 unique features that, when activated, make your site impervious to attack.
+#### Core Features ####
+* **[Runtime Application Self-Protection](https://en.wikipedia.org/wiki/Runtime_application_self-protection)** prevents the most severe vulnerabilities from being exploited. (PHP file modification, Admin account creation, Redirects, etc).
+* **Bot Blocking** stops 99.99% of attacks. Transparent CAPTCHA and Network verification prevent vulnerability scanners from accessing any part of your site.
+* **Malware Scanner** Scan your website for existing malware at over 10,000 files per minute and access our offline database with over 10 million data-points.
+* **Plugin vulnerability monitoring**. Hourly checked over a dozen vulnerability databases against your installed plugins to notify you if any of your themes or plugins have known vulnerabilities.
+* **Free Off-site Database Backups**. Because plugins can be re-installed, but your content can not.
+* **WAF firewall**. Of course we have all of the Firewall features you know and expect from any security product including protecting from **XSS**, **SQLi**, **LFI/RFI**, **XXE**, **SSRF**, **CSRF**, **Directory Traversal**, **Insecure Deserialization**, **OS Command Injection**, **PHP File Upload** and many more.
+* **Simple configuration** on/off security settings makes setup easy.
+* **SMS based multi-factor authentication** secures your accounts without the need of installing any new software.
+* **Monitor** every block and alert in realtime from your dashboard.
+ 
+### Runtime Application Self Protection ###
+BitFire is the first [RASP][1] security solution available for WordPress. Previously only available with $50,000 security installs from companies like [Imperva][2] (NYSE: IMPV) and [Signal Sciences][3] (NYSE: FSLY), RASP systems monitor your application's actions adding additional security checks along the way.
+[1]: https://techbeacon.com/security/what-runtime-application-self-protection-rasp "RASP from TechBeacon"
+[2]: https://www.imperva.com/products/runtime-application-self-protection-rasp/ "Imperva RASP'
+[3]: https://www.signalsciences.com/products/rasp-runtime-application-self-protection/ "RASP from Signal Sciences"
 
-* File Protection - Write Lock your files to prevent any attack from modifying your plugins or core files.
-* Bot Protection - 99% of hacks are automated. BitFire blocks all automated requests and only allows approved search engines and tools.
-* Redirect Protection - Prevent redirect attacks by enforcing only content from approved sites with dynamic Content Security Policy.
-* Multi-Factor Authentication - Prevent account takeover with multi-factor authentication. Receive notification of all login attempts.
-* Vulnerability Detection - Automatically check all of your plugins and themes against a database of over 3,500 known wordpress vulnerabilities.
+
+BitFire monitors all important system actions on your site like writing files, editing wordpress users, credential and privilege changes, network connections, and checking access controls. When any of these functions happen (or don't happen the case of access controls), BitFire runs checks like the following:
+
+* **Adding a new administrator account?** BitFire checks that the current user has the administrator privilege before allowing the account creation.
+* **Making a network connection?** BitFire checks the remote system against a list of over 2.5 million malware domains before allowing the connection.
+* **Adding or editing a file?** BitFire inspects the filename and content to ensure that it does not edit a PHP file or inject backdoor code. 
+* **Redirecting the visitor to another website?** First check the malware domain list before sending the redirect.
+* **Is a plugin eval() dynamic PHP Code?** Inspect the code being passed to eval() and block malicious code before executing it.
+
+These features protect vulnerable plugins and themes from the most common and severe vulnerabilities. They are only available with integration of the Operating System and WordPress core actions. Traditional WAFs only look at the request and either  pass it to WordPress or block it. They have no idea what WordPress did after they allowed the request. That's what makes RASP systems unique.
+
+### High Performance (< 1ms per request) ###
+
+Our unique approach to security allows us to run 50-100x faster than our most popular competitors. Because our RASP checks never happen during normal website operation you get blazing fast performance. BitFire only runs RASP checks when security sensitive operations happen (such as adding a new user account, editing a file, activating a plugin, etc). This means that most traffic does not ever need to be inspected for these types of attacks so your website stays just as performant after adding RASP as before. 
+
+### Complete Bot Blocking Tops Hackers Fast ###
+
+**99.99% of web attacks are completely automated** and run en-mass. These scanners are equipped to scan for and exploit 1 or more known security vulnerabilities. They then scan the entire Internet looking for vulnerable systems to compromise. 
+
+BitFire stops these automated attacks completely in 2 ways. Each web client has a unique identifier called a "user-agent". Chrome, Safari, Edge and Firefox all have unique user-agents that tell websites who they are. Hackers often use these user-agents to hide their malicious scanners as normal web traffic. BitFire stops these attacks by sending a transparent JavaScript challenge to anyone that claims to be a web browser that only real browsers can solve. The challenge takes less than 100 milliseconds to complete (one network round trip + 2ms) and only happens on the first page load for a browser. Normal humans then browse the site as usual and malicious scanners are stopped before they they can even access the homepage.
+
+The second type of user-agents are what are called "robots". These are often helpful robots like GoogleBot, Bing, AHrefs, SEOMoz and many others which index your website making it searchable or providing additional services. Hackers will often disguise their scanners as helpful bots like GoogleBot to avoid security systems. BitFire stops these malicious attacks by verifying the host network of the bot. For example, bots claiming to be GoogleBot are only allowed to access the site without JavaScript challenges if the source network is the Google campus. We have over 100 helpful web crawlers and scanners in our default approved database of robots so your site allows the good robots while keeping out the bad.
 
 
-* Up to 50x faster than the competition
-* More 0-day protections than anyone
-* Full guaranteed Protection in less than 2 milliseconds.
+### Scan for malware in seconds ###
 
-Protect yourself from 0-day threats with security processes, not just known signatures.
+<img src="https://bitfire.co/assets/malware_strip.jpg" alt="malware header image">
+
+We believe so strongly that BitFire will prevent any malware infecting your site, we didn't build a malware scanner for years. Only after several infected sites not running BitFire found us and asked for help did we decide to build a malware scanner for clients who might be infected before installing BitFire.  
+
+BitFire **scans PHP files at a rate over 10,000 per minute**. Most websites complete a full malware scan in under 45 seconds. We use a 3 step process to achieve the fastest malware scans possible.
+
+1. A combination of intelligent file hashing and offline malware databases identify potentially modified or injected files.
+2. Candidate files are then scanned for dangerous, dynamic or malicious functions or actions.
+3. Remaining files are then feed through character frequency analysis, and deep learning to remove common programmer design patterns and other false positives.
+
+**What is reported is a highly accurate list of found malware with a false positive rate of 1 in 10,000**.
+
+### WHY HAVEN'T I HEARD OF YOU BEFORE? ###
+
+The BitFire firewall was started as a custom security solution in 2018 for a
+small group of WordPress sites by Cory Marsh. Bringing his 20 years of 
+enterprise security knowledge and software architecture experience to create the first RASP for WordPress. We had a vision of bringing real enterprise 
+grade security solutions to the millions of websites running WordPress. After 
+almost 5 years of development and countless late nights we are finally ready 
+to offer the highest quality security product available to the WordPress 
+community at large. We receiving initial funding in late 2022 we are now officially launching!
+
 
 
 == Installation ==
 
 * Install this plugin via WordPress plugin installer.
 * In your Plugin Dashboard, click "Activate Plugin."
-* Click on "BitFire Admin" from wp-admin.
+* Open the BitFire Settings from your WordPress admin dashboard.  Complete the setup wizard.
+* Run a malware scan from the BitFire malware menu and verify your site files are 100% clean.
+* Run a database malware scan to ensure your content does not have any links to over 2.5 million malware sites.
+* Monitor your firewall blocking on the BitFire Dashboard page
 
 == Frequently Asked Questions ==
+
+= If other security plugins live up to their hype, why do they scan my site for malware daily? =
+That's an excellent question. The majority of popular security plugins create custom signatures for each WordPress plugin vulnerability as they are publicly disclosed. With over 10,000 known WordPress security vulnerabilities and less than 200 signatures, they miss blocking a lot of hacks. They are also unable to block the most common security flaws (access control errors) for anything they do not have a pre-built signature for. To make the situation more difficult, they delay these rules by up to a month for non-paying customers.
 
 = Can BitFire block bots and automated attacks? =
 BitFire's primary feature is bot blocking which is 100% functional in the free version. 99% of WordPress attacks are from automated tools scanning every domain and IP address for known vulnerabilities. BitFire verifies human web browsers with a JavaScript challenge similar to Cloudflare but over 50 times faster (1/10 second VS 6 seconds). BitFire also includes a list of over 80 search engines and SEO tools that are network verified to ensure only valid bot traffic reaches your site.
 
 = Do I have to buy it? =
-BitFire includes a complete standard firewall, malware scanning, vulnerability detection and unbreakable bot blocking for free. Additional features, including File Write Locking, Redirect Protection, Automated Malware Recovery, and Multi-Factor Authentication, require paid PRO or PREMIUM versions. https://bitfire.co/pricing
+BitFire includes a complete standard firewall, malware scanning, vulnerability detection offsite database backup and unbreakable bot blocking for free. Our patented RASP technology and SMS based 2FA is only available to our paying PRO and PREMIUM clients.  https://bitfire.co/pricing
+
 
 = How does Redirection Protection work? =
 Our unique software keeps track of every 3rd party domain your web page uses (Facebook, Google, JavaScript APIS, themes, etc.). After several weeks of learning, CSP security headers are sent to visitors instructing their browsers to only use or redirect to your approved domain list.
@@ -76,17 +133,11 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 == Privacy / Monitoring / Data Collection ==
 
-1. Privacy.  We take privacy very seriously.  BitFire inspects all traffic going to the webserver and takes care to filter out any potentially sensitive information by replacing it with ***redacted***.  This can include information like passwords, credit card numbers, etc.  The config.ini file includes a list of common sensitive field names under the "filtered_logging" section.  These fields are immediately filtered and can not be included in any logging or error reporting. You can add additional fields to filter in the config file by adding a line "filtered_logging[field_name] = true" and replacing "field_name" with the name of the desired parameter to filter.
+1. Privacy.  We take privacy very seriously. BitFire inspects all traffic going to the webserver and takes care to filter out any potentially sensitive information by replacing it with ***redacted***. The config.ini file includes a list of common sensitive field names under the "filtered_logging" section. You can add additional fields to filter in the config file by adding a line "filtered_logging[field_name] = true" and replacing "field_name" with the name of the desired parameter to filter.
 
-2. BitFire includes error monitoring.  While we strive to make BitFire as robust as possible, sometimes unforeseen things happen.  BitFire includes error handler which monitors it's operation.  In the event an error is detected _only_ in the BitFire software; including during install, an alert can be sent to BitFire's developer team.  The development team monitors these errors in real time and includes fixes for any detected errors in each new release.   This feature includes sending basic server info in the error report to help diagnose the problem.  You may opt in/out on the setting page.
+2. BitFire includes an error handler which monitors it's operation. In the event an error is detected _only_ in the BitFire software; including during install, an alert can be sent to BitFire's developer team. The development team monitors these errors in real time and includes fixes for any detected errors in each new release.
 
-3. Plugin usage.  You can help the development team improve the functionally by opting in to use the usage monitoring.  This adds a counter to send button clicks to help the development team understand which features are used by customers and how often. Default off.
-
-4. Updates.  Four times a day BitFire will request the latest signatures from the BitFire signature API.  These signatures are sent over SSL(TLS) and encrypted specifically for each client site.  In addition bitFire also sends a list of installed plugins and version numbers to compare against recently posted security vulnerabilities.
-
-5. Malware scanning.  When bitfire scans your website for malware it creates signatures for every file on your site.  It then compares these signatures against a database of over 20 million WordPress signatures to ensure your file integrity.  To do this, BitFire will send the signature values (hashes) of every file to the bitfire malware api. In addition to this, any found differences are compared with the official WordPress code hosted at wordpress.org.  When malware is detected it's signature added to BitFire's growing malware database for improved detection.
-
-6. PRO / PREMIUM.  The PRO version of BitFire is limited to 10,000 page views per day.  If you are using the PRO version and you regularly exceed this usage, a notice will be sent to you and BitFire requesting a license upgrade.  This data includes approximate daily usage per domain.
+3. Updates. Four times a day BitFire will request the latest signatures from the BitFire signature API. These signatures are sent over SSL(TLS) and encrypted specifically for each client site. In addition bitFire also sends a list of installed plugins and version numbers to compare against recently posted security vulnerabilities.
 
 
 
@@ -95,11 +146,41 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 1. BitFire shows detailed graphs about the type of attacks your website is defending.
 2. View detailed block and alerting information about each request, add blocking exceptions with a single click.
-3. Detailed malware scanner contains over 20 million data-points and completes in seconds.
-4. Advanced bot filtering validates real web browsers from automated scanners in milliseconds with JavaScript.
-5. Simple configuration with granular rules can be set to alert to test new rules before actually blocking.
+3. Detailed malware scanner contains over 20 million data-points and scans 10,000 PHP files per minute.
+4. Simple on/off configuration with granular rules can be set to alert to test new rules before actually blocking.
+5. Database malware scanner with backup and restore points can identify malware comments and posts from over 2.5 million domains.
+6. Plugin monitoring alerts you within the hour when new plugin vulnerabilities effecting your site are released so you can stay on top of important security updates.
 
 == Changelog ==
+
+= 3.0.8 =
+ * Database Malware Scanner Support
+ * Offsite database backups
+ * Fixes for some apache server installs
+ * Support for malware scanning plugins off the WordPress repository
+ * Added support and small fixes for PHP 8.1
+ * Improved malicious file upload scanning
+ * Improved basic settings and advanced settings page
+
+= 3.0.6 =
+ * Added a pretty error page for browsers that do not support JavaScript when JavaScript verification is enabled.
+
+= 3.0.4 =
+ * Minor bug fixes for corner cases
+
+= 3.0.1 =
+ * Added database malware scanning support for over 2.5 million domains
+
+
+= 2.3.5 =
+ * improved configuration wizard and css styles
+
+= 2.3.4 =
+ * Malware Scanner Support 
+ * Fixed a bug in browser verification on mobile safari.
+
+= 2.3.3 = 
+ * Added CSS styles to the blocking page
 
 = 2.1.2 =
  * Added plugin vulnerability notifications.  These will check over 3500 active CVE advisories 
@@ -209,8 +290,10 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 == Upgrade Notice ==
 
-= 1.8.3 =
+= 3.0.8 =
 No incompatibilities
+
+
 
 
 

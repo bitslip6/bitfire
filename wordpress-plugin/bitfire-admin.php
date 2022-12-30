@@ -3,6 +3,7 @@ namespace BitFirePlugin;
 
 use function BitFire\serve_advanced;
 use function BitFire\serve_dashboard;
+use function BitFire\serve_database;
 use function BitFire\serve_malware;
 use function BitFire\serve_settings;
 use function BitFire\serve_exceptions;
@@ -36,6 +37,7 @@ use function ThreadFin\debug;
 use function ThreadFin\ends_with;
 use function ThreadFin\error;
 use function ThreadFin\partial as BINDL;
+use function ThreadFin\partial;
 use function ThreadFin\partial_right as BINDR;
 
 // we should have attempted load 2x before here
@@ -49,6 +51,14 @@ require_once \BitFire\WAF_SRC."dashboard.php";
 require_once \BitFire\WAF_SRC."server.php";
 require_once \BitFire\WAF_SRC."api.php";
 
+
+/**
+ * get the current locale setting
+ * @return string 
+ */
+function find_locale() : string {
+   return get_locale(); 
+}
 
 
 /**
@@ -112,21 +122,23 @@ function bf_auth_effect() : Effect {
  * impure
  */
 function sync_paths() : void {
+    return;
+    require_once ABSPATH . "/wp-admin/includes/file.php";
     // sync all paths (make sure we stay up to date if WP_CONTENT_DIR is ever changed)
     $home = \get_home_path();
-    if ($home != CFG::str("wp_root") && contains($home, doc_root())) {
-        $e = update_ini_value("wp_root", \get_home_path())->run();
-        debug("sync wp_root [%s] / [%s] - [%d] (%s)", \get_home_path(), CFG::str("wp_root"), $e->read_status(), $e->read_errors());
+    if ($home != CFG::str("cms_root") && contains($home, doc_root())) {
+        $e = update_ini_value("cms_root", \get_home_path())->run();
+        debug("sync cms_root [%s] / [%s] - [%d] (%s)", \get_home_path(), CFG::str("cms_root"), $e->read_status(), $e->read_errors());
     }
-    if (defined("WP_CONTENT_DIR") && \WP_CONTENT_DIR != CFG::str("wp_contentdir")) {
+    if (defined("WP_CONTENT_DIR") && \WP_CONTENT_DIR != CFG::str("cms_content_dir")) {
         $dir = (!contains(\WP_CONTENT_DIR, doc_root())) ? doc_root() . \WP_CONTENT_DIR : \WP_CONTENT_DIR;
-        $e = update_ini_value("wp_contentdir", $dir)->run();
-        debug("sync wp_contentdir [%s] / [%s] - [%d] (%s)", \WP_CONTENT_DIR, CFG::str("wp_contentdir"), $e->read_status(), $e->read_errors());
+        $e = update_ini_value("cms_content_dir", $dir)->run();
+        debug("sync cms_content_dir [%s] / [%s] - [%d] (%s)", \WP_CONTENT_DIR, CFG::str("cms_content_dir"), $e->read_status(), $e->read_errors());
     }
-    if (\content_url() != CFG::str("wp_contenturl")) {
-        update_ini_value("wp_contenturl", \content_url())->run();
+    if (\content_url() != CFG::str("cms_content_url")) {
+        update_ini_value("cms_content_url", \content_url())->run();
     }
-    $wp_version = get_wordpress_version(CFG::str("wp_root"));
+    $wp_version = get_wordpress_version(CFG::str("cms_root"));
     // update wordpress version
     if (CFG::str("wp_version") != $wp_version) {
         update_ini_value("wp_version", $wp_version)->run();
@@ -145,10 +157,10 @@ function admin_init() {
     trace("admin init");
 
     // notify if wp-content dir changes...
-    sync_paths();
+    // sync_paths();
 
     // the admin function to run
-    $page = filter_input(INPUT_GET, "BITFIRE_WP_PAGE", FILTER_SANITIZE_SPECIAL_CHARS);
+    // $page = filter_input(INPUT_GET, "BITFIRE_WP_PAGE", FILTER_SANITIZE_SPECIAL_CHARS);
 
     $rm_path = CFG::str("rm_bitfire");
     if ($rm_path) {
@@ -187,6 +199,7 @@ function admin_init() {
     
     // serve the requested page
     // TODO: change this to a function map for settings to functions similar to API
+    /*
     if (strtolower($page) === "settings") {
         serve_settings();
     }
@@ -199,11 +212,93 @@ function admin_init() {
     else if (strtolower($page) === "exceptions") {
         serve_exceptions();
     }
+    else if (strtolower($page) === "database") {
+        serve_database();
+    }
     // default to the basic dashboard
     else {
         serve_dashboard();
     }
+    */
 }
+
+
+/**
+ * Register a custom admin menu page.
+ */
+function bitfire_add_menu() {
+    $alerts = create_plugin_alerts();
+    $base_num = count($alerts);
+    $title = ($base_num > 0) ? "Vulnerable Plugins, " : "";
+    $base_num += (CFG::disabled("whitelist_enable") || CFG::disabled("require_full_browser")) ? 1 : 0;
+    $title = ($base_num > 0) ? "Bot Blocking Disabled, " : "";
+    $base_num += (CFG::disabled("auto_start")) ? 1 : 0;
+    $title = ($base_num > 0) ? "Always On Disabled" : "";
+
+    \add_menu_page(
+        "BitFire Dashboard",
+        "BitFire <span class='update-plugins count-$base_num' title='$title'><span class='plugin-count'>$base_num</span></span>",
+        "manage_options",
+        "bitfire",
+        "\BitFire\serve_dashboard",
+        "dashicons-shield",
+        66
+    );
+
+    \add_submenu_page(
+        "bitfire",
+        "BitFire Dashboard Title",
+        "Settings",
+        "manage_options",
+        "bitfire_settings",
+        "\BitFire\serve_settings",
+        2
+    );
+    
+    \add_submenu_page(
+        "bitfire",
+        "BitFire Malware Scanner",
+        "Malware Scan",
+        "manage_options",
+        "bitfire_malware",
+        "\BitFire\serve_malware",
+        3
+    );  
+
+    if (strlen(CFG::str("pro_key")) > 20) {
+        \add_submenu_page(
+            "bitfire",
+            "BitFire PRO Settings",
+            "Advanced Settings",
+            "manage_options",
+            "bitfire_advanced",
+            "\BitFire\serve_advanced",
+            4
+        );  
+    }
+
+    \add_submenu_page(
+        "bitfire",
+        "BitFire Database", 
+        "Database Recovery",
+        "manage_options",
+        "bitfire_database",
+        "\BitFire\serve_database",
+        10
+    ); 
+
+    \add_submenu_page(
+        "bitfire",
+        "BitFire Exceptions",
+        "Rule Exceptions",
+        "manage_options",
+        "bitfire_exceptions",
+        "\BitFire\serve_exceptions",
+        6
+    ); 
+
+}
+
 
 
 // helper wrapper for wp_enqueue_script
@@ -219,30 +314,28 @@ function add_script_inline(string $handle, string $code) : string {
     return "";
 }
 
-// TODO: this doesn't seem to load with admin_enqueue_scripts...
 function bitfire_styles() {
     // ONLY ENQUEUE ON BITFIRE PAGES
     $page = filter_input(INPUT_GET, "BITFIRE_WP_PAGE", FILTER_SANITIZE_SPECIAL_CHARS);
     if (empty($page)) {
         $page = filter_input(INPUT_GET, "page", FILTER_SANITIZE_SPECIAL_CHARS);
-        if (empty($page) || $page != "bitfire_admin") {
+        if (empty($page) || !contains($page, "bitfire")) {
             return;
         }
     }
 
     \wp_register_script("dashkit", plugin_dir_url(__FILE__) . "public/dashkit.min.js", ["jquery"], "1.0", true);
-    //\wp_register_script("dashkit-boot", plugin_dir_url(__FILE__) . "public/bootstrap.bundle.min.js", ["jquery"], "1.0", false);
     \wp_register_script("dashkit-chart", plugin_dir_url(__FILE__) . "public/chart.min.js", ["jquery"], "1.0", true);
     \wp_register_script("dashkit-diff", plugin_dir_url(__FILE__) . "public/difflib.js", ["jquery"], "1.0", true);
     \wp_register_script("dashkit-prism", plugin_dir_url(__FILE__) . "public/prism.js", ["jquery"], "1.0", true);
+    \wp_register_script("dashkit-internal", plugin_dir_url(__FILE__) . "public/internal.js", [], "1.0", false);
     \wp_register_script("dashkit-vendor", plugin_dir_url(__FILE__) . "public/vendor.bundle.js", ["jquery"], "1.0", true);
     \wp_register_script("dashkit-theme", plugin_dir_url(__FILE__) . "public/theme.bundle.js", ["jquery"], "1.0", true);
     \wp_register_script("dashkit-pako", plugin_dir_url(__FILE__) . "public/pako.js", [], "1.0", true);
     \wp_register_script("dashkit-underscore", plugin_dir_url(__FILE__) . "public/underscore.min.js", [], "1.0", false);
-    \wp_register_script("dashkit-boot", plugin_dir_url(__FILE__) . "public/bootstrap.bundle.min.js", [], "1.0", true);
     \wp_register_style("dashkit-vs2015", plugin_dir_url(__FILE__) . "public/vs2015.min.css", [], "1.0");
     \wp_register_style("dashkit-prism", plugin_dir_url(__FILE__) . "public/prism.css", [], "1.0");
-    \wp_register_style("dashkit-theme", plugin_dir_url(__FILE__) . "public/theme.min.css", [], "1.0");
+    //\wp_register_style("dashkit-theme", plugin_dir_url(__FILE__) . "public/theme.min.css", [], "1.0");
     \wp_register_style("dashkit-bundle", plugin_dir_url(__FILE__) . "public/theme.bundle.css", [], "1.0");
     \wp_register_style("dashkit-feather", plugin_dir_url(__FILE__) . "public/feather.css", [], "1.0");
 
@@ -252,36 +345,15 @@ function bitfire_styles() {
     \wp_enqueue_script("dashkit-vendor", plugin_dir_url(__FILE__) . "public/vendor.bundle.js", ["jquery"], "1.0", true);
     \wp_enqueue_script("dashkit-diff", plugin_dir_url(__FILE__) . "public/difflib.js", ["jquery"], "1.0", true);
     \wp_enqueue_script("dashkit-prism", plugin_dir_url(__FILE__) . "public/prism.js", ["jquery"], "1.0", true);
+    \wp_enqueue_script("dashkit-internal", plugin_dir_url(__FILE__) . "public/internal.js", [], "1.0", false);
     \wp_enqueue_script("dashkit-pako", plugin_dir_url(__FILE__) . "public/pako.js", [], "1.0", true);
     \wp_enqueue_script("dashkit-theme", plugin_dir_url(__FILE__) . "public/theme.bundle.js", ["jquery"], "1.0", true);
     \wp_enqueue_script("dashkit", plugin_dir_url(__FILE__) . "public/dashkit.min.js", ["jquery"], "1.0", true);
-    \wp_enqueue_script("dashkit-boot", plugin_dir_url(__FILE__) . "public/bootstrap.bundle.min.js", array("jquery"), "1.0", true);
 
     \wp_enqueue_style("dashkit-vs2015", plugin_dir_url(__FILE__) . "public/vs2015.min.css", [], "1.0");
     \wp_enqueue_style("dashkit-prism", plugin_dir_url(__FILE__) . "public/prism.css", [], "1.0");
-    \wp_enqueue_style("dashkit-theme", plugin_dir_url(__FILE__) . "public/theme.min.css", [], "1.0");
     \wp_enqueue_style("dashkit-bundle", plugin_dir_url(__FILE__) . "public/theme.bundle.css", [], "1.0");
     \wp_enqueue_style("dashkit-feather", plugin_dir_url(__FILE__) . "public/feather.css", [], "1.0");
-}
-
-function user_has_role($user_id, $role_name) {
-    $user_meta = get_userdata($user_id);
-    $user_roles = $user_meta->roles;
-    return in_array($role_name, $user_roles);
-}
-
-
-/**
- * when a new admin user id added, set the mfa number to the current user until is is updated
- * @param mixed $user_id 
- * @return void 
- */
-function user_add($user_id) {
-    if (user_has_role($user_id, "Super Admin") || user_has_role($user_id, "Administrator")) {
-        $my_id = get_current_user_id();
-        $tel = get_user_meta($my_id, "bitfire_mfa_tel");
-        user_edit($user_id, $tel);
-    }
 }
 
 /**
@@ -298,7 +370,7 @@ function user_edit($user_id, $number = 0) {
         update_user_meta($user_id, "bitfire_mfa_code", $code);
         update_user_meta($user_id, "bitfire_mfa_tel", $number);
     } else {
-        error("unable to edit user, no number given");
+        debug("unable to edit user, no number given");
     }
 }
 
@@ -315,7 +387,7 @@ function create_plugin_alerts($skip_ignored = true) : array {
 
     $result = [];
 
-    $content_dir = CFG::str("wp_contentdir");
+    $content_dir = CFG::str("cms_content_dir");
     if ($content_dir == "" && defined(WP_CONTENT_DIR)) {
         $content_dir = WP_CONTENT_DIR;
     }
@@ -367,8 +439,9 @@ function create_plugin_alerts($skip_ignored = true) : array {
             $difficulty = esc_html($plugin["difficulty"]??"unknown");
             $type = esc_html($plugin["cvss_type"]??"unknown");
             $info = esc_html($plugin["info"]??"unknown");
-            $result[] = "<strong>$name has a known security issue <a target='_blank' href='https://cve.mitre.org/cgi-bin/cvename.cgi?name=$cve'>$cve</a></strong> <span style='padding-left:3rem'>Exploit difficulty: <em>".
-            "{$difficulty}</em></span><br><hr>{$type}<br><hr><!--span class='dashicons dashicons-arrow-up' onclick='document.getElementById(\"bfslide{$cve}\").classList.toggle(\"open\")'></span--><div class='' id='bfslide{$cve}'>{$info}<br><br>$links</div><a style='text-align:right;width:100%;display:block;margin-bottom:1rem;' href='{$self}cve_ignore=$cve' title='hide this alert for 1 day'>Dismiss Notice</a>";//, $plugin["plugin_name"]); 
+            $result[] = "<style>.bf{height:0;line-height:0;padding:0;overflow:hidden;opacity:0;transition:all .5s ease-in-out;} .bf.open{padding:.5em;line-height:1.5;opacity:1;height:auto !important}</style>
+            <strong>$name has a known security issue <a target='_blank' href='https://cve.mitre.org/cgi-bin/cvename.cgi?name=$cve'>$cve</a></strong> <span style='padding-left:3rem'>Exploit difficulty: <em>".
+            "{$difficulty}</em></span><br><hr>{$type}<span style='float:right;display:none;' class='dashicons dashicons-arrow-up' onclick='document.getElementById(\"bfslide{$cve}\").classList.toggle(\"open\")'></span><br><hr><div class='bf open' id='bfslide{$cve}'>{$info}<br><br>$links<a style='text-align:right;width:100%;display:block;margin-bottom:1rem;' href='{$self}cve_ignore=$cve' title='hide this alert for 1 day'>Dismiss Notice</a></div>";//, $plugin["plugin_name"]); 
         }
     }
 
@@ -377,14 +450,15 @@ function create_plugin_alerts($skip_ignored = true) : array {
 
 
 /**
- * add admin notices for unenabled configurations
+ * add admin notices for disabled configurations
  * @return void 
  */
 function alerts() {
     // show the wizard alert if we are not setup and not on the wizard page...
     if (CFG::disabled("wizard") && strpos($_SERVER['REQUEST_URI'], "SETTINGS") < 1) {
-        $url = admin_url("admin.php?page=bitfire_admin&BITFIRE_WP_PAGE=SETTINGS");
+        $url = admin_url("admin.php?page=bitfire_settings");
         show_alert("error", "BitFire setup is not complete.  Please <a href='$url'>run the setup wizard</a>.");
+        return;
     }
 
     // permanently disable nag messages  
@@ -404,16 +478,16 @@ function alerts() {
 
     // show some nag notices for important settings
     if (CFG::disabled("whitelist_enable") || CFG::disabled("require_full_browser")) {
-        $url = admin_url("admin.php?page=bitfire_admin&BITFIRE_WP_PAGE=SETTINGS#bot_handling");
+        $url = admin_url("admin.php?page=bitfire_settings#bot_handling");
         show_alert("warning", "<div style='display:flex;flex-direction:row;justify-content:space-between;'><span><a href='$url'>BitFire Settings</a> : Bot blocking is not fully enabled.  Please enable <strong>whitelist</strong> and <strong>full browser required</strong> to block hacking bots.</span> <a href='{$current_url}bitfire_nag_ignore=1'>&#10006; Dismiss</a></div>");
     }
     if (CFG::disabled("auto_start")) {
-        $url = admin_url("admin.php?page=bitfire_admin&BITFIRE_WP_PAGE=SETTINGS");
+        $url = admin_url("admin.php?page=bitfire_settings");
         show_alert("warning", "<div style='display:flex;flex-direction:row;justify-content:space-between;'><span><a href='$url'>BitFire Settings</a> : <strong>Always-On protection</strong> needs to be enabled to prevent direct plugin attacks. </span> <a href='{$current_url}bitfire_nag_ignore=1'>&#10006; Dismiss</a></div>");
     }
     if (strlen(CFG::str("pro_key")) > 20) {
-        if (CFG::disabled("site_lock")) {
-            $url = admin_url("admin.php?page=bitfire_admin&BITFIRE_WP_PAGE=ADVANCED");
+        if (CFG::disabled("rasp_filesystem")) {
+            $url = admin_url("admin.php?page=bitfire_advanced");
             //show_alert("warning", "BitFire File Lock is purchased but disabled.  Please enable in BitFire Advanced Settings");
             show_alert("warning", "<div style='display:flex;flex-direction:row;justify-content:space-between;'><span><a href='$url'>BitFire Advanced</a> : BitFire File Lock is purchased but disabled.  Please enable in BitFire Advanced Settings. </span> <a href='{$current_url}bitfire_nag_ignore=1'>&#10006; Dismiss</a></div>");
         }
@@ -433,21 +507,26 @@ function show_alert(string $type, string $notice, string $id="") {
     }
 }
 
-if (isset($_POST['action']) && isset($_POST['slug']) && $_POST['action'] == "update-plugin" && $_POST['slug'] == "bitfire") {
-    \ThreadFin\file_recurse(WAF_ROOT, function($file) {
-        $st = stat($file);
-        $hex = dechex($st['mode']);
-        $read = is_readable($file);
-        $write = is_writable($file);
-        if (!$read || !$write) {
-            chmod($file, 0664);
-        }
-    });
-    copy(WAF_INI, CFG::str("wp_contentdir") . "/bitfire.ini");
-}
+
 
 function upgrade($upgrade=null, $extra=null) {
-    copy(CFG::str("wp_contentdir") . "/bitfire.ini", WAF_INI);
+    // restore the old configurations
+    $old_config = CFG::str("cms_content_dir") . "/bitfire/config.ini";
+    if (file_exists($old_config)) {
+        @chmod(WAF_INI, FILE_RW);
+        rename($old_config, WAF_INI);
+    }
+    $restore_list = glob(CFG::str("cms_content_dir") . "/bitfire/*");
+    array_walk($restore_list, function($x) {
+        $n = basename($x);
+        chmod(WAF_ROOT."cache/$n", FILE_RW);
+        rename($x, WAF_ROOT."cache/$x");
+    });
+    $dir_name = CFG::str("cms_content_dir") . "/bitfire";
+    if (file_exists($dir_name)) {
+        @chmod($dir_name, FILE_RW);
+        @rmdir($dir_name);
+    }
 }
 
 function user_columns($columns = []) {
@@ -480,58 +559,34 @@ function custom_columns($value = '', $column_name = '', $user_id = 0) {
             $edit_url = _wp_specialchars(get_admin_url() . "user-edit.php?user_id={$user_id}#bitfire_mfa", ENT_QUOTES);
 
             $html = ($mfa) ? 
-            "<a href='$edit_url'><span class='dashicons dashicons-yes' data-code='f12a'></span><span style='color:#181;text-decoration:underline'>Yes</span></a>&nbsp;&nbsp;&nbsp;<span style='color:#999'> ok: </span><strong>$correct</strong> / <strong>$sent</strong>"
-            : "<a href='$edit_url'><span class='dashicons dashicons-no' data-code='f158'></span><span style='color:#181;text-decoration:underline'>No</span></a>";
+            "<a href='$edit_url'><span class='dashicons dashicons-yes' data-code='f12a'></span><span style='color:#181;text-decoration:underline' title='Click to edit the MFA telephone number'>Yes</span></a>&nbsp;&nbsp;&nbsp;<span style='color:#999'> ok: </span><strong>$correct</strong> / <strong>$sent</strong>"
+            : "<a href='$edit_url'><span class='dashicons dashicons-no' data-code='f158'></span><span style='color:#181;text-decoration:underline' title='Click to edit the MFA telephone number'>No</span></a>";
             return $html;
     }
 }
 
-add_action("upgrader_process_complete", "\BitFirePlugin\upgrade");
-
-add_action("admin_enqueue_scripts", "\BitFirePlugin\bitfire_styles");
-/*
-add_action("wp_footer", function() { 
-    //\wp_register_script("dashkit-underscore", plugin_dir_url(__FILE__) . "public/underscore.min.js", [], "1.0", true);
-    echo "<script src='".plugin_dir_url(__FILE__) . "public/chart.min.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/chart.min.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/vendor.bundle.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/difflib.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/prism.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/pako.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/theme.bundle.js"."' type='text/javascript'></script>";
-    echo "<script src='". plugin_dir_url(__FILE__) . "public/dashkit.min.js"."' type='text/javascript'></script>";
-    echo "<script src='".plugin_dir_url(__FILE__) . "public/bootstrap.bundle.min.js"."' type='text/javascript'></script>";
-
-    echo "<!-- BitFire wp_footer -->\n";
-});
-*/
-
-add_action("admin_notices", "\BitFirePlugin\alerts");
-
-add_action("activated_plugin", "BitFirePlugin\bitfire_plugin_check");
-add_action("deactivated_plugin", "BitFirePlugin\bitfire_plugin_check");
-
-
-add_filter("manage_users_columns", "BitFirePlugin\user_columns");
-add_filter('manage_users_custom_column', "BitFirePlugin\custom_columns", 10, 3);
-
-add_action('wp_dashboard_setup', 'BitFirePlugin\dashboard_init');
-  
 function dashboard_init() {
     wp_add_dashboard_widget('custom_help_widget', 'BitFire Security Notices', 'BitFirePlugin\dashboard_content');
 }
  
+/**
+ * todo: rewrite with renderer
+ * @return void 
+ * @throws RuntimeException 
+ * @throws Exception 
+ */
 function dashboard_content() {
 
     echo "<style> .bfslideup { height: 0px; transition: height 0.5s linear;} .bfslideup.open { height: auto; transition: height 0.5s linear;}</style>";
 
-    $url = admin_url("admin.php?page=bitfire_admin&BITFIRE_WP_PAGE=MALWARESCAN");
+    $url = admin_url("admin.php?page=bitfire_malware");
     $malware_file = WAF_ROOT . "/cache/malware_files.json";
     $malware = FileData::new($malware_file);
     if ($malware->exists) {
         $malware_data = $malware->read()->un_json()->lines;
         $seconds = time() - $malware_data['time'];
         $days = floor($seconds / DAY);
+        //malware_data also has "total" attribute
         $malware_good = "#36d638";
         $malware_icon = "yes";
         if ($days > 14) {
@@ -553,7 +608,7 @@ function dashboard_content() {
 
 
     // load all alert data
-    $url = admin_url("admin.php?page=bitfire_admin&BITFIRE_WP_PAGE=DASHBOARD");
+    $url = admin_url("admin.php?page=bitfire");
     $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
         ->read()
         ->map('\ThreadFin\un_json');
@@ -564,7 +619,7 @@ function dashboard_content() {
         return isset($x['tv']) && $x['tv'] > $check_day;
     });
     $block_24_num = count($block_24);
-    echo "<div style='border-left: 5px solid #36d638; padding-left: 1rem;'><span class='dashicons dashicons-shield'></span> Last 24 Hour Blocked Attacks: <a href='$url' style='float:right'>$block_24_num</a></div>";
+    echo "<div style='border-left: 5px solid #36d638; padding-left: 1rem;'><span class='dashicons dashicons-shield'></span> Last 24 Hours # Blocked Attacks: <a href='$url' style='float:right'>$block_24_num</a></div>";
     echo "<br><hr><br>\n";
 
 
@@ -579,5 +634,39 @@ function dashboard_content() {
         echo "<p>
         <span class='dashicons dashicons-plugins-checked' data-code='f485'></span>
         No Plugin Vulnerabilities Detected</p>";
+    }
+}
+
+
+/** don't show the bitfire menus if the user is not an admin.. */
+if (!is_admin()) {
+    return;
+}
+
+add_action("upgrader_process_complete", "\BitFirePlugin\upgrade");
+
+add_action("admin_enqueue_scripts", "\BitFirePlugin\bitfire_styles");
+
+// add the menu, 
+\add_action("admin_menu", "BitFirePlugin\bitfire_add_menu");
+add_action("admin_notices", "\BitFirePlugin\alerts");
+
+add_action("activated_plugin", "BitFirePlugin\bitfire_plugin_check");
+add_action("deactivated_plugin", "BitFirePlugin\bitfire_plugin_check");
+
+
+// TODO: only show this if the user is on the edit user page
+add_filter("manage_users_columns", "BitFirePlugin\user_columns");
+add_filter('manage_users_custom_column', "BitFirePlugin\custom_columns", 10, 3);
+
+// TODO: only show this if the user is on the dashboard page
+add_action('wp_dashboard_setup', 'BitFirePlugin\dashboard_init');
+  
+
+// run the bitfire admin page code if we are showing the bitfire admin page
+if (isset($_GET["page"])) {
+    $parts = explode("_", $_GET["page"]);
+    if ($parts[0] === "bitfire") {
+        admin_init();
     }
 }
