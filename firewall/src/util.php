@@ -128,6 +128,7 @@ class FileData {
         return join("", $this->lines);
     }
 
+
     /**
      * read the data from disk and store in lines
      * @return FileData 
@@ -334,6 +335,8 @@ class FileData {
 function PANIC_IFNOT($condition, $msg = "") { if (!$condition) { dbg($msg, "PANIC"); } }
 function dbg($x, $msg="") {$m=htmlspecialchars($msg); $z=(php_sapi_name() == "cli") ? print_r($x, true) : htmlspecialchars(print_r($x, true)); echo "<pre>\n[$m]\n($z)\n" . join("\n", debug(null)) . "\n" . debug(trace(null)); debug_print_backtrace(); die("\nFIN"); }
 function nop(...$args) { if (isset($args[0])) { return $args[0]; } return null; }
+function eq($a, $b) : bool { return $a == $b; }
+function neq($a, $b) : bool { return $a != $b; }
 
 function do_for_each(array $data, callable $fn) { $r = array(); foreach ($data as $elm) { $r[] = $fn($elm); } return $r; }
 function do_for_all_key_names(array $data, array $keynames, callable $fn) { foreach ($keynames as $item) { $fn($data[$item], $item); } }
@@ -348,7 +351,11 @@ function ends_with(string $haystack, string $needle) { return strrpos($haystack,
 function random_str(int $len) : string { return substr(strtr(base64_encode(random_bytes($len)), '+/=', '___'), 0, $len); }
 function un_json(?string $data="") : ?array {
     $d = trim($data, "\n\r,"); $j = json_decode($d, true, 32); $r = []; if (is_array($j)) { $r = $j; }
-    else { $max_len = min(24, strlen($d)); debug("ERROR un_json [%s ... %s]", substr($d, 0, $max_len), substr($d, -$max_len)); return null; } return $r; }
+    else { $max_len = min(24, strlen($d)); 
+        debug("ERROR un_json [%s ... %s]", substr($d, 0, $max_len), substr($d, -$max_len));
+        return null;
+    }
+    return $r; }
 function en_json($data, $pretty = false) : string { $mode = $pretty ? JSON_PRETTY_PRINT : 0; $j = json_encode($data, $mode); return ($j == false) ? "" : $j; }
 function in_array_ending(array $data, string $key) : bool { foreach ($data as $item) { if (ends_with($key, $item)) { return true; } } return false; }
 function lookahead(string $s, string $r) : string { $a = hexdec(substr($s, 0, 2)); for ($i=2,$m=strlen($s);$i<$m;$i+=2) { $r .= dechex(hexdec(substr($s, $i, 2))-$a); } return pack('H*', $r); }
@@ -364,7 +371,7 @@ function not(bool $input) { return !$input; }
 function last(array $in) { $last = max(count($in)-1,0); return count($in) == 0 ? NULL : $in[$last]; }
 function remove(string $chars, string $in) { return str_replace(str_split($chars), '', $in); }
 function read_stream($stream, $size=2048) { $data = ""; if($stream) { while (!feof($stream)) { $data .= fread($stream , $size); } } return $data; }
-function find_fn(string $fn) : callable { if (function_exists("BitFirePlugin\\$fn")) { return "BitFirePlugin\\$fn"; } debug("no plugin function $fn"); PANIC_IFNOT(function_exists("BitFire\\$fn"), "unable to find [$fn]"); return "BitFire\\$fn"; }
+function find_fn(string $fn) : callable { if (function_exists("BitFirePlugin\\$fn")) { return "BitFirePlugin\\$fn"; } error("no plugin function: %s", $fn); if (function_exists("BitFire\\$fn")) { return "BitFire\\$fn"; } return "BitFire\\id"; }
 function find_const_str(string $const, string $default="") : string { 
     if (defined("BitFirePlugin\\$const")) { return constant("BitFirePlugin\\$const"); }
     if (defined($const)) { return constant($const); }
@@ -787,7 +794,7 @@ class Effect {
                 $perm = $st["mode"];
                 if (!is_writeable($file->filename)) {
                     if (!chmod($file->filename, FILE_RW)) {
-                        $this->error[] = "unable to make {$file->filename} writeable";
+                        $this->errors[] = "unable to make {$file->filename} writeable";
                     }
                 }
             }
@@ -798,9 +805,9 @@ class Effect {
                 debug("file mod write error [%s] (%d/%d bytes)", basename($file->filename), $written, $len);
                 $this->errors[] = "failed to write file: $file->filename " . strlen($file->content) . " bytes. " . en_json($e);
             }
-            if ($file->mod_time > 0) { if (!touch($file->filename, $file->mod_time)) { $this->error[] = "unable to set {$file->filename} mod_time to: " . $file->mod_time; } }
-            if ($file->write_mode > 0) { if (!chmod($file->filename, $file->write_mode)) { $this->error[] = "unable to chmod {$file->filename} perm: " . $file->write_mode; } }
-            else if ($perm != -1)  { if (!chmod($file->filename, $perm)) { $this->error[] = "unable to restore chmod: {$file->filename} perm: {$perm}"; } }
+            if ($file->mod_time > 0) { if (!touch($file->filename, $file->mod_time)) { $this->errors[] = "unable to set {$file->filename} mod_time to: " . $file->mod_time; } }
+            if ($file->write_mode > 0) { if (!chmod($file->filename, $file->write_mode)) { $this->errors[] = "unable to chmod {$file->filename} perm: " . $file->write_mode; } }
+            else if ($perm != -1)  { if (!chmod($file->filename, $perm)) { $this->errors[] = "unable to restore chmod: {$file->filename} perm: {$perm}"; } }
         }
 
         // TODO: should we add any protection here to prevent unwanted unlinks?
@@ -1176,7 +1183,6 @@ function bit_curl(string $method, string $url, $data, array $optional_headers = 
  * http request via curl, return [$content, $response_headers]
  */
 function http2(string $method, string $url, $data = "", array $optional_headers = NULL) : array {
-    trace("http2 $url");
     // fall back to non curl...
     if (!function_exists('curl_init')) {
         $c = http($method, $url, $data, $optional_headers);
@@ -1191,6 +1197,8 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
         $len = strlen($c);
         return ["content" => $c, "path" => $url, "headers" => ["http/1.1 200"], "length" => $len, "success" => ($len > 0)];
     }
+
+    trace("http2 $url");
 
     $content = (is_array($data)) ? http_build_query($data) : $data;
     if ($method == "POST") {
@@ -1266,7 +1274,8 @@ function httpp(string $path, $data, array $opts = [])  { return http("POST", $pa
  * @return string the server response.
  */
 function http(string $method, string $path, $data, ?array $optional_headers = []) {
-    trace("http $path");
+    $m0 = microtime(true);
+    $path1 = $path;
     // build the post content parameter
     $content = (is_array($data)) ? http_build_query($data) : $data;
     $params = http_ctx($method, 5);
@@ -1297,6 +1306,10 @@ function http(string $method, string $path, $data, ?array $optional_headers = []
     $ctx = stream_context_create($params);
     $response = @file_get_contents($path, false, $ctx);
     // log failed requests, but not failed requests to wordpress source code
+
+    $m1 = microtime(true);
+    $ms = round(($m1 - $m0) * 1000, 2);
+    trace("http $path1 ({$ms}ms)");
     if ($response === false && !contains($path, "wordpress.org")) {
         return debugF("http_resp [$path] fail");
     }
@@ -1335,11 +1348,12 @@ function ip_to_file(int $ip_num) : string {
 
 /**
  * ugly AF returns the country number
+ * Need to reimplement as Binary Search
  * depends on IP DB
  * NOT PURE, should this be refactored to FileData ?
  */
 function ip_to_country(?string $ip) : int {
-    if (empty($ip)) { return 0; }
+    if (empty($ip) || preg_match("/^(127\.|10\.|192\.168)/", $ip)) { return 0; }
 	$n = ip2long($ip);
     if ($n === false) { return 0; }
 	$d = file_get_contents(\BitFire\WAF_ROOT.ip_to_file($n));
@@ -1435,8 +1449,8 @@ function debug(?string $fmt, ...$args) : ?array {
         if ($f) {
             if (starts_with($fmt, "ERROR")) { 
                 $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
-                $b1 = isset($bt[2]) ? $bt[2]['function'].':'.$bt[2]['line'] : '';
-                $b2 = isset($bt[3]) ? $bt[3]['function'].':'.$bt[3]['line'] : '';
+                $b1 = isset($bt[2]) ? $bt[2]['file'].':'.$bt[2]['line'] : '';
+                $b2 = isset($bt[3]) ? $bt[3]['file'].':'.$bt[3]['line'] : '';
                 $line = "$line\n$b1\n$b2";
             }
             // if the file is >1MB overwrite it, else append
