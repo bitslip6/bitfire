@@ -223,3 +223,17 @@ window.addEventListener('DOMContentLoaded', (event) => {
 
 
 function _text(text) { return text; }
+
+function update_times2() {
+  var times = document.getElementsByTagName("time");
+  let formatter = new Intl.DateTimeFormat(LLANG, {weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: true})
+  for (var i=0; i<times.length; i++) {
+    let ts = parseInt(times[i].getAttribute("data-mtime"));
+    let d = formatter.formatToParts(new Date(ts*1000));
+
+    let markup = "<span class='text-primary'>"+fp(d, 'weekday', ', ', 'month', ' ', 'day') + "</span> " +
+      "<span class='text-muted'>"+fp(d, 'year')+" @</span>" +
+      "<span class='text-info'>"+fp(d, 'hour', ':', 'minute', ':', 'second', ' ', 'dayPeriod') + "</span>";
+      times[i].innerHTML = markup;
+  }
+}
