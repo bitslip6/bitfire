@@ -29,6 +29,13 @@
 
     <!-- MAIN CONTENT -->
     <div class="main-content">
+      <style>
+        /*ul.header-tabs li a::after { content: ' | '; color: #CCC; padding-left:1rem; text-decoration: none !important;}
+        */
+        ul.header-tabs li a { transition: transform .2s ease, color .1s ease; }
+        ul.header-tabs li a:hover { transform: translate(0, -4px); color: #222; }
+        .header-tabs .nav-link { padding: .5rem .75rem; }
+      </style>
 
         <div class="row align-items-center">
           <div class="col left">
@@ -46,6 +53,12 @@
                 </a>
               </li>
               <li class="nav-item">
+                <a href="{{self}}?BITFIRE_PAGE=BOTLIST" class="nav-link grow" title="Allow or Block automated bots">
+                  Bot Learning 
+                </a>
+              </li>
+ 
+              <li class="nav-item">
                 <a href="{{self}}?BITFIRE_PAGE=SETTINGS" class="nav-link grow" title="adjust firewall settings">
                   Settings
                 </a>
@@ -62,8 +75,8 @@
               </li>
 
               <li class="nav-item {{hidefree_class}}">
-                <a href="{{self}}?BITFIIRE_PAGE=ADVANCED" class="nav-link grow" title="enable PRO features">
-                  Advanced
+                <a href="{{self}}?BITFIRE_PAGE=ADVANCED" class="nav-link grow" title="enable PRO features">
+                  RASP
                 </a>
               </li>
 
