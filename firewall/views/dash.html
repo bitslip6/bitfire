@@ -1,30 +1,40 @@
 <style>
   {{custom_css}}
+  ul.dropdown-menu li { padding: 0.25rem 1rem; }
+  ul.dropdown-menu li a { color: #6e84a3; }
+  ul.dropdown-menu li a:hover { color: #122637; }
 </style>
 <style>
 thead.details th, th { font-size: 12px; }
+.nowrap { overflow: hidden; }
+.left { float: left; }
 
+td { border-spacing: 1rem;}
 .table-sm td { padding: .25rem; }
 .tbalt {
   color: #333;
   overflow: hidden;
-  background-color: #EFEFEF;
-  font-family: monospace;
+  background-color: #F0E0E0;
 }
 .tbalt td {
   border-bottom: 1px solid #CCC;
 }
 .table-sm th { padding: .5rem .25rem; }
 span.method { padding: .45rem .75rem; font-weight: bold; color: #111; }
+/*
 tr.inforow td {
-  background-image: linear-gradient(to bottom, rgba(240,240,240,0),92%, rgba(240,240,240,1)100%);
+  background-image: linear-gradient(to bottom, rgba(254,240,240,0),92%, rgba(240,240,240,1)100%);
 }
+*/
 
 .alert-secondary { padding: 0.35em 0.65em 0.35em 0.55em; top: 20px }
 
 .arrow { transform: rotateY( 45deg ); top: 74px; left: 50%; }
 .arrow:after { background-color: rgba(0,0,0,0.8) !important; }
 .cover { opacity: 0.5;  }
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro&display=swap');
+.tbalt, .mono { font-family: 'Source Code Pro', monospace; }
 </style>
     
 <script type="text/javascript">
@@ -195,17 +205,38 @@ tr.inforow td {
                 <span class="arrow"></span>
               </span>
 
-              <div class="card-header" style="padding-left:0;">
+              <div class="card-header" style="">
 
-                <span class="fe fe-chevron-down " style="flex:0;margin-right:4rem;" type="button" id="block_toggle" onclick="collapseit('block')"></span>
-                <h4 style="margin-right: 4rem;">Blocks <small class="text-muted" id="block_range">{{block_range}}</small> of {{block_count}}</h4>
-                <button class="btn btn-secondary mr-6" id="download_blocks">Download as JSON</button>
-                <span>Page: </span>
-                <nav arial-label="Block Pagination" class="mt-4 ml-2">
+                <span class="fe fe-chevron-down " style="flex-basis:50px;flex-grow:0;" type="button" id="block_toggle" onclick="collapseit('block')"></span>
+                <h4 class="mt-1" style="flex-basis:200px;">Blocks <small class="text-muted" id="block_range">{{block_range}}</small> of {{block_count}}</h4>
+                <button class="btn btn-info mr-6 mt-1" id="download_blocks" style="">Download as JSON</button>
+                <span style="flex-basis:100px;text-align:right;">Page: </span>
+                <nav arial-label="Block Pagination" class="mt-4 ml-2" style="flex-grow:4;flex-basis:300px;">
                   <ul class="pagination" id="block_page_list">
-                    <!-- TODO: template $max_pages2 alert_page_list with paginator_template var -->
                   </ul>
                 </nav>
+
+                <div class="form-check" style="padding-right:80px">
+                  <label class="form-check-label tdc" for="flexCheckDefault" style="padding-right:70px">Invert Filter</label>
+                  <input class="form-check-input" type="checkbox" name="invert_check" {{invert_block_check}} id="invert_block_check" style="margin-top:3px;">
+                </div>
+
+                <div class="dropdown">
+                  <button title="Filter the display to just selected blocks" class="btn btn-secondary dropdown-toggle" style="width:auto;" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Filter Blocks
+                  </button>
+                  <ul class="dropdown-menu" style="min-width:13rem;">
+                    <li><a href="{{filter_link}}&block_filter=10000">Cross Site Scripting</a></li>
+                    <li><a href="{{filter_link}}&block_filter=12000">Generic Web Filtering</a></li>
+                    <li><a href="{{filter_link}}&block_filter=14000">SQL Injection</a></li>
+                    <li><a href="{{filter_link}}&block_filter=30000:31000:32000">RASP</a></li>
+                    <li><a href="{{filter_link}}&block_filter=21000">File Upload</a></li>
+                    <li><a href="{{filter_link}}&block_filter=27000">JavaScript Challenge</a></li>
+                    <li><a href="{{filter_link}}&block_filter=24000">Bot Network Auth</a></li>
+                    <li><a href="{{filter_link}}&block_filter=26000">Request Rate</a></li>
+                    <li><a href="{{filter_link}}">Show Everything</a></li>
+                  </ul>
+                </div>
               </div>
               <div class="card-body ">
                 <div class="slide-up open" id="block_table_content">
@@ -213,13 +244,11 @@ tr.inforow td {
                 <table class="table table-sm" style="width:100%">
                   <thead class="details">
                     <tr>
-                      <th scope="col">Browser / Country</th>
-                      <th scope="col">Time</th>
-                      <th scope="col">IP</th>
-                      <th scope="col">URL / Agent</th>
+                      <th scope="col" style="width:250px;">Browser / Time</th>
+                      <th scope="col">Request</th>
                     </tr>
                   </thead>
-                  <tbody style="font-size:10px;width:100%" id="block_rows">
+                  <tbody style="font-size:14px;width:100%" id="block_rows">
                   </tbody>
                 </table>
                 </div>
@@ -254,11 +283,9 @@ do not block good traffic before flipping the rule to block mode.
                 <h4>Alerts <small class="text-muted" id="alert_range">{{report_range}}</small> of {{report_count}}</h4>
               -->
 
-				        <a style="font-size:.75rem;" href="{{self}}&filename=alert&BITFIRE_API=download&BITFIRE_NONCE={{api_code}}">
-                <button class="btn btn-secondary mr-6" id="download_alerts">Download as JSON</button>
-                </a>
-                <span>Page: </span>
-                <nav arial-label="Alert Pagination" class="mt-4 ml-2">
+                <button class="btn btn-info mr-6" id="download_alerts">Download as JSON</button>
+                <span style="flex-basis:100px;text-align:right;">Page: </span>
+                <nav arial-label="Alert Pagination" class="mt-3 ml-2">
                   <ul class="pagination" id="alert_page_list">
                     <!-- TODO: template $max_pages alert_page_list with paginator_template var -->
                   </ul>
@@ -269,6 +296,8 @@ do not block good traffic before flipping the rule to block mode.
 <script type="text/template" id="line_template">
 <tr class="inforow" width="100%">
       <td class="nowrap" scope="row">
+        <time data-mtime="<%= tv %>"></time>
+        <br>
       <div class="avatar-group">
         <div class="avatar-xs left">
           <img src="{{assets}}<%= exception_img%>" alt="exception" width="24" title="<%= exception_title%>"
@@ -285,18 +314,26 @@ do not block good traffic before flipping the rule to block mode.
         </div>
       </div>
       </td>
-      <td class="nowrap"><time data-mtime="<%= tv %>"></time></td>
-      <td class="nowrap"><strong><%- request.ip %></strong></td>
+      <td class="nowrap mono">
+        <div>
+          <strong class="text-secondary"><%- request.ip %></strong> <i class="fe fe-chevron-right"></i>
+          <span style="" class="text-muted mono ">&quot;<%= truncate(request.agent, 128) %>&quot;</span>
+        </div>
+        <strong style="padding-right:40px;" class="text-info"><%- request.method %></strong><span class="text-dark"><%- request.scheme %>://<%- request.host %><%- request.path %><%-request.query%></span>
+      </td>
+        <!--
       <td class="wrap">
         <div style="float:left"><strong><%- request.method %>&nbsp;&nbsp;&nbsp;<%- request.scheme %>://<%- request.host %><%- request.path %></strong></div>
-        <div style="float:right"><%= truncate(request.agent, 76) %></div>
       </td>
+      -->
     </tr>
     <tr class="tbalt inforow">
       <td class="nowrap"><strong><%= block.code %> <%- block.message_class %></strong></td>
+      <!--
       <td class="wrap">parameter: <%- block.parameter %></td>
-      <td class="wrap">match: &quot;<%= truncate(block.value, 80)%>&quot;</td>
-      <td class="nowrap">info: <%- block.pattern %></td>
+      -->
+      <td class="nowrap">info: <%= truncate(block.pattern,80)%>
+      <%- block.parameter %> match: &quot;<%- truncate(block.value, 80)%>&quot;</td>
     </tr>
 </script>
        
@@ -304,14 +341,12 @@ do not block good traffic before flipping the rule to block mode.
                 <table class="table table-sm" style="width:100%">
                   <thead class="details">
                     <tr>
-                      <th scope="col">Browser / Country</th>
-                      <th scope="col">Time</th>
-                      <th scope="col">IP</th>
-                      <th scope="col">URL / Agent</th>
+                      <th scope="col" style="width:250px;">Browser / Time</th>
+                      <th scope="col">Request</th>
                     </tr>
                   </thead>
                   <!-- TODO: loop over $reporting and template into alert_rows -->
-                  <tbody style="font-size:10px;width:100%" id="alert_rows">
+                  <tbody style="font-size:14px;width:100%" id="alert_rows">
                   </tbody>
                 </table>
                 </div>
@@ -601,8 +636,8 @@ function update_times() {
     let ts = parseInt(times[i].getAttribute("data-mtime"));
     let d = formatter.formatToParts(new Date(ts*1000));
 
-    let markup = "<span class='text-primary'>"+fp(d, 'weekday', ', ', 'month', ' ', 'day') + "</span> " +
-      "<span class='text-muted'>"+fp(d, 'year')+" @</span>" +
+    let markup = "<span class='text-muted'>"+fp(d, 'weekday', ', ', 'month', ' ', 'day') + "</span> " +
+      "<span class='text-muted'>"+fp(d, 'year')+" </span>" +
       "<span class='text-info'>"+fp(d, 'hour', ':', 'minute', ':', 'second', ' ', 'dayPeriod') + "</span>";
       times[i].innerHTML = markup;
   }
@@ -682,9 +717,19 @@ function update_times() {
         console.log("download ", type);
         BitFire_api("download", {"filename": type})
           .then(response => response.json())
-          .then(r => { console.log(r); });
+          .then(r => { 
+            let file_name = "bitfire_" + type + "_data.json";
+            saveBlob(new Blob([JSON.stringify(r, null, 2)], {type:"application/json"}), file_name); 
+          });
       }
 
+      // https://stackoverflow.com/questions/22724070/prompt-file-download-with-xmlhttprequest
+      function saveBlob(blob, fileName) {
+          var a = document.createElement('a');
+          a.href = window.URL.createObjectURL(blob);
+          a.download = fileName;
+          a.dispatchEvent(new MouseEvent('click'));
+      }
 
       document.addEventListener("DOMContentLoaded", request);
       update_country();
@@ -696,8 +741,25 @@ function update_times() {
 
       run_tooltips();
 
-      //GBI("download_alerts").addEventListener("click", download_type("alert"));
-      //GBI("download_blocks").addEventListener("click", download_type("block"));
+      GBI("download_alerts").addEventListener("click", function() { download_type("alert")} );
+      GBI("download_blocks").addEventListener("click", function() { download_type("block")} );
+      GBI("invert_block_check").addEventListener("click", function(event) {
+        let e = event.target;
+        console.log(event);
+        console.log(e);
+        console.log(e.checked);
+        let loc = String(window.location);
+        if (loc.indexOf("block_filter") < 1) {
+          alert("Please select a filter first");
+          return false;
+        }
+        if (e.checked) {
+          loc += "&invert_block_check=1";
+        } else {
+          loc = loc.replace("&invert_block_check=1", "");
+        }
+        window.location = loc;
+      } );
 
     </script>
 
