@@ -22,7 +22,7 @@ function test_ip_block() : void {
     $effect = \BitFire\Pure\ip_block($block, $request, $block_time);
     assert_eq(count($effect->read_files()), 1, "ip block did not set any ip block files");
     assert_eq($effect->read_files()[0]->filename, "/tmp/blocks/127.0.0.1", "ip block did not set correct path");
-    assert_eq($effect->read_files()[0]->modtime, time() + 600, "ip block did not set correct expiration time");
+    assert_eq($effect->read_files()[0]->mod_time, time() + 600, "ip block did not set correct expiration time");
     assert_gt(strlen($effect->read_files()[0]->content), 128, "ip block did not set block reason");
 }
 
@@ -81,7 +81,7 @@ function test_load_exceptions_unit() : void {
 {"parameter":"example", "uuid": "example_global_parameter_all_codes", "code": 0},
 {"parameter":"example", "path": "/some/path", "uuid": "example_parameter_one_url_all_codes", "code": 0}
 ]';
-    $file = \BitFire\WAF_ROOT."exceptions.json";
+    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
     FileData::mask_file($file, $d);
 
     $exceptions = FileData::new($file)->read()->un_json();
@@ -92,7 +92,7 @@ function test_load_exceptions_unit() : void {
  * @type integration
  */
 function test_load_exceptions_int() : void {
-    $file = \BitFire\WAF_ROOT."exceptions.json";
+    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
     $exceptions = FileData::new($file)->read()->un_json();
     assert_gt(count($exceptions()), 1, "unable to load exceptions from $file");
 }

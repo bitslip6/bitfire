@@ -17,6 +17,7 @@ require_once \BitFire\WAF_SRC . "botfilter.php";
 require_once \BitFire\WAF_SRC . "webfilter.php";
 require_once \BitFire\WAF_SRC . "bitfire.php";
 require_once \BitFire\WAF_SRC . "storage.php";
+require_once \BitFire\WAF_SRC . "cms.php";
 
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $_SERVER['HTTP_HOST'] = 'unit_test';

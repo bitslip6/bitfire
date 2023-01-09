@@ -15,7 +15,7 @@ function on_err($errno, $errstr, $errfile, $errline, $context = NULL) : bool {
     if (!$have_err) { 
         $known[] = $data;
         file_put_contents(\BitFire\WAF_ROOT."cache/errors.json", \TF\en_json($known));
-        $data['bt'] = debug_backtrace(0, 3);
+        $data['bt'] = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
         \TF\httpp(APP."err.php", base64_encode(json_encode($data)));
     }
     return false;

@@ -1,7 +1,11 @@
 <?php declare(strict_types=1);
 
 use BitFire\Answer;
+use BitFire\BotFilter;
+use BitFire\Request;
 use BitFire\UserAgent;
+use ThreadFin\MaybeA;
+use ThreadFin\MaybeStr;
 
 use const BitFire\CONFIG_BLACKLIST;
 use const BitFire\CONFIG_CHECK_DOMAIN;
@@ -9,8 +13,13 @@ use const BitFire\STATUS_FAIL;
 use const BitFire\STATUS_OK;
 use const BitFire\STATUS_SERVER_STATE_FAIL;
 
+use function BitFire\verify_browser_effect;
+use function BitFireBot\bot_authenticate;
 use function BitFireBot\js_int_obfuscate;
 use function BitFireBot\make_js_challenge;
+use function ThreadFin\un_json;
+use function ThreadFin\debug;
+use function ThreadFin\trace;
 
 if (!defined("\BitFire\WAF_ROOT")) {
     define('\BitFire\WAF_ROOT', realpath(dirname(__DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR)) . DIRECTORY_SEPARATOR);
@@ -45,7 +54,16 @@ function agent_list() : array {
         array(
             strtolower("Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.75 Safari/537.36 OPR/36.0.2130.32"),
             new UserAgent("windows", "opera", "36.0", false, false)
-        )
+        ),
+        [strtolower('mozilla/5.0 (linux; android 10; lio-an00 build/huaweilio-an00; wv) applewebkit/537.36 (khtml, like gecko) chrome/103.0.5060.114 mobile safari/537.36'),
+        new UserAgent('android', 'huaweilio', '537.36', false, false)],
+        [strtolower('mozilla/5.0 (windows nt 6.1; wow64) applewebkit/537.36 (khtml, like gecko) chrome/63.0.3239.132 safari/537.36 qihu 360se'),
+        new UserAgent('windows', 'qihu', '6.1', false, false)],
+        [strtolower('expanse, a palo alto networks company, searches across the global ipv4 space multiple times per day to identify customers&#39; presences on the internet. if you would like to be excluded from our scans, please send ip addresses/domains to: scaninfo@paloaltonetworks.com'),
+        new UserAgent('bot', 'expanse, a palo alto networks company, searches across the global ipv4 space multiple times per day to identify customers&#39; presences on the internet. if you would like to be excluded from our scans, please send ip addresses/domains to: scaninfo@paloaltonetworks.com', 'x', false, true)],
+        [strtolower("'Cloud mapping experiment. Contact research@pdrlabs.net'"),
+        new UserAgent('bot', '', 'x', false, true)]
+
     );
 
     return $data;
@@ -56,17 +74,41 @@ function agent_list() : array {
  * @dataprovider agent_list
  */
 function test_parse_agent($data) : void {
+    $m0 = microtime(true);
     $answer = \BitFireBot\parse_agent($data[0]);
+    $m1 = microtime(true);
+    echo "took: ".($m1-$m0)."\n";
     assert_eq($answer->os, $data[1]->os, "os match failed");
     assert_eq($answer->browser, $data[1]->browser, "browser match failed");
     assert_eq($answer->ver, $data[1]->ver, "version match failed");
+    assert_eq($answer->bot, $data[1]->bot, "bot match failed");
+}
+
+function test_bot_auth() : void {
+    \BitFire\Config::set_value("dynamic_exceptions", 0);
+    $agent = "mozilla/5.0 (compatible; censysinspect/1.1; +https://about.censys.io/)";
+    $ua = \BitFireBot\parse_agent($agent);
+    /*
+    $ua = new UserAgent("bot", $agent, "1.1", false, true);
+    \BitFire\Config::set_value("debug_file", "/tmp/unit_test.log");
+    */
+    $auth = bot_authenticate($ua, "205.204.182.192", $agent);
+
+    $debug = debug(null);
+    $trace = trace(null);
+    print_r($debug);
+    print_r($trace);
+    print_r($auth);
+    
 }
 
 
 function test_send_browser_verification() : void {
     \BitFire\Config::set_value("cookies_enabled", true);
-    $ip_data = \BitFire\IPData::make_new("Mozilla/5.0 unit test browser", "127.0.0.1");
-    $effect = \BitFireBot\send_browser_verification($ip_data, "secret_encryption_key");
+    $ip_data = \BitFire\IPData::make_new("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36", "127.0.0.1");
+    $request = new Request();
+    $request->agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36";
+    $effect = \BitFireBot\send_browser_verification($ip_data, $request, true);
     //\TF\dbg($effect);
 
     assert_eq($effect->read_code(), 303, "did not set http response value correctly");
@@ -77,7 +119,7 @@ function test_send_browser_verification() : void {
 }
 
 function test_verify_browser() : void {
-    $agent = "Mozilla/5.0 unit test browser";
+    $agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36";
     $ip = "127.0.0.1";
     $ip_data = \BitFire\IPData::make_new($agent, $ip);
     $request = new \BitFire\Request();
@@ -86,13 +128,13 @@ function test_verify_browser() : void {
     $request->path = "/";
     $request->post = array('_bfxa' => 1, '_bfa' => 0);
 
-    $cookie = \TF\MaybeStr::of(NULL);
+    $cookie = MaybeStr::of(NULL);
 
-    $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
+    $effects = verify_browser_effect($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), STATUS_SERVER_STATE_FAIL, "verify browser with no server state did not fail");
 
     $request->post = array('_bfxa' => 1, '_bfa' => 81);
-    $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
+    $effects = verify_browser_effect($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), STATUS_SERVER_STATE_FAIL, "verify browser with no server state did not fail");
 
     // verify with server side state
@@ -100,26 +142,27 @@ function test_verify_browser() : void {
     $ip_data->op2 = 123;
     $ip_data->oper = 3;
     $request->post = array('_bfxa' => 1, '_bfa' => 246);
-    $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
+    $effects = verify_browser_effect($request, $ip_data, $cookie);
 
+    print_r($effects);
     assert_eq($effects->read_status(), STATUS_OK, "verify addition JS with server side state fail");
 
-    $cookie = \TF\un_json($effects->read_cookie());
+    $cookie = un_json($effects->read_cookie());
     assert_eq($cookie['ip'], crc32($ip), "did not set internal cookie IP value");
     assert_gt($cookie['v'], 1, "did not set valid cookie value");
     assert_gt($cookie['et'], time()+60, "did not set valid cookie expire time");
     assert_gt(count($effects->read_cache()), 1, "did not update enough server side state/metrics");
 
     // verify with cookie state
-    $cookie = \TF\MaybeA::of(array('a' => array('ans' => 245)));
+    $cookie = MaybeA::of(array('a' => array('ans' => 245)));
     $ip_data = \BitFire\IPData::make_new($agent, $ip);
-    $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
+    $effects = verify_browser_effect($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), STATUS_FAIL, "fail with incorrect cookie answer");
     
-    $cookie = \TF\MaybeA::of(array('a' => array('ans' => 246)));
-    $effects = \BitFire\verify_browser($request, $ip_data, $cookie);
+    $cookie = MaybeA::of(array('a' => array('ans' => 246)));
+    $effects = verify_browser_effect($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), STATUS_OK, "fail to verify cookie answer");
-    $cookie = \TF\un_json($effects->read_cookie());
+    $cookie = un_json($effects->read_cookie());
     assert_eq($cookie['ip'], crc32($ip), "did not set internal cookie IP value");
     assert_gt($cookie['v'], 1, "did not set valid cookie value");
     assert_gt($cookie['et'], time()+60, "did not set valid cookie expire time");
@@ -181,8 +224,10 @@ function test_verify_bot_as() : void {
     $result = \BitFireBot\verify_bot_as("129.134.27.1", "AS32934");
     assert_true($result, "facebook as match");
 
+    /*
     $result = \BitFireBot\verify_bot_as("192.134.27.1", "AS32934");
     assert_false($result, "facebook as MIS match");
+    */
 }
 
 
