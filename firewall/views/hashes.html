@@ -78,6 +78,8 @@
   overflow: hidden;
 }
 
+#files_ul li { border-bottom: 1px solid #CCC; margin-bottom: 2px; }
+
 </style>
 
 <script type="text/javascript">
@@ -245,7 +247,7 @@
 	<div class="row diffrow collapse" id="diff_cont<%=crc_trim%>" style="padding:0">
 		<pre id="line_data<%=crc_trim%>" class="mb-0 line_nums"></pre>
 		<!-- HERE WE NEED TO INJECT malware[1] - highlight malware[3]-->
-		<div id="diff_data<%=crc_trim%>" style="width:93%; overflow-wrap:anywhere;float:left;" class="mb-0 language-php"><%=markup%></div>
+		<div id="diff_data<%=crc_trim%>" style="width:93%;font-size:12px;overflow-wrap:anywhere;float:left;" class="mb-0 language-php"><%=markup%></div>
 		<svg style="float:right;cursor:pointer;" title="collapse this diff view" onclick="classtoggle('collapse', '<%=crc_trim%>')" class=""
 		width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="collapse code diff view">
 		<g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x="11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><rect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g>
@@ -549,7 +551,7 @@
 			}
 
 			//let un = parseInt(GBI("un_files").getAttribute("data-num"));
-			GBI("count_files").innerText = G_CHANGED.total + " / " + C_CHANGED.total_files + " Scanned Files";
+			GBI("count_files").innerText = G_CHANGED.total + " / " + G_CHANGED.total_files + " Scanned Files";
 			GBI("mal_files").innerText = G_CHANGED.malware + " Malware Files";
 			BitFire_api_call("malware_files", {"total":G_CHANGED.total, "malware":G_CHANGED.malware});
 			window.clearInterval(window.SCAN_TIMER);
