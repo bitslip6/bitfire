@@ -40,8 +40,23 @@ use function ThreadFin\debug;
 use function ThreadFin\en_json;
 use function ThreadFin\httpp;
 
-// If this file is called directly, abort.
-if ( ! defined( "BitFire\WAF_ROOT" ) ) { die(); }
+/**
+ * begins bitfire firewall, respects bitfire_enabled flag in config.ini
+ * we might have already run the firewall if we are auto_prepend, so
+ * check if we have loaded and do not double load.  this check
+ * is also done in startup.php as a failsafe
+ * @since    1.8.0
+ */
+if (!defined("BitFire\WAF_ROOT")) {
+    $f =  __dir__ . "/startup.php";
+    if (file_exists($f)) {
+        include_once $f;
+    }
+    trace("plugin");
+}
+
+$threadfin = dirname(__FILE__, 2) . "/threadfin/api.php";
+if (file_exists($threadfin)) { include_once $threadfin; }
 
 
 /**
@@ -53,11 +68,10 @@ if ( ! defined( "BitFire\WAF_ROOT" ) ) { die(); }
  * config.ini dashboard_url here.
  * @since 1.9.0 
  */
-function dashboard_url() : string {
-    trace("dash_url");
-    return "/some_admin_page.php?plugin=bitfire-plugin";
-    return CFG::str("dashboard_path", "/bitfire_default_admin_page");
+function dashboard_url(string $page_token, string $internal_name) : string {
+    return "/bitfire/startup.php?BITFIRE_PAGE=$internal_name";
 }
+
 
 /**
  * UNCOMMENT IF YOU HAVE CMS AUTH INTEGRATION
@@ -70,12 +84,13 @@ function dashboard_url() : string {
  * page access.
  * @since 1.9.0
  */ 
-/*
 function is_admin() : bool {
-    // This is the WordPress implementation:
-    return \current_user_can("manage_options");
+    $cookie = BitFire::get_instance()->cookie;
+    if ($cookie && $cookie->extract("wp")() == 2) {
+        return true;
+    }
+    return false;
 }
-*/
 
 /**
  * Called to verify dashboard authentication.  IF user is not authenticated,
@@ -90,13 +105,13 @@ function is_admin() : bool {
 function verify_admin_effect(Request $request) : Effect {
     trace("VAE");
 
-    // unauthentiated users are allowd to use the send_mfa funtion
+    // unauthenticated users are allowed to use the send_mfa function
     if ($request->get["BITFIRE_API"]??"" == "send_mfa") {
         return Effect::$NULL;
     }
 
     // test the auth data with internal CMS function here
-    if (function_exists('your_auth_function') && your_auth_function($_COOKIES['your_auth_token'])) {
+    if (function_exists('your_auth_function') && your_auth_function($_COOKIE['your_auth_token'])) {
         return Effect::$NULL;
     }
 
@@ -149,10 +164,7 @@ function bf_auth_effect() : Effect {
  */
 function find_cms_root() : string {
     // update to use your CMS root here 
-    if (defined("MY_CMS_ROOT")) { return \MY_CMS_ROOT; }
-    // fall back to config file if we are running in front of WordPress 
-    $config_path = CFG::str("cms_root");
-    if (file_exists($config_path)) { return $config_path; }
+    if (defined("MY_CMS_ROOT") && file_exists(\MY_CMS_ROOT)) { return \MY_CMS_ROOT; }
 
     return $_SERVER['DOCUMENT_ROOT']??"";
 }
@@ -168,20 +180,6 @@ function add_script_inline(string $handle, string $code) : string {
 
 
 
-/**
- * Begins BitFire firewall, respects bitfire_enabled flag in config.ini
- * We might have already run the firewall if we are auto_prepend, so
- * check if we have loaded and do not double load.  This check
- * is also done in startup.php as a failsafe
- * @since    1.8.0
- */
-if (!defined("BitFire\WAF_ROOT")) {
-    $f =  __DIR__ . "/startup.php";
-    if (file_exists($f)) {
-        include_once $f;
-    }
-    trace("cust");
-}
 
 
 /**
@@ -191,8 +189,8 @@ if (!defined("BitFire\WAF_ROOT")) {
  */
 function bitfire_dashboard_hit() {
     trace("MENU");
-    include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
-    \BitFirePlugin\admin_init();
+    //include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
+    //\BitFirePlugin\admin_init();
 }
 
 /**
@@ -322,38 +320,6 @@ function render_mfa_page($msg = "Please enter the access code just sent to the a
 
 
 
-/**
- * called on menu click
- * @return void 
- * @throws Exception 
- * @throws RuntimeException 
- */
-function admin_init() {
-    trace("admin init");
-
-    // the admin function to run
-    $page = filter_input(INPUT_GET, "BITFIRE_WP_PAGE", FILTER_SANITIZE_SPECIAL_CHARS);
-    
-    // serve the requested page
-    // TODO: change this to a function map for settings to functions similar to API
-    if (strtolower($page) == "settings") {
-        \BitFire\serve_settings();
-    }
-    else if (strtolower($page) == "advanced") {
-        \BitFire\serve_advanced();
-    }
-    else if (strtolower($page) == "malwarescan") {
-        \BitFire\serve_malware();
-    }
-    else if (strtolower($page) == "exceptions") {
-        \BitFire\serve_exceptions();
-    }
-    // default to the basic dashboard
-    else {
-        \BitFire\serve_dashboard();
-    }
-}
-
 
 
 // we must do this here because by the time bitfire-admin.php loads, content has already been
@@ -365,14 +331,6 @@ function bitfire_init() {
     if (CFG::enabled("pro_mfa") && function_exists("\BitFirePRO\sms")) {
         trace("mfa");
         // add user edit field for mfa code here
-        // WORDPRESS EXAMPLE FEATURED HERE:
-        function mfa_field($user) { echo \BitFirePRO\wp_render_user_form($user); }
-        add_action('show_user_profile', '\BitFirePlugin\mfa_field');
-
-        // mfa field update on user save here
-        add_action("edit_user_profile_update", "\BitFirePlugin\user_edit");
-        add_action("personal_options_update", "\BitFirePlugin\user_edit");
-        add_action("user_register", "\BitFirePlugin\user_edit");
     }
 
     // auth verification
@@ -398,27 +356,13 @@ function bitfire_init() {
 
 
     // show the MFA form if we are on the login page and we are configured to use MFA
-    // WORDPRESS EXAMPLE FEATURED HERE:
     if (CFG::enabled("pro_mfa") && function_exists("\BitFirePRO\wp_render_mfa_page")) {
-        $path = BitFire::get_instance()->_request->path;
-        if (contains($path, "wp-login.php")) {
-            trace("wp_login");
-            add_action("wp_authenticate", "\BitFirePRO\wp_user_login");
-        }
     }
 }
 
 
 // add the menu, check for an API call
-// WORDPRESS EXAMPLE HERE
-\add_action("admin_menu", "BitFirePlugin\bitfire_add_menu");
-\add_action("wp_loaded", "BitFirePlugin\bitfire_init");
-
-\register_activation_hook(__FILE__, 'BitFirePlugin\activate_bitfire');
-\register_deactivation_hook(__FILE__, 'BitFirePlugin\deactivate_bitfire');
+// TODO: add CMS menu integration here ...
 
 
-// IMPLEMENT:
-// FOREACH SCRIPT TAG ADD A NONCE="$nonce" ATTRIBUTE
-// $nonce = CFG::str("csp_nonce");
 

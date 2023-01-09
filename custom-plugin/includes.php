@@ -3,9 +3,15 @@
 namespace BitFirePlugin;
 
 use BitFire\Config AS CFG;
+use ThreadFin\FileData;
 
+use const BitFire\WAF_ROOT;
+
+use function BitFireSvr\trim_off;
 use function ThreadFin\get_sub_dirs;
 use function ThreadFin\contains;
+use function ThreadFin\dbg;
+use function ThreadFin\ends_with;
 
 define("\BitFire\\CMS_INCLUDED", true);
 
@@ -24,6 +30,19 @@ const ACTION_PARAMS = ["do", "page", "action", "screen-id"];
 // files used to determine package versions for plugin malware scan
 // can be an empty list if no such files exist
 const PACKAGE_FILES = ["readme.txt", "README.txt", "package.json"];
+
+/**
+ * get the wordpress version from a word press root directory
+ */
+function get_cms_version(string $root_dir): string
+{
+    $full_path = "$root_dir/wp-includes/version.php";
+    $wp_version = "1.0";
+    if (file_exists($full_path)) {
+        include $full_path;
+    }
+    return trim_off($wp_version, "-");
+}
 
 
 /**
@@ -125,11 +144,20 @@ function package_to_ver(string $carry, string $line) : string {
  * @return array the list of directories to scan
  */
 function malware_scan_dirs(string $root) : array {
-    $plugin_dir = "{$root}modules";
+    $check_list = ["modules", "components", "wp-content/plugins", "wp-content/themes"];
 
-    return array_merge(
-        get_sub_dirs($plugin_dir),
-        ["{$root}includes", "{$root}admin"]);
+    $all_dirs = get_sub_dirs($root);
+    $base_dirs = array_diff($all_dirs, $check_list);
+
+    $keep_dirs = array_map(function($x) use ($root) {
+        if (file_exists("{$root}/{$x}")) {
+            return get_sub_dirs("{$root}/{$x}");
+        }
+        return [];
+    }, $check_list);
+    $flat_dirs = array_merge(...array_values($keep_dirs));
+
+    return array_merge($base_dirs, $flat_dirs);
 }
 
 /**
@@ -144,3 +172,35 @@ function mail(string $subject, string $message) {
     $headers = "From: bitfire@$domain\r\nReply-To: no-reply@$domain\r\nX-Mailer: PHP/".phpversion();
     mail(CFG::str("email"), $subject, $message, $headers);
 } 
+
+const PARAM_SEARCH = 1;
+const LOG_ACTION = 2;
+const DST_USER = 4;
+const RISKY_DB_PARAM = ["wp_capabilities"];
+
+/**
+ * stub for function auditing
+ * @param string $fn_name 
+ * @param string $file 
+ * @param string $line 
+ * @param mixed $args 
+ * @return void 
+ */
+function fn_audit(string $fn_name, string $file, string $line, ...$args) {
+    static $fn_map = [
+        "update_user_meta" => [1 => DST_USER, 2 => RISKY_DB_PARAM, 3=> PARAM_SEARCH],
+        "wp_create_user" => [1 => LOG_ACTION],
+        "wp_insert_user" => [1 => LOG_ACTION]
+    ];
+    $src = $file . ":" . $line;
+    $x = FileData::new(WAF_ROOT."cache/{$fn_name}.json")->read()->un_json()->lines;
+    if (!isset($x[$src])) { 
+        $x[$src] = [];
+    }
+}
+
+
+// find a plugin / theme version number located in $path
+function version_from_path(string $path, string $default_ver = "") {
+    return "1.0";
+}
