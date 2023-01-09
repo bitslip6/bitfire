@@ -59,7 +59,7 @@ const PROFILE_MAX_VARS = 20;
 const PROFILE_MAX_CAPS = 20;
 
 $standalone_wp_include = \BitFire\WAF_ROOT . "wordpress-plugin".DS."includes.php";
-if (CFG::str("cms_root") || defined("WPINC")) {
+if (CFG::str("wp_version") || defined("WPINC")) {
     if (file_exists($standalone_wp_include)) {
         trace("wp_alone");
         require_once $standalone_wp_include;
