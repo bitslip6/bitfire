@@ -235,12 +235,13 @@ function process_request2(array $get, array $post, array $server, array $cookies
         $request->post_raw = file_get_contents("php://input");
         // handle json encoded post data
         if ($server["CONTENT_TYPE"]??"" === "application/json" && !empty($request->post_raw)) {
-            $x = un_json($request->post_raw);
+            $x = json_decode($request->post_raw, true);
             if (is_array($x)) {
                 trace("CT:AJOK");
                 $request->post = array_merge($request->post, $x);
             } else {
                 trace("CT:AJERR");
+                debug("JSON ERR [%s]", substr($request->post_raw, 0, 2048));
             }
         }
         $request->post_freq = freq_map($request->post);
