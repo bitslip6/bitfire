@@ -135,12 +135,12 @@ try {
             }
         }
 
-        // we don't want to check the FS for admins, or authenticated bots
-        if (!$is_admin && !$bitfire->bot_filter->browser->whitelist) {
+        // we don't want to check the FS for admins, (or authenticated bots?)
+        if (! $is_admin && !$bitfire->bot_filter->browser->whitelist) {
             \BitFirePRO\site_lock();
         }
     }
-} catch (\Exception$e) {
+} catch (\Exception $e) {
     \BitFire\on_err($e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine());
 }
 
