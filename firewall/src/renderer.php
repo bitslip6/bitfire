@@ -50,6 +50,18 @@ function escape(string $text) : string {
 	return htmlspecialchars($text, ENT_QUOTES, 'UTF-8', false);
 }
 
+/**
+ * count the number of elements in an array, or 0 for any other input type
+ * @param mixed $input 
+ * @return string 
+ */
+function counter($input) : string {
+	if (is_array($input)) {
+		return count($input);
+	}
+	return "0";
+}
+
 
 
 namespace ThreadFin;
@@ -72,7 +84,9 @@ const MODIFIER_MAPPING = [
 	"+" => "intval",
 	"%d" => "\ThreadFin\\view\\days_format",
 	"%u" => "strtoupper",
-	"%U" => "ucfirst"
+	"%U" => "ucfirst",
+	"%W" => "ucwords",
+	"%c" => "ThreadFin\\view\\counter"
 ];
 // CHAR FORMAT matches single character modifiers
 const CHAR_FORMAT = "[+-]";
@@ -151,14 +165,16 @@ function view_modifier(string $modifier_name, ?callable $modifier_fn = null) : ?
 
 	if ($modifier_fn === NULL) {
 		$modifiers = explode("|", $modifier_name);
+
 		$idx = 0;
 		$fn = $mapping[$modifiers[0]]??NULL;
 		while(isset($modifiers[++$idx])) {
-			//echo "CHAIN $fn = {$modifiers[$idx]}\n";
+			// echo "CHAIN $fn = {$modifiers[$idx]}\n";
 			$fn = chain($fn, $mapping[$modifiers[$idx]]??NULL);
 		}
 		return $fn;
 	}
+
 	$mapping[$modifier_name] = $modifier_fn;
 	return NULL;
 }
@@ -226,11 +242,11 @@ function render_file(string $src2, array $replacements = array()) : string {
  */
 function content_replacement(array $x, array $replacements) {
 	$mod_fn = NULL;
-	if (!empty($x[1])) {
-		$mod_fn = view_modifier($x[1]);
+	if (!empty($x[2])) {
+		$mod_fn = view_modifier($x[2]);
 	}
-	$primary = $x[2];
-	$secondary = $x[3]??"";
+	$primary = $x[3];
+	$secondary = $x[4]??"";
 
 	// replace content.  apply any view modifiers
 	if (isset($replacements[$primary])) {
@@ -254,12 +270,13 @@ function content_replacement(array $x, array $replacements) {
 			$value = (string)$return;	
 		}
 		if (!isset($value)) {
-			debug("VIEW VAR MISSING $primary.$secondary ($value)");
+			debug("VIEW VAR MISSING $primary.$secondary");
+			$value = "";
 		}
 		return ($mod_fn == NULL) ? $value : $mod_fn($value);
 	}
 
-	debug("unset view variable [$primary]");
+	debug("unset view variable [%s.%s]", $primary, $secondary);
 	return "undefined [{$primary}.{$secondary}]";
 }
 
@@ -309,7 +326,7 @@ function process_line(string $line, array $replacements) : string {
 	}, $line);
 
 	// replace variable substitution
-	$line = preg_replace_callback("/{{\s*(\%[a-zA-Z]|".CHAR_FORMAT.")?\s*([_\w-]+)\.?([_\w-]*)\s*}}/", 
+	$line = preg_replace_callback("/{{\s*((\%[a-zA-Z]|".CHAR_FORMAT."|\|)*)*\s*([_\w-]+)\.?([_\w-]*)\s*}}/", 
 	BINDR("ThreadFin\\content_replacement", $replacements), $line, MAX_VAR_REPLACEMENT);
 
 	// replace inline templates
