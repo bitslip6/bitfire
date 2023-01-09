@@ -18,7 +18,6 @@ flood
 secur
 radar
 bust
-grab
 havij
 ninja
 scois
@@ -80,4 +79,4 @@ phantom
 slimer
 k2spider
 leakix
-headlesschrome
+zgrab
