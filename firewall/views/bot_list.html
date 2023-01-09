@@ -1,54 +1,96 @@
 <style>
       {{custom_css}}
+      .badge { font-weight: 500; }
+      img.svg { fill: #444; }
+      .dropdown-ellipses { color: #3b506c; }
+      .limit { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .net-any { background-image: url('{{assets}}/net_any.png'); display: inline-block; width:1rem;height:1rem; background-size: contain; }
+      .net-auth { background-image: url('{{assets}}/net_auth.png'); display: inline-block; width:1rem;height:1rem; background-size: contain; }
+      .net-none { background-image: url('{{assets}}/net_none.png'); display: inline-block; width:1rem;height:1rem; background-size: contain; }
+      .anyip:hover { color: #fd7e14; } 
+      .authip:hover { color: #00d97e; } 
+      .noip:hover { color: #12263f; } 
+      .black { color: #000;  }
+      .limit1, .limit2, .limit3 {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+      }
+      .limit1 { -webkit-line-clamp: 1; }
+      .limit2 { -webkit-line-clamp: 2; }
+      .limit3 { -webkit-line-clamp: 3; }
+
+      a.dropdown-item { cursor: pointer; }
 </style>
     
 <script type="text/javascript">
 </script>
 
-    <script type="text/template" id="alert_template">
-      <div class="alert alert-warning alert-dismissible fade show">
-        {{text}}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    </script>
-
 {{ template:bot_row "data" }}
-<li class="list-group-item">
+<li class="list-group-item" style="padding-bottom: 1.25rem; padding-top: 0.25rem;">
   <div class="row align-items-center">
     <div class="col-auto">
-      <a href="#!" class="avatar avatar-lg">
-        <img src="{{-data.homepage}}/favicon.ico" alt="{{-data.vendor}}" class="avatar-img rounded">
+      <a href="{{-data.home_page}}" target="_blank" class="avatar avatar-lg" style="padding:10px;">
+        <img src="{{-data.favicon}}" data-alt-img={{-data.icon}} alt="" style="border: 1px solid #edf2f9" class="avatar-img svg rounded">
       </a>
     </div>
-    <div class="col ms-n2">
+    <div class="col ms-n2" >
 
       <!-- Title -->
       <h4 class="mb-1 name">
-        <a href="{{-data.family_homepage}}" target="_blank">{{-data.name}}</a>
+        <a href="{{-data.home_page}}" target="_blank">{{-data.name}}</a> <i class="text-primary fe fe-external-link"></i>
+        <small class="text-muted"> by: {{-data.vendor}}</small>
       </h4>
 
       <!-- Text -->
-      <p class="card-text small text-muted mb-1">
-        {{-data.ua_string}}
+      <p class="card-text small mb-1 limit3">
+        <!--span class="text-muted bfcat">{{-data.category}}:</span--> <span class="text-secondary bfua agent" style="padding-right:2rem;"><i>{{-data.agent}}</i></span> &quot;<span class="text-primary">{{-data.trim}}</span>&quot;
       </p>
 
       <!-- Time -->
       <p class="card-text small text-muted">
-        <span class="tdc">First seen on </span><time class="text-primary" data-offset="{{page_tz}}" data-mtime="{{data.mtime}}" datetime="{{data.machine_date}}"></time>
+        <span class="tdc">Time: </span><time class="text-info" data-offset="{{page_tz}}" data-mtime="{{+data.mtime}}" datetime="{{-data.machine_date}}">{{-data.machine_date}}</time>
+        / <time class="text-info" data-offset="{{page_tz}}" data-mtime="{{+data.last_time}}" datetime="{{-data.machine_date2}}">{{-data.machine_date2}}</time>
+
+        <span class="tdc bg-warning-soft" style="margin-left:2rem;">404: <span class="text-dark" style="display:inline-block;width:20px;text-align:right;margin-right:15px;">{{+data.not_found}}</span></span>
+        <span class="tdc bg-danger-soft">Fail: <span class="text-dark" style="display:inline-block;width:20px;text-align:right;margin-right:15px;">{{+data.miss}}</span></span>
+        <span class="tdc bg-success-soft" style="margin-left:0rem;">Hit: <span class="text-dark" style="display:inline-block;width:20px;text-align:right;margin-right:15px;">{{+data.hit}}</span></span>
+        <span class="tdc">Auth: <span class="badge bg-{{data.allowclass}}">{{-|%W data.allow}}</span></span>
       </p>
 
     </div>
-    <div class="col-auto">
-      <p class="card-text small tdc">Unique IPs: {{+data.number_ips}}</p>
-      <p class="card-text small tdc">Source Domain: {{-data.domain}}</p>
-      <p class="card-text small tdc">Category: {{-data.category}}</p>
+    <div class="col-auto" style="width:240px;">
+      <p class="card-text small tdc mb-1"><!--<span class="text-muted">Valid IPs:</span> --><span class="text-secondary"><span class="limit2 text-muted">({{%c data.ips}}) {{data.ip_str}}</span></span></p>
+      <p class="card-text small tdc mb-1"><!--<span class="text-muted">Domain(s):</span> --><span class="text-info limit3">{{-data.domain}}</span></p>
+      <p class="card-text small tdc mb-1"><span class="text-muted"></span><span class="text-dark limit2">{{-data.country}}</span></p>
+      <p class="card-text small tdc mb-1"><span class="text-muted">Classification:</span> <span class="badge bg-{{-data.classclass}}">{{-data.category}}</span></p>
     </div>
-    <div class="col-auto">
 
-      <div class="col-auto tog" id="bitfire_enabled_con" data-enabled="{{data.enabled}}" data-title="Turn on to allow {{data.vendor}} bots" data-toggle="true">
+    <div class="col-auto" style="margin-left: 0">
+      <div class="dropdown">
+        <a href="#" style="font-size:24px;" title="Control bot access with this menu" class="dropdown-ellipses dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+          <i class="text-danger fe fe-more-vertical"></i>
+        </a>
+        <div class="dropdown-menu dropdown-menu-end" style="position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(0px, 27.5px, 0px);" data-popper-placement="bottom-end">
+          <a data-id="{{-data.id}}" class="anyip dropdown-item" title="Allow this robot from any IP Address">
+            <i class="net-any"></i> Allow From Any IP 
+          </a>
+          <a data-id="{{-data.id}}" class="authip dropdown-item" title="Allow from only Authenticated IP Address (Auto Learn will use the first 30 IP address for this bot)">
+            <i class="net-auth"></i> Allow Authenticated IP
+          </a>
+          <a data-id="{{-data.id}}" class="noip dropdown-item" title="Disallow this robot from any IP Address">
+            <i class="net-none"></i> Disallow Any IP
+          </a>
+          <a data-id="{{-data.id}}" class="rmip dropdown-item" title="Remove this bot entry until seen again">
+            <i class="fe fe-trash-2 black"></i> Remove entry
+          </a>
+        </div>
       </div>
-
+      
     </div>
+
+
   </div> 
 </li>
 {{ end template }}
@@ -71,22 +113,28 @@
             <div class="card">
               <div class="card-header">
                 <h3 class="card-header-title text-primary">
-                  {{title}}
+                  Firewall Bot Controls
                 </h3>
+                <p class="small text-muted pt-3"><span class="tdc">Show Known Bots</span>
+                <div class="col-auto tog" style="margin-left: 75px;margin-top:-8px;" data-title="Toggle to show known allowed bots">
+                  <div class="form-switch right">
+                    <input class="form-check-input success" autocomplete="off" id="bitfire_show_known" type="checkbox" onclick="return show_known()" {{known_check}} data-bs-toggle="tooltip" data-bs-placement="top" title="" data-bs-original-title="Toggle to show/hide known bots">
+                  </div>
+                </div>
+                </p>
               </div>
               <div class="card-body mb-4" style="padding:1rem !important">
-                {{body}}
-
 
                 <div class="card">
+                    <!--
                   <div class="card-header">
     
-                    <!-- Title -->
                     <h4 class="card-header-title">
                       Allowed Bots
                     </h4>
                         
                   </div>
+                  -->
                   <!--
                   <div class="card-header">
     
@@ -108,9 +156,9 @@
                   <div class="card-body">
     
                     <!-- List -->
-                    <ul class="list-group list-group-lg list-group-flush list my-n4">
+                    <ul class="list-group list-group-lg list-group-flush list my-n4" style="padding-top:1rem;">
 
-                      {{ render:bot_row "found_bots" }}
+                      {{ render:bot_row "bot_list" }}
                     </ul>
     
                   </div>
@@ -128,7 +176,76 @@
     
   <script type="text/javascript">
       window.BITFIRE_NONCE = '{{api_code}}';
+      window.LLANG = "EN";
+      // update_times2();
+
+      function toggle_bot(e1, e2) {
+        console.log(e1, e2);
+      }
+
+      function swap_img(event, url) {
+        console.log("swap", event);
+        let alt_url = event.target.getAttribute("data-alt-img");
+        if (alt_url) {
+          event.target.removeAttribute("data-alt-img");
+          console.log(alt_url);
+          event.target.src=alt_url;
+        } else {
+          event.target.src="https://bitfire.co/assets/robot.svg"
+        }
+      }
+
+      function show_known() {
+        const urlSearchParams = new URLSearchParams(window.location.search);
+        const params = Object.fromEntries(urlSearchParams.entries());
+        let foo = String(window.location);
+        let basic_url = foo.replace(/\&?known=\w+/ig, "");
+        console.log(basic_url);
+        console.log(params);
+        if (params.known == "known") {
+          window.location = basic_url + "&known=unknown";
+        } else {
+          window.location = basic_url + "&known=known";
+        }
+      }
+
+      function api(id, action) {
+        return function() {
+          BitFire_api_call("bot_action", {"bot":id, "action":action}, function() {
+            console.log("complete", id,action);
+            window.location.reload();
+          });
+          return false;
+        }
+      }
+
+      let rm_elms = document.getElementsByClassName("rmip");
+      for(let i=0; i< rm_elms.length; i++) {
+        let id = rm_elms[i].getAttribute("data-id");
+        rm_elms[i].addEventListener("click",api(id, "rm"));//BitFire_api("bot_action", {"bot": id, "action":"rm"}));
+      }
+      let no_elms = document.getElementsByClassName("noip");
+      for(let i=0; i< no_elms.length; i++) {
+        let id = no_elms[i].getAttribute("data-id");
+        no_elms[i].addEventListener("click",api(id, "no"));//BitFire_api("bot_action", {"bot": id, "action":"no"}));
+      }
+      let any_elms = document.getElementsByClassName("anyip");
+      for(let i=0; i< any_elms.length; i++) {
+        let id = any_elms[i].getAttribute("data-id");
+        any_elms[i].addEventListener("click",api(id, "any"));//BitFire_api("bot_action", {"bot": id, "action":"any"}));
+      }
+      let auth_elms = document.getElementsByClassName("authip");
+      for(let i=0; i< auth_elms.length; i++) {
+        let id = auth_elms[i].getAttribute("data-id");
+        auth_elms[i].addEventListener("click",api(id, "auth"));//BitFire_api("bot_action", {"bot": id, "action":"auth"}));
+      }
+
+      let avatar_elms = document.getElementsByClassName("avatar-img");
+      for(let i=0; i< avatar_elms.length; i++) {
+        avatar_elms[i].addEventListener("error", swap_img);
+      }
+
+//onerror="swap_img(this, {{-data.icon}})"
   </script>
 
-    
   {{gtag}}
