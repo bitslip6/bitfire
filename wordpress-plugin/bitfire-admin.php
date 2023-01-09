@@ -247,13 +247,24 @@ function bitfire_add_menu() {
 
     \add_submenu_page(
         "bitfire",
-        "BitFire Dashboard Title",
+        "BitFire Settings",
         "Settings",
         "manage_options",
         "bitfire_settings",
         "\BitFire\serve_settings",
         2
     );
+
+    \add_submenu_page(
+        "bitfire",
+        "BitFire Bot Control",
+        "Bot Control",
+        "manage_options",
+        "bitfire_botlist",
+        "\BitFire\serve_botlist",
+        2
+    );
+
     
     \add_submenu_page(
         "bitfire",
