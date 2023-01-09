@@ -16,6 +16,7 @@ use ThreadFin\FileData;
 use ThreadFin\FileMod;
 use ThreadFin\MaybeStr;
 use BitFire\Config as CFG;
+use LDAP\Result;
 use RuntimeException;
 use SplFixedArray;
 use ThreadFinDB\Credentials;
@@ -191,15 +192,16 @@ function add_api_exception(\BitFire\Request $r) : Effect {
  * @return void 
  */
 function download(\BitFire\Request $r) : Effect {
-    assert(isset($r->get["filename"]), "filename is required");
+    assert(isset($r->post["filename"]), "filename is required");
 
 	$effect = Effect::new();
     $root = \BitFireSvr\cms_root();
-	$filename = trim($r->get['filename'], "/");
+	$filename = trim($r->post['filename'], "/");
     $path = $root . $filename;
 
     // alert / block download
     if ($filename == "alert" || $filename == "block") {
+        $effect->header('Content-Type', 'application/json');
         // TODO: move to server functions
         $config_name = ($filename == "alert") ? CONFIG_REPORT_FILE : CONFIG_BLOCK_FILE;
         $report_file = \ThreadFin\FileData::new(CFG::file($config_name))->read();
@@ -209,6 +211,7 @@ function download(\BitFire\Request $r) : Effect {
         $filename .= ".json";
     }
 	else {
+        $effect->header('Content-Type', 'application/x-php');
         // FILE NAME GUARD
         if (! ends_with($filename, "php") || contains($filename, RESTRICTED_FILES)) {
             return $effect->api(false, "invalid file.");
@@ -224,7 +227,6 @@ function download(\BitFire\Request $r) : Effect {
     if (!isset($r->get['direct'])) {
         $base = basename($filename);
         $effect->header("content-description", "File Transfer")
-        ->header('Content-Type', 'application/octet-stream')
         ->header('Content-Disposition', 'attachment; filename="' . $base . '"')
         ->header('Expires', '0')
         ->header('Cache-Control', 'must-revalidate')
@@ -362,6 +364,96 @@ function diff(\BitFire\Request $request) : Effect {
     return $effect;
 }
 
+function ip_to_domain(string $ip) : ?string {
+    $domain = gethostbyaddr($ip);
+    debug("fwd: %s [%s]", $ip, $domain);
+    if (!empty($domain)) {
+        $ips = gethostbynamel($domain);
+    debug("reverse: [%s]", $ips);
+        if (in_array($ip, $ips)) {
+            if (preg_match("/([a-zA-Z0-9_-]+\.(?:[a-zA-Z]+|xn-\w+))\.?$/", $domain, $matches)) {
+                return $matches[1];
+            }
+        }
+    }
+    return null;
+}
+
+function bot_action(\BitFire\Request $request) : Effect {
+
+    $effect = Effect::new();
+    $id = intval($request->post["bot"]);
+
+    $info_file = WAF_ROOT."cache/bots/{$id}.json";
+    if ($request->post["action"] == "rm") {
+        $effect->unlink($info_file);
+        $effect->api(true, "bot remove", ["id" => $id]);
+        return $effect;
+    }
+    $fd = FileData::new($info_file);
+    if ($fd->exists) {
+        trace("BOT_RM");
+        $bot_data = unserialize($fd->raw(), ["allowed_classes" => ["BitFire\BotInfo"]]);
+        if (!$bot_data) {
+            $effect->unlink($info_file);
+            return $effect->api(false, "unable to load bot file $id");
+        }
+    } else {
+        return $effect->api(false, "bot file $id does not exist");
+        
+    }
+    if ($request->post["action"] == "no") {
+        trace("BOT_NO");
+        $bot_data->net = "!";
+        $effect->api(true, "bot block all", ["id" => $id, "domain" => $bot_data->domain, "net" => $bot_data->net]);
+    }
+    else if ($request->post["action"] == "any") {
+        trace("BOT_ANY");
+        $bot_data->net = "*";
+        $effect->api(true, "bot allow any", ["id" => $id, "domain" => $bot_data->domain, "net" => $bot_data->net]);
+    }
+    else if ($request->post["action"] == "auth") {//} && contains($bot_data->net, ["!", "*"])) {
+        trace("BOT_AUTH");
+        $bot_data->net = "";
+        $bot_data->domain = "";
+        $lookup = [];
+        $domain_list = [];
+        // debug("bot ips [%s]", $bot_data->ips);
+        foreach($bot_data->ips as $ip => $value) {
+            debug("ip [%s]", $ip);
+            if (strlen($ip) < 7) { continue; }
+            if (isset($lookup[$ip])) { continue; }
+            $lookup[$ip] = true;
+
+            /*
+            $domain = gethostbyaddr($ip);
+            if (!empty($domain)) {
+                if (!strpos($bot_data->domain, $domain) !== false) {
+                    $bot_data->domain .= ",$domain";
+                }
+            }
+            */
+            $domain = ip_to_domain($ip);
+            if (!in_array($domain, $domain_list)) {
+                $domain_list[] = $domain;
+            }
+            $as = find_ip_as($ip);
+            if (!empty($net)) {
+                if (!strpos($bot_data->net, $as) !== false) {
+                    $bot_data->net .= ",$as";
+                }
+            }
+        }
+        $bot_data->domain = implode(",", $domain_list);
+        debug("allowed domain [%s], net [%s]", $bot_data->domain, $bot_data->net);
+        $effect->api(true, "bot auth", ["id" => $id, "domain" => $bot_data->domain, "net" => $bot_data->net]);
+    }
+
+
+    $effect->file(new FileMod($info_file, serialize($bot_data)));
+    return $effect;
+}
+
 // not DRY ripped from dashboard.php
 function dump_hash_dir(\BitFire\Request $request) : Effect {
     require_once WAF_SRC . "cms.php";
@@ -403,7 +495,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
 
         // the auto allow list
         $filter_hashes = FileData::new(WAF_ROOT."hashes/{$plugin_name}.json")->read()->un_json()->lines;
-        debug("ZZZ manual/auto allow hash size: %d/%d", count($allow_map), count($filter_hashes));
+        //debug("ZZZ manual/auto allow hash size: %d/%d", count($allow_map), count($filter_hashes));
 
         // $h = new \BitFireSvr\FileHash();
         // skip stuff we have already proved to be clean
@@ -421,7 +513,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
             return true;
         });
         $num_min = count($min_hashes);
-        debug("ZZZ Local system authenticated %d of %d hashes", ($num_files - $num_min), $num_files);
+        // debug("ZZZ Local system authenticated %d of %d hashes", ($num_files - $num_min), $num_files);
 
 
         $h2 = en_json(["ver" => $ver, "files" => $min_hashes]);
@@ -461,7 +553,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         });
         $num_miss = count($missed);
 
-        debug("ZZZ [%s] hashes sent/received [%d/%d] hashes miss: %d/%d", $plugin_name, $num_min, $c1, $num_miss, $num_files);
+        // debug("ZZZ [%s] hashes sent/received [%d/%d] hashes miss: %d/%d", $plugin_name, $num_min, $c1, $num_miss, $num_files);
         $effect = Effect::new();
         $known = false;
         // if the entire directory is unknown, squash it to a single entry
@@ -473,7 +565,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
 
                 // if we allow it, then it cant be missing
                 if (isset($allow_map[$test_entry['crc_trim']])) {
-                    debug("ZZZ !! NEVER HIT AM %s", $test_entry['file_path']);
+                    // debug("ZZZ !! NEVER HIT AM %s", $test_entry['file_path']);
                     continue;
                 }
                 // todo, remove me
@@ -517,7 +609,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
                 $compacted[] = $test_entry;
             }
             # TODO: effect this
-            debug("ZZZ Saving hashes for $plugin_name");
+            // debug("ZZZ Saving hashes for $plugin_name");
             $effect->file(new FileMod(WAF_ROOT."hashes/{$plugin_name}.json", en_json($filter_hashes)));
         } else {
             $enrich_fn = BINDL('\BitFire\enrich_hashes', $ver, $dir_without_plugin_name);
@@ -531,7 +623,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
             dbg($enriched, "enriched");
             }
             */
-            debug("ZZZ Known Plugin miss/filter %d/%d of: (%d)", $num_miss, count($final), $num_files);
+            // debug("ZZZ Known Plugin miss/filter %d/%d of: (%d)", $num_miss, count($final), $num_files);
             $known = true;
             $compacted = compact_array($final);
 
@@ -696,6 +788,7 @@ function make_code(string $secret) : string {
     $hash = hash_hmac("sha256", "{$iv}.{$time}", $secret, false);
     return "{$hash}.{$iv}.{$time}";
 }
+
 
 // validate hmac($iv.$time, $secret)  == $test_hmac, within 6 hours
 function validate_raw(string $test_hmac, string $iv, string $time, string $secret) : bool {
@@ -1116,7 +1209,7 @@ function in_list(array $haystack, int $needle, int $high) : bool {
 
 function upload_file(string $url, array $post_data, string $path_to_file, string $file_param, ?string $file_name = null) : ?string {
     $data = ""; 
-    $boundary = "---------------------".substr(md5(rand(0,32000)), 0, 10); 
+    $boundary = "---------------------".substr(md5(mt_rand(0,32000)), 0, 10); 
 
     // append post data 
     foreach($post_data as $key => $val) 
@@ -1248,6 +1341,27 @@ function clean_post(Request $request) : Effect {
     }
 
     return $effect->api(false, "clean post", ["data" => $db->logs, "errors" => $db->errors]);
+}
+
+function bot_allow(Request $request) : Effect {
+    $id = $request->post["id"];
+    $info_file = WAF_ROOT."cache/bots/{$id}.json";
+    $effect = Effect::new();
+    /** @var BotData $bot_data */
+    $bot_data = json_decode(FileData::new($info_file)->raw(), false);
+
+    if (!empty($bot_data)) {
+        if ($request->post["allow"] == "true") {
+            $bot_data->net = $request->post["net"];
+            $bot_data->domain = $request->post["domain"];
+            $bot_data->valid = true;
+        } else {
+            $bot_data->valid = false;
+        }
+        $effect->file(new FileMod($info_file, json_encode($bot_data, JSON_PRETTY_PRINT)));
+    }
+
+    return $effect;
 }
 
 
