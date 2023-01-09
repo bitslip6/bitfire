@@ -336,22 +336,6 @@ function make_js_challenge_effect() : Effect {
     return $alert_effect;
 }
 
-// find a plugin / theme version number located in $path
-function version_from_path(string $path, string $default_ver = "") {
-    $package_fn = find_fn("package_to_ver");
-    $package_files = find_const_arr("PACKAGE_FILES");
-    $php_files = array_map('basename', glob($path."/*.php"));
-    $all_files = array_merge($package_files, $php_files);
-
-    foreach($all_files as $file) {
-        $file_path = "{$path}/{$file}";
-        if (file_exists($file_path)) {
-            $version = FileData::new($file_path)->read()->reduce($package_fn, "");
-            if ($version) { return $version; }
-        }
-    }
-    return $default_ver;
-}
 
 
 /**
