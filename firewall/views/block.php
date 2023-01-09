@@ -1,11 +1,6 @@
 <?php
     $code = intval(\BitFire\Config::int("response_code", 200));
     $error_css = isset($error_css) ? htmlentities($error_css) : "";
-    $uuid = $block_type = "undefined";
-    if (isset($block)) {
-        $uuid = $block->uuid;
-        $block_type = htmlentities($block->__toString());
-    }
     $ms = round(((microtime(true)-$GLOBALS['start_time'])*1000), 2);
     $now = \ThreadFin\utc_date("m/d @H.i.s"); 
     http_response_code($code);
@@ -26,8 +21,7 @@
 <body>
 <div id="block"> <div class="block-bg"></div> <div class="block"> <div class="block-err"> <h1>Halt!</h1> </div>
 <h2>Something went wrong</h2>
-<p class="nor">This site is protected by BitFire WAF.  <br>
-Your action: <strong><?php echo $block_type; ?></strong> was blocked.  </p>
+<p class="nor"><?php echo $custom_err?></p>
 <p class="nor">If this is an error, please click the request review button below. Reference ID <i><?php echo $uuid; ?></i></p>
 <a href="#" id="review"> <button type="button" id="review">Request Review</button> </a>
 <a href="/"> <button type="button" id="home">Back To Homepage</button> </a>
