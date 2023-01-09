@@ -25,6 +25,7 @@ use const ThreadFin\ENCODE_RAW;
 use function BitFirePlugin\get_cms_version;
 use function BitFirePlugin\malware_scan_dirs;
 use function BitFireSvr\update_ini_value;
+use function ThreadFin\machine_date;
 use function BitFireWP\wp_parse_credentials;
 use function BitFireWP\wp_parse_define;
 use function ThreadFin\array_add_value;
@@ -32,6 +33,7 @@ use function ThreadFin\b2s;
 use function ThreadFin\ip_to_country;
 use function ThreadFin\compact_array;
 use function ThreadFin\compose;
+use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\en_json;
 use function ThreadFin\ends_with;
@@ -55,6 +57,11 @@ require_once \BitFire\WAF_SRC . "cms.php";
 require_once \BitFire\WAF_SRC . "server.php";
 require_once \BitFire\WAF_SRC . "botfilter.php";
 require_once \BitFire\WAF_SRC . "renderer.php";
+if (CFG::str("wp_version")) {
+    require_once \BitFire\WAF_ROOT . "wordpress-plugin/includes.php";
+} else {
+    require_once \BitFire\WAF_ROOT . "custom-plugin/includes.php";
+}
 
 const PAGE_SZ = 30;
 const PORN_WORD = "sex|teen|adult|chat|porn|naked|pussy|hardcore|anal|cock|xxx|webcam|amateur|girls";
@@ -117,8 +124,7 @@ function list_text_inputs(string $config_name) :string {
 }
 
 
-function country_enricher(array $country_info): callable
-{
+function country_enricher(array $country_info): callable {
     return function (?array $input) use ($country_info): ?array {
         if (!empty($input)) {
             $code = ip_to_country($input['request']['ip'] ?? $input['ip'] ?? '');
@@ -126,6 +132,16 @@ function country_enricher(array $country_info): callable
         }
         return $input;
     };
+}
+
+function country_resolver(string $ip, array $country_info): string {
+    if (!empty($ip)) {
+        $code = ip_to_country($ip);
+        if (isset($country_info[$code])) {
+            return $country_info[$code];
+        }
+    }
+    return "-";
 }
 
 function add_country($data)
@@ -153,10 +169,20 @@ function is_dis()
 }
 
 
-function url_to_path($url)
-{
+function url_to_path($url) {
     $idx = strpos($url, "/");
     return substr($url, $idx);
+}
+
+function get_asset_dir() {
+    $assets = "https://bitfire.co/assets/";
+    if (defined("WPINC")) {
+        $assets = CFG::str("cms_contenturl")."/plugins/bitfire/public/";
+    } else if (contains($_SERVER['REQUEST_URI'], "startup.php")) {
+        $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        $assets = dirname($path) . "/public/";
+    }
+    return $assets;
 }
 
 /**
@@ -177,6 +203,11 @@ function render_view(string $view_filename, string $page_name, array $variables 
     $is_free = (strlen(Config::str('pro_key')) < 20);
 
 
+    $assets = "https://bitfire.co/assets/";
+    if (defined("WPINC")) {
+        $assets = CFG::str("cms_contenturl")."/plugins/bitfire/public/";
+    }
+    if (isset($variables['assets'])) { $assets = $variables['assets']; ;}
 
 
 
@@ -188,12 +219,13 @@ function render_view(string $view_filename, string $page_name, array $variables 
     $variables['api_code'] = make_code(CFG::str("secret"));
     $variables['api'] = BITFIRE_COMMAND;
     $variables['self'] = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
+    $variables['page_tz'] = date('Z');
 
     $variables['password_reset'] = (CFG::str('password') === 'default') || (CFG::str('password') === 'bitfire!');
     $variables['is_free'] = b2s($is_free);
     $variables['llang'] = "en-US";
     $variables['public'] = \ThreadFin\get_public();
-    $variables['assets'] = (defined("WPINC") && !empty($content)) ? "$content/plugins/bitfire/public/" : "https://bitfire.co/assets/";
+    $variables['assets'] = $assets;
     $variables['version'] = BITFIRE_VER;
     $variables['sym_version'] = BITFIRE_SYM_VER;
     $variables['showfree_class'] = $is_free ? "" : "hidden";
@@ -211,6 +243,7 @@ function render_view(string $view_filename, string $page_name, array $variables 
         "exceptions_url" => $url_fn("bitfire_exceptions", "EXCEPTIONS"),
         "database_url" => $url_fn("bitfire_database", "DATABASE"),
         "advanced_url" => $url_fn("bitfire_advanced", "ADVANCED"),
+        "botlist_url" => $url_fn("bitfire_advanced", "BOTLIST"),
     ], $variables);
     // inject header and style
     if (!isset($header_variables["plugin_alerts"])) {
@@ -236,7 +269,7 @@ function render_view(string $view_filename, string $page_name, array $variables 
         // save current content
         $out = $effect->read_out();
         $variables["maincontent"] = $out;
-        $variables["has_scanner"] = "hidden";
+        $variables["has_scanner"] = (empty(CFG::str("CMS_ROOT"))) ? "hidden2" : "";
         // render the skin with old content
         $effect->out(render_file(\BitFire\WAF_ROOT."views/skin.html", $variables), ENCODE_RAW, true);
     }
@@ -422,6 +455,10 @@ function dashboard_url(string $token, string $internal_name) : string {
     unset($get['BITFIRE_WP_PAGE']);
     unset($get['BITFIRE_PAGE']);
     unset($get['tooltip']);
+    unset($get['page']);
+    unset($get['block_page_num']);
+    unset($get['alert_page_num']);
+    unset($get['block_filter']);
     return $url['path'] . '?' . http_build_query($get) . "&BITFIRE_PAGE=$internal_name";
 }
 
@@ -453,9 +490,13 @@ function serve_settings() {
 function serve_advanced() {
     // authentication guard
     validate_auth()->run();
+    $is_free = (strlen(Config::str('pro_key')) < 20);
+    $disabled = ($is_free) ? "disabled='disabled'" : "";
     $data = ["mfa" => defined("WPINC") ? "Enable multi factor authentication. Add MFA phone numbers in user editor." :
-        "Multi Factor Authentication is only available in the WordPress plugin. Reinstall the plugin to enable.",
+        "Multi Factor Authentication is only available in the WordPress plugin. Please install from the WordPress plugin directory.",
         "show_mfa" => (defined("WPINC")) ? "" : "hidden",
+        "disabled" => $disabled,
+        "info" => "<h4 class='text-info'> * Runtime Application Self Protection must first be installed with BitFire PRO. See link in header for details.</h4>",
         "mfa_class" => (defined("WPINC")) ? "text-muted" : "text-danger"];
     //"dashboard_path" => $dashboard_path,
     render_view(\BitFire\WAF_ROOT . "views/advanced.html", "bitfire_advanced", array_merge(CFG::$_options, $data))->run();
@@ -464,7 +505,136 @@ function serve_advanced() {
 function serve_bot_list() {
     // authentication guard
     validate_auth()->run();
-    $data = [];
+    $url_fn = find_fn("dashboard_url");
+    $request = BitFire::get_instance()->_request;
+
+    require_once WAF_SRC . "botfilter.php";
+    $bot_files = glob(\BitFire\WAF_ROOT . "cache/bots/*.json");
+    $country_mapping = \ThreadFin\un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country_name.json"));
+    $country_fn = BINDR("BitFire\country_resolver", un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country.json")));
+
+
+    $all_bots = array_map(function ($file) {
+        $id = pathinfo($file, PATHINFO_FILENAME);
+        $bot = unserialize(file_get_contents($file));
+        if (!$bot) { return new BotInfo("broken bot ($id)"); }
+        if (empty($bot->mtime)) { $bot->mtime = filemtime($file); }
+        $bot->last_time = filemtime($file);
+        // ID must always be the filename...
+        $bot->id = $id;
+
+        return $bot;
+    }, $bot_files);
+
+    $known = $request->get["known"]??"unknown";
+    $filter_bots = array_filter($all_bots, function($bot) use ($known) {
+        if ($known=="known") {
+            return $bot->category != "Auto Learn";
+        } else {
+            return $bot->category == "Auto Learn";
+            //return ($bot->mtime > (time() - DAY*30)) && ($bot->valid < 1);
+        }
+    });
+
+    // order by last time seen, newest first
+    usort($filter_bots, function($a, $b) {
+        return $a->last_time < $b->last_time;
+    });
+
+    $bot_list = array_map(function ($bot) use ($country_fn, $country_mapping) {
+        if (empty($bot->country) && !empty($bot->ips)) {
+            $ips = array_keys($bot->ips);
+            $country_counts = [];
+            foreach ($ips as $ip) {
+                $country = $country_mapping[$country_fn($ip)]??"-";
+                $country_counts[$country] = ($country_counts[$country]??0) + 1;
+            }
+            arsort($country_counts);
+            $bot->country = join(",", array_slice(array_keys($country_counts), 0, 3));
+            if (empty($bot->name)) {
+                $bot->name = "Unknown Bot";
+            }
+        } else if (empty($bot->country)) {
+            $bot->country = "-";
+        }
+        // trim down to the minimum user agent, this need to be a function. keep in sync with botfilter.php
+        $agent_min1 = preg_replace("/[^a-z\s]/", " ", strtolower(trim($bot->agent)));
+        $agent_min2 = preg_replace("/\s+/", " ", preg_replace("/\s[a-z]{1,3}\s([a-z]{1-3}\s)?/", " ", $agent_min1));
+        // remove common words
+        $rem_fn = function ($carry, $item) {
+            return str_replace($item, "", $carry);
+        };
+        $agent_min_words = array_filter(explode(" ", array_reduce(COMMON_WORDS, $rem_fn, $agent_min2)));
+
+        $bot->trim = substr(trim(join(" ", $agent_min_words)), 0, 250);
+
+
+        $bot->allow = "authenticated";
+        $bot->allowclass = "success";
+        if ($bot->net === "*") {
+            $bot->allow = "ANY IP";
+            $bot->domain = "Any";
+        $bot->allowclass = "danger";
+        } else if ($bot->net === "!") {
+            $bot->allow = "BLOCKED";
+            $bot->allowclass = "dark";
+        }
+        $bot->agent = substr($bot->agent, 0, 160);
+        if (!empty($bot->home_page)) { 
+            $info = parse_url($bot->home_page);
+            $bot->favicon = $info["scheme"] . "://" . $info["host"] . "/favicon.ico";
+        } else {$bot->favicon = get_asset_dir() . "robot.svg";}
+        $bot->classclass = "danger";
+        if ($bot->valid==0) {
+            $bot->classclass = "warning";
+        } else if ($bot->valid==1) {
+            $bot->classclass = "success";
+        }
+        if (empty($bot->hit)) { $bot->hit = 0; }
+        if (empty($bot->miss)) { $bot->miss = 0; }
+        if (empty($bot->not_found)) { $bot->not_found = 0; }
+        if (empty($bot->domain)) { $bot->domain = "-"; }
+        if (empty($bot->icon)) { $bot->icon = "robot.svg"; }
+        $bot->machine_date = date("Y-m-d", $bot->mtime);
+        $bot->machine_date2 = date("Y-m-d", $bot->last_time);
+        $bot->checked = ($bot->valid > 0) ? "checked" : "";
+        $bot->domain = trim($bot->domain, ",");
+        $bot->ip_str = join(", ", array_keys($bot->ips));
+        if (empty($bot->home_page)) { $bot->home_page = ""; }
+        if (empty($bot->vendor)) { $bot->vendor = "Unknown"; }
+        return $bot;
+    }, $filter_bots);
+
+    $x = $request->get["known"]??"unknown";
+    $check = ($x === "known") ? "checked" : "";
+
+    if (empty($bot_list)) {
+        $bot = new BotInfo("This is a place-holder bot for display only. Bots will appear here when they are detected. Control access with the triple dot icon on the right.");
+        $bot->allow = "no authentication";
+        $bot->allowclass = "dark";
+        $bot->category = "Test Sample";
+        $bot->country = "Local Host";
+        $bot->country_code = "-";
+        $bot->domain = "BitFire.co";
+        $bot->favicon = "https://bitfire.co/favicon.ico";
+        $bot->hit = 0;
+        $bot->miss = 0;
+        $bot->not_found = 0;
+        $bot->ips = ['127.0.0.1' => 1];
+        $bot->home_page = "https://bitfire.co/sample_bot";
+        $bot->favicon = "https://bitfire.co/assets/img/shield128.png";
+        $bot->name = "BitFire Sample Bot";
+        $bot->net = "-";
+        $bot->trim = "BitFire";
+        $bot->domain = "bitfire.co";
+        $bot->vendor = "BitFire, llc";
+        $bot->machine_date = date("Y-m-d");
+        $bot->machine_date2 = date("Y-m-d");
+
+        $bot_list = [$bot];
+    }
+
+    $data = ["bot_list" => $bot_list, "known_check" => $check];
     render_view(\BitFire\WAF_ROOT . "views/bot_list.html", "bitfire_bot_list", array_merge(CFG::$_options, $data))->run();
 }
 
@@ -639,6 +809,7 @@ function serve_database() : void
 
     $credentials = null;
     if (defined("WPINC") && defined("DB_USER")) {
+        $prefix  = "wp_";
         if (isset($GLOBALS['wpdb'])) {
             trace("WP_DB");
             $prefix = $GLOBALS['wpdb']->prefix;
@@ -647,6 +818,7 @@ function serve_database() : void
     } else {
         trace("BIT_DB");
         $credentials = wp_parse_credentials(CFG::str("cms_root"));
+        $prefix = $credentials->prefix;
     }
     if ($credentials) {
         $db = DB::cred_connect($credentials)->enable_log(true);
@@ -780,8 +952,7 @@ function serve_database() : void
 /**
  * TODO: split this up into multiple functions
  */
-function serve_dashboard() :void
-{
+function serve_dashboard() :void {
     // handle dashboard wizard
     if (CFG::disabled("wizard") && !isset($_GET['tooltip'])) {
        serve_settings();
@@ -804,6 +975,7 @@ function serve_dashboard() :void
 
     // load all alert data
     // TODO: make dry
+    $report_code = intval($_GET['report_filter']??0);
     $report_file = \ThreadFin\FileData::new(CFG::file(CONFIG_REPORT_FILE))
         ->read();
 
@@ -815,6 +987,22 @@ function serve_dashboard() :void
         ->map('\ThreadFin\un_json')
         ->map($country_fn);
     $reporting = $report_file->lines;
+
+    // filter to just the requested block type
+    if ($report_code > 0) {
+        $reporting = array_filter($reporting, function($x) use ($report_code) {
+            // if the filter is a class, then allow anything with that class
+            $class = code_class($report_code);
+            if ($report_code == $class) {
+                $block_class = code_class($x["block"]["code"]);
+                return $block_class == $report_code;
+            }
+            // allow only the exact code
+            return $x["block"]["code"] == $report_code;
+        });
+    }
+
+
     // calculate number of alert pages
     //$report_count = $report_file->num_lines;
     $data["report_count"] = $report_count;
@@ -837,23 +1025,38 @@ function serve_dashboard() :void
     // add alerts
     $data['alerts_json'] = json_encode($data["alerts"], JSON_HEX_APOS);
 
+    $block_code = intval($_GET['block_filter']??0);
 
-
-    // load all alert data
+    // load all block data
     $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
         ->read()
         ->apply(BINDR('\BitFire\remove_lines', 400))
         ->apply_ln('array_reverse')
         ->map('\ThreadFin\un_json');
     $block_count = $block_file->num_lines; // need block count before filtering pagination
-    $blocking_full = $block_file->lines;
+    //$blocking_full = $block_file->lines;
     $block_file->apply_ln(BINDR('array_slice', $block_page_num * PAGE_SZ, PAGE_SZ, false))
         ->map($country_fn);
     $blocking = $block_file->lines;
 
-    // calculate number of alert pages
+    // filter to just the requested block type
+    if ($block_code > 0) {
+        $eqfn = ($_GET['invert_block_check']) ? "\ThreadFin\\neq" : "\ThreadFin\\eq";
+        $blocking = array_filter($blocking, function($x) use ($block_code, $eqfn) {
+            // if the filter is a class, then allow anything with that class
+            $class = code_class($block_code);
+            if ($block_code == $class) {
+                $block_class = code_class($x["block"]["code"]);
+                return $eqfn($block_class, $block_code);
+            }
+            // allow only the exact code
+            return $eqfn($x["block"]["code"], $block_code);
+        });
+    }
+
+    $data["invert_block_check"] = isset($_GET['invert_block_check']) ? "checked='checked'" : "";
+    // calculate number of block pages
     $data["block_count"] = $block_count;
-    //$last = min([(($block_count / PAGE_SZ)), $block_count]);
     $data["block_range"] = ($block_page_num * PAGE_SZ) . " - " . ($block_page_num * PAGE_SZ) + PAGE_SZ;
     $data["block_pages"] = ceil($block_count / PAGE_SZ);
     $data["blocks"] = [];
@@ -861,7 +1064,12 @@ function serve_dashboard() :void
     $exceptions = load_exceptions();
     array_map(function($line) use (&$data, $exceptions, $config) {
         if (isset($line["block"])) {
-            $data["blocks"][] = enrich_alert($line, $exceptions, $config["botwhitelist"]);
+            $block = enrich_alert($line, $exceptions, $config["botwhitelist"]);
+
+            if (!empty($block["request"]["get"])) {
+                $block["request"]["query"] = '?'. http_build_query($block["request"]["get"]??[]);
+            }
+            $data["blocks"][] = $block;
         }
     }, $blocking);
 
@@ -870,9 +1078,12 @@ function serve_dashboard() :void
 
 
 
+    // calculate just the 24 hour block count
     $check_day = time() - DAY*2;
     $block_24 = array_filter($blocking, function ($x) use ($check_day) {
-        return isset($x['tv']) && $x['tv'] > $check_day;
+        $pass = isset($x['tv']) && $x['tv'] > $check_day;
+        
+        return $pass;
     });
     $data['block_count_24'] = count($block_24);
     //$blocks = array_slice($blocking, $block_page_num * PAGE_SZ, PAGE_SZ);
@@ -912,6 +1123,9 @@ function serve_dashboard() :void
             <span class='dashicons dashicons-admin-plugins' data-code='f485'></span> {$alert}</div>\n";
         }
     }
+
+    $url_fn = find_fn("dashboard_url");
+    $data["filter_link"] = $url_fn("bitfire", "DASHBOARD");
 
     //$data["theme_css"] = file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css");
     render_view(\BitFire\WAF_ROOT."views/dash.html", "bitfire", $data)->run();
