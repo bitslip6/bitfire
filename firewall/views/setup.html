@@ -29,7 +29,9 @@
       BitFire_api("toggle_config_value", {"param":config,"value":value})
         .then(r => r.json())
         .then(data => {
-          window.location="{{self}}?page=bitfire";
+          window.setTimeout(function() {
+            window.location.reload();
+          }, 500);
         });
     }
 
