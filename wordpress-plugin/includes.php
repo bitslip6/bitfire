@@ -7,11 +7,15 @@ use ThreadFin\FileData;
 
 use const BitFire\WAF_ROOT;
 
+use function BitFireSvr\get_wordpress_version;
 use function BitFireSvr\trim_off;
 use function ThreadFin\get_sub_dirs;
 use function ThreadFin\contains;
+use function ThreadFin\dbg;
 use function ThreadFin\debug;
 use function ThreadFin\ends_with;
+use function ThreadFin\find_const_arr;
+use function ThreadFin\find_fn;
 
 define("\BitFire\\CMS_INCLUDED", true);
 
@@ -90,11 +94,21 @@ function package_to_ver(string $carry, string $line) : string {
 
 function malware_scan_dirs(string $root) : array {
     debug("malware_scan (%s)", $root);
+    $r1 = realpath(CFG::str("cms_root"))."/";
+    $r2 = realpath(CFG::str("cms_content_dir"))."/";
+
     if (!ends_with($root, "/")) { $root .= "/"; }
     $d1 = CFG::str("cms_content_dir")."/plugins";
     $d2 = CFG::str("cms_content_dir")."/themes";
     $d3 = CFG::str("cms_content_dir")."/uploads";
-    return array_merge(get_sub_dirs($d1), get_sub_dirs($d2), get_sub_dirs($d3));
+    $t4 = get_sub_dirs(CFG::str("cms_root"));
+    $d4 = array_diff($t4, ["{$r1}wp-content", "{$r1}wp-includes", "{$r1}wp-admin"]);
+    $t5 = get_sub_dirs(CFG::str("cms_content_dir"));
+    $d5 = array_diff($t5, ["{$r2}plugins", "{$r2}themes"]);
+
+    $result = array_merge(get_sub_dirs($d1), get_sub_dirs($d2), get_sub_dirs($d3), $d4, $d5);
+    $q1 = array_unique($result);
+    return $q1;
 }
 
 
@@ -132,4 +146,21 @@ function fn_audit(string $fn_name, string $file, string $line, ...$args) {
     if (!isset($x[$src])) { 
         $x[$src] = [];
     }
+}
+
+// find a plugin / theme version number located in $path
+function version_from_path(string $path, string $default_ver = "") {
+    $package_fn = find_fn("package_to_ver");
+    $package_files = find_const_arr("PACKAGE_FILES");
+    $php_files = array_map('basename', glob($path."/*.php"));
+    $all_files = array_merge($package_files, $php_files);
+
+    foreach($all_files as $file) {
+        $file_path = "{$path}/{$file}";
+        if (file_exists($file_path)) {
+            $version = FileData::new($file_path)->read()->reduce($package_fn, "");
+            if ($version) { return $version; }
+        }
+    }
+    return $default_ver;
 }
