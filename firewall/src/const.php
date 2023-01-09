@@ -19,7 +19,7 @@ const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 1
 const FEATURE_NAMES = array(0 => 'unknown', 10000 => 'Cross Site Scripting', 11000 => 'Generic Web Filtering', 12000 => 'Generic Web Filtering', 13000 => 'Generic Web Filtering', 14000 => 'SQL Injection', 15000 => 'Generic Web Filtering', 16000 => 'Generic Web Filtering', 17000 => 'Generic Web Filtering', 18000 => 'Spam Content', 20000 => 'JavaScript Required', 21000 => 'File Upload', 22000 => 'Domain Name Verify', 23000 => 'Domain Verify', 24000 => 'Invalid Robot Network', 25000 => 'Malicious Robot', 26000 => 'Rate Limit Exceeded', 27000 => 'JavaScript Required', 29000 => 'PHP File Lock', 30000 => 'Strict CMS Requests', 31000 => 'Invalid Robot Network', 32000 => 'Unauthorized User Edit', 50000 => 'Generic Web Filtering');
 const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg', 16000 => 'php.svg', 17000 => 'fire.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg', 26000 => 'speed.svg', 27000 => 'robot.svg', 29000 => 'php.svg', 30000 => 'xss.svg', 31000 => 'badbot.svg', 32000 => 'sql.svg', 50000 => 'rule.svg');
 
-const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\allow', '\\BitFire\\send_mfa', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff','\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\download', '\\BitFire\\rem_api_exception', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\backup_database', '\\BitFire\\add_list_elm','\\BitFire\\clean_post', '\\BitFire\\scan_malware', '\\BitFire\\remove_list_elm', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\get_hr_data', '\\BitFire\\dump_hash_dir','\\BitFire\\install', '\\BitFire\\uninstall', '\\BitFire\\download', '\\BitFire\\malware_files');
+const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\allow', '\\BitFire\\send_mfa', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff','\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\download', '\\BitFire\\rem_api_exception', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\backup_database', '\\BitFire\\add_list_elm','\\BitFire\\clean_post', '\\BitFire\\scan_malware', '\\BitFire\\remove_list_elm', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\bot_action', '\\BitFire\\get_hr_data', '\\BitFire\\dump_hash_dir','\\BitFire\\install', '\\BitFire\\uninstall', '\\BitFire\\download', '\\BitFire\\malware_files');
 const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 29000 => 0, 70000 => 0);
 const BITFIRE_VER = 999;
 const BITFIRE_SYM_VER = "9.9.9";
@@ -127,12 +127,12 @@ const STATUS_ECOM = 70;
 
 // if we are installed in a web-accessible location, make files un-readable
 if (strstr( __FILE__, $_SERVER["DOCUMENT_ROOT"]) !== false) {
-    define('FILE_W', 0222);
-    define('FILE_R', 0444);
+    define('BitFire\FILE_W', 0222);
+    define('BitFire\FILE_R', 0444);
 }
 else {
-    define('FILE_W', 0664);
-    define('FILE_R', 0664);
+    define('BitFire\FILE_W', 0664);
+    define('BitFire\FILE_R', 0664);
 }
 const FILE_RW = 0664;
 const FILE_EX = 0775;
