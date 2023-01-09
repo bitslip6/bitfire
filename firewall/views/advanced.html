@@ -157,6 +157,7 @@
               <span class="card-header-title text-secondary right">Enable</span>
               <small class="text-muted"><i>(Runtime Application Self-Protection)</i></small>
             </h2>
+            {{info}}
           </div>
 
 
@@ -431,7 +432,7 @@ function toggle_features() {
         }
         html += '\
     <div class="form-switch right">\
-        <input class="form-check-input success" autocomplete="off" id="'+name+'_block" type="checkbox" onclick="return toggle_report(\''+name+'\', false)" '+check2+' '+tool2+'>\
+        <input class="form-check-input success" {{disabled}} autocomplete="off" id="'+name+'_block" type="checkbox" onclick="return toggle_report(\''+name+'\', false)" '+check2+' '+tool2+'>\
     </div>';
     window.CONFIG_LIST[name] = alert;
 
