@@ -66,6 +66,7 @@ class Headers
     public $upgrade_insecure;
     /** @var string $referer the referring html page */
     public $referer;
+    public $content_type;
 }
 
 /**
@@ -264,7 +265,7 @@ class Config {
     // return true if value is set to true or "block"
     public static function is_block(string $name) : bool {
         $value = self::$_options[$name]??'';
-        return ($value === 'block' || $value === true) ? true : false;
+        return ($value === 'block' || $value == true) ? true : false;
     }
 
     // return true if value is set to "report" or "alert"
@@ -438,11 +439,9 @@ class BitFire
         $this->_request = process_request2($_GET, $_POST, $_SERVER, $_COOKIE); // filter out all request data for parsed use
 
         // handle a common case urls we never care about
-        /*
         if (in_array($this->_request->path, CFG::arr("urls_not_found"))) {
             http_response_code(404); die();
         }
-        */
     }
     
     /**
@@ -623,6 +622,9 @@ class BitFire
             else if ($p === "DATABASE") {
                 serve_database();
             }
+            else if ($p === "BOTLIST") {
+                serve_bot_list();
+            }
             else {
                 serve_dashboard();
             }
@@ -742,7 +744,14 @@ function bitfire_init() {
  * @param null|Request $req the offending request
  * @return Effect 
  */
-function block_now(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null) : Effect {
+function block_now(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null, ?string $custom_err = null) : Effect {
+    $uuid = $block_type = "undefined";
+    if (isset($block)) {
+        $uuid = $block->uuid;
+        $block_type = htmlentities($block->__toString());
+    }
+    if (empty($custom_err)) { $custom_err = "This site is protected by BitFire WAF. <br> Your action: <strong> $block_type</strong> was blocked."; }  
+
     $block = BitFire::new_block($code, $parameter, $value, $pattern, $block_time, $req);
     if (!$block->empty()) {
         $block = $block();
