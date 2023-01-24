@@ -12,6 +12,7 @@
 
 namespace ThreadFin;
 
+use const BitFire\BITFIRE_VER;
 use const BitFire\CONFIG_CACHE_TYPE;
 use const BitFire\CONFIG_COOKIES;
 use const BitFire\CONFIG_ENCRYPT_KEY;
@@ -1237,6 +1238,9 @@ function bit_curl(string $method, string $url, $data, array $optional_headers = 
  * http request via curl, return [$content, $response_headers]
  */
 function http2(string $method, string $url, $data = "", array $optional_headers = NULL) : array {
+    if (!isset($optional_headers['User-Agent'])) {
+		$optional_headers['User-Agent'] = "BitFire RASP https://bitfire.co/user_agent/".BITFIRE_VER;
+    }
     // fall back to non curl...
     if (!function_exists('curl_init')) {
         $c = http($method, $url, $data, $optional_headers);
@@ -1345,7 +1349,7 @@ function http(string $method, string $path, $data, ?array $optional_headers = []
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
-		$optional_headers['User-Agent'] = "BitFire RASP https://bitfire.co/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
+		$optional_headers['User-Agent'] = "BitFire RASP https://bitfire.co/user_agent/".BITFIRE_VER;
     }
 
     
@@ -1493,13 +1497,13 @@ function debug(?string $fmt, ...$args) : ?array {
     // format any objects or arrays for debug
     foreach ($args as &$arg) { 
         if (is_array($arg) || is_object($arg)) { $arg = json_encode($arg, JSON_PRETTY_PRINT); }
-        $arg = str_replace("%", "%%", $arg);
+        else { $arg = str_replace("%", "%%", $arg); }
     }
 
     $line = "";
     // write debug to headers for quick debug
     if (CFG::enabled("debug_header")) {
-        $line = str_replace(array("\r","\n",":"), array(" "," ",";"), sprintf($fmt, ...$args));
+        $line = str_replace(array("\r","\n",":"), array(" "," ",";"), @sprintf($fmt, ...$args));
         if (!headers_sent() && $idx < 24) {
             $s = sprintf("x-bf-%02d: %s", $idx, substr($line, 0, 1024));
             $len += strlen($s);
@@ -1773,6 +1777,7 @@ function parse_ini() : array {
         if (strlen($pass) < 40 && $pass != 'disabled' && $pass != 'configure') {
             $hashed = hash('sha3-256', $pass);
             $config['password'] = $hashed;
+            require_once WAF_SRC . "server.php"; // make sure we have the correct function loaded
             update_ini_value('password', $hashed)->run();
         }
 
