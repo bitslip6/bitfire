@@ -15,12 +15,19 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
     if (strpos($errstr, 'request failed')) {
         return false;
     }
+    // don't allow infinite recursion...
+    if (strpos($err_file, 'error_handler')) {
+        return false;
+    }
 
     $data = [
+        'ver' => BITFIRE_VER,
+        'type' => \BitFire\TYPE,
         'errno' => $errno,
         'errstr' => $errstr,
         'err_file' => $err_file,
         'err_line' => $err_line,
+        'php_ver' => phpversion(),
     ];
 
     // check if we have already sent this error. 
