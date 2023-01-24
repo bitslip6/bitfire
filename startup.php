@@ -6,7 +6,7 @@ use BitFire\Config as CFG;
 use function BitFirePlugin\is_admin;
 use function ThreadFin\debug;
 use function ThreadFin\output_profile;
-use function ThreadFin\parse_ini2;
+use function ThreadFin\parse_ini;
 use function ThreadFin\trace;
 use ThreadFin\MaybeBlock;
 
@@ -40,7 +40,6 @@ $GLOBALS['start_time'] = microtime(true);
 const DS = DIRECTORY_SEPARATOR;
 if (!defined('BitFire\WAF_ROOT')) {
     define('BitFire\WAF_ROOT', realpath(__DIR__) . DS);
-    define('BitFire\WAF_INI', \BitFire\WAF_ROOT . 'config.ini');
     define('BitFire\BLOCK_DIR', \BitFire\WAF_ROOT . 'blocks');
     define('BitFire\WAF_SRC', \BitFire\WAF_ROOT . 'src' . DS);
     define('BitFire\TYPE', '__TYPE__');
@@ -60,7 +59,7 @@ include \BitFire\WAF_SRC . 'bitfire.php';
 
 try {
     // load the config file
-    CFG::set(parse_ini2(\BitFire\WAF_INI));
+    CFG::set(parse_ini());
     debug('  --> bitfire %s [%s:%s] @%s', BITFIRE_SYM_VER, $_SERVER['REQUEST_METHOD'], substr($_SERVER['REQUEST_URI'], 0, 80), date('D M j G:i:s'));
 
     // handle IP level blocks
