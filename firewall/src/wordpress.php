@@ -240,7 +240,9 @@ function get_credentials() : ?Credentials {
         trace("BITDB");
         $credentials = wp_parse_credentials(CFG::str("cms_root"));
         $defs = wp_parse_define(CFG::str("cms_root")."/wp-config.php");
-        $credentials->prefix = $defs["table_prefix"]??"wp_";
+        if (!empty($credentials)) {
+            $credentials->prefix = $defs["table_prefix"]??"wp_";
+        }
         return $credentials;
     }
 
