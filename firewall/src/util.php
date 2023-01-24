@@ -1545,7 +1545,7 @@ function debug(?string $fmt, ...$args) : ?array {
  * sets a cookie in a browser in various versions of PHP
  * NOT PURE 
  */
-function cookie(string $name, ?string $value, int $exp) : void {
+function cookie(string $name, ?string $value, int $exp = DAY) : void {
     if (!CFG::enabled("cookies_enabled")) { debug("wont set cookie, disabled"); return; }
     if (headers_sent($file, $line)) { debug("unable to set cookie, headers already sent ($file:$line)"); return; }
     if (PHP_VERSION_ID < 70300) { 
