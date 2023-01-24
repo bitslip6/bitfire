@@ -81,7 +81,7 @@ function add_exception(ex) {
       console.log(ex);
       console.log(list);
       for (i=0; i<list.length; i++) {
-        list[i].src="{{assets}}bandage.svg";
+        list[i].src="https://bitfire.co/assets/bandage.svg";
         list[i].classList.remove("secondary");
         list[i].classList.add("warning");
       }
