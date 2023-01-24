@@ -91,7 +91,7 @@ class Entity {
  */
 abstract class Typed_List implements \ArrayAccess, \Iterator, \Countable, \JsonSerializable {
 
-    private int $_position = 0;
+    protected int $_position = 0;
     public array $_list = [];
 
     // return the number of items in the list
@@ -114,7 +114,8 @@ abstract class Typed_List implements \ArrayAccess, \Iterator, \Countable, \JsonS
     }
 
     // SeekableIterator impl. return the current index
-    public function key() : mixed {
+    #[\ReturnTypeWillChange]
+    public function key() {
         return $this->_position;
     }
 
@@ -125,7 +126,7 @@ abstract class Typed_List implements \ArrayAccess, \Iterator, \Countable, \JsonS
 
     // SeekableIterator impl. check if the current position is valid
     public function valid() : bool {
-        return isset($this->array[$this->_position]);
+        return isset($this->_list[$this->_position]);
     }
 
     // ArrayAccess impl. set the value at a specific index
@@ -167,11 +168,13 @@ abstract class Typed_List implements \ArrayAccess, \Iterator, \Countable, \JsonS
 
 
     //public abstract function add($item) : void;
-    public abstract function offsetGet($index) : mixed;
+    #[\ReturnTypeWillChange]
+    public abstract function offsetGet($index);
 
     // SeekableIterator impl. return the element at $this->_position.
     // override the return type!
-    public abstract function current() : mixed;
+    #[\ReturnTypeWillChange]
+    public abstract function current();
 }
 
 
@@ -224,7 +227,7 @@ class Malware_List extends Typed_List {
     }
 
     public function current() : Malware {
-        return $this->array[$this->_position];
+        return $this->_list[$this->_position];
     }
 }
 
@@ -342,8 +345,8 @@ function get_line_indents(string $input) : int {
     $spaces /= $lines;
     $tabs /= $lines;
 
-    $base = min($spaces, 0x7FFF);
-    $off = min($tabs, 0x7FFF) << 15;
+    $base = min(floor($spaces), 0x7FFF);
+    $off = min(floor($tabs), 0x7FFF) << 15;
     return intval($base | $off);
 }
 
@@ -569,10 +572,26 @@ function make_sane_path(Request $request) : string {
 // sets profile url name to effect->out
 function cms_build_profile(\BitFire\Request $request, bool $is_admin) : Effect {
     $effect = Effect::new();
+    // only build profiles for php paths
     if (!ends_with($request->path, ".php")) { return $effect; }
 
-    $sane_path = make_sane_path($request);
-    $profile_path = \BitFire\WAF_ROOT . "cache/profile/{$sane_path}.txt";
+    // only build a profile if was have  a config dir
+    if (!defined(WAF_INI)) { return $effect; }
+
+    if (defined(WAF_INI)) {
+        $path_dir = dirname(WAF_INI, 1) . "/profile";
+        if (!file_exists($path_dir)) {
+            mkdir($path_dir, 0775, true);
+        }
+        $sane_path = make_sane_path($request);
+        if (!empty($path_dir)) {
+            $profile_path = "$path_dir/{$sane_path}.txt";
+        }
+        // something went wrong!
+        else {
+            return $effect;
+        }
+    }
 
         
     // TODO: update frequency map
@@ -626,7 +645,10 @@ function cms_build_profile(\BitFire\Request $request, bool $is_admin) : Effect {
 
     // backup 1 in 20
     if (mt_rand(0, 20) == 1 || !file_exists($profile_path)) {
-        httpp(APP."profile.php", base64_encode(json_encode(["path" => $sane_path, "profile" => $profile])));
+        // backup the profile after we serve the page
+        register_shutdown_function(function() use ($sane_path, $profile) {
+            httpp(APP."profile.php", base64_encode(json_encode(["path" => $sane_path, "profile" => $profile])));
+        });
     }
 
     return $effect;

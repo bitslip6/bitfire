@@ -124,6 +124,10 @@ function minify_str(string $in) : string {
 	$t3 = $in;
 	if (empty($t3)) { return ""; }
 
+	if (!class_exists("DOMDocument")) {
+		return $in;
+	}
+
 	libxml_use_internal_errors(false);
 
 	// load XML

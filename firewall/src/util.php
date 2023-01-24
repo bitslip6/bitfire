@@ -27,6 +27,8 @@ use \BitFire\Config as CFG;
 use \BitFire\Block as Block;
 use RuntimeException;
 
+use function BitFire\on_err;
+use function BitFireSvr\update_ini_value;
 use function \ThreadFin\partial as BINDL;
 use function \ThreadFin\partial_right as BINDR;
 
@@ -805,9 +807,11 @@ class Effect {
                 debug("file mod write error [%s] (%d/%d bytes)", basename($file->filename), $written, $len);
                 $this->errors[] = "failed to write file: $file->filename " . strlen($file->content) . " bytes. " . en_json($e);
             }
-            if ($file->mod_time > 0) { if (!touch($file->filename, $file->mod_time)) { $this->errors[] = "unable to set {$file->filename} mod_time to: " . $file->mod_time; } }
-            if ($file->write_mode > 0) { if (!chmod($file->filename, $file->write_mode)) { $this->errors[] = "unable to chmod {$file->filename} perm: " . $file->write_mode; } }
-            else if ($perm != -1)  { if (!chmod($file->filename, $perm)) { $this->errors[] = "unable to restore chmod: {$file->filename} perm: {$perm}"; } }
+            if (file_exists($file->filename)) {
+                if ($file->mod_time > 0) { if (!touch($file->filename, $file->mod_time)) { $this->errors[] = "unable to set {$file->filename} mod_time to: " . $file->mod_time; } }
+                if ($file->write_mode > 0) { if (!chmod($file->filename, $file->write_mode)) { $this->errors[] = "unable to chmod {$file->filename} perm: " . $file->write_mode; } }
+                else if ($perm != -1)  { if (!chmod($file->filename, $perm)) { $this->errors[] = "unable to restore chmod: {$file->filename} perm: {$perm}"; } }
+            }
         }
 
         // TODO: should we add any protection here to prevent unwanted unlinks?
@@ -815,8 +819,21 @@ class Effect {
         // unknown files: (not plugins, themes or core WordPress files)
         do_for_each($this->unlinks, function ($x) {
             debug("unlink $x");
-            if (!unlink($x)) {
-                $this->errors[] = "unable to delete $x";
+            recursive_delete($x);
+            if (is_file($x)) {
+                if (!unlink($x)) {
+                    $this->errors[] = "unable to delete file $x";
+                }
+            } else if (is_dir($x)) {
+                $t = $this;
+                file_recurse($x, function($file) use (&$t) {
+                    if (!unlink($file)) {
+                        $this->errors[] = "unable to recursive delete file $file";
+                    }
+                });
+                if (!rmdir($x)) {
+                    $this->errors[] = "unable to delete directory $x";
+                }
             }
         });
 
@@ -836,7 +853,12 @@ class Effect {
             }
         }
 
-        if (!empty($this->errors)) { debug("ERROR effect: " . json_encode($this->errors, JSON_PRETTY_PRINT)); } 
+        if (!empty($this->errors)) {
+            debug("ERROR effect: " . json_encode($this->errors, JSON_PRETTY_PRINT));
+            if (function_exists("\BitFire\on_err")) {
+                on_err(1000, json_encode($this->errors, JSON_PRETTY_PRINT), __FILE__, __LINE__);
+            }
+        } 
 
         if ($this->exit) {
             debug(trace());
@@ -853,6 +875,38 @@ class Effect {
 }
 Effect::$NULL = Effect::new();
 
+// https://stackoverflow.com/questions/5707806/
+function recursive_copy(string $source, string $dest) {
+    mkdir($dest, 0755);
+    foreach ($iterator = new \RecursiveIteratorIterator(
+    new \RecursiveDirectoryIterator($source, \RecursiveDirectoryIterator::SKIP_DOTS),
+    \RecursiveIteratorIterator::SELF_FIRST) as $item) {
+        if ($item->isDir()) {
+            mkdir($dest . DIRECTORY_SEPARATOR . $iterator->getSubPathname());
+        } else {
+            copy($item, $dest . DIRECTORY_SEPARATOR . $iterator->getSubPathname());
+        }
+    }
+}
+
+// https://stackoverflow.com/questions/3338123/
+function recursive_delete(string $dir) {
+    if (is_dir($dir)) { 
+        $objects = scandir($dir);
+        foreach ($objects as $object) { 
+            if ($object != "." && $object != "..") { 
+                if (is_dir($dir. DIRECTORY_SEPARATOR .$object) && !is_link($dir."/".$object)) {
+                    recursive_delete($dir. DIRECTORY_SEPARATOR .$object);
+                }
+                else {
+                    unlink($dir. DIRECTORY_SEPARATOR .$object); 
+                }
+            } 
+        }
+        rmdir($dir); 
+    } 
+
+}
 
 
 interface MaybeI {
@@ -1291,7 +1345,7 @@ function http(string $method, string $path, $data, ?array $optional_headers = []
         $optional_headers['Content-Type'] = "application/x-www-form-urlencoded";
     }
     if (!isset($optional_headers['User-Agent'])) {
-		$optional_headers['User-Agent'] = "BitFire WAF https://bitfire.co/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
+		$optional_headers['User-Agent'] = "BitFire RASP https://bitfire.co/user_agent"; //Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/72.0";
     }
 
     
@@ -1439,25 +1493,10 @@ function debug(?string $fmt, ...$args) : ?array {
     // format any objects or arrays for debug
     foreach ($args as &$arg) { 
         if (is_array($arg) || is_object($arg)) { $arg = json_encode($arg, JSON_PRETTY_PRINT); }
+        $arg = str_replace("%", "%%", $arg);
     }
 
     $line = "";
-    // write to file
-    if (CFG::enabled("debug_file")) {
-        $line = sprintf($fmt, ...$args);
-        $f = CFG::file("debug_file");
-        if ($f) {
-            if (starts_with($fmt, "ERROR")) { 
-                $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
-                $b1 = isset($bt[2]) ? $bt[2]['file'].':'.$bt[2]['line'] : '';
-                $b2 = isset($bt[3]) ? $bt[3]['file'].':'.$bt[3]['line'] : '';
-                $line = "$line\n$b1\n$b2";
-            }
-            // if the file is >1MB overwrite it, else append
-            $mode = (file_exists($f) && filesize($f) > 1024*1024*4) ? FILE_W : FILE_APPEND;
-            file_put_contents($f, "$line\n", $mode);
-        }
-    }
     // write debug to headers for quick debug
     if (CFG::enabled("debug_header")) {
         $line = str_replace(array("\r","\n",":"), array(" "," ",";"), sprintf($fmt, ...$args));
@@ -1467,10 +1506,30 @@ function debug(?string $fmt, ...$args) : ?array {
             if ($len < 4000) {
                 header($s);
             }
-            $idx++;
         }
     }
 
+    // write to file
+    if (CFG::enabled("debug_file")) {
+        if ($idx === 0) {
+            register_shutdown_function(function () use ($log) {
+                $out_dir = dirname(\BitFire\WAF_INI, 1);
+                $f = $out_dir . "/debug.log";
+                $mode = (file_exists($f) && filesize($f) > 1024*1024*4) ? FILE_W : FILE_APPEND;
+                file_put_contents($f, join("\n", $log), $mode);
+            });
+        }
+        $line = sprintf($fmt, ...$args);
+        if (starts_with($fmt, "ERROR")) {
+            $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
+            $b1 = isset($bt[2]) ? $bt[2]['file']??'??'.':'.$bt[2]['line']??'??' : '';
+            $b2 = isset($bt[3]) ? $bt[3]['file']??'??'.':'.$bt[3]['line']??'??' : '';
+            $line = "$line\n$b1\n$b2";
+        }
+        // if the file is >1MB overwrite it, else append
+    }
+    
+    $idx++;
     if (!empty($line)) { $log[] = $line; }
     return null;
 }
@@ -1528,15 +1587,6 @@ function b2s(bool $input) :string {
     return ($input) ? "true" : "false";
 }
 
-// todo: refactor and delete, only 1 caller parse_ini()
-function file_write(string $filename, string $content, $opts = LOCK_EX) : bool {
-    $len = strlen($content);
-    $result = (@file_put_contents($filename, $content, $opts) === $len);
-    if (!$result) {
-        debug("error write file [%s] len [%d]", $filename, $len);
-    }
-    return $result;
-}
 
 /**
  * make the config file readable, parse it, then make it unreadable again
@@ -1554,6 +1604,189 @@ function load_ini_fn(string $src) : callable {
     };
 }
 
+
+/**
+ * return an effect to create a ini_info.php file which sets
+ * a variable $ini_type to the type of ini file used. we do
+ * this here because some wordpress servers do not always
+ * allow us to write php files on any request.
+ * @return Effect 
+ */
+function make_config_loader() : Effect {
+    $effect = Effect::new();
+    if (defined("BitFire\WAF_INI")) { return $effect->out(\BitFire\WAF_INI)->hide_output(); }
+    //file_put_contents("/tmp/foo.txt", print_r(get_defined_constants(), true));
+
+
+    // FIRST, lets verify that we already have a valid config
+    // if so we bail out early here...
+    $parent = dirname(WAF_ROOT, 1);
+    $file = FileData::new(\BitFire\WAF_ROOT."ini_info.php");
+    if ($file->exists) {
+        $secret_key = "";
+        include $file->filename;
+        $config_file = $parent . "/bitfire_{$secret_key}/config.ini";
+        if (file_exists($config_file)) {
+            define("BitFire\WAF_INI", $config_file);
+            return $effect->out($config_file)->hide_output();
+        }
+    }
+
+    // we don't know where the config is because there is no ini_info file
+    // probably a first run, or a new install, lets find it
+    // find all old configs
+    $config_dirs = glob("{$parent}/bitfire_*");
+    // get the creation/modification time so we can find most recent
+    $dir_with_time = array_map(function($dir) {
+        return [ "dir" => $dir, "time" => filemtime($dir) ];
+    }, $config_dirs);
+    usort($dir_with_time, function($a, $b) {
+        return $a["time"] - $b["time"];
+    });
+    // if we have existing dirs, then lets use the most recent config
+    if (count($dir_with_time) > 0) {
+        $newest = array_pop($dir_with_time);
+        if (preg_match("/bitfire_(\w+)/", $newest["dir"], $matches)) {
+            $secret_key = $matches[1];
+            while($next = array_pop($dir_with_time)) {
+                // delete all but the newest
+                $effect->unlink($next["dir"]);
+            }
+        }
+    }
+    // no old configs, lets create a new one
+    if (empty($secret_key)) {
+        $secret_key = random_str(10);
+        // check if the hidden config has not yet been moved and move it
+        $path = $parent . "/bitfire_{$secret_key}/";
+        $orig_config = WAF_ROOT . "hidden_config";
+        if (file_exists($orig_config)) {
+            rename($orig_config, $path);
+        }
+    }
+
+    // we should have a secret key by now, lets update the ini_info file
+    if (!empty($secret_key)) {
+        $markup = "<?php \$secret_key = '$secret_key'; ";
+        if (function_exists("shmop_open")) {
+            $markup .= '$ini_type = "shmop";';
+        } else if (function_exists("apcu_store")) {
+            $markup .= '$ini_type = "acpu";';
+        } else {
+            $markup .= '$ini_type = "opcache";';
+        }
+        $effect->file(new FileMod(\BitFire\WAF_ROOT."ini_info.php", $markup));
+    }
+
+    $path = $parent . "/bitfire_{$secret_key}/";
+    define("BitFire\WAF_INI", $path . "config.ini");
+    return $effect->out($path . "config.ini")->hide_output();
+}
+
+
+/**
+ * locate the config file from the secret key
+ * @param string $secret_key the secret key as stored in the ini_info.php file
+ * @return string the path to the config file
+ */
+/*
+function find_config_path(string $secret_key = "") : string {
+
+    $parent = dirname(WAF_ROOT, 1);
+    $path = realpath($parent . "/bitfire_{$secret_key}/");
+    $config_file = $path . "config.ini";
+
+    // load the file directly because we know the hidden path
+    if (!empty($config_file) && file_exists($config_file)) {
+        return $config_file;
+    }
+    // we don't know the hidden path, lets glob the path
+    else {
+        $parent = dirname(WAF_ROOT, 1);
+        $paths = glob("$parent/bitfire_*", GLOB_MARK);
+        $config_file = array_reduce($paths, function($carry, $path) {
+            if (empty($carry)) {
+                if (file_exists($path . "config.ini")) {
+                    return $path . "config.ini";
+                }
+            }
+        }, "");
+    }
+    if (empty($config_file)) {
+        $effect = make_config_loader()->run();
+        $config_file = $effect->read_out();
+    }
+    define("\BitFire\WAF_INI", $config_file);
+
+    return $config_file;
+}
+*/
+
+/**
+ * get the path to a hidden file
+ * @param string $file_name the name of the file
+ * @param (null|string)|null $secret_key - the secret key as stored in the ini_info.php file
+ * @return string - the realpath to the file
+ */
+function get_hidden_file(string $file_name, ?string $secret_key = null) : string {
+    static $path = null;
+    // use the secret key passed to us
+    if (!empty($secret_key)) {
+        $parent = dirname(WAF_ROOT, 1);
+        $path = realpath($parent . "/bitfire_{$secret_key}/") . "/";
+    }
+    // fall back to the secret key in the ini_info file
+    if (empty($path)) {
+        $path = dirname(make_config_loader()->read_out(), 1) . "/";
+    }
+    return $path . $file_name;
+}
+
+/**
+ * load the config from the secret config location
+ * @return array 
+ * @throws RuntimeException 
+ */
+function parse_ini() : array {
+    $ini_type = "opcache";
+    $secret_key = "";
+
+    $loader = make_config_loader()->run();
+    $config_file = $loader->read_out();
+
+    // get the ini file modification time
+    $mod_time = filemtime($config_file);
+
+    // load the config from the cache
+    $cache = CacheStorage::get_instance($ini_type);
+    // $options is an array [$data, $mtime]
+    $options = $cache->load_or_cache("parse_ini", 600, function() use ($config_file) {
+        return parse_ini_file($config_file, false, INI_SCANNER_TYPED);
+    });
+
+    // if the file modification time is newer than the cached data, reload the config
+    if (!isset($options[1]) || $options[1] < $mod_time) {
+        
+        $config = parse_ini_file($config_file, false, INI_SCANNER_TYPED);
+        // ensure that passwords are always hashed
+        $pass = $config['password']??'disabled';
+        if (strlen($pass) < 40 && $pass != 'disabled' && $pass != 'configure') {
+            $hashed = hash('sha3-256', $pass);
+            $config['password'] = $hashed;
+            update_ini_value('password', $hashed)->run();
+        }
+
+        $cache->save_data('parse_ini', $config, DAY);
+    } else {
+        // the cached data is newer than the file, use the cached data
+        $config = $options[0];
+    }
+
+    // if we have a pro key, then download the latest pro version of code
+    check_pro_ver($config["pro_key"]??"");
+
+    return $config;
+}
 
 /**
  * TODO: clean up debug lines here...
@@ -1608,9 +1841,6 @@ function parse_ini2(string $src) : array {
 
         if (($t > $options[1]) || (!is_array($options))) {
             $options = $load_fn();
-            //echo("<p>clear! file time: $t, cache time: [{$options[1]}]</p>");
-            //print_r($options);
-            //trace("CLR");
             $cache->save_data("parse_ini2", $options, DAY);
         }
         $config = $options[0];
@@ -1623,47 +1853,6 @@ function parse_ini2(string $src) : array {
     return $config;
 }
 
-/**
- * load the ini file and cache the parsed code if possible
- * TODO: refactor file_write
- * NOT PURE
- * @deprecated
- */
-function parse_ini(string $ini_src) : void {
-    $config = CacheStorage::get_instance()->load_data("config.ini", []);
-    $parsed_file = "$ini_src.php";
-    // prefer cache storage as it is secure (not web readable) and widely available
-    if (!empty($config)) {
-        CFG::set($config);
-        // we have config in cache. disallow world reading
-        @chmod(dirname($ini_src), FILE_W);
-    }
-    // next try op code caching
-    else if (file_exists($parsed_file) && filemtime($parsed_file) > filemtime($ini_src)) {
-        require "$ini_src.php";
-        CFG::set($config);
-    }
-    // read the ini config...
-    else {
-        // make sure the file is not web readable...
-        if (!is_readable($ini_src)) { chmod($ini_src, 0440); }
-        $config = parse_ini_file($ini_src, false, INI_SCANNER_TYPED);
-        CFG::set($config);
-        if (CFG::enabled("cache_ini_files") && is_writable($parsed_file)) {
-            if (!file_write($parsed_file, "<?php\n\$config=". var_export($config, true). ";\n")) {
-                debug("unable to update cached ini");
-                if (is_writable($ini_src)) {
-                    file_replace($ini_src, "cache_ini_files = true", "cache_ini_files = false")->run();
-                }
-            }
-            // make the file unreadable
-            else {
-                chmod($ini_src, 0600);
-            }
-        }
-    }
-
-}
 
 /**
  * impure fetch pro code and install

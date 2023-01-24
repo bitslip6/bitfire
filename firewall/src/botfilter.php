@@ -175,6 +175,9 @@ class BotInfo
     public $allow;
     public $allowclass;
     public $mtime;
+    public $trim;
+    public $machine_date;
+    public $machine_date2;
 
     public function __construct($agent)
     {
@@ -467,6 +470,7 @@ class BotFilter
     {
         trace("bot");
         $block = Maybe::$FALSE;
+        $this->browser = new UserAgent("bot", "bot", "1.0", false, true);
 
         // if XMLRPC is enabled, add /xmlrpc.php to the list of bot urls
         if (Config::enabled("block_xmlrpc")) {
@@ -957,6 +961,7 @@ use function ThreadFin\is_regex_reduced;
 use function ThreadFin\memoize;
 use function ThreadFin\debug;
 use function ThreadFin\en_json;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\http2;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial_right as BINDR;
@@ -1349,12 +1354,12 @@ function parse_agent(string $user_agent): UserAgent {
         // only check if we have not found a browser yet
         if ($carry->bot) {
             // check if the agent matches the regex
-            $pattern = AGENT_MATCH[$match_key];
+            $pattern = AGENT_MATCH[$match_key]??'no_such_agent';
             //echo "check /$pattern/ in $user_agent\n";
             if (preg_match("!$pattern!", $user_agent, $matches)) {
 
                 // check if the agent has any words not in the list of words for the browser
-                $misses = array_diff($agent_min_words, explode(" ", AGENT_WORDS[$match_key]));
+                $misses = array_diff($agent_min_words, explode(" ", AGENT_WORDS[$match_key]??$match_key));
                 // remove any found words that are less than 4 characters, 
                 // this allows for small version differences
                 $important_words = array_filter($misses, function ($word) {
@@ -1615,15 +1620,9 @@ function load_bot_data(string $info_file, string $ip, string $trim_agent, int $v
     }
     if (empty($bot_data)) {
 
-
-        // expanse palo alto networks company searches across global space multiple times day identify customers presences the internet you would like be excluded from scans please send addresses domains scaninfo paloal
-        
-        // OOO CHECK FOR CENSYS IO DATA!!
-
         $response = http2("GET", APP . "bot_info.php", array("ip" => $ip, "trim" => $trim_agent, "agent"=>$_SERVER['HTTP_USER_AGENT']));
         if (!empty($response)) {
             /** @var BotInfo $app_data */
-            file_put_contents("/tmp/server.txt", $response["content"]);
             $app_data = unserialize($response["content"], ["allowed_classes" => ["BitFire\BotInfo"]]);
 
             if (!empty($app_data)) {
@@ -1639,7 +1638,7 @@ function load_bot_data(string $info_file, string $ip, string $trim_agent, int $v
 
     //REMOTE BOT DATA IS BEING SENT BUT NOT LOADED...
 
-    if (empty($bot_data) || ! $bot_data->valid) {
+    if (empty($bot_data)) {
         trace("BOT_NEW");
         $bot_data = new BotInfo($trim_agent);
         $bot_data->ips = [$ip => 1];
@@ -1693,7 +1692,7 @@ function add_net_to_bot(BotInfo $bot_data, string $ip, bool $ensure_auth = true)
         // only add the domain if it is not an IP address...
         if (! preg_match("/^[0-9\.\:]+$/", $matches[1])) {
             $check_ips = gethostbynamel($host);
-            if (in_array($ip, $check_ips)) {
+            if (!empty($check_ips) && in_array($ip, $check_ips)) {
                 $bot_data->domain .= ",{$matches[1]}";
             } else {
                 debug("reverse bot ip lookup failed [%s] [%s]", $check_ips, $ip);
@@ -1734,7 +1733,8 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
 
     $valid = UA_NO_MATCH;
     $id = crc32($agent->trim);
-    $info_file = WAF_ROOT . "cache/bots/{$id}.json";
+    $bot_dir = get_hidden_file("bots");
+    $info_file = "{$bot_dir}/{$id}.json";
     debug("bot file (%s) [%s] -> (%s)", $ip, $info_file, print_r($agent, true));
     $bot_data = load_bot_data($info_file, $ip, $agent->trim, (CFG::enabled("dynamic_exceptions") ? 1 : 0));
     $bot_data->agent = $user_agent;
@@ -1783,7 +1783,7 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
             trace("BOT_DOM:$valid");
         }
         // check the AS network if everything else fails
-        if ($valid != UA_NET_MATCH && !empty($bot_data->net)) {
+        if ($valid != UA_NET_MATCH && !empty($bot_data->net) && $bot_data->net !== "!") {
             $all_as = explode(",", $bot_data->net);
             foreach ($all_as as $as) {
                 if (verify_bot_as($ip, $as) == "yes") {
@@ -1801,7 +1801,7 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
     if ($valid != UA_NET_MATCH && CFG::enabled("dynamic_exceptions")) {
         if (empty($agent->trim)) {
             debug ("cowardly refusing to authenticate empty user agent");
-        } else {
+        } else if ($bot_data->net != "!") {
             trace("DYN_EN");
             $valid = UA_NET_MATCH;
             $bot_data = add_net_to_bot($bot_data, $ip, true);
@@ -1822,7 +1822,8 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
         // remove old bot files after 60 days every 1000 requests or so
         // CLEANING
         if (mt_rand(0, 1000) <= 1) {
-            $files = glob(WAF_ROOT . "cache/bots/*.json");
+            $bot_dir = get_hidden_file("bots");
+            $files = glob("{$bot_dir}/*.json");
             array_walk($files, function ($x) {
                 if (filemtime($x) < time() - DAY*60) {
                     unlink($x);

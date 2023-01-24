@@ -13,6 +13,7 @@ namespace BitFire;
 
 use ThreadFin\CacheStorage;
 use BitFire\Config as CFG;
+use BitFire\StringResult as BitFireStringResult;
 use RuntimeException;
 use ThreadFin\Effect;
 use ThreadFin\FileMod;
@@ -158,11 +159,11 @@ class WebFilter {
 function sql_filter(\BitFire\Request $request) : MaybeBlock {
     trace("sql");
     foreach ($request->get as $key => $value) {
-        $maybe = search_sql($key, $value, $request->get_freq[$key]);
+        $maybe = search_sql($key, flatten($value), $request->get_freq[$key]);
         if (!$maybe->empty()) { return $maybe; }
     }
     foreach ($request->post as $key => $value) {
-        $maybe = search_sql($key, $value, $request->post_freq[$key]);
+        $maybe = search_sql($key, flatten($value), $request->post_freq[$key]);
         if (!$maybe->empty()) { return $maybe; }
     }
     return Maybe::$FALSE;
@@ -212,17 +213,19 @@ function check_ext_mime(array $file) : MaybeA {
     
     if (!empty($file["tmp_name"]??"")) {
         // check file extensions...
-        $info = pathinfo($file["tmp_name"]);
-        if (ends_with(strtolower($file["name"]), "php") ||
-            in_array(strtolower($info['extension']), array("php", "phtml", "php3", "php4", "php5", "php6", "php7", "php8", "phar"))) {
-            return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
-        }
-            
-        // check mime types
-        $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
-        $info = finfo_file($ctx, $file["tmp_name"]);
-        if (stripos($info, "php") !== false || stripos($file["type"], "php") !== false) {
-            return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+        if (file_exists($file["tmp_name"])) {
+            $p_info = pathinfo($file["tmp_name"]);
+            if (ends_with(strtolower($file["name"]), "php") ||
+                in_array(strtolower($p_info['extension']??''), array("php", "phtml", "php5", "php6", "php7", "php8", "phar"))) {
+                return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_EXT, "file upload", $file["name"], ".php", BLOCK_SHORT));
+            }
+                
+            // check mime types
+            $ctx = finfo_open(FILEINFO_MIME_TYPE | FILEINFO_CONTINUE);
+            $f_info = finfo_file($ctx, $file["tmp_name"]);
+            if (stripos($f_info, "php") !== false || stripos($file["type"], "php") !== false) {
+                return MaybeBlock::of(BitFire::new_block(FAIL_FILE_PHP_MIME, "file upload", $file["name"], ".php", BLOCK_SHORT));
+            }
         }
     }
 
@@ -341,7 +344,7 @@ function strip_strings(string $value) : StringResult {
 /**
  * remove sql comments 
  */
-function strip_comments(string $value) {
+function strip_comments(string $value) : StringResult {
     $s1 = str_replace(SQL_IMPORTANT_CHARS, " ", $value);
     $s2 = preg_replace("/\/\*.*?\*\//sm", '', $s1);
     $s3 = preg_replace("/(#|--\s)[^\n]+/", '', $s2);

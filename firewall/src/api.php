@@ -48,6 +48,7 @@ use function ThreadFin\un_json;
 use function ThreadFin\debug;
 use function ThreadFin\debugN;
 use function ThreadFin\file_replace;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\icontains;
 use function ThreadFin\output_profile;
 use function ThreadFin\trace;
@@ -92,7 +93,7 @@ function rem_api_exception(\BitFire\Request $r) : Effect {
     $effect = Effect::new();
 
     // load exceptions from disk
-    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $file = get_hidden_file("exceptions.json");
     $exceptions = FileData::new($file)->read()->un_json();
     if ($exceptions === null) {
         debug("json read error in exceptions.json");
@@ -160,7 +161,7 @@ function add_api_exception(\BitFire\Request $r) : Effect {
     $ex = new \BitFire\Exception((int)$r->post['code'], random_str(8), $param, $r->post['path']);
 
     // load exceptions from disk
-    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $file = get_hidden_file("exceptions.json");
     $exceptions = FileData::new($file)->read()->un_json()->map('\BitFire\map_exception');
 
     // add new exception (will not double add)
@@ -203,7 +204,7 @@ function download(\BitFire\Request $r) : Effect {
     if ($filename == "alert" || $filename == "block") {
         $effect->header('Content-Type', 'application/json');
         // TODO: move to server functions
-        $config_name = ($filename == "alert") ? CONFIG_REPORT_FILE : CONFIG_BLOCK_FILE;
+        $config_name = ($filename == "alert") ? get_hidden_file("alerts.json") : get_hidden_file("blocks.json");
         $report_file = \ThreadFin\FileData::new(CFG::file($config_name))->read();
         $report_file->apply_ln('array_reverse')
             ->map('\ThreadFin\un_json');
@@ -384,7 +385,8 @@ function bot_action(\BitFire\Request $request) : Effect {
     $effect = Effect::new();
     $id = intval($request->post["bot"]);
 
-    $info_file = WAF_ROOT."cache/bots/{$id}.json";
+    $bot_dir = get_hidden_file("bots");
+    $info_file = "{$bot_dir}/{$id}.json";
     if ($request->post["action"] == "rm") {
         $effect->unlink($info_file);
         $effect->api(true, "bot remove", ["id" => $id]);
@@ -450,7 +452,9 @@ function bot_action(\BitFire\Request $request) : Effect {
     }
 
 
-    $effect->file(new FileMod($info_file, serialize($bot_data)));
+    // update the bot access file, but keep the modification time the same
+    $mtime = filemtime($info_file);
+    $effect->file(new FileMod($info_file, serialize($bot_data), FILE_RW, $mtime));
     return $effect;
 }
 
@@ -484,11 +488,8 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
             return Effect::new()->api(true, "hashed $num_files files", array("ver" => $ver, "basename" => basename($dir_path), "dir" => $request->post['dir'], "path" => $dir_path, "file_count" => $num_files, "hit_count" => $num_files, "success" => true, "data" => base64_encode(json_encode([]))));
         }
 
-
-
-
         // the manual allow list
-        $allowed = FileData::new(\BitFire\WAF_ROOT."cache/hashes.json")->read()->un_json()->lines;
+        $allowed = FileData::new(get_hidden_file("hashes.json"))->read()->un_json()->lines;
         if ($allowed === null || empty($allowed)) { $allowed = []; }
         $allow_map = [];
         foreach ($allowed as $file) { $allow_map[$file["file"]] = $file["trim"]; }
@@ -519,7 +520,9 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         $h2 = en_json(["ver" => $ver, "files" => $min_hashes]);
         $encoded = base64_encode($h2);
 
+        //file_put_contents("/tmp/hash1.json", $h2);
         $result = httpp(APP."hash_compare.php", $encoded, array("Content-Type" => "application/json"));
+        //file_put_contents("/tmp/hash2.json", $result);
         $decoded = un_json($result);
         if ($decoded === null) {
             return Effect::new()->api(false, "error reading result from BitFire. please upgrade BitFire.", array("success" => false, "data" => base64_encode('[]')));
@@ -527,9 +530,6 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         $c1 = count($decoded);
 
         $dir_without_plugin_name = dirname($dir_path);
-        if ($plugin_name == "wp-includes") {
-            file_put_contents("/tmp/includes_wtf.json", en_json($decoded, true));
-        }
 
         // TODO: array walk the returned result and add passed files to the auto allow list
 
@@ -882,7 +882,7 @@ function upgrade(\BitFire\Request $request) : Effect {
     });
 
     $cwd = getcwd();
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return $effect->api($success, "upgraded with [$dest] in [$cwd]");
 }
 
@@ -894,14 +894,17 @@ function delete(\BitFire\Request $request) : Effect {
 
     $effect = Effect::new();
     $f = $request->post['value'];
+    $name = $request->post['name']??'';
 
-    if (stristr($f, "..") !== false) { return $effect->api(false, "refusing to delete relative path"); }
+    if (stristr($f, "..") !== false) { return $effect->api(false, "refusing to delete relative path [$f]"); }
 
     if (strlen($f) > 1) {
         $out1 = $root . $f.".bak.".mt_rand(10000,99999);
         $src = $root . $f;
 
-        if (!file_exists($src)) { return $effect->api(false, "refusing to delete relative path"); } 
+        if (!file_exists($src)) { return $effect->api(false, "refusing to delete non-existent file [$src] ($f) ($name)"); } 
+        $src = $root . DIRECTORY_SEPARATOR . $name . DIRECTORY_SEPARATOR . $f;
+        if (!file_exists($src)) { return $effect->api(false, "refusing to delete non-existent file [$src] ($f) ($name)"); } 
 
         $quarantine_path = str_replace($root, \BitFire\WAF_ROOT."quarantine/", $out1);
         debug("moving [%s] to [%s]", $src, $quarantine_path);
@@ -936,7 +939,7 @@ function set_pass(\BitFire\Request $request) : Effect {
     $p1 = hash("sha3-256", $request->post['pass1']??'');
     debug("pass sha3-256 %s ", $p1);
     $pass = file_replace(\BitFire\WAF_INI, "password = 'default'", "password = '$p1'")->run()->num_errors() == 0;
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     exit(($pass) ? "success" : "unable to write to: " . \BitFire\WAF_INI);
 }
 
@@ -959,7 +962,7 @@ function remove_list_elm(\BitFire\Request $request) : Effect {
     }
 
     // SUCCESS!
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return $effect->api(true, "updated");
 }
 
@@ -977,7 +980,7 @@ function add_list_elm(\BitFire\Request $request) : Effect {
     if (!in_array($name, \BitFireSvr\CONFIG_KEY_NAMES)) { return $effect->api(false, "unknown parameter name"); }
 
     $effect = add_ini_value("{$name}[]", $value)->api(true, "config.ini updated");
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return $effect;
 }
 
@@ -990,13 +993,13 @@ function install(?\BitFire\Request $request = null) : Effect {
     }
 
     $effect = \BitFireSvr\install();
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return $effect;
 }
 
 // uninstall always on protection (auto_prepend_file)
 function uninstall(\BitFire\Request $request) : Effect {
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return \BitFireSvr\uninstall();
 }
 
@@ -1024,7 +1027,7 @@ function toggle_config_value(\BitFire\Request $request) : Effect {
         $effect->chain(\BitFireSvr\install());
     } 
     $effect->api(true, "updated");
-    CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+    CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return $effect;
 }
 
@@ -1035,7 +1038,7 @@ function toggle_config_value(\BitFire\Request $request) : Effect {
  */
 function allow(\BitFire\Request $request) : Effect {
     // preamble
-    $file_name = \BitFire\WAF_ROOT . "cache/hashes.json";
+    $file_name = get_hidden_file("hashes.json");
     $effect = Effect::new();
     $data = un_json($request->post_raw);
     if ($data === null) {
@@ -1089,7 +1092,7 @@ function clear_cache(\BitFire\Request $request) : Effect {
  * @throws RuntimeException 
  */
 function review(\BitFire\Request $request) : Effect {
-    $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
+    $block_file = \ThreadFin\FileData::new(get_hidden_file("blocks.json"))
         ->read()
         ->map('\ThreadFin\un_json');
 
@@ -1274,6 +1277,9 @@ function backup_database(Request $request) : Effect {
 
     // find number of posts and comments included in backup 
     $credentials = \BitFireWP\get_credentials();
+    if (empty($credentials)) {
+        return $effect->api(false, $message, ["backup_size" => 0, "file" => CFG::str("cms_content_dir") . "no-backup.sql.gz", "store" => "", "status" => "failed - unable to find database credentials"]);
+    }
     $db = DB::cred_connect($credentials);
     $prefix = $credentials->prefix;
     $db->enable_log(true);
@@ -1345,7 +1351,9 @@ function clean_post(Request $request) : Effect {
 
 function bot_allow(Request $request) : Effect {
     $id = $request->post["id"];
-    $info_file = WAF_ROOT."cache/bots/{$id}.json";
+    $bot_dir = get_hidden_file("bots");
+    $info_file = "{$bot_dir}/{$id}.json";
+
     $effect = Effect::new();
     /** @var BotData $bot_data */
     $bot_data = json_decode(FileData::new($info_file)->raw(), false);

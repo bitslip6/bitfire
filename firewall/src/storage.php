@@ -112,7 +112,11 @@ class CacheStorage implements Storage {
      * @return string opcode cache file path for a given key
      */
     protected function key2name(string $key) : string {
-        return \BitFire\WAF_ROOT . "cache/objects/$key";
+        $dir =  \BitFire\WAF_ROOT . "cache/objects/";
+        if (!file_exists($dir)) {
+            mkdir($dir, 0775, true);
+        }
+        return $dir . $key;
     }
 
     /**

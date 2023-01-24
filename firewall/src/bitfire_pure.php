@@ -28,6 +28,7 @@ use function ThreadFin\set_if_empty;
 use function ThreadFin\utc_date;
 use function ThreadFin\utc_microtime;
 use function ThreadFin\debug;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\trace;
 use function ThreadFin\un_json;
 
@@ -107,7 +108,7 @@ function match_block_exception(?Block $block, \BitFire\Exception $exception, str
  * @return array of \BitrFire\Exception
  */
 function load_exceptions() : array {
-    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $file = get_hidden_file("exceptions.json");
     return FileData::new($file)->read()->un_json()->map('\BitFire\map_exception')();
 }
 
@@ -124,7 +125,7 @@ function match_exception(\BitFire\Exception $ex1, \BitFire\Exception $ex2) : boo
  * remove an exception from the list
  */
 function remove_exception(\BitFire\Exception $ex) : Effect {
-    $filename = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $filename = get_hidden_file("exceptions.json");
     $exceptions = array_filter(load_exceptions(), function(\BitFire\Exception $test) use ($ex) { return ($ex->uuid === $test->uuid) ? false : true; }); 
     $effect = Effect::new(new FileMod($filename, json_encode($exceptions, JSON_PRETTY_PRINT), FILE_W));
     return $effect;
@@ -418,26 +419,9 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
         $metrics[$ip] = ($metrics[$ip]??0) + 1;
         return $metrics;
     }, function() { return \BitFire\BITFIRE_METRICS_INIT; } , DAY);
-    /* 
-    // cache the last 25 blocks in memory if block file is disabled
-    if (Config::disabled(CONFIG_BLOCK_FILE)) { $cache->rotate_data("log_data", $data, 15); }
-    */
 
     $content = json_encode($data)."\n";
     httpp(APP."blocks.php", $content, array("Content-Type" => "application/json"));
-
-    /*
-    if ($block != NULL && $block->code != 0) {
-        unset($data['headers']);
-        unset($data['rhead']);
-        if (Config::enabled('report_file') && ($data["pass"] === true)) {
-            $file = Config::file('report_file');
-            file_put_contents($file, $content, FILE_APPEND);
-        }  else if (Config::enabled(CONFIG_BLOCK_FILE)) {
-            file_put_contents(Config::file(CONFIG_BLOCK_FILE), $content, FILE_APPEND);
-        }
-    }
-    */
 }
 
 /**

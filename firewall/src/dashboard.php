@@ -45,6 +45,7 @@ use function ThreadFin\partial as BINDL;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
 use function ThreadFin\find_const_arr;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\http2;
 use function ThreadFin\icontains;
 use function ThreadFin\output_profile;
@@ -57,10 +58,16 @@ require_once \BitFire\WAF_SRC . "cms.php";
 require_once \BitFire\WAF_SRC . "server.php";
 require_once \BitFire\WAF_SRC . "botfilter.php";
 require_once \BitFire\WAF_SRC . "renderer.php";
-if (CFG::str("wp_version")) {
-    require_once \BitFire\WAF_ROOT . "wordpress-plugin/includes.php";
-} else {
-    require_once \BitFire\WAF_ROOT . "custom-plugin/includes.php";
+
+$wp_inc = \BitFire\WAF_ROOT . "wordpress-plugin/includes.php";
+$cust_inc = \BitFire\WAF_ROOT . "wordpress-plugin/includes.php";
+
+if (CFG::str("wp_version") && file_exists($wp_inc)) {
+    require_once $wp_inc;
+} else if (file_exists($cust_inc)) {
+    require_once $cust_inc;
+} else if (file_exists(WAF_ROOT . "includes.php")) {
+    require_once WAF_ROOT . "includes.php";
 }
 
 const PAGE_SZ = 30;
@@ -103,7 +110,7 @@ function get_file_count($path) : int {
 
 function list_text_inputs(string $config_name) :string {
 
-    $assets = (defined("WPINC")) ? CFG::str("cms_contenturl")."/plugins/bitfire/public/" : "https://bitfire.co/assets/"; // DUP
+    $assets = (defined("WPINC")) ? CFG::str("cms_content_url")."/plugins/bitfire/public/" : "https://bitfire.co/assets/"; // DUP
     $list = CFG::arr($config_name);
     $idx = 0;
     //$result = \BitFirePlugin\add_script_inline("bitfire-list-$config_name", 'window.list_'.$config_name.' = '.json_encode($list).';');
@@ -177,7 +184,7 @@ function url_to_path($url) {
 function get_asset_dir() {
     $assets = "https://bitfire.co/assets/";
     if (defined("WPINC")) {
-        $assets = CFG::str("cms_contenturl")."/plugins/bitfire/public/";
+        $assets = CFG::str("cms_content_url")."/plugins/bitfire/public/";
     } else if (contains($_SERVER['REQUEST_URI'], "startup.php")) {
         $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $assets = dirname($path) . "/public/";
@@ -205,7 +212,7 @@ function render_view(string $view_filename, string $page_name, array $variables 
 
     $assets = "https://bitfire.co/assets/";
     if (defined("WPINC")) {
-        $assets = CFG::str("cms_contenturl")."/plugins/bitfire/public/";
+        $assets = CFG::str("cms_content_url")."/plugins/bitfire/public/";
     }
     if (isset($variables['assets'])) { $assets = $variables['assets']; ;}
 
@@ -326,32 +333,35 @@ function dump_hashes() : ?array {
 
     // decode the result of the server test
     $decoded = un_json($result);
+    if (!empty($decoded)) {
+        $allowed = FileData::new(get_hidden_file("hashes.json"))->read()->un_json()->lines;
+        $allow_map = [];
+        foreach ($allowed as $file) { $allow_map[$file["file"]] = $file["path"]; }
 
 
-    $allowed = FileData::new(\BitFire\WAF_ROOT."cache/hashes.json")->read()->un_json()->lines;
-    $allow_map = [];
-    foreach ($allowed as $file) { $allow_map[$file["file"]] = $file["path"]; }
+        $num_files = count($hashes);
+        $ver = get_cms_version($root);
+        $enrich_fn  = BINDL('\BitFire\enrich_hashes', $ver, $root);
+        $enriched_files = array_map($enrich_fn, $decoded);
 
 
-    $num_files = count($hashes);
-    $ver = get_cms_version($root);
-    $enrich_fn  = BINDL('\BitFire\enrich_hashes', $ver, $root);
-    $enriched_files = array_map($enrich_fn, $decoded);
-
-
-    // remove files that passed check
-    $filtered = array_filter($enriched_files, function ($file) use ($allow_map) {
-        $keep = $file['r'] !== "PASS";
-        if ($keep) {
-            $keep = ($allow_map[$file['file_path']]??false) ? false : true;
-        }
-        // now skip root files that don't have malware
-        if ($keep) {
-            return $file["malware"]->count() > 0;
-        }
-        
-        return $keep;
-    });
+        // remove files that passed check
+        $filtered = array_filter($enriched_files, function ($file) use ($allow_map) {
+            $keep = $file['r'] !== "PASS";
+            if ($keep) {
+                $keep = ($allow_map[$file['file_path']]??false) ? false : true;
+            }
+            // now skip root files that don't have malware
+            if ($keep) {
+                return $file["malware"]->count() > 0;
+            }
+            
+            return $keep;
+        });
+    }
+    else {
+        $filtered = [];
+    }
 
 
 
@@ -405,7 +415,7 @@ if (function_exists('xhprof_enable') && file_exists(WAF_ROOT . "profiler.enabled
     $data['version_str'] = BITFIRE_SYM_VER;
     $data['llang'] = "en-US";
     $data['wp_ver'] = get_cms_version($root);
-    $data['file_count'] = $file_list['count'];
+    $data['file_count'] = count($file_list['files']);
     $data['file_list_json'] = en_json(compact_array($file_list['files']));
     $data['dir_ver_json'] = en_json($dir_list);
     $data['is_free'] = $is_free;
@@ -492,11 +502,12 @@ function serve_advanced() {
     validate_auth()->run();
     $is_free = (strlen(Config::str('pro_key')) < 20);
     $disabled = ($is_free) ? "disabled='disabled'" : "";
+    $info = ($is_free) ? "<h4 class='text-info'> * Runtime Application Self Protection must first be installed with BitFire PRO. See link in header for details.</h4>" : "";
     $data = ["mfa" => defined("WPINC") ? "Enable multi factor authentication. Add MFA phone numbers in user editor." :
         "Multi Factor Authentication is only available in the WordPress plugin. Please install from the WordPress plugin directory.",
         "show_mfa" => (defined("WPINC")) ? "" : "hidden",
         "disabled" => $disabled,
-        "info" => "<h4 class='text-info'> * Runtime Application Self Protection must first be installed with BitFire PRO. See link in header for details.</h4>",
+        "info" => $info,
         "mfa_class" => (defined("WPINC")) ? "text-muted" : "text-danger"];
     //"dashboard_path" => $dashboard_path,
     render_view(\BitFire\WAF_ROOT . "views/advanced.html", "bitfire_advanced", array_merge(CFG::$_options, $data))->run();
@@ -509,7 +520,8 @@ function serve_bot_list() {
     $request = BitFire::get_instance()->_request;
 
     require_once WAF_SRC . "botfilter.php";
-    $bot_files = glob(\BitFire\WAF_ROOT . "cache/bots/*.json");
+    $bot_dir = get_hidden_file("bots");
+    $bot_files = glob("{$bot_dir}/*.json");
     $country_mapping = \ThreadFin\un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country_name.json"));
     $country_fn = BINDR("BitFire\country_resolver", un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country.json")));
 
@@ -538,7 +550,7 @@ function serve_bot_list() {
 
     // order by last time seen, newest first
     usort($filter_bots, function($a, $b) {
-        return $a->last_time < $b->last_time;
+        return $a->last_time - $b->last_time;
     });
 
     $bot_list = array_map(function ($bot) use ($country_fn, $country_mapping) {
@@ -588,7 +600,7 @@ function serve_bot_list() {
         if ($bot->valid==0) {
             $bot->classclass = "warning";
         } else if ($bot->valid==1) {
-            $bot->classclass = "success";
+            $bot->classclass = "secondary";
         }
         if (empty($bot->hit)) { $bot->hit = 0; }
         if (empty($bot->miss)) { $bot->miss = 0; }
@@ -648,9 +660,11 @@ function serve_bot_list() {
 function validate_auth() : Effect {
 
     // issue a notice if the web path is not writeable
+    /*
     if (!is_writable(WAF_INI)) {
         return render_view(\BitFire\WAF_ROOT."views/permissions.html", "content", ["title" => "bitfire must be web-writeable", "body" => "please make sure bitfire is owned by the web user and web writeable"])->exit(true);
     }
+    */
 
     return \BitFire\verify_admin_password();
 }
@@ -705,7 +719,7 @@ function enrich_alert(array $report, array $exceptions, array $whitelist) : arra
 
 function serve_exceptions() :void
 {
-    $file_name = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $file_name = get_hidden_file("exceptions.json");
     $exceptions = FileData::new($file_name)->read()->un_json()->map(function ($x) {
         $class = (floor($x["code"] / 1000) * 1000);
         $x["message"] = MESSAGE_CLASS[$class];
@@ -785,7 +799,7 @@ function serve_database() : void
     $info["backup-comments"] = $backup_status["comments"] ?? '?';
     $info["restore_disabled"] = "disabled";
     $info["restore-available"] = "N/A";
-    $info["points"] = $backup_status["archives"];
+    $info["points"] = $backup_status["archives"]??'?';
 
     if ($backup_status["online"]) {
         //$info["restore_disabled"] = "";
@@ -976,7 +990,7 @@ function serve_dashboard() :void {
     // load all alert data
     // TODO: make dry
     $report_code = intval($_GET['report_filter']??0);
-    $report_file = \ThreadFin\FileData::new(CFG::file(CONFIG_REPORT_FILE))
+    $report_file = \ThreadFin\FileData::new(get_hidden_file("alerts.json"))
         ->read();
 
     $report_count = $report_file->num_lines;
@@ -1006,7 +1020,7 @@ function serve_dashboard() :void {
     // calculate number of alert pages
     //$report_count = $report_file->num_lines;
     $data["report_count"] = $report_count;
-    $data["report_range"] = ($alert_page_num * PAGE_SZ) . " - " . ($alert_page_num * PAGE_SZ) + PAGE_SZ;
+    $data["report_range"] = ($alert_page_num * PAGE_SZ) . " - " . (($alert_page_num * PAGE_SZ) + PAGE_SZ);
     $data["report_pages"] = ceil($report_count / PAGE_SZ);
     $data["alerts"] = [];
     $data["access"] = defined("WPINC") ? "You can access the dashboard by clicking the BitFire icon in the admin bar." : "You can access the dashboard by visiting " .  parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
@@ -1028,7 +1042,7 @@ function serve_dashboard() :void {
     $block_code = intval($_GET['block_filter']??0);
 
     // load all block data
-    $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
+    $block_file = \ThreadFin\FileData::new(get_hidden_file("blocks.json"))
         ->read()
         ->apply(BINDR('\BitFire\remove_lines', 400))
         ->apply_ln('array_reverse')
@@ -1057,7 +1071,7 @@ function serve_dashboard() :void {
     $data["invert_block_check"] = isset($_GET['invert_block_check']) ? "checked='checked'" : "";
     // calculate number of block pages
     $data["block_count"] = $block_count;
-    $data["block_range"] = ($block_page_num * PAGE_SZ) . " - " . ($block_page_num * PAGE_SZ) + PAGE_SZ;
+    $data["block_range"] = ($block_page_num * PAGE_SZ) . " - " . (($block_page_num * PAGE_SZ) + PAGE_SZ);
     $data["block_pages"] = ceil($block_count / PAGE_SZ);
     $data["blocks"] = [];
 
@@ -1132,9 +1146,4 @@ function serve_dashboard() :void {
 }
 
 
-// ensure that passwords are always hashed
-if (strlen(CFG::str("password")) < 40 && CFG::str("password") != "disabled" && CFG::str("password") != "configure") {
-    $hashed = hash("sha3-256", CFG::str("password"));
-    update_ini_value("password", $hashed)->run();
-}
 

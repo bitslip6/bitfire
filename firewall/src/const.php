@@ -35,8 +35,6 @@ const WAF_MIN_HIT = 25;
 const WAF_MIN_PERCENT = 10;
 
 const CONFIG_COOKIES='cookies_enabled';
-const CONFIG_REPORT_FILE='report_file';
-const CONFIG_BLOCK_FILE='block_file';
 const CONFIG_DASHBOARD_PATH='dashboard_path';
 const CONFIG_WHITELIST_ENABLE='whitelist_enable';
 const CONFIG_BLACKLIST_ENABLE='blacklist_enable';
@@ -127,8 +125,8 @@ const STATUS_ECOM = 70;
 
 // if we are installed in a web-accessible location, make files un-readable
 if (strstr( __FILE__, $_SERVER["DOCUMENT_ROOT"]) !== false) {
-    define('BitFire\FILE_W', 0222);
-    define('BitFire\FILE_R', 0444);
+    define('BitFire\FILE_W', 0664);
+    define('BitFire\FILE_R', 0664);
 }
 else {
     define('BitFire\FILE_W', 0664);

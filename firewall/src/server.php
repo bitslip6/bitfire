@@ -33,6 +33,7 @@ use const BitFire\STATUS_EEXIST;
 use const BitFire\STATUS_ENOENT;
 use const BitFire\STATUS_OK;
 use const BitFire\STATUS_FAIL;
+use const BitFire\WAF_INI;
 use const BitFire\WAF_ROOT;
 use const ThreadFin\DAY;
 use const ThreadFin\DS;
@@ -47,6 +48,8 @@ use function ThreadFin\partial as BINDL;
 use function ThreadFin\random_str;
 use function ThreadFin\debug;
 use function ThreadFin\en_json;
+use function ThreadFin\get_hidden_file;
+use function ThreadFin\recursive_copy;
 use function ThreadFin\trace;
 use function ThreadFin\take_nth;
 use function ThreadFin\utc_date;
@@ -76,6 +79,7 @@ class FileHash {
     public $size;
     public $crc_path;
     public $crc_trim;
+    public $unique;
     public $crc_expected;
     public $type;
     public $name;
@@ -88,7 +92,7 @@ class FileHash {
 function doc_root() : string {
     static $root = "/";
     if ($root === "/") { 
-        $root = filter_input(INPUT_SERVER, "DOCUMENT_ROOT");
+        $root = $_SERVER['DOCUMENT_ROOT'];
     }
     return $root;
 }
@@ -131,8 +135,15 @@ function need_quote(string $data) : bool {
  * @param callable $fn 
  * @param string $filename 
  */
-function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI, bool $append = false) : EF {
-    assert(file_exists($filename), "$filename does not exist.  please create it.");
+function update_ini_fn(callable $fn, string $filename = "", bool $append = false) : EF {
+    if (empty($filename)) {
+        if (defined("\BitFire\WAF_INI")) {
+            $filename = \BitFire\WAF_INI;
+        } else {
+            $filename = make_config_loader()->run()->read_out();
+        }
+    }
+    assert(file_exists($filename), "[$filename] does not exist.  please create it.");
 
     $effect = EF::new();
 
@@ -165,7 +176,7 @@ function update_ini_fn(callable $fn, string $filename = \BitFire\WAF_INI, bool $
             // write the parsed config php file
             ->file(new FileMod($ini_code, '<?php $config = ' . var_export($new_config, true) . ";\n", FILE_RW, time() + 5))
             // clear the config cache entry
-            ->update(new CacheItem("parse_ini2", "\ThreadFin\\nop", "\ThreadFin\\nop", -DAY));
+            ->update(new CacheItem("parse_ini", "\ThreadFin\\nop", "\ThreadFin\\nop", -DAY));
         }
     }
     if (!$is || $new_config == false) {
@@ -261,12 +272,6 @@ function add_ini_value(string $param, string $value, ?string $default = NULL, st
     return $effect;
 }
 
-// TODO: implement me to add new options to config.ini on upgrade
-// TODO: add function to add new config item if it does not exist.
-function upgrade_config() : Effect {
-    // add dashboard-usage, dynamic_exceptions, nag_ignore, wizard
-    return Effect::$NULL;
-}
 
 
 /**
@@ -414,7 +419,7 @@ function update_config(string $ini_src) : Effect
 
     // use WordPress or hosted content if not WordPress
     if (function_exists("plugin_dir_url")) {
-        $assets = \plugin_dir_url(dirname(__FILE__, 2)) . "public/";
+        $assets = \plugin_dir_url(dirname(__FILE__, 1)) . "public/";
     } else if (!empty($root)) {
         $assets = CFG::str("cms_content_url") . "/plugins/bitfire/public";
     } else {
@@ -429,10 +434,10 @@ function update_config(string $ini_src) : Effect
 
     $alert = '{"time":"'.utc_date('r').'","tv":'.utc_time().',"exec":"0.001557 sec","block":{"code":26001,"parameter":"REQUEST_RATE","value":"41","pattern":"40","block_time":2},"request":{"headers":{"requested_with":"","fetch_mode":"","accept":"","content":"","encoding":"","dnt":"","upgrade_insecure":"","content_type":"text\/html"},"host":"unit_test","path":"\/","ip":"127.0.0.1","method":"GET","port":8080,"scheme":"http","get":[],"get_freq":[],"post":[],"post_raw":"","post_freq":[],"cookies":[],"agent":"test request rate alert","referer":null},"http_code":404},';
     $block = '{"time":"'.utc_date('r').'","tv":'.utc_time().',"exec":"0.001865 sec","block":{"code":10020,"parameter":"bitfire_block_test","value":"event.path","pattern":"static match","block_time":0},"request":{"headers":{"requested_with":"","fetch_mode":"","accept":"*\/*","content":"","encoding":"","dnt":"","upgrade_insecure":"","content_type":"text\/html"},"host":"localhost","path":"\/","ip":"127.0.0.1","method":"GET","port":80,"scheme":"http","get":{"test_block":"event.path"},"get_freq":{"test_block":{"46":1}},"post":[],"post_raw":"","post_freq":[],"cookies":[],"agent":"curl\/7.74.0"},"browser":{"os":"bot","whitelist":true,"browser":"curl\/7.74.0","ver":"x","bot":true,"valid":0},"rate":{"rr":1,"rr_time":1651697370,"ref":null,"ip_crc":3619153832,"ua_crc":3606776447,"ctr_404":0,"ctr_500":0,"valid":0,"op1":293995,"op2":2607,"oper":4,"ans":0},"http_code":403}';
-    $e->file(new FileMod(\BitFire\WAF_ROOT . "cache/alerts.json", $alert, 0, 0, true));
-    $e->file(new FileMod(\BitFire\WAF_ROOT . "cache/blocks.json", $block, 0, 0, true));
+    $e->file(new FileMod(get_hidden_file("alerts.json"), $alert, 0, 0, true));
+    $e->file(new FileMod(get_hidden_file("blocks.json"), $block, 0, 0, true));
 
-    $e->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", "\n".json_encode($info, JSON_PRETTY_PRINT), FILE_W, 0, true)));
+    $e->chain(Effect::new()->file(new FileMod(get_hidden_file("install.log"), "\n".json_encode($info, JSON_PRETTY_PRINT), FILE_W, 0, true)));
     httpp(APP."zxf.php", base64_encode(json_encode($info)));
 
     return $e;
@@ -500,9 +505,12 @@ function install_file(string $file, string $format): bool
         do_for_each(glob(dirname($file).'/*.bitfire.*'), 'unlink');
 
         // create new backup with random extension and make unreadable to prevent hackers from accessing
-        $backup_filename = "$file.bitfire_bak." . mt_rand(10000, 99999);
-        copy($file, $backup_filename);
-        @chmod($backup_filename, FILE_W);
+        if (file_exists($file) && is_readable($file)) {
+            $backup_filename = "$file.bitfire_bak." . mt_rand(10000, 99999);
+            if (copy($file, $backup_filename)) {
+                @chmod($backup_filename, FILE_W);
+            }
+        }
 
         $full_content = $c . $ini_content;
         if (file_put_contents($file, $full_content, LOCK_EX) == strlen($full_content)) {
@@ -519,7 +527,11 @@ function install() : Effect {
     $effect = Effect::new();
     $software = filter_input(INPUT_SERVER, "SERVER_SOFTWARE", FILTER_SANITIZE_URL);
     $apache = stripos($software, "apache") !== false;
-    $root = doc_root(); // SERVER DOCUMENT ROOT, NOT CMS ROOT!
+
+    $root = cms_root(); // prefer CMS root over doc root
+    if (empty($root)) {
+        $root = doc_root();
+    }
     $ini = "$root/".ini_get("user_ini.filename");
     $hta = "$root/.htaccess";
     $extra = "";
@@ -607,30 +619,10 @@ function install() : Effect {
             "Unable to add BitFire to auto start.  check permissions on file [$file]";
     }
 
-    $effect->chain(make_config_loader());
-
     $effect->chain(Effect::new()->file(new FileMod(\BitFire\WAF_ROOT."install.log", join(", ", debug(null))."\n$note\n", FILE_W, 0, true)));
     return $effect->exit(false)->api($status, $note)->status((($status) ? STATUS_OK : STATUS_FAIL));
 }
 
-/**
- * return an effect to create a ini_info.php file which sets
- * a variable $ini_type to the type of ini file used. we do
- * this here because some wordpress servers do not always
- * allow us to write php files on any request.
- * @return Effect 
- */
-function make_config_loader() : Effect {
-    $markup = '<?php $ini_type = "opcache";';
-    if (function_exists("shmop_open")) {
-        $markup = '<?php $ini_type = "shmop";';
-    } else if (function_exists("apcu_store")) {
-        $markup = '<?php $ini_type = "acpu";';
-    }
-
-    $file = new FileMod(\BitFire\WAF_ROOT."ini_info.php", $markup);
-    return Effect::new()->file($file);
-}
 
 // uninstall always on protection (auto_prepend_file)
 // TODO: refactor to api response
@@ -665,7 +657,7 @@ function uninstall() : \ThreadFin\Effect {
 
         $status = ((\BitFireSvr\install_file($file, "")) ? "success" : "error");
         // install a lock file to prevent auto_prepend from being uninstalled for ?5 min
-        $effect->file(new FileMod(\BitFire\WAF_ROOT . "uninstall_lock", "locked", 0, time() + ini_get("user_ini.cache_ttl")));
+        $effect->file(new FileMod(\BitFire\WAF_ROOT . "uninstall_lock", "locked", 0, time() + intval(ini_get("user_ini.cache_ttl"))));
         $path = realpath(\BitFire\WAF_ROOT."startup.php"); // duplicated from install_file. TODO: make this a function
     }
 
@@ -741,6 +733,7 @@ function hash_file2(string $path, string $root_dir, string $name, callable $type
     $hash->type = $type_fn($realpath);
     $hash->name = $name;
     $hash->size = filesize($realpath);
+    $hash->unique = random_str(10);
 
     // HACKS AND FIXES
     if (stripos($realpath, "/wp-includes/") !== false) { $hash->rel_path = "/wp-includes".$hash->rel_path; }
@@ -791,9 +784,12 @@ function hash_file(string $filename, string $root_dir, string $plugin_id, string
     $result['plugin_id'] = $plugin_id;
     $result['size'] = filesize($filename);
 
+
+    /*
     if (function_exists('BitFirePRO\find_malware')) {
         $result['malware'] = \BitFirePRO\find_malware($input);
     }
+    */
 
     return $result;
 }
@@ -995,7 +991,7 @@ function authenticate_tech(string $signed_message) : MaybeStr {
     try {
         $tech_public_key = hex2bin(CFG::str("tech_public_key")); 
         return MaybeStr::of(sodium_crypto_sign_open($signed_message, $tech_public_key));
-    } catch (Exception) {
+    } catch (Exception $e) {
         return MaybeStr::of(false); 
     } 
 }
@@ -1020,6 +1016,12 @@ function is_browser_request(?\BitFire\Request $request) : bool
  * @return Effect the effect to update ini and install auto_prepend
  */
 function bf_activation_effect() : Effect {
+
+    // ensure that cache objects directory exists!
+    if (file_exists(WAF_ROOT . "cache") && !file_exists(WAF_ROOT . "cache" . DIRECTORY_SEPARATOR . "objects")) {
+        mkdir(WAF_ROOT . "cache" . DIRECTORY_SEPARATOR . "objects", 0775, true);
+    }
+
     $effect = \BitFireSvr\update_ini_value("bitfire_enabled", "true");
     debug("configured: [%d]", CFG::enabled("configured"));
 
@@ -1035,7 +1037,7 @@ function bf_activation_effect() : Effect {
     // update configured after check for install.  allows install on deactivate - activate
     $effect->chain(update_ini_value("configured", "true")); // MUST SYNC WITH UPDATE_CONFIG CALLS (WP)
     // in case of upgrade, run the config updater to add new config parameters
-    $effect->chain(\BitFireSvr\upgrade_config());
+    //$effect->chain(\BitFireSvr\upgrade_config());
 
 
     // read the result of the auto prepend install and update the install.log
@@ -1079,30 +1081,22 @@ function bf_deactivation_effect() : Effect {
 }
 
 
-/** @return EF  */
-function standalone_to_wordpress() : Effect {
+/**
+ * TODO: refactor to move the secret dir.
+ * TODO: HIDDEN FIX
+ * @return Effect
+ **/
+function standalone_to_wordpress() : void {
     // load the old configuration if we have one
     // TODO: move to a backup function
-    $old_conf = WAF_ROOT."config.ini";
-    $new_conf = __DIR__."/config.ini";
-    if ($old_conf != $new_conf) {
-        chmod($old_conf, FILE_RW);
-        chmod($new_conf, FILE_RW);
-        @copy($old_conf, $new_conf);
-        chmod($old_conf, FILE_W);
-        chmod($new_conf, FILE_W);
+    $old_config_dir = dirname(WAF_INI, 1);
+
+    if (defined("WP_CONTENT_DIR")) {
+        $plugin_root_dir = WP_CONTENT_DIR."/plugins/";
+    } else {
+        $plugin_root_dir = dirname(__DIR__, 1);
     }
-    $hash_file = WAF_ROOT."cache/hashes.json";
-    if (file_exists($hash_file)) {
-        @copy($hash_file, __DIR__."/cache/hashes.json");
-    }
-    $block_file = WAF_ROOT."cache/blocks.json";
-    $alert_file = WAF_ROOT."cache/alerts.json";
-    @copy($block_file, __DIR__."/cache/blocks.json");
-    @copy($alert_file, __DIR__."/cache/alerts.json");
-    @copy(WAF_ROOT."cache/exceptions.json", __DIR__."cache/exceptions.json");
-    $effect = \BitFireSvr\uninstall()->hide_output();
-    return $effect;
+    recursive_copy($old_config_dir, $plugin_root_dir);
 }
 
 namespace BitFireChars;

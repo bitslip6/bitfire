@@ -30,6 +30,7 @@ use function ThreadFin\httpp;
 use function ThreadFin\random_str;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\get_public;
 use function ThreadFin\partial_right;
 use function ThreadFin\un_json;
@@ -246,7 +247,7 @@ class Config {
     public static function set(array $options) : void {
         if (empty($options)) {
             trace("no cfg");
-            CacheStorage::get_instance()->save_data("parse_ini2", null, -86400); 
+            CacheStorage::get_instance()->save_data("parse_ini", null, -86400); 
         } else {
             trace("cfg");
             Config::$_options = $options;
@@ -276,7 +277,6 @@ class Config {
 
     // get a string value with a default
     public static function str(string $name, string $default = '') : string {
-        if (isset(Config::$_options[$name])) { return (string) Config::$_options[$name]; }
         if ($name == "auto_start") { // UGLY HACK for settings.html
             $ini = ini_get("auto_prepend_file");
             $found = false;
@@ -292,6 +292,7 @@ class Config {
             }
             return ($found) ? "on" : "";
         }
+        if (isset(Config::$_options[$name])) { return (string) Config::$_options[$name]; }
         return (string) $default;
     }
 
@@ -404,6 +405,7 @@ class BitFire
 
     // request unique id
     public $uid;
+    public $inspected = false;
     public static $_exceptions = NULL;
     public static $_reporting = array();
     public static $_blocks = array();
@@ -448,20 +450,20 @@ class BitFire
      * write report data after script execution 
      */
     public function __destruct() {
-        if (!empty(CFG::enabled(CONFIG_REPORT_FILE)) && count(self::$_reporting) > 0) {
+        if (count(self::$_reporting) > 0) {
             $coded = array_map(function (array $x):array {
                 $x['http_code'] = http_response_code();
                 $x['request']->cookies = "**redacted**";
                 return $x; }, self::$_reporting);
-            json_to_file_effect(CFG::file(CONFIG_REPORT_FILE), $coded)->run();
+            json_to_file_effect(get_hidden_file("alerts.json"), $coded)->run();
         }
-        if (!empty(CFG::str(CONFIG_BLOCK_FILE)) && count(self::$_blocks) > 0) {
+        if (count(self::$_blocks) > 0) {
             $coded = array_map(function (array $x):array { 
                 $x['http_code'] = http_response_code();
                 $x['request']->cookies = "**redacted**";
                 //$x['request']['headers'] = array_filter($x['request']['headers'], 'array_filter');
                 return $x; }, self::$_blocks);
-            json_to_file_effect(CFG::file(CONFIG_BLOCK_FILE), $coded)->run();
+            json_to_file_effect(get_hidden_file("blocks.json"), $coded)->run();
         }
     }
 
@@ -539,6 +541,7 @@ class BitFire
      * return false if inspection failed...
      */
     public function inspect() : MaybeBlock {
+        $this->inspected = true;
         trace("ins");
         // HATE TO PUT THIS HERE, BUT WE NEED CFG LOADED SO WE CAN INCLUDE CORRECT PLUGIN
         require_once \BitFire\WAF_SRC."cms.php";
@@ -750,7 +753,7 @@ function block_now(int $code, string $parameter, string $value, string $pattern,
         $uuid = $block->uuid;
         $block_type = htmlentities($block->__toString());
     }
-    if (empty($custom_err)) { $custom_err = "This site is protected by BitFire WAF. <br> Your action: <strong> $block_type</strong> was blocked."; }  
+    if (empty($custom_err)) { $custom_err = "This site is protected by BitFire RASP. <br> Your action: <strong> $block_type</strong> was blocked."; }  
 
     $block = BitFire::new_block($code, $parameter, $value, $pattern, $block_time, $req);
     if (!$block->empty()) {
@@ -760,5 +763,6 @@ function block_now(int $code, string $parameter, string $value, string $pattern,
         require WAF_ROOT."views/block.php";
         return Effect::new()->out(ob_get_clean())->exit(true);
     }
+    return Effect::new();
 }
 
