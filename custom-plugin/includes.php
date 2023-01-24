@@ -13,7 +13,7 @@ use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\ends_with;
 
-define("\BitFire\\CMS_INCLUDED", true);
+define("BitFire\\CMS_INCLUDED", true);
 
 // list of plugin package files that can be used to determine package versions
 // can be an empty list if no such files exist

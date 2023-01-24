@@ -23,6 +23,7 @@ namespace BitFirePlugin;
 
 use BitFire\BitFire;
 use BitFire\Config as CFG;
+use BitFire\Config;
 use BitFire\Request;
 use Exception;
 use RuntimeException;
@@ -205,11 +206,11 @@ function activate_bitfire() {
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
 
     // install data can be verbose, so redirect to install log
-    $debug_file = \BitFire\Config::str("debug_file");
-    \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
+    //$debug_file = \BitFire\Config::str("debug_file");
+    //\BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
+    Config::set_value("debug", true);
     $effect = \BitfireSvr\bf_activation_effect();
     $effect->hide_output()->run();
-    \BitFire\Config::set_value("debug_file", $debug_file);
     httpp(APP."zxf.php", base64_encode(\ThreadFin\en_json(["action" => "activate", "name" => $_SERVER['SERVER_NAME']??"na"])));
 
     @chmod(\BitFire\WAF_INI, FILE_W);
@@ -229,8 +230,7 @@ function deactivate_bitfire() {
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
 
     // install data can be verbose, so redirect to install log
-    $debug_file = \BitFire\Config::str("debug_file");
-    \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
+    \BitFire\Config::set_value("debug_file", true);
     \BitFire\Config::set_value("debug_header", false);
     $effect = \BitFireSvr\bf_deactivation_effect();
     $effect->hide_output()->run();
@@ -239,7 +239,6 @@ function deactivate_bitfire() {
     // this should also have been done in the uninstall step...
     CacheStorage::get_instance()->delete();
 
-    \BitFire\Config::set_value("debug_file", $debug_file);
     httpp(APP."zxf.php", \ThreadFin\en_json(["action" => "deactivate", "name" => $_SERVER['SERVER_NAME']??"na"]));
 
     @chmod(\BitFire\WAF_INI, FILE_W);
