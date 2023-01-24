@@ -832,7 +832,9 @@ function serve_database() : void
     } else {
         trace("BIT_DB");
         $credentials = wp_parse_credentials(CFG::str("cms_root"));
-        $prefix = $credentials->prefix;
+        if ($credentials) {
+            $prefix = $credentials->prefix;
+        }
     }
     if ($credentials) {
         $db = DB::cred_connect($credentials)->enable_log(true);
