@@ -558,12 +558,15 @@ class BitFire
 
         // 1% cleanup old cache files
         if (mt_rand(0, 100) < 2) {
-            $cache_file_list = glob(WAF_ROOT."/cache/objects/*");
+            $cache_file_list = glob(WAF_ROOT."cache/objects/*");
             array_walk($cache_file_list, function ($file) {
                 $success = false;
-                @include ($file);
-                if (!$success) {
-                    @unlink($file);
+                $path = realpath($file);
+                if (file_exists($path)) {
+                    @include ($path);
+                    if (!$success) {
+                        @unlink($file);
+                    }
                 }
             });
         }
