@@ -231,6 +231,8 @@ function activate_bitfire() {
 
     ob_start(function($x) { if(!empty($x)) { debug("PHP Warnings: [%s]\n", $x); } return $x; });
 
+    \BitfireSvr\bf_activation_effect()->hide_output()->run();
+
     if (function_exists("BitFirePlugin\upgrade")) {
         \BitFirePlugin\upgrade();
     }
@@ -242,7 +244,6 @@ function activate_bitfire() {
     // install data can be verbose, so redirect to install log
     \BitFire\Config::set_value("debug_file", true); 
     \BitFire\Config::set_value("debug_header", false);
-    \BitfireSvr\bf_activation_effect()->hide_output()->run();
 
     ob_end_clean();
 
