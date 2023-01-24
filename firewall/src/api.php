@@ -139,16 +139,12 @@ function add_api_exception(\BitFire\Request $r) : Effect {
     // special handling of bot exceptions
     $class = code_class($r->post['code']);
     $effect = Effect::new();
+    /*
     if ($class == 24000) {
         assert(isset($r->post['param']), "param is required");
         assert(isset($r->post['value']), "value is required");
         $value = $r->post['value']??NULL;
 
-        $as = find_ip_as($value);
-        $param_crc = "crc" . crc32($param);
-        $agents = FileData::new(WAF_ROOT . "/cache/whitelist_agents.ini")->raw();
-        $agents .= "\n; bot exception from:[$value]\nbotwhitelist[$param_crc] = \"AS$as\"\n";
-        $effect->file(new FileMod(WAF_ROOT . "/cache/whitelist_agents.ini", $agents, FILE_RW));
         //->update_ini_value("botwhitelist[$param_crc]", "AS{$as}", NULL)->api(true, "exception added");
         //$effect = update_ini_fn(function () use ($param_crc, $as, $value) { return "\n; bot exception from:[$value]\nbotwhitelist[$param_crc] = \"AS$as\"\n"; }, WAF_ROOT . "/cache/whitelist_agents.ini", true);
 
@@ -156,6 +152,7 @@ function add_api_exception(\BitFire\Request $r) : Effect {
         $effect->api(true, "exception added");
         return $effect;
     }
+    */
 
     // all other exceptions, previous block returns...
     $ex = new \BitFire\Exception((int)$r->post['code'], random_str(8), $param, $r->post['path']);
