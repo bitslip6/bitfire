@@ -58,6 +58,7 @@ class Credentials {
     public $password;
     public $prefix;
     public $db_name;
+    public $host;
 
     /**
      * create database credentials
@@ -321,7 +322,8 @@ class DB {
      * auto quotes values,  use {!name} to not quote
      * @return SQL - SQL result abstraction
      */
-    public function fetch(string $sql, array|object $data = NULL, $mode = MYSQLI_ASSOC) : SQL {
+    //public function fetch(string $sql, array|object $data = NULL, $mode = MYSQLI_ASSOC) : SQL {
+    public function fetch(string $sql, $data = NULL, $mode = MYSQLI_ASSOC) : SQL {
         assert(!empty($this->_db), "database: {$this->database} is not connected [".gettype($this->_db)."]");
 
         $type = (is_array($data)) ? 'array' : ((is_object($data)) ? 'object' : 'scalar');
@@ -616,7 +618,7 @@ class SQL {
                 $fn(...$this->_data) :
                 $fn($this->_data);
         } else {
-            $this->errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
+            $this->_errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
         }
 
         return $this;
@@ -629,7 +631,7 @@ class SQL {
         if (is_array($this->_x) && !empty($this->_x)) {
             return array_map($fn, $this->_x);
         } else {
-            $this->errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
+            $this->_errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
         }
         return [];
     }
@@ -643,7 +645,7 @@ class SQL {
         if (is_array($this->_x) && !empty($this->_x)) {
             return array_reduce($this->_x, $fn, $initial);
         } else {
-            $this->errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
+            $this->_errors[] = "wont call " . func_name($fn) . " on data : " . var_export($this->_data, true);
         }
         return false;
     }
