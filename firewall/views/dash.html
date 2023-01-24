@@ -3,11 +3,13 @@
   ul.dropdown-menu li { padding: 0.25rem 1rem; }
   ul.dropdown-menu li a { color: #6e84a3; }
   ul.dropdown-menu li a:hover { color: #122637; }
+  [class^=col-] { margin: 0 !important; }
 </style>
 <style>
 thead.details th, th { font-size: 12px; }
 .nowrap { overflow: hidden; }
 .left { float: left; }
+.limit { overflow: hidden; text-overflow: ellipsis; }
 
 td { border-spacing: 1rem;}
 .table-sm td { padding: .25rem; }
@@ -37,11 +39,7 @@ tr.inforow td {
 .tbalt, .mono { font-family: 'Source Code Pro', monospace; }
 </style>
     
-<script type="text/javascript">
-        
-  
-
-        
+    <script type="text/javascript">
         const VERSION = {{version}};
         const VERSION_STR = "{{sym_version}}";
         const LLANG = "{{llang}}";
@@ -57,8 +55,10 @@ tr.inforow td {
             
       <!-- CARDS -->
       <div class="container-fluid">
+        <small><a class="text-info" target="_blank" href="https://bitfire.co/support-dashboard-usage">BitFire Dashboard Documentation <i class="fe fe-external-link"></i></a></small>
         <div class="row">
           <div class="col-12 col-lg-4">
+
             <div class="card p-0 card-fill tooltipA" id="block_by_type" style="justify-content: space-evenly;">
               <a id="block_by_type_tip" style="scroll-margin-top:300px;"></a>
               <span class="tooltip-text"><div class="left">This is the BitFire dashboard. {{access}} The last 24 hours of blocks by type can be viewed here.</div>
@@ -193,7 +193,7 @@ tr.inforow td {
       <div class="row">
           <div class="col-12 col-lg-12">
             <a id="block_table_tip"></a>
-            <div class="card card-fill tooltipA" id="block_table" style="max-width: 100%">
+            <div class="card card-fill tooltipA" id="block_table" style=""">
               <span class="tooltip-text"><div class="left">Under the graphs you can see the attacks that have been blocked by the firewall.  
                 You can adjust which types of attacks are blocked in the Settings page. <i>If you see something that should not be blocked, 
                 click on the magic wand icon to add an exception for the offending block.</i></div>
@@ -241,14 +241,14 @@ tr.inforow td {
               <div class="card-body ">
                 <div class="slide-up open" id="block_table_content">
 
-                <table class="table table-sm" style="width:100%">
+                <table class="table table-sm" style="">
                   <thead class="details">
                     <tr>
                       <th scope="col" style="width:250px;">Browser / Time</th>
                       <th scope="col">Request</th>
                     </tr>
                   </thead>
-                  <tbody style="font-size:14px;width:100%" id="block_rows">
+                  <tbody style="" id="block_rows">
                   </tbody>
                 </table>
                 </div>
@@ -278,7 +278,7 @@ do not block good traffic before flipping the rule to block mode.
               <div class="card-header" style="padding-left:0">
 
                 <span class="fe fe-chevron-down " style="flex:0;margin-right:4rem;" type="button" id="alert_toggle"></span>
-                <h4 style="margin-right: 4rem;">Alerts <small class="text-muted" id="block_range">{{report_range}}</small> of {{report_count}}</h4>
+                <h4 style="margin-right: 4rem;">Alerts <small class="text-muted" id="block_range">{{report_range}}</small> of {{+report_count}}</h4>
                 <!--
                 <h4>Alerts <small class="text-muted" id="alert_range">{{report_range}}</small> of {{report_count}}</h4>
               -->
@@ -317,9 +317,9 @@ do not block good traffic before flipping the rule to block mode.
       <td class="nowrap mono">
         <div>
           <strong class="text-secondary"><%- request.ip %></strong> <i class="fe fe-chevron-right"></i>
-          <span style="" class="text-muted mono ">&quot;<%= truncate(request.agent, 128) %>&quot;</span>
+          <strong style="padding-right:40px;" class="text-info"><%- request.method %></strong><span class="text-dark"><%- request.scheme %>://<%- request.host %><%- request.path %><%-request.query%></span>
         </div>
-        <strong style="padding-right:40px;" class="text-info"><%- request.method %></strong><span class="text-dark"><%- request.scheme %>://<%- request.host %><%- request.path %><%-request.query%></span>
+        <span style="" class="text-muted mono ">&quot;<%= truncate(request.agent, 128) %>&quot;</span>
       </td>
         <!--
       <td class="wrap">
@@ -332,7 +332,7 @@ do not block good traffic before flipping the rule to block mode.
       <!--
       <td class="wrap">parameter: <%- block.parameter %></td>
       -->
-      <td class="nowrap">info: <%= truncate(block.pattern,80)%>
+      <td class="limit">info: <%= truncate(block.pattern,80)%>
       <%- block.parameter %> match: &quot;<%- truncate(block.value, 80)%>&quot;</td>
     </tr>
 </script>
@@ -490,7 +490,7 @@ do not block good traffic before flipping the rule to block mode.
         70000: "Malware"
       };
 
-      var zup_ids = ["block_by_type", "block_by_country", "block_by_hour", "alert_table", "block_table"];
+      var zup_ids = ["block_by_type", "block_by_country", "block_by_hour", "block_table", "alert_table"];
       var zup_idx = 0;
 
 
@@ -687,7 +687,7 @@ function update_times() {
           if ({{is_wordpress}}) {
             // TODO: in stand alone mode, skip the malware scan...
             alert("Dashboard tour complete. Now let's make sure your system files are secure...");
-            window.location = "{{self}}?page=bitfire_malware&tooltip=1&BITFIRE_PAGE=MALWARE";
+            window.location = "{{self}}?page=bitfire_malware&tooltip=1";
           } else {
             alert("Dashboard tour complete. Malware scanning is not yet available for this platform.");
           }

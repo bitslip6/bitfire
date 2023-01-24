@@ -20,7 +20,7 @@
 </head>
 <body>
 <div id="block"> <div class="block-bg"></div> <div class="block"> <div class="block-err"> <h1>Halt!</h1> </div>
-<h2>Something went wrong</h2>
+<h2>Something Happened</h2>
 <p class="nor"><?php echo $custom_err?></p>
 <p class="nor">If this is an error, please click the request review button below. Reference ID <i><?php echo $uuid; ?></i></p>
 <a href="#" id="review"> <button type="button" id="review">Request Review</button> </a>

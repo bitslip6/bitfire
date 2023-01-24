@@ -127,6 +127,7 @@
 			<div class="col-12">
 
 
+			<h2><small><a class="text-info" target="_blank" href="https://bitfire.co/support-malware-scanning">Malware Scanner Documentation <i class="fe fe-external-link"></i></a></small></h2>
 			<div class="card">
 			<div class="cover malware"></div>
 			<div class="card-body" style="margin-top:1.5rem;">
@@ -139,7 +140,8 @@
 					BitFire Malware Scanner
 					</span>
 				</strong>
-				<small class="text-muted"><i>(click Scan Files Now to begin)</i></small>
+				<small class="text-muted"><i>(click Scan Files Now to begin)</i>
+				</small>
 				</h2>
 			</div>
 
@@ -180,9 +182,9 @@
 
 <!-- file changed template -->
 <script type="text/template" id="hash_template">
-	<div class="row align-items-center" id="info<%=crc_trim%>">
+	<div class="row align-items-center" id="info<%=unique%>">
 		<div class="col-auto">
-			<img id="icon<%=crc_trim%>" src="{{assets}}/malware.png" width="32" height="32" />
+			<img id="icon<%=unique%>" src="{{assets}}/malware.png" width="32" height="32" />
 		</div>
 		<div class="col ms-n2">
 
@@ -210,13 +212,13 @@
 			</p>
 			
 		</div>
-		<div class="col-auto" id="action_list<%=crc_trim%>">
+		<div class="col-auto" id="action_list<%=unique%>">
 
 				<% if (window.isf) { %>
-				<button style="font-size:.75rem;" id="repair<%=crc_trim%>" onclick="alert('Upgrade to PRO to access 10,000,000 WordPress file data-points and auto repair this file.');"
+				<button style="font-size:.75rem;" id="repair<%=unique%>" onclick="alert('Upgrade to PRO to access 10,000,000 WordPress file data-points and auto repair this file.');"
 				class="lift btn btn-white d-md-inline-block {{showfree_class}}" title="replace this file with the master copy from wordpress.org">
 				<% } else { %>
-				<button style="font-size:.75rem;" id="repair<%=crc_trim%>" onclick="repair_file('<%=file_path%>', '<%=url%>', <%=crc_trim%>, <%=found%>);"
+				<button style="font-size:.75rem;" id="repair<%=unique%>" onclick="repair_file('<%=file_path%>', '<%=url%>', '<%=unique%>', <%=found%>);"
 				class="lift btn btn-white  d-md-inline-block" title="replace this file with the master copy from wordpress.org">
 				<% } %>
 					<img src="{{assets}}check-square.svg" class="success"> Repair
@@ -233,22 +235,22 @@
 				</a>
 				
 				<button style="font-size:.75rem;" role="button" title="show diff for this file"
-				onclick="show_diff('<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', true)" class="lift btn btn-white d-md-inline-block">
+				onclick="show_diff('<%=rel_path%>', '<%=url%>', '<%=unique%>', true)" class="lift btn btn-white d-md-inline-block">
 					<img src="{{assets}}copy.svg" class="secondary"> Diff
 				</button>
 
-				<a href="#diff<%=crc_trim%>" style="font-size:.75rem;" role="button" title="delete this file"
-				onclick="del('<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', <%=found%>)" class="btn btn-white d-md-inline-block">
+				<a href="#diff<%=unique%>" style="font-size:.75rem;" role="button" title="delete this file"
+				onclick="del('<%=name%>', '<%=rel_path%>', '<%=url%>', '<%=crc_trim%>', <%=found%>)" class="btn btn-white d-md-inline-block">
 					<img src="{{assets}}trash.svg" class="secondary"> Delete
 				</a>
 
 		</div>
 	</div>
-	<div class="row diffrow collapse" id="diff_cont<%=crc_trim%>" style="padding:0">
-		<pre id="line_data<%=crc_trim%>" class="mb-0 line_nums"></pre>
+	<div class="row diffrow collapse" id="diff_cont<%=unique%>" style="padding:0">
+		<pre id="line_data<%=unique%>" class="mb-0 line_nums"></pre>
 		<!-- HERE WE NEED TO INJECT malware[1] - highlight malware[3]-->
-		<div id="diff_data<%=crc_trim%>" style="width:93%;font-size:12px;overflow-wrap:anywhere;float:left;" class="mb-0 language-php"><%=markup%></div>
-		<svg style="float:right;cursor:pointer;" title="collapse this diff view" onclick="classtoggle('collapse', '<%=crc_trim%>')" class=""
+		<div id="diff_data<%=unique%>" style="width:93%;font-size:12px;overflow-wrap:anywhere;float:left;" class="mb-0 language-php"><%=markup%></div>
+		<svg style="float:right;cursor:pointer;" title="collapse this diff view" onclick="classtoggle('collapse', '<%=unique%>')" class=""
 		width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" title="collapse code diff view">
 		<g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"/><rect fill="#335EEA" opacity=".3" x="11" y="7" width="2" height="14" rx="1"/><path d="M6.707 14.707a1 1 0 11-1.414-1.414l6-6a1 1 0 011.383-.03l6 5.5a1 1 0 11-1.352 1.474L12.03 9.384l-5.323 5.323z" fill="#335EEA"/><rect fill="#335EEA" opacity=".3" x="3" y="3" width="18" height="2" rx="1"/></g>
 		</svg>
@@ -286,7 +288,7 @@
 <script type="text/javascript">
     window.BITFIRE_NONCE = '{{api_code}}';
 
-	/** called after reapir pro api call */
+	/** called after repair pro api call */
 	function repaired(response) {
 		console.log("repaired", response);
 		if (response.success) {
@@ -335,9 +337,9 @@
 
 	function render_malware(c) {
 		let result = "";
-		result.markup += "<pre><code class='language-php'>" + htmlEscape(c.pre_text) + "</code></pre>";
-		result.markup += "<pre class='evil'><code class='language-php'>🦠 1" + htmlEscape(c.content) + "</code></pre>";
-		result.markup += "<pre><code class='language-php'>" + htmlEscape(c.post_text) + "</code></pre><br><hr><br>";
+		result += "<pre><code class='language-php'>" + htmlEscape(c.pre_text) + "</code></pre>";
+		result += "<pre class='evil'><code class='language-php'>🦠 1" + htmlEscape(c.content) + "</code></pre>";
+		result += "<pre><code class='language-php'>" + htmlEscape(c.post_text) + "</code></pre><br><hr><br>";
 		return result;
 	}
 
@@ -352,7 +354,6 @@
 	var hash_renderer = _.template(hash_content.innerText);
 	var good_content = GBI("good_template");
 	var good_renderer = _.template(good_content.innerText);
-	var list_elms = [];
 	console.log("list: ", file_list);
 
 	// map the list of root files to a list of li elements
@@ -365,10 +366,9 @@
 		for (let i = 0; i < x.malware.length; i++) {
 			x.markup += render_malware(x.malware[i]);
 		}
-		console.log(x.markup);
 		html = hash_renderer(x);
 		let li = document.createElement("li")
-		li.id = "file" + x.crc_trim;
+		li.id = "file" + x.unique;
 		li.name = "an" + x.crc_trim;
 		li.classList.add("list-group-item");
 		li.innerHTML = html;
@@ -489,7 +489,7 @@
 
 				let html = hash_renderer(x);
 				let li = document.createElement("li")
-				li.id = "file" + x.crc_trim;
+				li.id = "file" + x.unique;
 				li.name = "an" + x.crc_trim;
 				li.classList.add("list-group-item");
 				li.innerHTML = html;
@@ -527,8 +527,7 @@
 			// console.log("New item line ELM", elm);
 			//show_diff(elm.file_path, elm.url, elm.crc_trim);
 			let html = malware_to_html(elm.malware);
-			update_diff(html, "", elm.crc_trim, true);
-		});
+			
 		*/
 
 		if (++dir_idx < dirs.length) {
@@ -725,7 +724,6 @@
 					html += "// Local File ADDS Lines: " + ops[i][3] + " - " + last_line + "<br />\n";
 					html2 = "";
 					for (j = ops[i][3]; j < ops[i][4]; j++) {
-						//if (l2[j].includes("/bitfire/startup.php")) { has_diff = false; } // ignore our bitfire include
 						if(1==1) {
 							let evil_line = evil(l2[j]);
 							if (num_replace++ < 100 || evil_line) {
@@ -888,12 +886,12 @@
 		return result;
 	}
 
-	function del(path, url, actual, real) {
+	function del(name, path, url, actual, real) {
 		if (real) { alert("This is a wordpress file.  Please repair it instead."); return; }
 		let result = confirm("Are you sure you want to delete " + path + " ?");
 		if (result) {
 			console.log("delete: " + path); document.getElementById("file" + actual).classList.add("collapse");
-			BitFire_api("delete", {"value": path})
+			BitFire_api("delete", {"value": path, "name": name})
 			.then(e => {
 				console.log(e);
 				alert(e.note);
