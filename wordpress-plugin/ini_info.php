@@ -1,1 +1,0 @@
-<?php $ini_type = "nop";

@@ -18,7 +18,6 @@ use ThreadFin\Effect as Effect;
 use ThreadFin\FileData;
 use ThreadFin\FileMod;
 
-use const BitFire\CONFIG_BLOCK_FILE;
 use const BitFire\FILE_RW;
 use const BitFire\FILE_W;
 use const BitFire\WAF_INI;
@@ -36,6 +35,7 @@ use function ThreadFin\trace;
 use function ThreadFin\debug;
 use function ThreadFin\ends_with;
 use function ThreadFin\error;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial;
 use function ThreadFin\partial_right as BINDR;
@@ -232,8 +232,8 @@ function bitfire_add_menu() {
     $title = ($base_num > 0) ? "Vulnerable Plugins, " : "";
     $base_num += (CFG::disabled("whitelist_enable") || CFG::disabled("require_full_browser")) ? 1 : 0;
     $title = ($base_num > 0) ? "Bot Blocking Disabled, " : "";
-    $base_num += (CFG::disabled("auto_start")) ? 1 : 0;
-    $title = ($base_num > 0) ? "Always On Disabled" : "";
+    //$base_num += (CFG::disabled("auto_start")) ? 1 : 0;
+    //$title = ($base_num > 0) ? "Always On Disabled" : "";
 
     \add_menu_page(
         "BitFire Dashboard",
@@ -247,6 +247,16 @@ function bitfire_add_menu() {
 
     \add_submenu_page(
         "bitfire",
+        "BitFire Bot Control",
+        "Bot Control",
+        "manage_options",
+        "bitfire_botlist",
+        "\BitFire\serve_bot_list",
+        1
+    );
+
+    \add_submenu_page(
+        "bitfire",
         "BitFire Settings",
         "Settings",
         "manage_options",
@@ -254,17 +264,6 @@ function bitfire_add_menu() {
         "\BitFire\serve_settings",
         2
     );
-
-    \add_submenu_page(
-        "bitfire",
-        "BitFire Bot Control",
-        "Bot Control",
-        "manage_options",
-        "bitfire_botlist",
-        "\BitFire\serve_botlist",
-        2
-    );
-
     
     \add_submenu_page(
         "bitfire",
@@ -424,6 +423,8 @@ function create_plugin_alerts($skip_ignored = true) : array {
             $file_mod = new FileMod($cve_plugins_file, en_json($plugins), FILE_W);
             Effect::new()->file($file_mod)->run();
         }
+        // no plugins found?  odd...
+        if (empty($plugins)) { return $result; }
 
         //global $wp;
         //$self = add_query_arg($wp->query_vars, home_url($wp->request));
@@ -492,10 +493,12 @@ function alerts() {
         $url = admin_url("admin.php?page=bitfire_settings#bot_handling");
         show_alert("warning", "<div style='display:flex;flex-direction:row;justify-content:space-between;'><span><a href='$url'>BitFire Settings</a> : Bot blocking is not fully enabled.  Please enable <strong>whitelist</strong> and <strong>full browser required</strong> to block hacking bots.</span> <a href='{$current_url}bitfire_nag_ignore=1'>&#10006; Dismiss</a></div>");
     }
+    /*
     if (CFG::disabled("auto_start")) {
         $url = admin_url("admin.php?page=bitfire_settings");
         show_alert("warning", "<div style='display:flex;flex-direction:row;justify-content:space-between;'><span><a href='$url'>BitFire Settings</a> : <strong>Always-On protection</strong> needs to be enabled to prevent direct plugin attacks. </span> <a href='{$current_url}bitfire_nag_ignore=1'>&#10006; Dismiss</a></div>");
     }
+    */
     if (strlen(CFG::str("pro_key")) > 20) {
         if (CFG::disabled("rasp_filesystem")) {
             $url = admin_url("admin.php?page=bitfire_advanced");
@@ -620,7 +623,7 @@ function dashboard_content() {
 
     // load all alert data
     $url = admin_url("admin.php?page=bitfire");
-    $block_file = \ThreadFin\FileData::new(CFG::file(CONFIG_BLOCK_FILE))
+    $block_file = \ThreadFin\FileData::new(get_hidden_file("blocks.json"))
         ->read()
         ->map('\ThreadFin\un_json');
     $blocking_full = $block_file->lines;
@@ -654,7 +657,7 @@ if (!is_admin()) {
     return;
 }
 
-add_action("upgrader_process_complete", "\BitFirePlugin\upgrade");
+//add_action("upgrader_process_complete", "\BitFirePlugin\upgrade");
 
 add_action("admin_enqueue_scripts", "\BitFirePlugin\bitfire_styles");
 

@@ -19,7 +19,7 @@ if (! defined('WP_UNINSTALL_PLUGIN')) {
 }
 
 
-if ($_REQUEST['slug'] === "bitfire") {
+if ($_REQUEST['slug']??'' === "bitfire") {
 
 
 	// make sure the user has at least admin credentials

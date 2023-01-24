@@ -73,6 +73,7 @@ use function ThreadFin\http2;
 use function ThreadFin\httpp;
 use function ThreadFin\icontains;
 use function ThreadFin\ip_to_country;
+use function ThreadFin\parse_ini;
 use function ThreadFin\un_json;
 
 // If this file is called directly, abort.
@@ -81,7 +82,7 @@ if ( ! defined( "WPINC" ) ) { die(); }
 // upgrade from standalone firewall to plugin
 if (defined("BitFire\TYPE") && \BitFire\TYPE == "STANDALONE") { 
     require_once \BitFire\WAF_SRC."server.php";
-    standalone_to_wordpress()->run();
+    standalone_to_wordpress();
 }
 
 /**
@@ -215,11 +216,14 @@ function find_cms_root() : ?string {
  */
 function activate_bitfire() {
     trace("wp_act");
+    $config = parse_ini();
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
+    // make sure the config loader has run
+
     $file_name = ini_get("auto_prepend_file");
     if (contains($file_name, "bitfire")) {
         $base_dir = realpath(dirname($file_name));
-        CacheStorage::get_instance()->save_data("parse_ini2", null, -86400);
+        CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
         \BitFireSvr\uninstall()->run();
         sleep(1);
         \BitFireSvr\update_ini_value("rm_bitfire", $base_dir)->hide_output()->run();
@@ -231,10 +235,21 @@ function activate_bitfire() {
         \BitFirePlugin\upgrade();
     }
 
+    if (defined('WP_CONTENT_DIR') && file_exists('WP_CONTENT_DIR')) {
+        mkdir(WP_CONTENT_DIR . "/bitfire", 0775, false);
+    }
+
     // install data can be verbose, so redirect to install log
-    \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
+    \BitFire\Config::set_value("debug_file", true); 
     \BitFire\Config::set_value("debug_header", false);
-    $effect = \BitfireSvr\bf_activation_effect()->hide_output()->run();
+    \BitfireSvr\bf_activation_effect()->hide_output()->run();
+
+    ob_end_clean();
+
+
+
+
+
     debug(trace());
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
@@ -247,7 +262,7 @@ function activate_bitfire() {
 function deactivate_bitfire() {
     trace("deactivate");
     // install data can be verbose, so redirect to install log
-    \BitFire\Config::set_value("debug_file", \BitFire\WAF_ROOT . "install.log");
+    \BitFire\Config::set_value("debug_file", true);
     \BitFire\Config::set_value("debug_header", false);
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
     \BitFireSvr\bf_deactivation_effect()->hide_output()->run();
@@ -517,13 +532,16 @@ if (CFG::enabled("block_xmlrpc")) {
     \add_filter("xmlrpc_enabled", function(){ return false; });
 }
 // make sure users have the correct capabilities
-add_filter("user_has_cap", "BitFirePlugin\check_user_cap", 10, 4);
+//add_filter("user_has_cap", "BitFirePlugin\check_user_cap", 10, 4);
  
 // todo: move this to -admin
 \register_activation_hook(__FILE__, 'BitFirePlugin\activate_bitfire');
 \register_deactivation_hook(__FILE__, 'BitFirePlugin\deactivate_bitfire');
 
 $i = BitFire::get_instance();
+if (!$i->inspected) {
+    $i->inspect();
+}
 $r = $i->_request;
 if ($i->bot_filter) {
     $br = $i->bot_filter->browser;
@@ -531,7 +549,7 @@ if ($i->bot_filter) {
      * if browser verification is in reporting mode, we need to append the JavaScript
      * and NOT block the request.
      */
-    if (!$br->bot && CFG::is_report(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
+    if (isset($br) && !$br->bot && CFG::is_report(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
         if ($br->valid < 2) {
             debug("Bot Checking: [%s/%s] (%d)", $br->browser, $br->ver, $br->valid);
             // we may have to check this here if we are not running in always on mode
@@ -591,6 +609,7 @@ if (function_exists('BitFirePRO\wp_requirement_check') && !wp_requirement_check(
     die("Invalid request");
 }
 
+/*
 if (isset($_GET['backup'])) {
     $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
     mkdir(CFG::str("cms_content_dir") . "/bitfire", 0775, true);
@@ -599,17 +618,20 @@ if (isset($_GET['backup'])) {
         copy($x, $dst);
     });
 }
+*/
 
 // todo: move to -admin
 // if the plugin is updating, make sure the files are readable and configs are backed up
+/*
 if (isset($_POST['action']) && isset($_POST['slug']) && $_POST['action'] == "update-plugin" && $_POST['slug'] == "bitfire") {
     // only allow making files readable if upgrading and user is an admin
-    if (is_admin()) {
-        $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
-        array_walk($backup_list, function($x) {
-            $dst = CFG::str("cms_content_dir") . "/bitfire/" . basename($x);
-            copy($x, $dst);
-    });
+    // TODO: HIDDEN FIX
+        if (is_admin()) {
+            $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
+            array_walk($backup_list, function($x) {
+                $dst = CFG::str("cms_content_dir") . "/bitfire/" . basename($x);
+                copy($x, $dst);
+        });
 
         debug("prep bitfire permissions for upgrade");
         \ThreadFin\file_recurse(WAF_ROOT, function($file) {
@@ -632,4 +654,5 @@ if (isset($_POST['action']) && isset($_POST['slug']) && $_POST['action'] == "upd
         debug("only admins can prep bitfire permissions");
     }
 }
+*/
 

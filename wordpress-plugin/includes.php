@@ -17,7 +17,7 @@ use function ThreadFin\ends_with;
 use function ThreadFin\find_const_arr;
 use function ThreadFin\find_fn;
 
-define("\BitFire\\CMS_INCLUDED", true);
+define("BitFire\\CMS_INCLUDED", true);
 
 const ENUMERATION_FILES = ["readme.txt", "license.txt"];
 const PLUGIN_DIRS = ["/plugins/", "/themes/"];
