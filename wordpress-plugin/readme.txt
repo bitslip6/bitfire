@@ -4,7 +4,7 @@ Donate link: http://bitfire.co/pricing
 Tags: security, firewall, malware scanner, waf, rasp, anti-virus, antivirus, secure, virus, hacked, authentication, backups
 Requires at least: 4.0.1
 Tested up to: 6.1.1
-Stable tag: __VERSION__
+Stable tag: 3.6.5
 Requires PHP: 7.1
 License: AGPLv3 or later
 License URI: https://www.gnu.org/licenses/agpl-3.0.en.html
@@ -22,6 +22,24 @@ BitFire integrates WordPress directly with your operating system to add native s
 BitFire RASP also monitors which plugin actions are correctly doing permission checks to dynamically add the correct permission checks and patch plugin vulnerabilities that are currently unknown.
 
 Armed with the fastest malware scanner available today and the most complete bad bot blocking available for WordPress, BitFire is the next generation security plugin that actually prevents your site from falling victim to the next WordPress hack.
+
+#### Comparison with WordFence ####
+WordFence is the most popular choice for WordPress security.  How does BitFire compare to the market leader?
+Read a point by point comparison
+
+**[WordFence VS BitFire](https://bitfire.co/EN/wordfence-vs-bitfire)**
+
+== Screenshots ==
+
+1. BitFire shows detailed graphs about the type of attacks your website is defending.
+2. Bot Control page allows instant authenitcation of over 600 known bots.
+3. Detailed malware scanner contains over 20 million data-points and scans 10,000 PHP files per minute.
+4. View detailed block and alerting information about each request, add blocking exceptions with a single click.
+5. Database malware scanner with backup and restore points can identify malware comments and posts from over 2.5 million domains.
+6. Plugin monitoring alerts you within the hour when new plugin vulnerabilities effecting your site are released so you can stay on top of important security updates.
+7. Simple on/off configuration with granular rules can be set to alert to test new rules before actually blocking.
+
+
 
 #### Core Features ####
 * **[Runtime Application Self-Protection](https://en.wikipedia.org/wiki/Runtime_application_self-protection)** prevents the most severe vulnerabilities from being exploited. (PHP file modification, Admin account creation, Redirects, etc).
@@ -142,16 +160,35 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 
 
-== Screenshots ==
-
-1. BitFire shows detailed graphs about the type of attacks your website is defending.
-2. View detailed block and alerting information about each request, add blocking exceptions with a single click.
-3. Detailed malware scanner contains over 20 million data-points and scans 10,000 PHP files per minute.
-4. Simple on/off configuration with granular rules can be set to alert to test new rules before actually blocking.
-5. Database malware scanner with backup and restore points can identify malware comments and posts from over 2.5 million domains.
-6. Plugin monitoring alerts you within the hour when new plugin vulnerabilities effecting your site are released so you can stay on top of important security updates.
-
 == Changelog ==
+
+= 3.6.4 =
+ * improved malware detection
+ * improved support for some smaller hosting providers
+ * improved bot authentication during learning
+
+= 3.6.3 =
+ * various PHP warning fixes
+
+= 3.6.2 =
+ * Improve support for WordPress installs in path sub directory
+ * Performance improvent for user capability check
+ * Small warning fixes for PHP 8.1
+
+= 3.6.1 =
+ * New bot control management page
+ * Improved settings and RASP configuration
+ * Improved upgraede process to keep all config data between upgrades, re-installs
+ * New hidden (secret) file support for nginx without modifiying file permissions
+   (configuration data is now stored in a random hashed directory)
+ * Small bug fixes on malware scanning for files in root directory
+ * Improved support for PHP 7.2
+
+= 3.5.3 =
+ * Added over 600 known bots with network identification
+ * Improved malware scanning support for unknown files
+ * Added additional scan locations
+ * Added JavaScript malware scanning
 
 = 3.0.8 =
  * Database Malware Scanner Support

@@ -165,12 +165,12 @@ function admin_init() {
     $rm_path = CFG::str("rm_bitfire");
     if ($rm_path) {
         // need
-        debug("PURGE $rm_path");
+        debug("PURGE %s", $rm_path);
         // remove old bitfire directory, if it exists
         // TODO: improve this....
         if (ends_with($rm_path, "bitfire") && !contains(ini_get("auto_prepend_file"), $rm_path)) { 
             if (file_exists($rm_path) && file_exists("{$rm_path}/startup.php")) {
-                debug("EXEC PURGE $rm_path");
+                debug("EXEC PURGE %s", $rm_path);
                 file_recurse($rm_path, function($x) {
                     if (is_dir($x)) {
                         $r = chmod($x, 0775);
@@ -525,22 +525,29 @@ function show_alert(string $type, string $notice, string $id="") {
 
 function upgrade($upgrade=null, $extra=null) {
     // restore the old configurations
+    // nothing to do on upgrade now...
+    /*
     $old_config = CFG::str("cms_content_dir") . "/bitfire/config.ini";
     if (file_exists($old_config)) {
         @chmod(WAF_INI, FILE_RW);
         rename($old_config, WAF_INI);
     }
     $restore_list = glob(CFG::str("cms_content_dir") . "/bitfire/*");
-    array_walk($restore_list, function($x) {
-        $n = basename($x);
-        chmod(WAF_ROOT."cache/$n", FILE_RW);
-        rename($x, WAF_ROOT."cache/$x");
-    });
-    $dir_name = CFG::str("cms_content_dir") . "/bitfire";
-    if (file_exists($dir_name)) {
-        @chmod($dir_name, FILE_RW);
-        @rmdir($dir_name);
+    if (count($restore_list) > 0) {
+        array_walk($restore_list, function($x) {
+            $n = basename($x);
+            chmod(WAF_ROOT."cache/$n", FILE_RW);
+            rename($x, WAF_ROOT."cache/$x");
+        });
     }
+    $dir_name = CFG::str("cms_content_dir") . "/bitfire";
+    if (count($dir_name) > 0) {
+        if (file_exists($dir_name)) {
+            @chmod($dir_name, FILE_RW);
+            @rmdir($dir_name);
+        }
+    }
+    */
 }
 
 function user_columns($columns = []) {
