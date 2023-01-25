@@ -49,9 +49,11 @@
   background-color: rgba(0,0,0,0.8) !important;
 }
 
+/*
 .secondary { filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%); }
 .success { filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%); }
 .warning { filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%); }
+*/
 
 #status_line {
 	display: flex;
@@ -224,7 +226,7 @@
 					<img src="{{assets}}check-square.svg" class="success"> Repair
 				</button>
 
-				<button style="font-size:.75rem;" onclick="BitFire_api_call('allow', {'path':'<%=crc_path%>', 'filename':'<%=file_path%>', 'trim':'<%=crc_trim%>'}, allowed);"
+				<button style="font-size:.75rem;" onclick="BitFire_api_call('allow', {'path':'<%=crc_path%>', 'filename':'<%=file_path%>', 'unique': '<%=unique%>', 'trim':'<%=crc_trim%>'}, allowed);"
 				class="lift btn btn-white  d-md-inline-block" title="Mark this exact file as fine and remove this version from future scans">
 					<img src="{{assets}}check-square.svg" class="warning"> Allow
 				</button>
@@ -304,10 +306,10 @@
 	function allowed(response) {
 		console.log("allowed", response);
 		if (response.success) {
-			let e = document.getElementById("action_list" + response.data.id);
+			let e = document.getElementById("action_list" + response.data.unique);
 			e.innerHTML = "<h3 class='text-primary btn'>File Allowed</h3>";
-			e = document.getElementById("diff_cont" + response.data.id).classList.add("collapse");
-			document.getElementById("icon" + response.data.id).src = "https://bitfire.co/assets/php-file.png";
+			e = document.getElementById("diff_cont" + response.data.unique).classList.add("collapse");
+			document.getElementById("icon" + response.data.unique).src = "https://bitfire.co/assets/php-file.png";
 		} else {
 			alert("unable to allow file: " + response.note);
 		}
@@ -423,103 +425,77 @@
 
 	var hash_dir_handler = function (response) {
 
-		console.log("hash handler", response);
-		let new_files = JSON.parse(atob(response.data.data));
+		//console.log("hash handler", response.data);
+		if (!response.data.success) {
+			console.error(response);
+		} else {
+			let new_files = JSON.parse(atob(response.data.data));
 
-		G_CHANGED.total += response.data.file_count;
-		G_CHANGED.malware += new_files.length;
-		/*
-		if (response.known) {
-			G_CHANGED["changed-ok"] = response.data.file_count - new_files.length;
-		}
+			G_CHANGED.total += parseInt(response.data.file_count);
+			G_CHANGED.malware += new_files.length;
+			
+			let content = GBI("hash_template");
+			let hash_renderer = _.template(content.innerText);
+			let frag = new DocumentFragment();
 
-		let cf = GBI("count_files"); // todo fix small bypass here
-		if (cf) {
-			let cnt = parseInt(cf.getAttribute("data-count"));
-			if (cnt > 0) {
-				let cnt2 = parseInt(response.data.file_count);
-				if (cnt2 > 0) {
-					let ncnt = cnt + cnt2;
-					cf.setAttribute("data-count", ncnt);
-					cf.innerText = "(" + ncnt + ") Scanned Files";
-					update_percent();
+			if (response.data.hit_count == 0) { 
+				type = "core";
+				if (response.data.dir.indexOf("/plugins/") > 1) { type = "plugin"; }
+				else if (response.data.dir.indexOf("/themes/") > 1) { type = "theme"; }
+				//alert("unknown "+ type + " file found: " + response. data.basename);
+			}
+			if (new_files && new_files.length > 0) {
+
+				var list_elms = _.map(new_files, function (x) {
+					x.self_url = surl;
+					// console.log(x);
+
+			G_CHANGED.malware++;
+			x.markup = "";
+			for (let i = 0; i < x.malware.length; i++) {
+				let c = x.malware[i];
+				let p = Prism.highlight(c.pre_text, Prism.languages.php).replaceAll("\n", "<br>");
+				let e = Prism.highlight(c.content, Prism.languages.php).replaceAll("\n", "<br>");
+				let r = Prism.highlight(c.post_text, Prism.languages.php).replaceAll("\n", "<br>");
+
+				x.markup += "<span>" + p + "</span><span class='evil'>🦠"+e+"</span><span>"+r+"</span><br><hr>\n";
+			}
+
+
+					let html = hash_renderer(x);
+					let li = document.createElement("li")
+					li.id = "file" + x.unique;
+					li.name = "an" + x.crc_trim;
+					li.classList.add("list-group-item");
+					li.innerHTML = html;
+					return li;
+
+				});
+
+				//console.log(list_elms);
+				//console.log(frag);
+				for (let i=0; i<list_elms.length; i++) {
+					let elm=list_elms[i];
+
+					//console.log(elm);
+					frag.appendChild(elm);
 				}
-			}
-		} else {
-			console.error("FAIL NO count_files element", cf);
-		}
-		*/
+			} else {
+				console.log("dump hash dir good hashes");
 
-		/*
-		// TODO: replace the info includes to a bool test
-		unknown_files = new_files.filter(function (x) {
-			return (x.r == "MISS") ? false : true;
-		});
-		if (unknown_files.length < new_files) { alert("unknown plugin: " + response.basename); }
-		*/
+				var good_content = GBI("good_template");
+				var good_renderer = _.template(good_content.innerText);
+				var good_plugin = {"table":"plugin", "name":response.data.basename, "num_files": response.data.file_count};
 
-
-		let content = GBI("hash_template");
-		let hash_renderer = _.template(content.innerText);
-		let frag = new DocumentFragment();
-
-		if (response.data.hit_count == 0) { 
-			type = "core";
-			if (response.data.dir.indexOf("/plugins/") > 1) { type = "plugin"; }
-			else if (response.data.dir.indexOf("/themes/") > 1) { type = "theme"; }
-			//alert("unknown "+ type + " file found: " + response. data.basename);
-		}
-		if (new_files && new_files.length > 0) {
-
-			var list_elms = _.map(new_files, function (x) {
-				x.self_url = surl;
-				// console.log(x);
-
-		G_CHANGED.malware++;
-		x.markup = "";
-		for (let i = 0; i < x.malware.length; i++) {
-			let c = x.malware[i];
-			let p = Prism.highlight(c.pre_text, Prism.languages.php).replaceAll("\n", "<br>");
-			let e = Prism.highlight(c.content, Prism.languages.php).replaceAll("\n", "<br>");
-			let r = Prism.highlight(c.post_text, Prism.languages.php).replaceAll("\n", "<br>");
-
-			x.markup += "<span>" + p + "</span><span class='evil'>🦠"+e+"</span><span>"+r+"</span><br><hr>\n";
-		}
-
-
-				let html = hash_renderer(x);
 				let li = document.createElement("li")
-				li.id = "file" + x.unique;
-				li.name = "an" + x.crc_trim;
-				li.classList.add("list-group-item");
-				li.innerHTML = html;
-				return li;
-
-			});
-
-			//console.log(list_elms);
-			//console.log(frag);
-			for (let i=0; i<list_elms.length; i++) {
-				let elm=list_elms[i];
-
-				//console.log(elm);
-				frag.appendChild(elm);
+				li.innerHTML = good_renderer(good_plugin);
+				frag.appendChild(li);
 			}
-		} else {
-			console.log("dump hash dir good hashes");
+			//console.log(frag);
 
-			var good_content = GBI("good_template");
-			var good_renderer = _.template(good_content.innerText);
-			var good_plugin = {"table":"plugin", "name":response.data.basename, "num_files": response.data.file_count};
-
-			let li = document.createElement("li")
-			li.innerHTML = good_renderer(good_plugin);
-			frag.appendChild(li);
+			GBI("files_ul").appendChild(frag);
+			update_times();
 		}
-		//console.log(frag);
-
-		GBI("files_ul").appendChild(frag);
-		update_times();
 
 
 		/*

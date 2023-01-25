@@ -11,11 +11,6 @@
 .slide-up { height: 0px; transition: height 0.25s linear;}
 .slide-up.open { height: auto; transition: height 0.5s linear;}
 .zup { z-index: 100 }
-/*
-.secondary { filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%); }
-.success { filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%); }
-.warning { filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%); }
-*/
 
 /* Tooltip text */
 .tooltipA .tooltip-text {

@@ -4,6 +4,9 @@
   ul.dropdown-menu li a { color: #6e84a3; }
   ul.dropdown-menu li a:hover { color: #122637; }
   [class^=col-] { margin: 0 !important; }
+  .secondary { filter: invert(52%) sepia(31%) saturate(365%) hue-rotate(176deg) brightness(92%) contrast(92%); }
+  .success { filter: invert(65%) sepia(41%) saturate(4358%) hue-rotate(112deg) brightness(101%) contrast(101%); }
+  .warning { filter: invert(91%) sepia(98%) saturate(899%) hue-rotate(321deg) brightness(100%) contrast(93%); }
 </style>
 <style>
 thead.details th, th { font-size: 12px; }
@@ -311,6 +314,9 @@ do not block good traffic before flipping the rule to block mode.
         </div>
         <div class="avatar-xs left">
           <img src="https://bitfire.co/assets/flags/<%= country_img %>" alt="<%- country_alt %>" width="24" class="avatar-img rounded-circle" title="<%= flag_title%>"/>
+        </div>
+        <div class="avatar-xs left">
+          <img src="{{assets}}bell-ring.svg" alt="review icon" width="24" title="<%-block.review_name%>" class="<%-block.review_class%> success" />
         </div>
       </div>
       </td>
