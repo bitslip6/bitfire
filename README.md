@@ -13,7 +13,8 @@
 <p align="center">
   <a href="https://bitfire.co/">
     <img src="firewall/views/bitslip.png" alt="Logo" width="80" height="80">
-  <h2 align="center">BitFire RASP Firewall for PHP</h2> </a>
+    </a>
+  <h2 align="center"><a href="https://bitfire.co/">BitFire RASP Firewall for PHP</a></h2>
 
 
   <p align="center">
