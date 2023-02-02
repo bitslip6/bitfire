@@ -103,7 +103,7 @@ function wp_parse_define(string $file) : array {
 function wp_fetch_salt(string $root, string $scheme) : string {
 	$scheme = strtoupper($scheme);
 	$defines = wp_parse_define("$root/wp-config.php");
-	if (!isset($defines["{$scheme}_KEY"])) { debug("auth define [$scheme] missing"); return ""; }
+	if (!isset($defines["{$scheme}_KEY"])) { debug("auth define [%s] missing", $scheme); return ""; }
 	return $defines["{$scheme}_KEY"] . $defines["{$scheme}_SALT"];
 }
 
@@ -205,7 +205,7 @@ function temp_lock_dir(string $content_path) {
     if (function_exists("\BitFire\lock_site_dir")) {
         \BitFire\lock_site_dir($content_path, false);
         register_shutdown_function(function() use($content_path) {
-            debug("shutdown called re-lock: [$content_path]");
+            debug("shutdown called re-lock: [%s]",$content_path);
             \BitFire\lock_site_dir($content_path, true);
         });
     }

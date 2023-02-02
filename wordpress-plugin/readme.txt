@@ -17,17 +17,51 @@ Best RASP firewall for WordPress. Stop malware, redirects, back-doors and accoun
 
 Protect yourself from 0-day threats with security processes, not just signatures.
 
-BitFire integrates WordPress directly with your operating system to add native security checks for security sensitive operations across all plugins and themes. BitFire makes it impossible for non-administrators to alter your PHP files no matter how bad the security flaws on your website. BitFire also monitors database access preventing unauthorized account take over and permission exploitation.
+*Infected with malware?*
+BitFire malware scanner has one of the highest malware detection rates in the industry.
+Most malware scans take less than 60 seconds. See the data:
+**[WordPress Malware Detection Rates vs WordFence](https://medium.com/@cory_67329/wordpress-malware-removal-product-comparison-top-5-4d53c60c65eb#707a)
 
-BitFire RASP also monitors which plugin actions are correctly doing permission checks to dynamically add the correct permission checks and patch plugin vulnerabilities that are currently unknown.
+*Complete Bot protection*
+Automated scanning tools make up 99.99% of all WordPress hacks.
+BitFire is the only WordPress security plugin that tracks every bot on your website.
+We compare each bot visit against a list of 600 known good bots and only allow them if their IP address is valid. 
+This prevents hackers from impersonating good bots like GoogleBot and bypassing your security.
+See every bot accessing your site and approve or deny it.
 
-Armed with the fastest malware scanner available today and the most complete bad bot blocking available for WordPress, BitFire is the next generation security plugin that actually prevents your site from falling victim to the next WordPress hack.
+*Integrated human verification*
+BitFire integrates a free human verification system that validates your visitors are real humans.
+Using integrated JavaScript, humans can only access your website after answering a JavaScript challenge.
+This works similar to cloudflair human verification but is much faster, usually < 100 milliseconds.
+
+Human verification is important to block hackers since many automated hacking tools impersonate
+web browsers. BitFire stops all of these from accessing your website.
+
+*Runtime Application Self Protection*
+BitFire is the only RASP firewall for WordPress.
+*[How RASP works from checkpoint](https://www.checkpoint.com/cyber-hub/cloud-security/what-is-runtime-application-self-protection-rasp/)
+Integrated directly with WordPress and your webserver, bitfire stops malware before it can infect your site.
+
+*RASP File Protection*
+File-Protection runs anytime a PHP file is attempted to be modified on your server.
+BitFire intercepts the write and verifies that a valid site administrator is modifying the file and not a hacker.
+This prevents any malware from infecting your site  even if the firewall missed it.
+
+*RASP Database Protection*
+Database-Protection monitors SQL queriers to your WordPress database.
+Anytime data is attempted to be modified BitFire inspects the tables being updated.
+If the query is attempting to create a new user or update permissions to administrator level,
+BitFire will block the query unless the user is logged in as an administrator.
+
+This defeats any attempt by hackers to install backdoor accounts onto your server.
+
+*RASP Network Protection*
+Last, BitFire RASP intercepts all network requests from your webserver to the Internet.
+BitFire blocks all Server Side Request Forgery attempts, stops all Time Of Use, Time of Check attacks (TOUTOC) and prevents your server from talking to a malware command and control servers.
+
 
 #### Comparison with WordFence ####
-WordFence is the most popular choice for WordPress security.  How does BitFire compare to the market leader?
-Read a point by point comparison
-
-**[WordFence VS BitFire](https://bitfire.co/EN/wordfence-vs-bitfire)**
+WordFence is the most popular choice for WordPress security.  How does BitFire compare to the market leader?  **[WordFence VS BitFire](https://bitfire.co/EN/wordfence-vs-bitfire)**
 
 == Screenshots ==
 
@@ -102,7 +136,7 @@ The BitFire firewall was started as a custom security solution in 2018 for a
 small group of WordPress sites by Cory Marsh. Bringing his 20 years of 
 enterprise security knowledge and software architecture experience to create the first RASP for WordPress. We had a vision of bringing real enterprise 
 grade security solutions to the millions of websites running WordPress. After 
-almost 5 years of development and countless late nights we are finally ready 
+almost 4 years of development and countless late nights we are finally ready 
 to offer the highest quality security product available to the WordPress 
 community at large. We receiving initial funding in late 2022 we are now officially launching!
 
@@ -162,6 +196,14 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 == Changelog ==
 
+= 3.7.1 =
+ * reduce malware false positives
+ * added detection for image include malware
+ * improved machine learning dataset
+ * added __wakeup() handlers for all classes with magic methods to prevent inclusion in POP chain
+ * improved bot listing formatting to support longer data formats
+ * better handling of some server temporary failures (filesystem, network, etc)
+
 = 3.6.4 =
  * improved malware detection
  * improved support for some smaller hosting providers
@@ -172,14 +214,14 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 = 3.6.2 =
  * Improve support for WordPress installs in path sub directory
- * Performance improvent for user capability check
+ * Performance improvement for user capability check
  * Small warning fixes for PHP 8.1
 
 = 3.6.1 =
  * New bot control management page
  * Improved settings and RASP configuration
- * Improved upgraede process to keep all config data between upgrades, re-installs
- * New hidden (secret) file support for nginx without modifiying file permissions
+ * Improved upgrade process to keep all config data between upgrades, re-installs
+ * New hidden (secret) file support for nginx without modifying file permissions
    (configuration data is now stored in a random hashed directory)
  * Small bug fixes on malware scanning for files in root directory
  * Improved support for PHP 7.2

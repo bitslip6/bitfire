@@ -126,6 +126,8 @@ class CacheStorage implements Storage {
      */
     public function save_data(string $key_name, $data, int $seconds, int $priority = 32) : bool {
         assert(self::$_type !== null, "must call set_type before using cache");
+        if(!is_array($data) && !is_string($data) && !is_null($data)) { debug("store invalid data (%s)[%s]", $key_name, $data); return false; }
+
         $storage = array($key_name, $data);
         switch (self::$_type) {
             case "shm":
@@ -138,11 +140,17 @@ class CacheStorage implements Storage {
             case "opcache":
                 // don't op cache metrics
                 if (strpos($key_name, "metric") !== false) { return false; }
-
-                $s = var_export($storage, true);
-                $exp = time() + $seconds; 
-                $data = "<?php \$value = $s; \$priority = $priority; \$success = (time() < $exp);";
-                return file_put_contents($this->key2name($key_name), $data, LOCK_EX) == strlen($data);
+                $object_file = $this->key2name($key_name);
+                if ($data === null) { 
+                    if (file_exists($object_file)) {
+                        return unlink($this->key2name($key_name));
+                    }
+                } else {
+                    $s = var_export($storage, true);
+                    $exp = time() + $seconds; 
+                    $data = "<?php \$value = $s; \$priority = $priority; \$success = (time() < $exp);";
+                    return file_put_contents($object_file, $data, LOCK_EX) == strlen($data);
+                }
             default:
                 return false;
         }
@@ -252,7 +260,7 @@ class CacheStorage implements Storage {
             assert(is_array($data) || is_string($data), "$key_name generator returned invalid data (" . gettype($data) . ")");
             $this->save_data($key_name, $data, $ttl);
         }
-        assert(is_array($data) || is_string($data), "$key_name cache returned invalid data (" . gettype($data) . ")");
+        // assert(is_array($data) || is_string($data), "$key_name cache returned invalid data (" . gettype($data) . ")");
         return $data;
     }
 

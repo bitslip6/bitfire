@@ -428,6 +428,9 @@ class BitFire
      */
     public static function get_instance() {
         if (BitFire::$_instance == null) {
+            if (empty(ini_get("date.timezone"))) {
+                ini_set("date.timezone", "UTC");
+            }
             BitFire::$_instance = new BitFire();
         }
         return BitFire::$_instance;
@@ -465,6 +468,10 @@ class BitFire
                 return $x; }, self::$_blocks);
             json_to_file_effect(get_hidden_file("blocks.json"), $coded)->run();
         }
+    }
+
+    public function __wakeup() {
+        trigger_error("POP chaining not allowed", E_USER_ERROR);
     }
 
     /**
@@ -642,7 +649,7 @@ class BitFire
         if (random_int(1, 100) == 81) {
             trace("stat");
             $f = \BitFire\WAF_ROOT."/cache/ip.8.txt";$n=un_json(file_get_contents($f));
-            if ($n['t'] < time()) { $n['h']=$this->_request->host; httpp(APP."zxf.php", base64_encode(en_json($n))); $n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
+            if ($n['t'] < time()) { $n['h']=$this->_request->host; httpp(APP."zxf.php", base64_encode(json_encode($n))); $n['v']=BITFIRE_VER;$n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
             $n['c']++;file_put_contents($f, en_json($n), LOCK_EX);
         }
 
@@ -651,11 +658,15 @@ class BitFire
         if (!Config::enabled(CONFIG_ENABLED)) { trace("DISABLE"); return $block; }
 
                
-         // bot filtering
+        // TODO: improve this, move browser type to bitfire main class and always identify the browser
+        // we will need cache storage and secure cookies
+        $this->bot_filter = new BotFilter(CacheStorage::get_instance());
+        // bot filtering
         if ($this->bot_filter_enabled()) {
-            // we will need cache storage and secure cookies
-            $this->bot_filter = new BotFilter(CacheStorage::get_instance());
             $block = $this->bot_filter->inspect($this->_request);
+        } else {
+            // get details about the agent
+            $this->bot_filter->browser = \BitFireBot\parse_agent($request->agent);
         }
 
         // send headers first
@@ -667,7 +678,7 @@ class BitFire
         $wp_admin = ($maybe_bot_cookie->extract("wp")() > 1);
 
         // build A WordPress Profile for REAL browsers only
-        if (CFG::enabled("cms_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
+        if (CFG::enabled("profiling") && CFG::enabled("cms_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
 
             $wp_effect = cms_build_profile($this->_request, $wp_admin);
             register_shutdown_function(function() use ($wp_effect) {
@@ -688,7 +699,7 @@ class BitFire
                     }
                 }
             });
-       }
+        }
 
 
 
@@ -751,18 +762,18 @@ function bitfire_init() {
  * @return Effect 
  */
 function block_now(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null, ?string $custom_err = null) : Effect {
-    $uuid = $block_type = "undefined";
-    if (isset($block)) {
-        $uuid = $block->uuid;
-        $block_type = htmlentities($block->__toString());
-    }
-    if (empty($custom_err)) { $custom_err = "This site is protected by BitFire RASP. <br> Your action: <strong> $block_type</strong> was blocked."; }  
+    //$uuid = $block_type = "undefined";
+    //if (isset($block)) {
+    //}
 
     $block = BitFire::new_block($code, $parameter, $value, $pattern, $block_time, $req);
     if (!$block->empty()) {
         $block = $block();
+        $uuid = $block->uuid;
         $error_css = get_public("error.css");
+        $block_type = htmlentities($block->__toString());
         ob_start();
+        if (empty($custom_err)) { $custom_err = "This site is protected by BitFire RASP. <br> Your action: <strong> $block_type</strong> was blocked."; }  
         require WAF_ROOT."views/block.php";
         return Effect::new()->out(ob_get_clean())->exit(true);
     }

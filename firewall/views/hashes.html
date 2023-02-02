@@ -231,7 +231,7 @@
 					<img src="{{assets}}check-square.svg" class="warning"> Allow
 				</button>
 
-				<a style="font-size:.75rem;" href="<%=self_url%>&filename=<%=rel_path%>&BITFIRE_API=download&BITFIRE_NONCE={{secret}}"
+				<a style="font-size:.75rem;" href="<%=self_url%>?filename=<%=rel_path%>&BITFIRE_API=download&BITFIRE_NONCE={{api_code}}"
 				class="lift btn btn-white d-md-inline-block" title="download this file">
 					<img src="{{assets}}download.svg" class="secondary"> Download
 				</a>
@@ -340,7 +340,7 @@
 	function render_malware(c) {
 		let result = "";
 		result += "<pre><code class='language-php'>" + htmlEscape(c.pre_text) + "</code></pre>";
-		result += "<pre class='evil'><code class='language-php'>🦠 1" + htmlEscape(c.content) + "</code></pre>";
+		result += "<pre class='evil'><code class='language-php'>🦠" + htmlEscape(c.content) + "</code></pre>";
 		result += "<pre><code class='language-php'>" + htmlEscape(c.post_text) + "</code></pre><br><hr><br>";
 		return result;
 	}
@@ -431,8 +431,9 @@
 		} else {
 			let new_files = JSON.parse(atob(response.data.data));
 
-			G_CHANGED.total += parseInt(response.data.file_count);
-			G_CHANGED.malware += new_files.length;
+			let checked_files = parseInt(response.data.file_count);
+			if (checked_files > 0) { G_CHANGED.total += checked_files; }
+			//G_CHANGED.malware += new_files.length;
 			
 			let content = GBI("hash_template");
 			let hash_renderer = _.template(content.innerText);

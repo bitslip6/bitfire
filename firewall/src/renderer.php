@@ -145,7 +145,7 @@ function minify_str(string $in) : string {
 	libxml_clear_errors();
 	$xpath = new DOMXpath($doc);
 	$elms = $xpath->query("//*[contains(@class,'tdc')]");
-	debug("translating " . $elms->count() . " tags\n");
+	debug("translating %d tags\n", $elms->count());
 	for ($i = 0; $i < $elms->count(); $i++) {
 		$in = trim(inner_html($elms->item($i)));
 		$translated = _($in);
@@ -274,7 +274,7 @@ function content_replacement(array $x, array $replacements) {
 			$value = (string)$return;	
 		}
 		if (!isset($value)) {
-			debug("VIEW VAR MISSING $primary.$secondary");
+			debug("VIEW VAR MISSING %s.%s", $primary, $secondary);
 			$value = "";
 		}
 		return ($mod_fn == NULL) ? $value : $mod_fn($value);

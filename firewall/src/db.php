@@ -153,6 +153,13 @@ class DB {
         }
     }
 
+    /**
+     * disallow object POP chaining...
+     */
+    public function __wakeup() {
+        trigger_error("No POP Chaining", E_USER_ERROR);
+    }
+
 
     /**
      * @param null|mysqli $mysqli 
@@ -232,7 +239,8 @@ class DB {
             $db->database = $db_name;
             return $db;
         } else {
-            debug("failed to connect to {$host} as {$user} on {$db_name}");
+            //debug("failed to connect to {$host} as {$user} on {$db_name}");
+            debug("failed to connect to %s as %s on %s", $host, $user, $db_name);
         }
         return DB::from(NULL);
     }

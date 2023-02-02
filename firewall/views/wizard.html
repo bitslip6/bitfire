@@ -4,17 +4,25 @@
       .form-switch {
         pargin-right:6rem;
       }
-      #wizard_enable {
+      #wizard_enable, #wizard_text {
         border: 1px solid #DDD;
         border-left: 0;
         border-right: 0;
-        padding: 0.5rem 2rem 2rem 2rem;
         margin: 2rem 1rem 4rem 1rem;
       }
+      #wizard_enable {
+        padding: 0.5rem 2rem 2rem 2rem;
+      }
+      #wizard_text:not(.collapse) {
+        display: flex;
+      }
+      #wizard_text_input { flex-grow: 1; max-height: 30px; }
+      #wizard_text_label { flex-grow: 0; }
     </style>
        
     <script type="text/javascript">
         window.CONFIG_LIST = {};
+
       
         function rand_string(config_name, length = 32) {
             let result           = '';
@@ -84,14 +92,20 @@
             .then(r => r.json())
             .then(data => {
               window.CTR++;
-              if (window.CTR == 5) {
-                console.log("window counter >= 5");
-                GBI("save_changes").removeEventListener("click", save_changes);
-                window.setTimeout(function() { 
+              window.EN_IDX++;
+              //console.log("api resp", window.CTR, window.EN_IDX);
+              if (window.CTR == window.EN.length) {
+                //console.log("window counter >= 5");
+                window.setTimeout(function() {
                   update_value("wizard", "true");
                   GBI("spin").classList.add("hidden");
-                  GBI("save_changes").innerHTML = "<a href='{{self}}?page=bitfire&tooltip=1' class='white' style='color:#FFF'>Tour Dashboard <span class='fe fe-chevron-right'></span></a>"; },
-                  100);
+                  GBI("save_changes").innerHTML = "<a href='{{self}}?page=bitfire&tooltip=1' class='white' style='color:#FFF'>Tour Dashboard <span class='fe fe-chevron-right'></span></a> ";
+                }, 200);
+              } else if (window.EN_IDX < window.EN.length) {
+                //console.log("update value", window.CTR, window.EN_IDX);
+                window.setTimeout(function() {
+                  update_value(window.EN[window.EN_IDX][0], window.EN[window.EN_IDX][1]);
+                }, 100);
               }
             });
         }
@@ -223,6 +237,12 @@
                   </div>
                 </div>
 
+                <div class="collapse" id="wizard_text">
+                  <label id="wizard_text_label" for="wizard_text_input" class="form-label left" style="margin-right:70px; margin-left:-10px; padding: .5rem 2rem 0 2rem;"> Alert notification email </label>
+                  <input type="email" class="form-contro" id="wizard_text_input" style="margin:.25rem" onchange="text_set(this)" title="setting value" value="">
+                </div>
+
+
                 <button type="button" class="btn btn-primary left" id="wizard_back" disabled="disabled"><span class="fe fe-chevron-left"></span> Back</button>
 
                 <button type="button" class="btn btn-primary hidden right" id="wizard_finish" data-bs-toggle="modal" data-bs-target="#finish_modal">Finish <span class="fe fe-chevrons-right"></span></button>
@@ -279,12 +299,14 @@
   <script type="text/javascript">
 
   window.BITFIRE_NONCE = '{{api_code}}';
+  window.EN_IDX = 0;
   window.EN = [
     ["auto_start", true],
     ["allow_ip_block", false],
     ["enforce_ssl_1year", (document.location.protocol == 'https:')],
     ["require_full_browser", true],
-    ["whitelist_enable", true]
+    ["whitelist_enable", true],
+    ["notification_email", "{{your_email}}"]
   ];
   window.WIZ = [];
   window.WIZ[0] = {'title': 'Always On Protection', 'descr': 'Always on protection runs the firewall as the very first script before any plugins load.  This ' +
@@ -297,13 +319,19 @@
 '99.99% of all automated attacks.  Recommended setting, <small>(may reduce server traffic by eliminating bots)</small>.'};
   window.WIZ[4] = {'title': 'Block Impersonating Robots', 'descr': 'Hackers often impersonate search engines like GoogleBot, Bing and others to bypass filtering. ' +
 'BitFire can prevent these attacks by verifying over 100 commonly used search engines and 3\'rd party services.'};
+  window.WIZ[5] = {'title': 'Email Notifications', 'descr': 'BitFire can notify you if it detects malware or security issues with your plugins and themes. ' +
+'Where would you like critical notifications to go?'};
 
 
   function toggle_wiz(elm) {
     let idx = GBI("wizard_next").getAttribute("data-idx");
     let en = elm.checked;
     window.EN[idx][1] = en;
-    //console.log(ch)
+  }
+
+  function text_set(elm) {
+    let idx = GBI("wizard_next").getAttribute("data-idx");
+    window.EN[idx][1] = elm.value;
   }
 
   function set_percent(per) {
@@ -314,9 +342,10 @@
     b.setAttribute("aria-valuenow", per);
   }
 
+
   function set_wiz_pos(pos) {
     //console.log("set wiz pos", pos)
-    percent = (pos / window.WIZ.length) * 100;
+    percent = Math.round((pos / window.WIZ.length) * 100);
     set_percent(percent);
 
     let t = window.WIZ[pos]["title"].replace("\n", "<br>");
@@ -325,7 +354,28 @@
     GBI("wizard_body").innerHTML = d;
     GBI("wizard_next").setAttribute("data-idx", pos);
     GBI("progress_bar").setAttribute("aria-valuenow", percent);
-    //console.log("set enabled: ", pos, window.EN[pos][1]);
+
+    let def = window.EN[pos][1];
+    if (typeof def == "string") {
+      let t_elm = GBI("wizard_text");
+      if (t_elm.classList.contains("collapse")) {
+        GBI("wizard_enable").classList.toggle("collapse");
+        t_elm.classList.toggle("collapse");
+        let i_elm = GBI("wizard_text_input");
+        console.log("t_elm value", i_elm.value, i_elm);
+        if (!i_elm.value || i_elm.value == "") {
+          console.log("set def value", def, window.EN[pos]);
+          i_elm.value = def;
+        }
+      }
+    } else {
+      let t_elm = GBI("wizard_enable");
+      if (t_elm.classList.contains("collapse")) {
+        GBI("wizard_enable").classList.toggle("collapse");
+        GBI("wizard_text").classList.toggle("collapse");
+      }
+    }
+
     GBI("wizard_enable_tog").checked = window.EN[pos][1];
   }
 
@@ -369,9 +419,8 @@
 
   function save_changes() {
     console.log("save changes", window.EN);
-    for (i=0; i<window.EN.length; i++) {
-      update_value(window.EN[i][0], window.EN[i][1]);
-    }
+    GBI("save_changes").removeEventListener("click", save_changes);
+    update_value(window.EN[window.EN_IDX][0], window.EN[window.EN_IDX][1]);
   }
 
       

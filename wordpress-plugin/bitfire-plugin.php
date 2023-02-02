@@ -387,8 +387,12 @@ function bitfire_plugin_check() {
     $encoded = base64_encode(en_json($plugins));
     $result = http2("POST", APP."cve_check.php", $encoded, ["Content-Type: application/json"]);
     $content_dir = CFG::str("cms_content_dir");
-    if ($content_dir == "" && defined(WP_CONTENT_DIR)) {
-        $content_dir = WP_CONTENT_DIR;
+    if (empty($content_dir) || ($content_dir == DIRECTORY_SEPARATOR)) {
+        if (defined(WP_CONTENT_DIR)) {
+            $content_dir = WP_CONTENT_DIR;
+        } else {
+            $content_dir = dirname(__DIR__, 2);
+        }
     }
     $effect = Effect::new()->file(new FileMod($content_dir."/plugins/bitfire/cache/plugins.json", $result["content"], FILE_W));
     $effect->run();
@@ -520,25 +524,6 @@ function check_user_cap(?array $all_caps = null, ?array $caps = null, ?array $ar
  * BEGIN MAIN PLUGIN CODE
  */
 
-// plugin run once wordpress is loaded
-\add_action("wp_loaded", "BitFirePlugin\bitfire_init");
-// update logout function to remove our cookie as well
-\add_action("wp_logout", function() { \ThreadFin\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), null, -1); });
-// keep the db transaction log up to date for differential database backups
-if (CFG::enabled("rasp_db") && function_exists("\BitFirePRO\query_filter")) {
-    \add_filter("query", "BitFirePRO\query_filter");
-}
-// disable xmlrpc
-if (CFG::enabled("block_xmlrpc")) {
-    \add_filter("xmlrpc_enabled", function(){ return false; });
-}
-// make sure users have the correct capabilities
-//add_filter("user_has_cap", "BitFirePlugin\check_user_cap", 10, 4);
- 
-// todo: move this to -admin
-\register_activation_hook(__FILE__, 'BitFirePlugin\activate_bitfire');
-\register_deactivation_hook(__FILE__, 'BitFirePlugin\deactivate_bitfire');
-
 $i = BitFire::get_instance();
 if (!$i->inspected) {
     $i->inspect();
@@ -589,6 +574,27 @@ if ($i->bot_filter) {
         }
     }
 }
+
+// plugin run once wordpress is loaded
+\add_action("wp_loaded", "BitFirePlugin\bitfire_init");
+// update logout function to remove our cookie as well
+\add_action("wp_logout", function() { \ThreadFin\cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), null, -1); });
+// keep the db transaction log up to date for differential database backups
+if (CFG::enabled("rasp_db") && function_exists("\BitFirePRO\query_filter")) {
+    \add_filter("query", "BitFirePRO\query_filter");
+}
+// disable xmlrpc
+if (CFG::enabled("block_xmlrpc")) {
+    \add_filter("xmlrpc_enabled", function(){ return false; });
+}
+// make sure users have the correct capabilities
+//add_filter("user_has_cap", "BitFirePlugin\check_user_cap", 10, 4);
+ 
+// todo: move this to -admin
+\register_activation_hook(__FILE__, 'BitFirePlugin\activate_bitfire');
+\register_deactivation_hook(__FILE__, 'BitFirePlugin\deactivate_bitfire');
+
+
 
 
 if (CFG::enabled("csp_policy_enabled")) {

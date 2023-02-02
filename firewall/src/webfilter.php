@@ -396,7 +396,7 @@ function generic(string $name, string $value, array $values, array $keys) : Mayb
     $block = Maybe::$FALSE;
 
     foreach ($values as $key => $needle) {
-        if (!is_int($key) || empty($needle)) { debug("key $key, need $needle"); continue; }
+        if (!is_int($key) || empty($needle)) { debug("key [%s], need [%s]", $key, $needle); continue; }
         if ((strpos($value, $needle) !== false || strpos($name, $needle) !== false)) { 
             return BitFire::new_block($key, $name, $value, "static match: $needle");
         }
@@ -426,7 +426,7 @@ function dynamic_match($key, string $needle, string $value, string $name) : Mayb
         if ($key == 10101) {
             if ($list == null) { $list = file(WAF_ROOT . "cache/events.txt", FILE_IGNORE_NEW_LINES); debug("load events sz %d", count($list)); }
             if (!\ThreadFin\contains($value, $list)) {
-                debug("found non event ($value)");
+                debug("found non event (%s)", $value);
                 return Maybe::$FALSE;
             }
         }

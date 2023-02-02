@@ -49,6 +49,7 @@ use function ThreadFin\random_str;
 use function ThreadFin\debug;
 use function ThreadFin\en_json;
 use function ThreadFin\get_hidden_file;
+use function ThreadFin\make_config_loader;
 use function ThreadFin\recursive_copy;
 use function ThreadFin\trace;
 use function ThreadFin\take_nth;
@@ -174,7 +175,7 @@ function update_ini_fn(callable $fn, string $filename = "", bool $append = false
             // write the raw ini content
             ->file(new FileMod($filename, $raw, FILE_W))
             // write the parsed config php file
-            ->file(new FileMod($ini_code, '<?php $config = ' . var_export($new_config, true) . ";\n", FILE_RW, time() + 5))
+            ->file(new FileMod($ini_code, '<?'.'php $config = ' . var_export($new_config, true) . ";\n", FILE_RW, time() + 5))
             // clear the config cache entry
             ->update(new CacheItem("parse_ini", "\ThreadFin\\nop", "\ThreadFin\\nop", -DAY));
         }
@@ -213,14 +214,16 @@ function update_ini_value(string $param, string $value, ?string $default = NULL)
     $search = (!empty($default)) ? "/\s*[\#\;]*\s*{$param_esc}\s*\=.*[\"']?{$default}[\"']?/" : "/\s*[\#\;]*\s*{$param_esc}\s*\=.*/";
     $replace = "$param = $quote_value";
 
+    debug("update ini value [%s] [%s]", $search, $replace);
+
     if ($value === "!") { $replace = ""; }
     $fn = (BINDL("preg_replace", $search, $replace));
 
     $effect = update_ini_fn($fn);
     if ($effect->read_status() == STATUS_OK) {
-        debug("updated $param -> $value");
+        debug("updated %s -> %s", $param, $value);
     } else {
-        debug("config failed to update $param -> $value");
+        debug("config failed to update %s -> %s", $param, $value);
     }
     return $effect;
 }
@@ -428,7 +431,7 @@ function update_config(string $ini_src) : Effect
     $info['assets'] = $assets;
     $info['version'] = BITFIRE_SYM_VER;
 
-    debug("replacing assets ($assets)");
+    debug("replacing assets (%s)", $assets);
     $z = file_replace(\BitFire\WAF_ROOT . "public/theme.bundle.css", "/url\(([a-z\.-]+)\)/", "url({$assets}$1)")->run();
     if ($z->num_errors() > 0) { debug("ERROR [%s]", en_json($z->read_errors())); }
 
@@ -455,8 +458,8 @@ function alter_settings(string $filename, string $content) : EF {
     $content = FileData::new($filename)->raw();
 
     // remove old backups
-    do_for_each(glob(dirname($filename, GLOB_NOSORT).'/*.bitfire_bak*'), [$e, 'unlink']);
-    do_for_each(glob(dirname($filename, GLOB_NOSORT).'/.*.bitfire_bak*'), [$e, 'unlink']);
+    do_for_each(glob(dirname($filename)."/$filename.bitfire_bak*", GLOB_NOSORT), [$e, 'unlink']);
+    //do_for_each(glob(dirname($filename)."/$filename.bitfire_bak*", GLOB_NOSORT), [$e, 'unlink']);
 
     // create new backup with random extension and make unreadable to prevent hackers from accessing
     $backup_filename = "$filename.bitfire_bak." . mt_rand(10000, 99999);
@@ -490,13 +493,16 @@ function install_file(string $file, string $format): bool
 
     if ((file_exists($file) && is_writeable($file)) || is_writable(dirname($file))) {
         $ini_content = (!empty($format)) ? sprintf("\n#BEGIN BitFire\n{$format}\n#END BitFire\n", $self, $self) : "";
-        debug("install content: ($self) [$ini_content]");
+        debug("install content: (%s) [%s]", $self, $ini_content);
 
         // remove any previous content, capture the current content
-        $c = file_get_contents($file);
-        if ($c !== false) {
-            if (strstr($c, "BEGIN BitFire") !== false) {
-                $c = preg_replace('/\n?\#BEGIN BitFire.*END BitFire\n?/ism', '', $c);
+        $c = "";
+        if (file_exists($file)) {
+            $c = file_get_contents($file);
+            if ($c !== false) {
+                if (strstr($c, "BEGIN BitFire") !== false) {
+                    $c = preg_replace('/\n?\#BEGIN BitFire.*END BitFire\n?/ism', '', $c);
+                }
             }
         }
 
@@ -571,7 +577,7 @@ function install() : Effect {
             if (!file_exists(CFG::str("cms_content_dir")."plugins/wordfence") && !file_exists($waf_load)) {
                 $self = dirname(__DIR__) . "/startup.php";
                 if (file_exists($self)) {
-                    $effect->file(new FileMod($waf_load, "<?php include_once '$self'; ?>\n"))
+                    $effect->file(new FileMod($waf_load, "<?"."php include_once '$self'; ?>\n"))
                         ->status(STATUS_OK)
                         ->out("WPEngine hosting. WordFence WAF emulation enabled. Always on protected.");
                 } else {
@@ -658,8 +664,8 @@ function uninstall() : \ThreadFin\Effect {
         $status = ((\BitFireSvr\install_file($file, "")) ? "success" : "error");
         // install a lock file to prevent auto_prepend from being uninstalled for ?5 min
         $effect->file(new FileMod(\BitFire\WAF_ROOT . "uninstall_lock", "locked", 0, time() + intval(ini_get("user_ini.cache_ttl"))));
-        $path = realpath(\BitFire\WAF_ROOT."startup.php"); // duplicated from install_file. TODO: make this a function
     }
+    $path = realpath(\BitFire\WAF_ROOT."startup.php"); // duplicated from install_file. TODO: make this a function
 
     // remove all stored cache data
     CacheStorage::get_instance()->delete();

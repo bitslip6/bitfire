@@ -79,7 +79,7 @@ const PORN_WORD = "sex|teen|adult|chat|porn|naked|pussy|hardcore|anal|cock|xxx|w
  * SNAP, file_put_contents back
  */
 function remove_lines(FileData $file, int $num_lines) : FileData {
-    debug("File lines: " . $file->num_lines . " num_lines: $num_lines");
+    debug("File lines: %d num_lines: %d", $file->num_lines, $num_lines);
 
     if ($file->num_lines > $num_lines) { 
         $file->lines = array_slice($file->lines, -$num_lines);
@@ -309,6 +309,7 @@ function dump_dirs() : array {
  * @return ?array ("count" => $num_files, "root" => $root, "files" => $enriched_files);
  */
 function dump_hashes() : ?array {
+    require_once WAF_SRC . "diff.php";
     $root = \BitFireSvr\cms_root();
     $ver = get_cms_version($root);
     
@@ -331,8 +332,10 @@ function dump_hashes() : ?array {
     // send these hashes to the server for checking against the database
     $result = httpp(APP."hash_compare.php", $encoded, array("Content-Type" => "application/json"));
 
+    $num_files = 0;
     // decode the result of the server test
     $decoded = un_json($result);
+
     if (!empty($decoded)) {
         $allowed = FileData::new(get_hidden_file("hashes.json"))->read()->un_json()->lines;
         $allow_map = [];
@@ -341,23 +344,32 @@ function dump_hashes() : ?array {
 
         $num_files = count($hashes);
         $ver = get_cms_version($root);
-        $enrich_fn  = BINDL('\BitFire\enrich_hashes', $ver, $root);
+        $enrich_fn  = BINDL('\BitFire\enrich_hashes', $ver, $root, $num_files);
         $enriched_files = array_map($enrich_fn, $decoded);
 
 
+        //echo "<pre>\n";
+        //dbg($enriched_files);
+
         // remove files that passed check
         $filtered = array_filter($enriched_files, function ($file) use ($allow_map) {
-            $keep = $file['r'] !== "PASS";
+            $r = $file['r']??'fail';
+            $keep = ($r !== "PASS");
+            //echo "keep: [$r] - ($keep)\n";
             if ($keep) {
                 $keep = ($allow_map[$file['file_path']]??false) ? false : true;
+                //echo "allowed ($keep)!\n";
             }
             // now skip root files that don't have malware
             if ($keep) {
+                $num_malware = $file["malware"]->count();
+                //echo $file["file_path"] . " - file has problem, check malware [$num_malware]\n";
                 return $file["malware"]->count() > 0;
             }
             
             return $keep;
         });
+        // die("filtered");
     }
     else {
         $filtered = [];
@@ -486,9 +498,16 @@ function serve_settings() {
         $view = "setup.html";
     }
 
+    $email = "you@mail.com";
+    if (function_exists("wp_get_current_user")) {
+        $user = wp_get_current_user();
+        $email = $user->user_email;
+    }
+
     //"dashboard_path" => $dashboard_path,
     render_view(\BitFire\WAF_ROOT . "views/$view", "bitfire_settings", array_merge(CFG::$_options, array(
         "auto_start" => CFG::str("auto_start"),
+        "your_email" => $email,
 		//"theme_css" => file_get_contents(\BitFire\WAF_ROOT."public/theme.min.css"). file_get_contents(\BitFire\WAF_ROOT."public/theme.bundle.css"),
         "valid_domains_html" => list_text_inputs("valid_domains"),
         "hide_shmop" => (function_exists("shmop_open")) ? "" : "hidden",
@@ -550,7 +569,7 @@ function serve_bot_list() {
 
     // order by last time seen, newest first
     usort($filter_bots, function($a, $b) {
-        return $a->last_time - $b->last_time;
+        return $b->last_time - $a->last_time;
     });
 
     $bot_list = array_map(function ($bot) use ($country_fn, $country_mapping) {
@@ -595,7 +614,7 @@ function serve_bot_list() {
         if (!empty($bot->home_page)) { 
             $info = parse_url($bot->home_page);
             $bot->favicon = $info["scheme"] . "://" . $info["host"] . "/favicon.ico";
-        } else {$bot->favicon = get_asset_dir() . "robot.svg";}
+        } else {$bot->favicon = get_asset_dir() . "robot_nice.svg";}
         $bot->classclass = "danger";
         if ($bot->valid==0) {
             $bot->classclass = "warning";
@@ -606,13 +625,16 @@ function serve_bot_list() {
         if (empty($bot->miss)) { $bot->miss = 0; }
         if (empty($bot->not_found)) { $bot->not_found = 0; }
         if (empty($bot->domain)) { $bot->domain = "-"; }
-        if (empty($bot->icon)) { $bot->icon = "robot.svg"; }
+        if (empty($bot->icon)) { $bot->icon = "robot_nice.svg"; }
         $bot->machine_date = date("Y-m-d", $bot->mtime);
         $bot->machine_date2 = date("Y-m-d", $bot->last_time);
         $bot->checked = ($bot->valid > 0) ? "checked" : "";
         $bot->domain = trim($bot->domain, ",");
         $bot->ip_str = join(", ", array_keys($bot->ips));
-        if (empty($bot->home_page)) { $bot->home_page = ""; }
+        if (empty($bot->home_page)) { 
+            $bot->home_page = "https://www.google.com/search?q=" . urlencode($bot->agent);
+            $bot->icon = "robot.svg";
+        }
         if (empty($bot->vendor)) { $bot->vendor = "Unknown"; }
         return $bot;
     }, $filter_bots);
@@ -676,7 +698,7 @@ function enrich_alert(array $report, array $exceptions, array $whitelist) : arra
 
     $cl = \BitFire\code_class($report['block']['code']);
     $report['block']['message_class'] = MESSAGE_CLASS[$cl];
-    $test_exception = new \BitFire\Exception($report['block']['code'], 'x', NULL, $report['request']['path']);
+    $test_exception = new \BitFire\Exception($report['block']['code'], 'x', $report['block']['parameter'], $report['request']['path']);
 
     $report['type_img'] = CODE_CLASS[$cl];
     $browser = \BitFireBot\parse_agent($report['request']['agent']);
@@ -696,11 +718,12 @@ function enrich_alert(array $report, array $exceptions, array $whitelist) : arra
 
     // filter out the "would be" exception for this alert, and compare if we removed the exception
     $filtered_list = array_filter($exceptions, compose("\ThreadFin\\not", BINDR("\BitFire\match_exception", $test_exception)));
-    $has_exception = (count($exceptions) > count($filtered_list));
-    if ($cl == 24000) {
-        $crc = "crc".crc32($report['request']['agent']);
-        $has_exception = array_key_exists($crc, $whitelist);
+    if ($test_exception->code == "10029") {
+        //dbg($report, "report");
+        //dbg([$filtered_list, $test_exception], "test_exception");
     }
+    $has_exception = (count($exceptions) > count($filtered_list));
+
 
     $report['exception_class'] = ($has_exception) ? "warning" : "secondary";
     $report['exception_img'] = ($has_exception) ? "bandage.svg" : "fix.svg";
@@ -989,6 +1012,15 @@ function serve_dashboard() :void {
 
     $country_fn = country_enricher(\ThreadFin\un_json(file_get_contents(\BitFire\WAF_ROOT . "cache/country.json")));
 
+    $review_file = FileData::new(get_hidden_file("review.json"))
+        ->read()
+        ->map('\ThreadFin\un_json');
+    $review_data = [];
+    array_walk($review_file->lines, function($x) use (&$review_data) {
+        $review_data[$x['uuid']] = $x['name'];
+    });
+
+
     // load all alert data
     // TODO: make dry
     $report_code = intval($_GET['report_filter']??0);
@@ -996,7 +1028,7 @@ function serve_dashboard() :void {
         ->read();
 
     $report_count = $report_file->num_lines;
-    debug("report count: $report_count, page: $alert_page_num, size: " . PAGE_SZ);
+    debug("report count: %d page: %d, size: %d", $report_count, $alert_page_num, PAGE_SZ);
     $report_file->apply(BINDR('\BitFire\remove_lines', 400))
         ->apply_ln('array_reverse')
         ->apply_ln(BINDR('array_slice', $alert_page_num * PAGE_SZ, PAGE_SZ, false))
@@ -1032,11 +1064,14 @@ function serve_dashboard() :void {
     $config = ["botwhitelist" => []];
     //@include (\BitFire\WAF_ROOT."cache/whitelist_agents.ini.php");
     $config = array_merge($config, \parse_ini_file(\BitFire\WAF_ROOT."cache/whitelist_agents.ini"));
-    array_map(function($line) use (&$data, $exceptions, $config) {
+    array_walk($reporting, function($line) use (&$data, $exceptions, $config) {
         if (isset($line["block"])) {
-            $data["alerts"][] = enrich_alert($line, $exceptions, $config["botwhitelist"]);
+            $block = enrich_alert($line, $exceptions, $config["botwhitelist"]);
+            $block["block"]["review_class"] = "hidden";
+            $block["block"]["review_name"] = "";
+            $data["alerts"][] = $block;
         }
-    }, $reporting);
+    });
 
     // add alerts
     $data['alerts_json'] = json_encode($data["alerts"], JSON_HEX_APOS);
@@ -1078,16 +1113,24 @@ function serve_dashboard() :void {
     $data["blocks"] = [];
 
     $exceptions = load_exceptions();
-    array_map(function($line) use (&$data, $exceptions, $config) {
+    array_walk($blocking, function($line) use (&$data, $exceptions, $config, $review_data) {
         if (isset($line["block"])) {
             $block = enrich_alert($line, $exceptions, $config["botwhitelist"]);
 
             if (!empty($block["request"]["get"])) {
                 $block["request"]["query"] = '?'. http_build_query($block["request"]["get"]??[]);
             }
+
+            if (isset($block["block"]) && isset($block["block"]["uuid"]) && isset($review_data[$block["block"]["uuid"]])) {
+                $block["block"]["review_name"] = $review_data[$block["block"]["uuid"]] . " requested a review";
+                $block["block"]["review_class"] = "";
+            } else {
+                $block["block"]["review_class"] = "hidden";
+                $block["block"]["review_name"] = "";
+            }
             $data["blocks"][] = $block;
         }
-    }, $blocking);
+    });
 
     // add alerts
     $data['blocks_json'] = en_json($data["blocks"]);

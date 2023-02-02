@@ -347,7 +347,7 @@ function reverse_ip_lookup(string $ip): string
         return fast_ip_lookup($lookup_addr, 'PTR');
     }
     $lookup = gethostbyaddr($ip);
-    debug("gethostbyaddr [$ip] = ($lookup)");
+    debug("gethostbyaddr [%s] = (%s)", $ip, $lookup);
     return ($lookup !== false) ? $lookup : "";
 }
 
@@ -775,7 +775,7 @@ function bot_to_block(string $file)
 {
     // TODO: update percent call time, and wait time (99, 1)
     // if file is older than 60 seconds, delete it  
-    if (filemtime($file) < (time() + 1)) {
+    if (file_exists($file) && filemtime($file) < (time() + 1)) {
 
         // ugly hack to recreate the original request
         /** @var Request $request */
@@ -800,7 +800,7 @@ function bot_to_block(string $file)
             $match = (empty($as)) ? "no whitelist for the agent" : "AS{$as}";
             BitFire::new_block(FAIL_FAKE_BROWSER, $request->agent, $match, "did not complete JavaScript challenge", 0, $request);
         }
-        debug("agent: {$request->agent}, ip: {$request->ip}, reverse: $reverse_ip, as: $as");
+        debug("agent: \"%s\", ip: %s, reverse: %s, as: %s", $request->agent, $request->ip, $reverse_ip, $as);
         unlink($file);
     }
 }
@@ -1022,8 +1022,10 @@ function ip_to_int(string $ip): int
  */
 function is_local_request(\BitFire\Request $request): bool {
 
-    if (contains($request->ip, [$_SERVER['SERVER_ADDR'], '127.0.0.1', '::1'])) {
-        return true;
+    if (isset($_SERVER['SERVER_ADDR'])) {
+        if (contains($request->ip, [$_SERVER['SERVER_ADDR'], '127.0.0.1', '::1'])) {
+            return true;
+        }
     }
 
     // source agent is localhost
@@ -1034,7 +1036,7 @@ function is_local_request(\BitFire\Request $request): bool {
     ) {
         // some hosts will route this through their local gw
         $ip1 = explode(".", $request->ip);
-        $ip2 = explode(".", $_SERVER['SERVER_ADDR']);
+        $ip2 = explode(".", $_SERVER['SERVER_ADDR']??'127.0.0.1');
         $ip1b = array_slice($ip1, 0, 3);
         $ip2b = array_slice($ip2, 0, 3);
         $ip1c = join(".", $ip1b);
@@ -1625,8 +1627,15 @@ function load_bot_data(string $info_file, string $ip, string $trim_agent, int $v
             /** @var BotInfo $app_data */
             $app_data = unserialize($response["content"], ["allowed_classes" => ["BitFire\BotInfo"]]);
 
-            if (!empty($app_data)) {
-                $bot_data = $app_data;
+            if (!empty($app_data) && $app_data) {
+                if ($app_data->valid > 0) {
+                    // make sure we have auth data for valid bots
+                    if ($app_data['class_id'] != 10 && empty($bot_data['net']) && empty($bot_data['domain'])) {
+                        $bot_data = add_net_to_bot($app_data, $ip);
+                    } else {
+                        $bot_data = $app_data;
+                    }
+                }
                 // debug("loaded remote data [%s] [%s]", $app_data, $response['content']);
             } else {
                 debug("load remote bot info failed: [%s]", $response["content"]);
@@ -1657,6 +1666,7 @@ function load_bot_data(string $info_file, string $ip, string $trim_agent, int $v
             $bot_data = add_net_to_bot($bot_data, $ip);
             // make sure we have a fallback way to authenticate
             if (empty($bot_data->domain) && $valid) {
+                debug("no domain found for bot [%s] [%s]", $bot_data->agent, $ip);
                 $bot_data->net = "*";
             }
         }
@@ -1695,7 +1705,8 @@ function add_net_to_bot(BotInfo $bot_data, string $ip, bool $ensure_auth = true)
             if (!empty($check_ips) && in_array($ip, $check_ips)) {
                 $bot_data->domain .= ",{$matches[1]}";
             } else {
-                debug("reverse bot ip lookup failed [%s] [%s]", $check_ips, $ip);
+                $bot_data->domain .= ",{$matches[1]}";
+                debug("reverse bot ip lookup failed [%s] [%s] [%s]", $check_ips, $ip, $host);
             }
         }
     } 
@@ -1703,8 +1714,10 @@ function add_net_to_bot(BotInfo $bot_data, string $ip, bool $ensure_auth = true)
     // add this to the network list
     debug("get new bot host AS network [%s]", $host);
     $as = find_ip_as($ip);
-    if (empty($as)) {
-        if (!stripos($bot_data->net, $as)) {
+    if (!empty($as)) {
+        if (empty($bot_data->net)) {
+            $bot_data->net = $as;
+        } else if (!stripos($bot_data->net, $as)) {
             $bot_data->net .= ",{$as}";
         }
     }

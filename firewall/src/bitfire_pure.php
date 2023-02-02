@@ -232,17 +232,18 @@ function process_request2(array $get, array $post, array $server, array $cookies
     $request->cookies = map_mapvalue($cookies, $fn);
     $request->get_freq = freq_map($request->get);
     $request->post_len = $server["CONTENT_LENGTH"] ?? 0;
-    if ($server["REQUEST_METHOD"] === "POST") {
+    if ($server["REQUEST_METHOD"]??"" === "POST") {
         $request->post_raw = file_get_contents("php://input");
         // handle json encoded post data
         if ($server["CONTENT_TYPE"]??"" === "application/json" && !empty($request->post_raw)) {
+            $len = strlen($request->post_raw);
             $x = json_decode($request->post_raw, true);
             if (is_array($x)) {
-                trace("CT:AJOK");
+                trace("CT:AJOK:$len");
                 $request->post = array_merge($request->post, $x);
             } else {
                 trace("CT:AJERR");
-                debug("JSON ERR [%s]", substr($request->post_raw, 0, 2048));
+                debug("JSON ERR (%d) [%s]", $len, substr($request->post_raw, 0, 2048));
             }
         }
         $request->post_freq = freq_map($request->post);
@@ -306,10 +307,12 @@ function get_counts(string $input) : array {
     return \count_chars($input2, 1);
 }
 
-function get_counts_reduce(array $carry, string $input) : array {
+// $input maybe a string, or an array
+function get_counts_reduce(array $carry, $input) : array {
+    $flat_input = flatten($input);
     // match any unicode character in the letter or digit category, 
     // and count the remaining characters 
-    $counts = get_counts($input);
+    $counts = get_counts($flat_input);
     foreach (\array_keys($counts) as $key) {
         $carry[$key] = (isset($carry[$key])) ?
             $carry[$key] + ($counts[$key] ?? 0):

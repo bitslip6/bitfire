@@ -336,7 +336,13 @@ class FileData {
 
 // developer debug functions
 function PANIC_IFNOT($condition, $msg = "") { if (!$condition) { dbg($msg, "PANIC"); } }
-function dbg($x, $msg="") {$m=htmlspecialchars($msg); $z=(php_sapi_name() == "cli") ? print_r($x, true) : htmlspecialchars(print_r($x, true)); echo "<pre>\n[$m]\n($z)\n" . join("\n", debug(null)) . "\n" . debug(trace(null)); debug_print_backtrace(); die("\nFIN"); }
+function mark(?string $msg = null) {
+    static $last = 0; if (is_null($msg)) { return $last; }
+    $last = microtime(true); trace($msg); }
+function dbg($x, $msg="") {$m=htmlspecialchars($msg); $z=(php_sapi_name() == "cli") ? print_r($x, true) : htmlspecialchars(print_r($x, true)); echo "<pre>\n[$m]\n($z)\n" . join("\n", debug(null)) . "\n" . debug(trace(null));
+    $now = microtime(true); $last = mark(null); $ms = "-";
+    if ($last > 0) { $time = $now - $last; $ms = sprintf("%0.3f", $time * 1000); }
+    debug_print_backtrace(); die("\nFIN [$ms]"); }
 function nop(...$args) { if (isset($args[0])) { return $args[0]; } return null; }
 function eq($a, $b) : bool { return $a == $b; }
 function neq($a, $b) : bool { return $a != $b; }
@@ -437,7 +443,7 @@ function array_filter_modify(array $list, callable $filter_fn, callable $modify_
  */
 function get_sub_dirs(string $dirname) : array {
     $dirs = array();
-    if (!file_exists($dirname)) { debug("unable to find sub-dirs [$dirname]"); return $dirs; }
+    if (!file_exists($dirname)) { debug("unable to find sub-dirs [%s]", $dirname); return $dirs; }
 
     if ($dh = \opendir($dirname)) {
         while(($file = \readdir($dh)) !== false) {
@@ -463,7 +469,7 @@ function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL
     $max_files = 20000;
     $result_count = count($result);
     if (!file_exists($dirname)) { 
-        debug("[$dirname] not exist");
+        debug("[%s] not exist", $dirname);
         return $result;
     }
 
@@ -819,7 +825,7 @@ class Effect {
         // allowable: backup files, WordFence waf loader if it is an emulation file
         // unknown files: (not plugins, themes or core WordPress files)
         do_for_each($this->unlinks, function ($x) {
-            debug("unlink $x");
+            debug("unlink %s", $x);
             recursive_delete($x);
             if (is_file($x)) {
                 if (!unlink($x)) {
@@ -855,7 +861,7 @@ class Effect {
         }
 
         if (!empty($this->errors)) {
-            debug("ERROR effect: " . json_encode($this->errors, JSON_PRETTY_PRINT));
+            debug("ERROR effect: %s", json_encode($this->errors, JSON_PRETTY_PRINT));
             if (function_exists("\BitFire\on_err")) {
                 on_err(1000, json_encode($this->errors, JSON_PRETTY_PRINT), __FILE__, __LINE__);
             }
@@ -933,7 +939,7 @@ interface MaybeI {
     public function extract(string $key, $default = false) : MaybeI;
     public function index(int $index) : MaybeI;
     public function isa(string $type) : bool;
-    public function __toString() : string;
+    public function __toString();
     public function __isset($object) : bool;
 }
 
@@ -980,7 +986,7 @@ class MaybeA implements MaybeI {
     public function effect(callable $fn) : MaybeI { if (!empty($this->_x)) { $fn($this->_x); } else { 
         $this->_errors[] = func_name($fn) . ", null effect! [" . var_export($this->_x, true) . "]";
     } return $this; }
-    public function keep_if(callable $fn) : MaybeI { if ($fn($this->_x) === false) { $this->_errors[] = func_name($fn) . " if failed"; $this->_x = NULL; } return $this; }
+    public function keep_if(callable $fn) : MaybeI { if (!empty($this->_x) && $fn($this->_x) === false) { $this->_errors[] = func_name($fn) . " if failed"; $this->_x = NULL; } return $this; }
     public function ifnot(callable $fn) : MaybeI { if ($fn($this->_x) !== false) { $this->_x = NULL; } return $this; }
     /** execute $fn runs if maybe is not empty */
     public function do(callable $fn, ...$args) : MaybeI { if (!empty($this->_x)) { $this->assign($fn(...$args)); } else { 
@@ -1026,7 +1032,7 @@ class MaybeA implements MaybeI {
     }
     public function index(int $index) : MaybeI { if (is_array($this->_x)) { return new static ($this->_x[$index] ?? NULL); } return new static(NULL); }
     public function isa(string $type) : bool { return $this->_x instanceof $type; }
-    public function __toString() : string { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
+    public function __toString() { return is_array($this->_x) ? $this->_x : (string)$this->_x; }
     public function __isset($object) : bool { debug("isset"); if ($object instanceof MaybeA) { return (bool)$object->empty(); } return false; }
     public function __invoke(string $type = null) { return $this->value($type); }
 }
@@ -1185,7 +1191,7 @@ function map_mapvalue(?array $map, callable $fn) : array {
                 $result[(string)$key] = $tmp;
             }
         } else {
-            debug("Filtered data [$key]");
+            debug("Filtered data [%s]", $key);
         }
     }
     return $result;
@@ -1291,9 +1297,9 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     
     $server_output = \curl_exec($ch);
     if (!empty($server_output)) {
-        debug("curl [$url] returned: [%d] bytes", strlen($server_output));
+        debug("curl [%s] returned: [%d] bytes", $url, strlen($server_output));
     } else {
-        debug("curl [$url] failed");
+        debug("curl [%s] failed", $url);
         return ["content" => "", "length" => 0, "success" => false];
     }
 
@@ -1369,7 +1375,7 @@ function http(string $method, string $path, $data, ?array $optional_headers = []
     $ms = round(($m1 - $m0) * 1000, 2);
     trace("http $path1 ({$ms}ms)");
     if ($response === false && !contains($path, "wordpress.org")) {
-        return debugF("http_resp [$path] fail");
+        return debugF("http_resp [%s] fail", $path);
     }
 
     return $response;
@@ -1494,10 +1500,13 @@ function debug(?string $fmt, ...$args) : ?array {
         return (empty($fmt)) ? $log : null;
     }
 
+    // ugly AF
+    if ($fmt === "RETURN_LOG") { return $log; }
+
     // format any objects or arrays for debug
     foreach ($args as &$arg) { 
         if (is_array($arg) || is_object($arg)) { $arg = json_encode($arg, JSON_PRETTY_PRINT); }
-        else { $arg = str_replace("%", "%%", $arg); }
+        // else { $arg = str_replace("%", "%%", $arg); }
     }
 
     $line = "";
@@ -1516,9 +1525,10 @@ function debug(?string $fmt, ...$args) : ?array {
     // write to file
     if (CFG::enabled("debug_file")) {
         if ($idx === 0) {
-            register_shutdown_function(function () use ($log) {
+            register_shutdown_function(function () {
                 $out_dir = dirname(\BitFire\WAF_INI, 1);
                 $f = $out_dir . "/debug.log";
+                $log = debug("RETURN_LOG");
                 $mode = (file_exists($f) && filesize($f) > 1024*1024*4) ? FILE_W : FILE_APPEND;
                 file_put_contents($f, join("\n", $log), $mode);
             });
@@ -1526,8 +1536,8 @@ function debug(?string $fmt, ...$args) : ?array {
         $line = sprintf($fmt, ...$args);
         if (starts_with($fmt, "ERROR")) {
             $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
-            $b1 = isset($bt[2]) ? $bt[2]['file']??'??'.':'.$bt[2]['line']??'??' : '';
-            $b2 = isset($bt[3]) ? $bt[3]['file']??'??'.':'.$bt[3]['line']??'??' : '';
+            $b1 = isset($bt[2]) ? ($bt[2]['file']??'??'.':'.$bt[2]['line']??'??') : '';
+            $b2 = isset($bt[3]) ? ($bt[3]['file']??'??'.':'.$bt[3]['line']??'??') : '';
             $line = "$line\n$b1\n$b2";
         }
         // if the file is >1MB overwrite it, else append
@@ -1547,7 +1557,7 @@ function debug(?string $fmt, ...$args) : ?array {
  */
 function cookie(string $name, ?string $value, int $exp = DAY) : void {
     if (!CFG::enabled("cookies_enabled")) { debug("wont set cookie, disabled"); return; }
-    if (headers_sent($file, $line)) { debug("unable to set cookie, headers already sent ($file:$line)"); return; }
+    if (headers_sent($file, $line)) { debug("unable to set cookie, headers already sent (%s:%d)", $file, $line); return; }
     if (PHP_VERSION_ID < 70300) { 
         setcookie($name, $value, time() + $exp, '/; samesite=strict', '', false, true);
     } else {
@@ -1635,6 +1645,8 @@ function make_config_loader() : Effect {
             return $effect->out($config_file)->hide_output();
         }
     }
+    // ini_info was invalid, reset the key
+    $secret_key = "";
 
     // we don't know where the config is because there is no ini_info file
     // probably a first run, or a new install, lets find it
@@ -1671,7 +1683,7 @@ function make_config_loader() : Effect {
 
     // we should have a secret key by now, lets update the ini_info file
     if (!empty($secret_key)) {
-        $markup = "<?php \$secret_key = '$secret_key'; ";
+        $markup = "<?"."php \$secret_key = '$secret_key'; ";
         if (function_exists("shmop_open")) {
             $markup .= '$ini_type = "shmop";';
         } else if (function_exists("apcu_store")) {
@@ -1753,7 +1765,6 @@ function get_hidden_file(string $file_name, ?string $secret_key = null) : string
  */
 function parse_ini() : array {
     $ini_type = "opcache";
-    $secret_key = "";
 
     $loader = make_config_loader()->run();
     $config_file = $loader->read_out();
@@ -1765,7 +1776,8 @@ function parse_ini() : array {
     $cache = CacheStorage::get_instance($ini_type);
     // $options is an array [$data, $mtime]
     $options = $cache->load_or_cache("parse_ini", 600, function() use ($config_file) {
-        return parse_ini_file($config_file, false, INI_SCANNER_TYPED);
+        $config =  parse_ini_file($config_file, false, INI_SCANNER_TYPED);
+        if (count($config) > 10) { return $config; }
     });
 
     // if the file modification time is newer than the cached data, reload the config
@@ -1868,12 +1880,18 @@ function check_pro_ver(string $pro_key) {
     $profile = \BitFire\WAF_SRC . "proapi.php";
     if (strlen($pro_key) > 20 && (!file_exists($profile) || (file_exists($profile) && @filesize(\BitFire\WAF_SRC."proapi.php") < 512))) {
         trace("DWNPRO");
+        $email = "unknown";
+        $name = "unknown";
+        if (defined("WPINC")) {
+            $user = \wp_get_current_user();
+            $name = $user->user_firstname . " " . $user->user_lastname;
+        }
         $out = \BitFire\WAF_SRC."pro.php";
-        $content = http("POST", "https://bitfire.co/getpro.php", array("release" => \BitFire\BITFIRE_VER, "key" => $pro_key, "file" => "pro.php"));
+        $content = http("POST", "https://bitfire.co/getpro.php", array("name" => $name, "email" => $email, "release" => \BitFire\BITFIRE_VER, "key" => $pro_key, "domain" => $_SERVER['SERVER_NAME'],"file" => "pro.php"));
         debug("downloaded pro code [%d] bytes", strlen($content));
         if ($content && strlen($content) > 512) {
             if (@file_put_contents($out, $content, LOCK_EX) !== strlen($content)) { debug("unable to write [%s]", $out); };
-            $content = http("POST", "https://bitfire.co/getpro.php", array("release" => \BitFire\BITFIRE_VER, "key" => $pro_key, "file" => "proapi.php"));
+            $content = http("POST", "https://bitfire.co/getpro.php", array("name" => $name, "email" => $email, "release" => \BitFire\BITFIRE_VER, "key" => $pro_key, "domain" => $_SERVER['SERVER_NAME'], "file" => "proapi.php"));
             debug("downloaded proapi code [%d] bytes", strlen($content));
             $out = \BitFire\WAF_SRC."proapi.php";
             if ($content && strlen($content) > 100) {

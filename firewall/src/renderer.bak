@@ -217,7 +217,7 @@ function content_replacement($x, $replacements) {
 		}
 		return ($escape) ? htmlspecialchars($value) : $value;
 	} else {
-		debug("unset view variable [$primary]");
+		debug("unset view variable [%s]", $primary);
 	}
 }
 

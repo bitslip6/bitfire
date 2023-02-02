@@ -275,17 +275,15 @@ function bitfire_add_menu() {
         3
     );  
 
-    if (strlen(CFG::str("pro_key")) > 20) {
-        \add_submenu_page(
-            "bitfire",
-            "BitFire PRO Settings",
-            "Advanced Settings",
-            "manage_options",
-            "bitfire_advanced",
-            "\BitFire\serve_advanced",
-            4
-        );  
-    }
+    \add_submenu_page(
+        "bitfire",
+        "BitFire RASP Settings",
+        "RASP Settings",
+        "manage_options",
+        "bitfire_advanced",
+        "\BitFire\serve_advanced",
+        4
+    );  
 
     \add_submenu_page(
         "bitfire",

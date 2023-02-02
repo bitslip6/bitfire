@@ -19,6 +19,7 @@ use BitFire\Config as CFG;
 use LDAP\Result;
 use RuntimeException;
 use SplFixedArray;
+use ThreadFin\Maybe;
 use ThreadFinDB\Credentials;
 use ThreadFinDB\DB;
 
@@ -132,7 +133,7 @@ function add_api_exception(\BitFire\Request $r) : Effect {
     assert(isset($r->post['code']), "code is required");
     $param = $r->post['param']??NULL;
     $r->post["action"] = "add_exception";
-    httpp(APP."zxf.php", base64_encode(\ThreadFin\en_json($r->post)));
+    httpp(APP."zxf.php", base64_encode(json_encode($r->post)));
 
     // an effect and the exception to add
 
@@ -190,11 +191,11 @@ function add_api_exception(\BitFire\Request $r) : Effect {
  * @return void 
  */
 function download(\BitFire\Request $r) : Effect {
-    assert(isset($r->post["filename"]), "filename is required");
+    assert(isset($r->get["filename"]), "filename is required");
 
 	$effect = Effect::new();
-    $root = \BitFireSvr\cms_root();
-	$filename = trim($r->post['filename'], "/");
+    $root = \BitFireSvr\cms_root() . "/";
+	$filename = trim($r->get['filename'], "/");
     $path = $root . $filename;
 
     // alert / block download
@@ -212,12 +213,12 @@ function download(\BitFire\Request $r) : Effect {
         $effect->header('Content-Type', 'application/x-php');
         // FILE NAME GUARD
         if (! ends_with($filename, "php") || contains($filename, RESTRICTED_FILES)) {
-            return $effect->api(false, "invalid file.");
+            return $effect->api(false, "invalid file.", ["filename" => $filename]);
         }
         // load data
-        $file = FileData::new($filename);
+        $file = FileData::new($path);
         if (!$file->exists) {
-            return $effect->api(false, "invalid file.");
+            return $effect->api(false, "no file.", ["filename" => $path]);
         }
         $data = $file->raw();
     }
@@ -362,15 +363,29 @@ function diff(\BitFire\Request $request) : Effect {
     return $effect;
 }
 
+
+/*
+function ip_map_domain(string $ip) : MaybeStr {
+    $s = MaybeStr::of($ip);
+    $s->map('gethostbyaddr');
+    $s->map('gethostbynamel');
+    $s->
+
+    return $s;
+}
+*/
+
 function ip_to_domain(string $ip) : ?string {
     $domain = gethostbyaddr($ip);
     debug("fwd: %s [%s]", $ip, $domain);
     if (!empty($domain)) {
         $ips = gethostbynamel($domain);
-    debug("reverse: [%s]", $ips);
-        if (in_array($ip, $ips)) {
-            if (preg_match("/([a-zA-Z0-9_-]+\.(?:[a-zA-Z]+|xn-\w+))\.?$/", $domain, $matches)) {
-                return $matches[1];
+        if (!empty($ips)) {
+            debug("reverse: [%s]", $ips);
+            if (in_array($ip, $ips)) {
+                if (preg_match("/([a-zA-Z0-9_-]+\.(?:[a-zA-Z]+|xn-\w+))\.?$/", $domain, $matches)) {
+                    return $matches[1];
+                }
             }
         }
     }
@@ -457,22 +472,24 @@ function bot_action(\BitFire\Request $request) : Effect {
 
 // not DRY ripped from dashboard.php
 function dump_hash_dir(\BitFire\Request $request) : Effect {
+    require_once WAF_SRC . "diff.php";
     require_once WAF_SRC . "cms.php";
     $root = \BitFireSvr\cms_root();
 
-    if (contains($request->post['dir'], "thrive-leads")) {
-        if (function_exists('xhprof_enable') && file_exists(WAF_ROOT . "profiler.enabled")) {
-            xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
-        }
-    }
+    $ver = trim($request->post['ver'], '/');
+    $dir_path = realpath($request->post['dir']);
+    $plugin_name = basename($dir_path);
+    $num_files = 0;
 
     // for reading php files
     if (defined("BitFirePRO")) { stream_wrapper_restore("file"); }
 
+    if (contains($request->post['dir'], "bitfire")) {
+        return Effect::new()->api(true, "hashed $num_files files", array("ver" => $ver, "dir" => $dir_path, "path" => $dir_path, "file_count" => $num_files, "hit_count" => $num_files, "success" => true, "data" => base64_encode(json_encode([]))));
+    }
+
+
     if (!empty($root) && isset($request->post['dir']) && strlen($request->post['dir']) > 1) { 
-        $ver = trim($request->post['ver'], '/');
-        $dir_path = realpath($request->post['dir']);
-        $plugin_name = basename($dir_path);
 
         $type_fn = find_fn("file_type");
         $hash_fn = BINDR('\BitFireSvr\hash_file2', $dir_path, $plugin_name, $type_fn);
@@ -492,8 +509,8 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         foreach ($allowed as $file) { $allow_map[$file["file"]] = $file["trim"]; }
 
         // the auto allow list
-        $filter_hashes = FileData::new(WAF_ROOT."hashes/{$plugin_name}.json")->read()->un_json()->lines;
-        //debug("ZZZ manual/auto allow hash size: %d/%d", count($allow_map), count($filter_hashes));
+        $plugin_hash_file = FileData::new(WAF_ROOT."hashes/{$plugin_name}.json");
+        $filter_hashes = ($plugin_hash_file->exists) ? $plugin_hash_file->read()->un_json()->lines : [];
 
         // $h = new \BitFireSvr\FileHash();
         // skip stuff we have already proved to be clean
@@ -541,6 +558,8 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         //echo "<pre>\n";
         //print_r($allow_map);
         // remove files that passed, (silence is golden)
+
+
         $filtered = array_filter($decoded, function ($file) {
             $r = $file['r']??'MISS';
             return $r !== "PASS";
@@ -550,31 +569,35 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
         });
         $num_miss = count($missed);
 
+        //if ($plugin_name == "seo-by-rank-math") { dbg($filtered, "ZZZ"); }
+
         // debug("ZZZ [%s] hashes sent/received [%d/%d] hashes miss: %d/%d", $plugin_name, $num_min, $c1, $num_miss, $num_files);
         $effect = Effect::new();
         $known = false;
         // if the entire directory is unknown, squash it to a single entry
         if ($num_files > 0 && $num_min == $num_miss) {
-            debug("PLUGIN NOT FOUND [$plugin_name]");
+            debug("PLUGIN NOT FOUND [$plugin_name] %d / %d / (%d)", count($decoded), count($min_hashes), $num_files);
             $compacted = [];
 
+            $num_decoded = count($decoded);
             foreach ($decoded as $test_entry) {
 
                 // if we allow it, then it cant be missing
                 if (isset($allow_map[$test_entry['crc_trim']])) {
-                    // debug("ZZZ !! NEVER HIT AM %s", $test_entry['file_path']);
+                    debug("ZZZ !! NEVER HIT AM %s", $test_entry['file_path']);
                     continue;
                 }
                 // todo, remove me
-                if (ends_with($test_entry["file_path"], "/src/webfilter.php")) { continue; }
+                // if (ends_with($test_entry["file_path"], "/src/webfilter.php")) { continue; }
 
                 
-                $found_malware = cms_find_malware($test_entry["file_path"]);
+                $found_malware = cms_find_malware($test_entry["file_path"], $known, $num_decoded);
 
                 // TODO: need 2 lists of malware functions.  always report, and report if analysis fails
+                // this will remove the file from the list if it is not malware, so nothing is returned to browser 
                 if (count($found_malware) == 0) { 
-                    debug("Adding to list %s [%d = %d]", $test_entry["file_path"], $test_entry["crc_path"], $test_entry["crc_trim"]);
-                    $filter_hashes[$test_entry["crc_path"]] = $test_entry["crc_trim"];
+                    //XXX debug("Adding to clean file list %s [%d = %d]", $test_entry["file_path"], $test_entry["crc_path"], $test_entry["crc_trim"]);
+                    // $filter_hashes[$test_entry["crc_path"]] = $test_entry["crc_trim"];
                     continue;
                 }
 
@@ -588,7 +611,7 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
 
                 //$sum = array_sum(array_map(function($x){return filesize($x['file_path']);}, $compacted));
                 //$sum_kb = round($sum/1024, 2);
-                $test_entry["kb1"] = $test_entry["size"] . "Kb";
+                $test_entry["kb1"] = bytes_to_kb($test_entry["size"]);
                 $test_entry["icon"] = "x";
                 $test_entry["icon_class"] = "danger";
                 $test_entry["bgclass"] = "bg-danger-soft";
@@ -606,10 +629,10 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
                 $compacted[] = $test_entry;
             }
             # TODO: effect this
-            // debug("ZZZ Saving hashes for $plugin_name");
             $effect->file(new FileMod(WAF_ROOT."hashes/{$plugin_name}.json", en_json($filter_hashes)));
         } else {
-            $enrich_fn = BINDL('\BitFire\enrich_hashes', $ver, $dir_without_plugin_name);
+            debug("MISSED FILES [%d] in [%s]", count($missed), $plugin_name);
+            $enrich_fn = BINDL('\BitFire\enrich_hashes', $ver, $dir_without_plugin_name, count($filtered));
             $enriched = array_map($enrich_fn, $filtered);
             $final = array_filter($enriched, function($x) {
                 return count($x["malware"]) > 0;
@@ -623,7 +646,6 @@ function dump_hash_dir(\BitFire\Request $request) : Effect {
             // debug("ZZZ Known Plugin miss/filter %d/%d of: (%d)", $num_miss, count($final), $num_files);
             $known = true;
             $compacted = compact_array($final);
-
             $num_changed = (empty($encode)) ? 0 : count($encode);
         }
 
@@ -798,7 +820,7 @@ function validate_raw(string $test_hmac, string $iv, string $time, string $secre
     //debug("hmac check [$diff] $d3 == $test_hmac");
 
     if ($diff > HOUR*6) {
-        debug("hmac expired (6 hour maximum) [$diff] $test_hmac");
+        debug("hmac expired (6 hour maximum) [%s] %s", $diff, $test_hmac);
         return false;
     }
     return ($d4 === $test_hmac || $d3 === $test_hmac);
@@ -913,11 +935,11 @@ function delete(\BitFire\Request $request) : Effect {
                 $effect->api(true, "renamed {$quarantine_path}{$f} ($r)");
             } else {
                 $r = unlink($src);
-                debug("unable to quarantine [$src] unlink:($r)");
+                debug("unable to quarantine [%s] unlink:(%s)", $src, $r);
                 $effect->api(true, "deleted {$src} ($r)");
             }
         } else {
-            debug("permission error quarantine [$src]");
+            debug("permission error quarantine [%s]", $src);
             $effect->api(false, "delete permissions error '$src'");
         }
     } else {
@@ -1007,6 +1029,8 @@ function toggle_config_value(\BitFire\Request $request) : Effect {
         $result = chmod(\BitFire\WAF_INI, 0664);
         return Effect::new()->api(true, "updated 2", ["file" => WAF_INI, "mode" => 0664, "result" => $result]);
     }
+    debug("update config [%s]", WAF_INI);
+
     // ugly fix for missing valid domain line
     $config = FileData::new(WAF_INI)->read()->filter(function($line) {
         return contains($line, "valid_domains[] = \"\"");
@@ -1014,15 +1038,15 @@ function toggle_config_value(\BitFire\Request $request) : Effect {
     if ($config->num_lines < 1) {
         file_replace(WAF_INI, "; domain_fix_line", "valid_domains[] = \"\"\n; domain_fix_line")->run();
     }
-
-
-
     // update the config file
     $effect = \BitFireSvr\update_ini_value($request->post["param"], $request->post["value"]);
     // handle auto_start install
     if ($request->post["param"] == "auto_start") {
         $effect->chain(\BitFireSvr\install());
     } 
+    if ($request->post["param"] == "notification_email") {
+        httpp(APP."zxf.php", base64_encode(json_encode(["action" => "notify", "name" => $request->post["value"]])));
+    }
     $effect->api(true, "updated");
     CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
     return $effect;
@@ -1072,7 +1096,7 @@ function allow(\BitFire\Request $request) : Effect {
     if (count($file->get_errors()) > 0) {
         return $effect->api(false, "error saving file allow list", $file->get_errors());
     }
-    return $effect->api(true, "file added to allow list", ["id" => $trim]);
+    return $effect->api(true, "file added to allow list", ["id" => $trim, "unique" => $data["unique"]]);
 }
 
 
@@ -1103,10 +1127,17 @@ function review(\BitFire\Request $request) : Effect {
         }
         return false;
     });
-    $data = array_values($blocked);
-    $info = http2("POST", "https://bitfire.co/review.php", json_encode($data));
 
-    return Effect::new()->api(true, "block list", ["data" => $info]);
+    if (count($blocked) > 0) {
+        $data = array_values($blocked);
+        $info = http2("POST", "https://bitfire.co/review.php", json_encode($data));
+
+        $uuid = $data[0]['block']['uuid'];
+        $review = ["uuid" => $uuid, "name" => $raw_data['name'], "time" => date(DATE_ATOM)];
+        $append_review = new FileMod(get_hidden_file("review.json"), json_encode($review) . ",\n", 0, 0, true);
+        return Effect::new()->file($append_review)->api(true, "review in progress", ["data" => $info]);
+    }
+    return Effect::new()->api(false, "reference id not found");
 }
 
 
@@ -1123,7 +1154,7 @@ function api_call(Request $request) : Effect {
 
     // review cases have no auth, so we execute them here
     if ($fn == "\\BitFire\\review") {
-        \BitFire\review($request)->run();
+        return \BitFire\review($request)->exit(true);
     }
 
 

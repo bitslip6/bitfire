@@ -595,7 +595,7 @@ function cuckoo_open_mem(int $size_in_bytes, $token, bool $reduced = false)
         $GLOBALS['bf_err_skip'] = false;
         $id = @shmop_open($token, 'c', 0666, $size_in_bytes);
         if ($id === false) {
-            debug("shmop: unable to allocate $size_in_bytes shared memory token:[" . dechex($token) . "]");
+            debug("shmop: unable to allocate %d shared memory token:[%s]", $size_in_bytes, dechex($token));
         }
     } else if ($reduced) {
         debug("NOTICE: reduced cache size to %d bytes", $size_in_bytes);
