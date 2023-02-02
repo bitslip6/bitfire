@@ -18,7 +18,9 @@
 
 
   <p align="center">
+  <a href="https://bitfire.co/">
 enterprise class security for everyone
+</a>
     <br />
     <a href="https://bitfire.co/bitfire-install"><strong>BitFire Install Guide »</strong></a>
     <br />

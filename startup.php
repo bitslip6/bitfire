@@ -20,7 +20,7 @@ if (defined('BitFire\\WAF_ROOT')) {
 }
 // PHP version guard
 if (PHP_VERSION_ID < 70000) {
-    header('x-bitfire: requires php >= 7.1');
+    header('x-bitfire: failed php >= 7.1');
     return;
 }
 
@@ -55,6 +55,30 @@ if (function_exists('xhprof_enable') && file_exists(WAF_ROOT . "profiler.enabled
 
 // load the firewall program code
 include \BitFire\WAF_ROOT . 'error_handler.php';
+include \BitFire\WAF_SRC . 'const.php';
+
+// capture any bitfire fatal errors
+// send any errors that have been queued after the page has been served
+register_shutdown_function(function () {
+    $e = error_get_last();
+    // if last error was from bitfire, log it
+
+    if (is_array($e) 
+        && in_array($e['type']??-1, [E_ERROR, E_CORE_ERROR, E_COMPILE_ERROR]) 
+        && stripos($e['file'] ?? '', 'bitfire') > 0) {
+            $id = uniqid();
+	    $e['php_ver'] = phpversion();
+	    $e['ver'] = BITFIRE_VER;
+	    $e['id'] = $id;
+        file_get_contents("https://bitfire.co/err.php?msg=".base64_encode(json_encode($e)));
+
+        echo "<h1>Fatal Error Detected.</h1><p>please contact support - info@bitfire.co.</p><p>reference: $id</p>";
+    }
+
+    // send any errors that have been queued after the page has been served
+    on_err(-100, "", "", 0);
+});
+
 include \BitFire\WAF_SRC . 'bitfire.php';
 
 try {
