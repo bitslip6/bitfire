@@ -211,7 +211,7 @@ function activate_bitfire() {
     Config::set_value("debug", true);
     $effect = \BitfireSvr\bf_activation_effect();
     $effect->hide_output()->run();
-    httpp(APP."zxf.php", base64_encode(\ThreadFin\en_json(["action" => "activate", "name" => $_SERVER['SERVER_NAME']??"na"])));
+    httpp(APP."zxf.php", base64_encode(json_encode(["action" => "activate", "name" => $_SERVER['SERVER_NAME']??"na"])));
 
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
@@ -239,7 +239,7 @@ function deactivate_bitfire() {
     // this should also have been done in the uninstall step...
     CacheStorage::get_instance()->delete();
 
-    httpp(APP."zxf.php", \ThreadFin\en_json(["action" => "deactivate", "name" => $_SERVER['SERVER_NAME']??"na"]));
+    httpp(APP."zxf.php", base64_encode(json_encode(["action" => "deactivate", "name" => $_SERVER['SERVER_NAME']??"na"])));
 
     @chmod(\BitFire\WAF_INI, FILE_W);
 }

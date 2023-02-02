@@ -15,7 +15,6 @@ dirbuster
 dotdotpwn
 evil
 flood
-secur
 radar
 bust
 havij
@@ -30,7 +29,6 @@ nessus
 netspark
 nikto
 nmap
-audit
 openvas
 pangolin
 paros
@@ -38,10 +36,9 @@ pmafind
 gamehall
 qualys
 springen
-sql
+sqlmap
 lobster
 exploit
-toata
 uil2pn
 user-agent
 vega
@@ -50,13 +47,11 @@ w3af
 webinspect
 webshag
 fuzz
-whatweb
 whcc
 hash
 pwn
 detect
 enemy
-acunetix
 snatch
 spyder
 backdoor
@@ -74,7 +69,6 @@ whisker
 rip
 suck
 zeus
-massscan
 phantom
 slimer
 k2spider

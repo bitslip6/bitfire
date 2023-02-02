@@ -1,10 +1,12 @@
 <?php
 namespace BitFire;
 
+use function BitFireSvr\update_ini_value;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
 use function ThreadFin\httpp;
 use BitFire\Config as CFG;
+
 
 
 function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
@@ -13,7 +15,10 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
     // send any errors that have been queued
     if ($errno < -99) {
         array_walk($to_send, function ($data) {
-            httpp(APP . "err.php?file={$data['err_file']}&line={$data['err_line']}", base64_encode(json_encode($data)));
+            $msg = sprintf("file=%s&line=%s&errno=%s&errstr=%s&phpver=%s&type=%s&ver=%s", 
+                urlencode($data['err_file']), urlencode($data['err_line']), urlencode($data['errno']),
+                urlencode($data['errstr']), urlencode($data['php_ver']), urlencode($data['type']), urlencode($data['ver']));
+            file_put_contents(APP . "err.php?$msg", base64_encode(json_encode($data)));
         });
         return false;
     }
@@ -48,7 +53,8 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
             $err['errno'] == $data['errno'] &&
             $err['err_line'] == $data['err_line'] &&
             $err['err_file'] == $data['err_file']
-        ) { return false; }
+	) { 
+		return false; }
     }
 
     // debug data if we have it
@@ -67,6 +73,7 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
         $data['bt'] = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
         $to_send[] = $data;
     }
+    //print_r($to_send);
 
     return false;
 }
@@ -74,15 +81,4 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
 // capture any bitfire errors
 $error_handler = set_error_handler('\BitFire\on_err');
 
-// capture any bitfire fatal errors
-// send any errors that have been queued after the page has been served
-register_shutdown_function(function () {
-    $e = error_get_last();
-    // if last error was from bitfire, log it
-    if (is_array($e) && $e['type'] ?? -1 == E_ERROR && stripos($e['file'] ?? '', 'bitfire') > 0) {
-        on_err(1, $e['message'], "({$e['file']})", $e['line']);
-    }
 
-    // send any errors that have been queued after the page has been served
-    on_err(-100, "", "", 0);
-});
