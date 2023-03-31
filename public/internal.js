@@ -215,6 +215,7 @@ window.addEventListener('DOMContentLoaded', (event) => {
   document.addEventListener("visibilitychange", function() {
       if (document.visibilityState === 'hidden') {
           let el = JSON.parse(sessionStorage.getItem("bitfire"));
+          el.ver = '__VERSION__'; 
           navigator.sendBeacon("https://bitfire.co/ss.php", JSON.stringify(el));
           sessionStorage.setItem("bitfire", JSON.stringify([]));
       }
