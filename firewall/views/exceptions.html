@@ -84,10 +84,21 @@
                   BitFire Blocking Exceptions
                 </h3>
                 <br>
-                <span class="text-muted">Exceptions are rules unique to your site which allow normal functionality which may otherwise be blocked. This can happen when plugin developers use features in odd ways that the firewall mistakenly blocks.  Adding an exception will allow the feature to continue working.</span>
+                <p class="text-secondary">
+                  Exceptions are rules unique to your website which allow normal functionality which may otherwise be blocked by the BitFire firewall.
+                  This can happen when plugin developers use features in odd ways that the firewall mistakenly blocks.
+                </p>
+                <p class="text-secondary">
+                  Exceptions are added automatically during the first 5 days of install. You can manually add exceptions to blocked requests by 
+                  clicking the magic wand icon on the dashboard blocking page, or by manually editing the exception file.
+                </p>
+                <hr>
+                <p class="text-muted">You can manually edit this file at: {{exception_file}}</pan>
                 <hr>
 
-                <label class="form-label left pl-3" style="margin-right:70px; margin-left:-10px"> Auto-Learn Exceptions </label>
+
+
+                <label class="form-label left pl-3" style="margin-right:70px; margin-left:-10px;"> Auto-Learn Exceptions </label>
                 <div class="form-switch left ml-2">
                     <input class="form-check-input success" autocomplete="off" id="dynamic_exceptions" type="checkbox" {{checked}} onclick="toggle('dynamic_exceptions')" data-bs-toggle="tooltip" data-bs-placement="top" title="Enable dynamic exception learning to prevent false positives.  Learns for 5 days.">
                 </div>

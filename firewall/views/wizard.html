@@ -226,11 +226,11 @@
                 <h2 id="wizard_title" class="mb-2 mt-4">
                 </h2>
 
-                <p id="wizard_body" class="text-muted" style="height:60px">
+                <p id="wizard_body" class="text-muted" style="min-height:60px">
                 </p>
 
                 <div class="col-auto tog" id="wizard_enable" data-enabled="false" data-title="Enable Feature" data-toggle="false">
-                  <label class="form-label left" style="margin-right:70px; margin-left:-10px"> Enabled </label>
+                  <label class="form-label left" style="margin-right:70px; margin-left:-10px" id="wizard_label"> Enabled </label>
                   <div class="form-check form-switch right">
                       <input class="form-check-input success" autocomplete="off" id="wizard_enable_tog" type="checkbox" onclick="toggle_wiz(this)" data-bs-toggle="tooltip" data-bs-placement="top" title="Enable setting">
                       <label class="form-check-label" for="wizard_enable_tog"></label>
@@ -306,20 +306,23 @@
     ["enforce_ssl_1year", (document.location.protocol == 'https:')],
     ["require_full_browser", true],
     ["whitelist_enable", true],
+    ["hacked", false],
     ["notification_email", "{{your_email}}"]
   ];
   window.WIZ = [];
   window.WIZ[0] = {'title': 'Always On Protection', 'descr': 'Always on protection runs the firewall as the very first script before any plugins load.  This ' +
-'will protect direct access to any script on your server.\nWorks for 99.99% of all installs.  Recommended setting.'};
+'will protect direct access to any script on your server.\nWorks for 99.99% of all installs.  Recommended setting.', 'label': 'Enabled'};
   window.WIZ[1] = {'title': 'Allow IP Blocking', 'descr': 'IP Blocking will add a fast block for IP address that are sending multiple ' +
-'attack probes.  This will block all traffic from the offending IP address from 1 - 24 hours. <br><strong class="text-secondary">Enable if you are under active attack.</strong>' };
+'attack probes.  This will block all traffic from the offending IP address from 1 - 24 hours. <br><strong class="text-secondary">Enable if you are under active attack.</strong>', 'label': 'Enabled' };
   window.WIZ[2] = {'title': 'Force SSL', 'descr' : 'This will prevent non SSL traffic from accessing your web site.  All non-SSL ' +
-'traffic will be disabled.  Recommended setting if your site supports HTTPS.' };
+'traffic will be disabled.  Recommended setting if your site supports HTTPS.', 'label': 'Enabled' };
   window.WIZ[3] = {'title': 'Require Full Browser', 'descr': 'Send javascript challenge to verify browsers are real. This will stop ' +
-'99.99% of all automated attacks.  Recommended setting, <small>(may reduce server traffic by eliminating bots)</small>.'};
+'99.99% of all automated attacks.  Recommended setting, <small>(may reduce server traffic by eliminating bots)</small>.', 'label': 'Enabled'};
   window.WIZ[4] = {'title': 'Block Impersonating Robots', 'descr': 'Hackers often impersonate search engines like GoogleBot, Bing and others to bypass filtering. ' +
-'BitFire can prevent these attacks by verifying over 100 commonly used search engines and 3\'rd party services.'};
-  window.WIZ[5] = {'title': 'Email Notifications', 'descr': 'BitFire can notify you if it detects malware or security issues with your plugins and themes. ' +
+'BitFire can prevent these attacks by verifying over 100 commonly used search engines and 3\'rd party services.', 'label': 'Enabled'};
+  window.WIZ[5] = {'title': 'Is your website compromised?', 'descr': 'if you have no reason to suspect your security has been compromised, BitFire ' +
+  'will mark all your files as clean and make malware scanning much easier.', 'label': 'Compromised?'};
+  window.WIZ[6] = {'title': 'Email Notifications', 'descr': 'BitFire can notify you if it detects malware or security issues with your plugins and themes. ' +
 'Where would you like critical notifications to go?'};
 
 
@@ -350,8 +353,11 @@
 
     let t = window.WIZ[pos]["title"].replace("\n", "<br>");
     let d = window.WIZ[pos]["descr"].replace("\n", "<br>");
+    let l = window.WIZ[pos]["label"];
+
     GBI("wizard_title").innerHTML = t;
     GBI("wizard_body").innerHTML = d;
+    GBI("wizard_label").innerHTML = l;
     GBI("wizard_next").setAttribute("data-idx", pos);
     GBI("progress_bar").setAttribute("aria-valuenow", percent);
 

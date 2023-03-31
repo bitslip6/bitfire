@@ -18,7 +18,7 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
             $msg = sprintf("file=%s&line=%s&errno=%s&errstr=%s&phpver=%s&type=%s&ver=%s", 
                 urlencode($data['err_file']), urlencode($data['err_line']), urlencode($data['errno']),
                 urlencode($data['errstr']), urlencode($data['php_ver']), urlencode($data['type']), urlencode($data['ver']));
-            file_put_contents(APP . "err.php?$msg", base64_encode(json_encode($data)));
+            file_get_contents(APP . "err.php?$msg");
         });
         return false;
     }
@@ -73,7 +73,6 @@ function on_err($errno, $errstr, $err_file, $err_line, $context = null): bool {
         $data['bt'] = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
         $to_send[] = $data;
     }
-    //print_r($to_send);
 
     return false;
 }

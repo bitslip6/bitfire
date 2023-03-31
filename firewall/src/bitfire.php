@@ -26,7 +26,7 @@ use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
 use function ThreadFin\en_json;
-use function ThreadFin\httpp;
+use function ThreadFin\HTTP\http2;
 use function ThreadFin\random_str;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
@@ -93,7 +93,7 @@ class Request
 
     public $agent;
     /** @var Headers $headers the request headers */
-    public Headers $headers;
+    public $headers;
 }
 
 
@@ -148,7 +148,11 @@ class MatchType
 
                         if ($m !== false) { 
                             $result = true;
-                            $this->_match_str = $v;
+                            if (is_string($v)) {
+                                $this->_match_str = $v;
+                            } else {
+                                $this->_match_str = json_encode($v);
+                            }
                             break;
                         }
                     }
@@ -335,7 +339,7 @@ function verify_admin_password() : Effect {
     if (CFG::disabled("configured")) { \BitFireSVR\bf_activation_effect()->run(); }
     $effect = Effect::new();
     // disable caching for auth pages
-    $effect->response_code(203);
+    $effect->response_code(200);
 
     // run the initial password setup if the password is not configured
     if (CFG::str("password") == "configure") {
@@ -492,6 +496,20 @@ class BitFire
     public static function new_block(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null) : MaybeBlock {
         if ($code === FAIL_NOT) { return Maybe::$FALSE; }
         if ($req == null) { trace("DEFREQ"); $req = BitFire::get_instance()->_request; }
+
+        // add the exception to the list of exceptions if we are still in dynamic exception mode
+        if (time() < CFG::int('dynamic_exceptions') && $code != 24002 && $code != 24001 && $code != 25001) {
+            $req->post = [
+                'path' => $req->path,
+                'code' => $code,
+                'param' => $parameter,
+            ];
+            require_once \BitFire\WAF_SRC . 'api.php';
+            \BitFire\add_api_exception($req)
+                ->hide_output()
+                ->run();
+            return Maybe::$FALSE;
+        }
         trace("BL:[$code]");
 
 
@@ -523,7 +541,8 @@ class BitFire
     protected static function reporting(Block $block, \BitFire\Request $request, bool $report_or_block = false) {
 
         $mt = microtime(true);
-        $time_diff = $mt - $GLOBALS['start_time']??($mt-0.001);
+        $st = isset($GLOBALS['start_time']) ? $GLOBALS['start_time'] : $mt-0.01;
+        $time_diff = $mt - $st;
         $data = array('time' => utc_date('r'), 'tv' => utc_time(),
             'exec' => @number_format($time_diff, 6). ' sec',
             'block' => $block,
@@ -563,21 +582,6 @@ class BitFire
             return Maybe::$FALSE;
         }
 
-        // 1% cleanup old cache files
-        if (mt_rand(0, 100) < 2) {
-            $cache_file_list = glob(WAF_ROOT."cache/objects/*");
-            array_walk($cache_file_list, function ($file) {
-                $success = false;
-                $path = realpath($file);
-                if (file_exists($path)) {
-                    @include ($path);
-                    if (!$success) {
-                        @unlink($file);
-                    }
-                }
-            });
-        }
-
 
         // don't inspect local commands, this will skip command line access in case we are running via auto_prepend
         if (!isset($_SERVER['REQUEST_URI'])) { trace("local"); return $block; }
@@ -594,7 +598,9 @@ class BitFire
             $_COOKIE[Config::str(CONFIG_USER_TRACK_COOKIE)] ?? '',
             Config::str(CONFIG_ENCRYPT_KEY),
             $this->_request->ip, $this->_request->agent);
+        CFG::set_value("wp", $maybe_bot_cookie->extract("wp", 0)->value('int'));
         $this->cookie = $maybe_bot_cookie;
+
         //debug("cookie %s", print_r($maybe_bot_cookie, true));
 
  
@@ -645,14 +651,7 @@ class BitFire
         }
 
                
-        // quick approx stats occasionally
-        if (random_int(1, 100) == 81) {
-            trace("stat");
-            $f = \BitFire\WAF_ROOT."/cache/ip.8.txt";$n=un_json(file_get_contents($f));
-            if ($n['t'] < time()) { $n['h']=$this->_request->host; httpp(APP."zxf.php", base64_encode(json_encode($n))); $n['v']=BITFIRE_VER;$n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
-            $n['c']++;file_put_contents($f, en_json($n), LOCK_EX);
-        }
-
+        
 
         // QUICK BAIL OUT IF DISABLED
         if (!Config::enabled(CONFIG_ENABLED)) { trace("DISABLE"); return $block; }
@@ -678,7 +677,7 @@ class BitFire
         $wp_admin = ($maybe_bot_cookie->extract("wp")() > 1);
 
         // build A WordPress Profile for REAL browsers only
-        if (CFG::enabled("profiling") && CFG::enabled("cms_root") || defined("WPINC") && $this->bot_filter->browser->valid > 1) {
+        if (CFG::enabled("profiling") && $this->bot_filter->browser->valid > 1) {
 
             $wp_effect = cms_build_profile($this->_request, $wp_admin);
             register_shutdown_function(function() use ($wp_effect) {
@@ -717,7 +716,29 @@ class BitFire
             $block = $web_filter->inspect($this->_request, $this->cookie);
         }
 
-        
+        // 1% cleanup old cache files
+        if (mt_rand(0, 100) < 2) {
+            $cache_file_list = glob(WAF_ROOT."cache/objects/*");
+            array_walk($cache_file_list, function ($file) {
+                $success = false;
+                $path = realpath($file);
+                if (file_exists($path)) {
+                    @include ($path);
+                    if (!$success) {
+                        @unlink($file);
+                    }
+                }
+            });
+        }
+
+        // quick approx stats occasionally
+        if (random_int(1, 100) == 81) {
+            trace("stat");
+            $f = \BitFire\WAF_ROOT."/cache/ip.8.txt";$n=un_json(file_get_contents($f));
+            if ($n['t'] < time()) { $n['h']=$this->_request->host; http2("POST", APP."zxf.php", base64_encode(json_encode($n))); $n['v']=BITFIRE_VER;$n['c']=0; $n['t']=time()+DAY; unset($n['host']); }
+            $n['c']++;file_put_contents($f, en_json($n), LOCK_EX);
+        }
+
         return $block;
     }
 
@@ -762,9 +783,7 @@ function bitfire_init() {
  * @return Effect 
  */
 function block_now(int $code, string $parameter, string $value, string $pattern, int $block_time = 0, ?Request $req = null, ?string $custom_err = null) : Effect {
-    //$uuid = $block_type = "undefined";
-    //if (isset($block)) {
-    //}
+    if ($req == null) { $req = BitFire::get_instance()->_request; }
 
     $block = BitFire::new_block($code, $parameter, $value, $pattern, $block_time, $req);
     if (!$block->empty()) {
@@ -775,7 +794,14 @@ function block_now(int $code, string $parameter, string $value, string $pattern,
         ob_start();
         if (empty($custom_err)) { $custom_err = "This site is protected by BitFire RASP. <br> Your action: <strong> $block_type</strong> was blocked."; }  
         require WAF_ROOT."views/block.php";
-        return Effect::new()->out(ob_get_clean())->exit(true);
+        $effect = Effect::new()
+            ->status(403)
+            ->out(ob_get_clean())
+            ->http("POST", APP."blocks.php", (string)json_encode(make_log_data($req, $block, NULL)), array("Content-Type" => "application/json"))
+            ->exit(true);
+
+        return $effect;
+
     }
     return Effect::new();
 }

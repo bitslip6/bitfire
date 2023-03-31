@@ -33,7 +33,7 @@
 <script>
 document.getElementById("review").addEventListener("click", function () {
 let e=window.event; let data={"uuid":'<?php echo $uuid;?>',"x":e.clientX,"y":e.clientY}; console.log(data);
-let name = prompt("short message for the administrator to review your request", "you@youremail.com");
+let name = prompt("short message for the administrator to review your request", "");
 data["name"] = name;
 if (name != null) {
     const response = fetch("/?BITFIRE_API=review", {

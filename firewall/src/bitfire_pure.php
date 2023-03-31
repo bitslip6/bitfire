@@ -18,9 +18,10 @@ use ThreadFin\FileMod;
 
 use const ThreadFin\DAY;
 
+use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\find;
-use function ThreadFin\httpp;
+use function ThreadFin\HTTP\http2;
 use function ThreadFin\map_mapvalue;
 use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\random_str;
@@ -163,7 +164,7 @@ function filter_block_exceptions(Block $block, array $exceptions, \BitFire\Reque
 }
 
 function process_server2(array $server) : Request {
-    $url = parse_url(filter_input(INPUT_SERVER, 'REQUEST_URI') ?? '//localhost/');
+    $url = parse_url($_SERVER['REQUEST_URI'] ?? '//localhost/');
     $request = new Request();
     $request->ip = process_ip($server);
     $request->host = parse_host_header($server['HTTP_HOST'] ?? '');
@@ -236,21 +237,23 @@ function process_request2(array $get, array $post, array $server, array $cookies
         $request->post_raw = file_get_contents("php://input");
         // handle json encoded post data
         if ($server["CONTENT_TYPE"]??"" === "application/json" && !empty($request->post_raw)) {
-            $len = strlen($request->post_raw);
-            $x = json_decode($request->post_raw, true);
-            if (is_array($x)) {
-                trace("CT:AJOK:$len");
-                $request->post = array_merge($request->post, $x);
-            } else {
-                trace("CT:AJERR");
-                debug("JSON ERR (%d) [%s]", $len, substr($request->post_raw, 0, 2048));
+            if (isset($request->post_raw[0]) && contains($request->post_raw[0], ["[", "{"])) {
+                $len = strlen($request->post_raw);
+                $x = json_decode($request->post_raw, true);
+                if (is_array($x)) {
+                    trace("CT:AJOK:$len");
+                    $request->post = array_merge($request->post, map_mapvalue($x, $fn));
+                } else {
+                    trace("CT:AJERR");
+                    debug("JSON ERR (%d) [%s]", $len, substr($request->post_raw, 0, 2048));
+                }
             }
         }
         $request->post_freq = freq_map($request->post);
     } else {
         $request->post_raw = "N/A";
         $request->post_freq = [];
-        $request->post = [];
+        $request->post = "";
     }
 
     return $request;
@@ -424,13 +427,13 @@ function post_request(\BitFire\Request $request, ?Block $block, ?IPData $ip_data
     }, function() { return \BitFire\BITFIRE_METRICS_INIT; } , DAY);
 
     $content = json_encode($data)."\n";
-    httpp(APP."blocks.php", $content, array("Content-Type" => "application/json"));
+    http2("POST", APP."blocks.php", $content, array("Content-Type" => "application/json"));
 }
 
 /**
  * create the base log data
  */
-function make_log_data(\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : array {
+function make_log_data(?\BitFire\Request $request, ?Block $block, ?IPData $ip_data) : array {
 
     if ($block == NULL) { $block = new Block(0, "n/a", "n/a", "n/a"); }
     

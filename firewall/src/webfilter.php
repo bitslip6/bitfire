@@ -77,7 +77,10 @@ class WebFilter {
     
     public function inspect(\BitFire\Request $request, MaybeA $cookie) : MaybeBlock {
         $block = MaybeBlock::$FALSE;
-        if ((count($request->get) + count($request->post)) == 0) {
+        $c = is_array($request->get) ? count($request->get) : 0;
+        $p = is_array($request->post) ? count($request->post) : 0;
+
+        if ($c + $p == 0) {
             return $block;
         } 
 
@@ -87,31 +90,31 @@ class WebFilter {
             $cache = CacheStorage::get_instance();
             
             // update keys and values
-            $keyfile = \BitFire\WAF_ROOT."cache/keys2.raw";
-            $valuefile = \BitFire\WAF_ROOT."cache/values2.raw";
+            $key_file = \BitFire\WAF_ROOT."cache/keys2.raw";
+            $value_file = \BitFire\WAF_ROOT."cache/values2.raw";
             $update = -1; // file does not exist
-            if (file_exists($keyfile)) { 
-                $mtime = filemtime($keyfile);
+            if (file_exists($key_file)) { 
+                $mtime = filemtime($key_file);
                 if ($mtime < time()-DAY) { $update = 2; }
-                else if (filesize($keyfile) < 256) { $update = 3; }
+                else if (filesize($key_file) < 256) { $update = 3; }
                 else { $update = 0; }
             }
-            if ($update != 0) { trace("UP[$update]"); update_raw($keyfile, $valuefile)->run(); }
+            if ($update != 0) { trace("UP[$update]"); update_raw($key_file, $value_file)->run(); }
 
             // the reduction
-            $keys = $cache->load_or_cache("webkeys2", DAY, BINDL('\ThreadFin\recache2_file', $keyfile));
-            $values = $cache->load_or_cache("webvalues2", DAY, BINDL('\ThreadFin\recache2_file', $valuefile));
+            $keys = $cache->load_or_cache("webkeys2", DAY, BINDL('\ThreadFin\recache2_file', $key_file));
+            $values = $cache->load_or_cache("webvalues2", DAY, BINDL('\ThreadFin\recache2_file', $value_file));
             $c1 = count($keys); $c2 = count($values);
 
-            if ($c1 <= 1 || $c2 <= 1) { update_raw($keyfile, $valuefile)->run(); }
+            if ($c1 <= 1 || $c2 <= 1) { update_raw($key_file, $value_file)->run(); }
             if ($c1 <= 5) {
                 // looks like encryption is broken here ...
-                $keys = \ThreadFin\recache2_file($keyfile);
+                $keys = \ThreadFin\recache2_file($key_file);
                 trace("keys: " . count($keys));
                 $cache->save_data("webkeys2", $keys, DAY);
             }
             if ($c2 <= 5) {
-                $values = \ThreadFin\recache2_file($valuefile);
+                $values = \ThreadFin\recache2_file($value_file);
                 trace("values: " . count($values));
                 $cache->save_data("webvalues2", $values, DAY);
             }
@@ -121,12 +124,16 @@ class WebFilter {
 
             $x = $cookie->extract("x")->value("int");
             // always check on get params
-            $block->do_if_not('\ThreadFin\map_whilenot', $request->get, $reducer, NULL);
+            if (is_array($request->get)) {
+                $block->do_if_not('\ThreadFin\map_whilenot', $request->get, $reducer, NULL);
+            }
             // don't check for post if user can
-            if (empty($x) || $x < 2) {
+            if (is_array($request->post) && empty($x) || $x < 2) {
                 $block->do_if_not('\ThreadFin\map_whilenot', $request->post, $reducer, NULL);
             }
-            $block->do_if_not('\ThreadFin\map_whilenot', $request->cookies, $reducer, NULL);
+            if (is_array($request->cookies)) {
+                $block->do_if_not('\ThreadFin\map_whilenot', $request->cookies, $reducer, NULL);
+            }
         }
 
 
@@ -159,12 +166,16 @@ class WebFilter {
 function sql_filter(\BitFire\Request $request) : MaybeBlock {
     trace("sql");
     foreach ($request->get as $key => $value) {
-        $maybe = search_sql($key, flatten($value), $request->get_freq[$key]);
-        if (!$maybe->empty()) { return $maybe; }
+        if (isset($request->get_freq[$key])) {
+            $maybe = search_sql($key, flatten($value), $request->get_freq[$key]);
+            if (!$maybe->empty()) { return $maybe; }
+        }
     }
     foreach ($request->post as $key => $value) {
-        $maybe = search_sql($key, flatten($value), $request->post_freq[$key]);
-        if (!$maybe->empty()) { return $maybe; }
+        if (isset($request->post_freq[$key])) {
+            $maybe = search_sql($key, flatten($value), $request->post_freq[$key]);
+            if (!$maybe->empty()) { return $maybe; }
+        }
     }
     return Maybe::$FALSE;
 }
@@ -267,6 +278,8 @@ function search_short_sql(string $name, string $value) : MaybeA {
  * this could be way more functional, but it would be slower, choices...
  */
 function search_sql(string $name, string $value, ?array $counts) : MaybeA {
+    $block = Maybe::$FALSE;
+
     $p1 = strpos($value, "union");
     if ($p1 !== false) {
         $p2 = strpos($value, "select", $p1);
@@ -279,21 +292,16 @@ function search_sql(string $name, string $value, ?array $counts) : MaybeA {
     }
 
 
-    if (preg_match('/(select\s+[\@\*])/sm', $value, $matches)) {
-        return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
-    }
-
-    // block short sql,
-    $total_control = sum_sql_control_chars($counts);
-
+    // strip comments and look for injections
     $stripped_comments = strip_comments($value);
-
     if (preg_match('/(select\s+[\@\*])/sm', $stripped_comments->value, $matches) || preg_match('/(select[^a-zA-Z0-9]+(from|if))/sm', $stripped_comments->value, $matches)) {
         return BitFire::new_block(FAIL_SQL_SELECT, $name, $value, ERR_SQL_INJECT, BLOCK_NONE);
     }
+
         
-    $block = Maybe::$FALSE;
+    // block short sql,
     // look for the short injection types
+    $total_control = sum_sql_control_chars($counts);
 	if ($total_control > 0) { 
 		$block->do_if_not('\BitFire\search_short_sql', $name, $value);
 		$block->do_if_not('\BitFire\search_short_sql', $name, $stripped_comments->value);
@@ -448,7 +456,9 @@ function static_match($key, $needle, string $value, string $name) : MaybeA {
 /**
  * take character counts and return number which are sql control chars
  */
-function sum_sql_control_chars(array $counts) : int {
+function sum_sql_control_chars(?array $counts) : int {
+    if (empty($counts)) { return 0; }
+
     return array_sum(array_intersect_key($counts, SQL_CONTROL_CHARS));
 }
 

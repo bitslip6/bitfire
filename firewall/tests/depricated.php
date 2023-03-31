@@ -43,7 +43,7 @@ function process_access_file(string $file_name): array
     $batch = array();
     $exceptions = array();
     foreach (line_at_a_time($file_name) as $line) {
-        if ($batch_size++ >= 500) {
+        if ($batch_size++ >= 200) {
             $exceptions = array_merge($exceptions, process_batch($batch));
             $batch_size = 0;
             $batch = array();

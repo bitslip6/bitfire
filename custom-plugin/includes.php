@@ -34,12 +34,11 @@ const PACKAGE_FILES = ["readme.txt", "README.txt", "package.json"];
 /**
  * get the wordpress version from a word press root directory
  */
-function get_cms_version(string $root_dir): string
-{
+function get_cms_version(string $root_dir): string {
     $full_path = "$root_dir/wp-includes/version.php";
     $wp_version = "1.0";
     if (file_exists($full_path)) {
-        include $full_path;
+        @include $full_path;
     }
     return trim_off($wp_version, "-");
 }
@@ -170,7 +169,7 @@ function mail(string $subject, string $message) {
     $domain_list = CFG::arr("valid_domains");
     $domain = end($domain_list);
     $headers = "From: bitfire@$domain\r\nReply-To: no-reply@$domain\r\nX-Mailer: PHP/".phpversion();
-    mail(CFG::str("email"), $subject, $message, $headers);
+    // ma il(CFG::str("email"), $subject, $message, $headers);
 } 
 
 const PARAM_SEARCH = 1;

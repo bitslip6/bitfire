@@ -239,8 +239,6 @@ function deactivate_bitfire() {
     // this should also have been done in the uninstall step...
     CacheStorage::get_instance()->delete();
 
-    httpp(APP."zxf.php", base64_encode(json_encode(["action" => "deactivate", "name" => $_SERVER['SERVER_NAME']??"na"])));
-
     @chmod(\BitFire\WAF_INI, FILE_W);
 }
 

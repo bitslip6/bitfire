@@ -155,7 +155,7 @@
                 </span>
               </strong>
               <span class="card-header-title text-secondary right">Enable</span>
-              <small class="text-muted"><i>(<a href="https://bitfire.co/en/support-rasp-overview" target="_blank">Runtime Application Self-Protection <i class="fe fe-external-link"></i></a>)</i></small>
+              <small class="text-secondary"><i>(<a href="https://bitfire.co/en/support-rasp-overview" target="_blank">Runtime Application Self-Protection <i class="fe fe-external-link"></i></a>)</i></small>
             </h2>
             {{info}}
           </div>
@@ -171,7 +171,7 @@
                     <h4 class="font-weight-base mb-1">
                       Block WordPress Scanners
                     </h4>
-                    <small class="text-muted">
+                    <small class="text-secondary">
                       Block scanning for WordPress vulnerable plugins and themes. 
                     </small>
 
@@ -180,58 +180,6 @@
                   </div>
                 </div> <!-- / .row -->
               </div>
-
-              <div class="list-group-item">
-                <div class="row align-items-center">
-                  <div class="col">
-
-                    <h4 class="font-weight-base mb-1">
-                      RASP FileSystem Protection
-                    </h4>
-                    <small class="text-muted">
-                      Force RASP Access Control on all PHP files. Prevent PHP files from being modified or deleted unless logged in as Administrator.
-                    </small>
-                  </div>
-
-                  <div class="col-auto tog" id="rasp_filesystem_con" data-enabled="{{rasp_filesystem}}" data-title="lock changing any php files unless logged in as administrator" data-toggle="true">
-                  </div>
-                </div>
-              </div>
-
-              <div class="list-group-item">
-                <div class="row align-items-center">
-                  <div class="col">
-
-                    <h4 class="font-weight-base mb-1">
-                      RASP Database Protection
-                    </h4>
-                    <small class="text-muted">
-                      Force RASP Checks on all database queries. Prevent altering sensitive DB tables unless logged in as Administrator.
-                    </small>
-                  </div>
-
-                  <div class="col-auto tog" id="rasp_db_con" data-enabled="{{rasp_db}}" data-title="lock all user account changes unless logged in as administrator" data-toggle="true">
-                  </div>
-                </div>
-              </div>
-
-              <div class="list-group-item">
-                <div class="row align-items-center">
-                  <div class="col">
-
-                    <h4 class="font-weight-base mb-1">
-                      RASP Network Protection
-                    </h4>
-                    <small class="text-muted">
-                      Prevent connecting to bot command and control networks, stop man in the middle attacks.
-                    </small>
-
-                  </div>
-                  <div class="col-auto tog" id="rasp_js_con" data-enabled="{{rasp_js}}" data-title="Lock user account changes from any page other than the users.php WordPress editor page" data-toggle="true">
-                  </div>
-                </div> <!-- / .row -->
-              </div>
-
 
               <div class="list-group-item">
                 <div class="row align-items-center">
@@ -249,6 +197,77 @@
                   </div>
                 </div> <!-- / .row -->
               </div>
+
+
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      RASP FileSystem Protection
+                    </h4>
+                    <small class="text-secondary">
+                      Force RASP Access Control on all PHP files. Prevent PHP files from being modified or deleted unless logged in as Administrator.
+                    </small>
+                  </div>
+
+                  <div class="col-auto tog" id="rasp_filesystem_con" data-enabled="{{rasp_filesystem}}" data-title="lock changing any php files unless logged in as administrator" data-toggle="true">
+                  </div>
+                </div>
+              </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      RASP Database Protection
+                    </h4>
+                    <small class="text-secondary">
+                      Force RASP Checks on all database queries. Prevent altering sensitive DB tables unless logged in as Administrator.
+                    </small>
+                  </div>
+
+                  <div class="col-auto tog" id="rasp_db_con" data-enabled="{{rasp_db}}" data-title="lock all user account changes unless logged in as administrator" data-toggle="true">
+                  </div>
+                </div>
+              </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      RASP Network Protection
+                    </h4>
+                    <small class="text-secondary">
+                      Prevent connecting to bot command and control networks, stop man in the middle attacks.
+                    </small>
+
+                  </div>
+                  <div class="col-auto tog" id="rasp_js_con" data-enabled="{{rasp_js}}" data-title="Lock user account changes from any page other than the users.php WordPress editor page" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
+              <div class="list-group-item">
+                <div class="row align-items-center">
+                  <div class="col">
+
+                    <h4 class="font-weight-base mb-1">
+                      RASP User Authentication
+                    </h4>
+                    <small class="text-secondary">
+                      Prevent Authentication Bypass attacks.  Require valid Authentication cookies, or application pass and matching user ids
+                    </small>
+
+                  </div>
+                  <div class="col-auto tog" id="rasp_auth_con" data-enabled="{{rasp_auth}}" data-title="Lock user account changes from any page other than the users.php WordPress editor page" data-toggle="true">
+                  </div>
+                </div> <!-- / .row -->
+              </div>
+
 
               <!--
               <div class="list-group-item">

@@ -17,6 +17,7 @@ use function BitFire\verify_browser_effect;
 use function BitFireBot\bot_authenticate;
 use function BitFireBot\js_int_obfuscate;
 use function BitFireBot\make_js_challenge;
+use function ThreadFin\dbg;
 use function ThreadFin\un_json;
 use function ThreadFin\debug;
 use function ThreadFin\trace;
@@ -61,8 +62,8 @@ function agent_list() : array {
         new UserAgent('windows', 'qihu', '6.1', false, false)],
         [strtolower('expanse, a palo alto networks company, searches across the global ipv4 space multiple times per day to identify customers&#39; presences on the internet. if you would like to be excluded from our scans, please send ip addresses/domains to: scaninfo@paloaltonetworks.com'),
         new UserAgent('bot', 'expanse, a palo alto networks company, searches across the global ipv4 space multiple times per day to identify customers&#39; presences on the internet. if you would like to be excluded from our scans, please send ip addresses/domains to: scaninfo@paloaltonetworks.com', 'x', false, true)],
-        [strtolower("'Cloud mapping experiment. Contact research@pdrlabs.net'"),
-        new UserAgent('bot', '', 'x', false, true)]
+        [strtolower("Cloud mapping experiment. Contact research@pdrlabs.net"),
+        new UserAgent('bot', 'cloud mapping experiment. contact research@pdrlabs.net', 'x', false, true)]
 
     );
 
@@ -76,8 +77,6 @@ function agent_list() : array {
 function test_parse_agent($data) : void {
     $m0 = microtime(true);
     $answer = \BitFireBot\parse_agent($data[0]);
-    $m1 = microtime(true);
-    echo "took: ".($m1-$m0)."\n";
     assert_eq($answer->os, $data[1]->os, "os match failed");
     assert_eq($answer->browser, $data[1]->browser, "browser match failed");
     assert_eq($answer->ver, $data[1]->ver, "version match failed");
@@ -88,6 +87,7 @@ function test_bot_auth() : void {
     \BitFire\Config::set_value("dynamic_exceptions", 0);
     $agent = "mozilla/5.0 (compatible; censysinspect/1.1; +https://about.censys.io/)";
     $ua = \BitFireBot\parse_agent($agent);
+    //print_r($ua);
     /*
     $ua = new UserAgent("bot", $agent, "1.1", false, true);
     \BitFire\Config::set_value("debug_file", "/tmp/unit_test.log");
@@ -98,8 +98,7 @@ function test_bot_auth() : void {
     $trace = trace(null);
     print_r($debug);
     print_r($trace);
-    print_r($auth);
-    
+    //print_r($auth);
 }
 
 
@@ -128,7 +127,8 @@ function test_verify_browser() : void {
     $request->path = "/";
     $request->post = array('_bfxa' => 1, '_bfa' => 0);
 
-    $cookie = MaybeStr::of(NULL);
+    $cookie = MaybeA::of(['a' => ['ans' => 99]]);
+    //dbg($cookie);
 
     $effects = verify_browser_effect($request, $ip_data, $cookie);
     assert_eq($effects->read_status(), STATUS_SERVER_STATE_FAIL, "verify browser with no server state did not fail");

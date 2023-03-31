@@ -10,10 +10,9 @@
  */
 namespace ThreadFin\view;
 
-use const ThreadFin\DAY;
+use function ThreadFin\_t;
 
-// polly-fill for gettext
-if (!function_exists("_")) { function _(string $in) : string { return $in; } }
+use const ThreadFin\DAY;
 
 /**
  * take a unix timestamp and return localized string for number of days ago
@@ -25,10 +24,15 @@ function days_format(string $epoch) : string {
 	if ($t > 1) {
 		$diff = time() - $t;
 		$r = floor($diff / DAY);
-		if ($r == 0) { return _("today"); }
-		if ($r > 0 && $r < 1024) { return  $r . _(" days ago"); }
+		if ($r == 0) { return _t("today"); }
+		if ($r > 0 && $r < 1024) { return  $r . _t(" days ago"); }
 	}
-	return _("never");
+	return _t("never");
+}
+
+function checked($value) : string {
+	if ($value) { return " checked='checked' "; }
+	return "X";
 }
 
 
@@ -86,6 +90,7 @@ const MODIFIER_MAPPING = [
 	"%u" => "strtoupper",
 	"%U" => "ucfirst",
 	"%W" => "ucwords",
+	"%h" => "\ThreadFin\\view\\checked",
 	"%c" => "ThreadFin\\view\\counter"
 ];
 // CHAR FORMAT matches single character modifiers
@@ -148,7 +153,7 @@ function minify_str(string $in) : string {
 	debug("translating %d tags\n", $elms->count());
 	for ($i = 0; $i < $elms->count(); $i++) {
 		$in = trim(inner_html($elms->item($i)));
-		$translated = _($in);
+		$translated = _t($in);
 		$t3 = str_replace($in, $translated, $t3);
 	}
 
@@ -164,8 +169,6 @@ function minify_str(string $in) : string {
  */
 function view_modifier(string $modifier_name, ?callable $modifier_fn = null) : ?Callable {
 	static $mapping = MODIFIER_MAPPING;
-
-	//die("333 mod ($modifier_name) fn ($modifier_fn)\n");
 
 	if ($modifier_fn === NULL) {
 		$modifiers = explode("|", $modifier_name);
@@ -303,7 +306,7 @@ function template_replacement(array $x, array $replacements, array $templates) {
 	$template_arr = $templates[$template_name]??[];
 	$template_var = $template_arr[0]??$var_name;
 	$template_markup = $template_arr[1]??"";
-	if (isset($replacements[$var_name]) && count($replacements[$var_name]) > 0) {
+	if (isset($replacements[$var_name]) && is_array($replacements[$var_name]) && count($replacements[$var_name]) > 0) {
 		foreach($replacements[$var_name] as $item) {
 			$replacements[$template_var] = $item;
 			$content .= process_line($template_markup, $replacements);

@@ -12,6 +12,8 @@
 
 namespace ThreadFin;
 
+use const BitFire\ACTION_CLEAN;
+use const BitFire\ACTION_RETURN;
 use const BitFire\BITFIRE_VER;
 use const BitFire\CONFIG_CACHE_TYPE;
 use const BitFire\CONFIG_COOKIES;
@@ -49,6 +51,39 @@ const ENCODE_HTML=3;
 const ENCODE_BASE64=4;
 
 require_once WAF_SRC . "const.php";
+require_once WAF_SRC . "http.php";
+
+interface Catalog {
+    public function add($key, $value);
+    public function get_key($key);
+    public function get_value($value);
+}
+
+class Pair {
+    public $key;
+    public $value;
+}
+
+class List_Fwd_Rev_Pair implements Catalog {
+    public $fwd_list = array();
+    public $rev_list = array();
+
+    public function add($key, $value) {
+        $pair = new Pair();
+        $pair->key = $key;
+        $pair->value = $value;
+        $this->fwd_list[$key] = $pair;
+        $this->rev_list[$value] = $pair;
+    }
+
+    public function get_key($key) {
+        return $this->fwd_list[$key];
+    }
+    public function get_value($value) {
+        return $this->rev_list[$value];
+    }
+}
+
 
 /**
  * Complete filesystem abstraction
@@ -281,9 +316,7 @@ class FileData {
      */
     public function append(string $text) : FileData {
         $lines = explode("\n", $text);
-        if (!in_array($lines[0], $this->lines)) {
-            $this->lines = array_merge($this->lines, $lines);
-        }
+        $this->num_lines = array_push($this->lines, ...$lines);
         return $this;
     }
 
@@ -394,6 +427,13 @@ function find_const_arr(string $const, array $default=[]) : array {
     return $default;
 }
 function not_empty($in) { return !empty($in); }
+function whoami() : string {
+    if (function_exists('posix_getpwuid')) {
+        $x = posix_getpwuid(posix_getuid()); 
+        if ($x) { return $x['name']; }
+    }
+    return "the PHP user (usually www-data)";
+}
 
 
 function set_if_empty($data, $key, $value) { if (is_object($data) && !isset($data->$key)) { $data->$key = $value; } if (is_array($data) && !isset($data[$key])) { $data[$key] = $value; } return $data; }
@@ -405,22 +445,15 @@ function find(array $list, callable $fn) { foreach ($list as $item) { $x = $fn($
 function id_fn($data) { return function () use ($data) { return $data; }; }
 function array_add_value(array $keys, callable $fn) : array { $result = array(); foreach($keys as $x) {$result[$x] = $fn($x); } return $result;}
 
-function compact_array(array $in) : array { $result = []; foreach ($in as $x) { $result[] = $x; } return $result; }
+function compact_array(?array $in) : array { $result = []; foreach ($in as $x) { $result[] = $x; } return $result; }
 
 function either($a, $b) { return ($a) ? $a : $b; }
 function either_lb(callable $a, callable $b) { $x = $a(); if (!empty($x)) { return $x; } return $b(); }
 function array_len($x, int $len) { return is_array($x) && count($x) == $len; }
 
-// find the first match (preg_match) of matches in $input, or null
-function find_match(string $input, array $matches) : ?array {
-    return array_reduce($matches, function ($carry, $x) use ($input) {
-        if ($carry == null && preg_match($x, $input, $matches) !== false) { return $matches; }
-        return $carry;
-    }, null);
-}
-
 
 /**
+ * @use bitfire-admin
  * modify all elements of $list that match $filter_fn with $modify_fn
  * @param array $list 
  * @param callable $filter_fn  - function($key, $value) : bool
@@ -451,7 +484,7 @@ function get_sub_dirs(string $dirname) : array {
             if (!$file || $file === '.' || $file === '..') {
                 continue;
             }
-            if (is_dir($path) && !is_link($path)) {
+            if (is_dir($path) && $dirname !== $path) {
                 $dirs[] = $path;
 			}
         }
@@ -461,6 +494,36 @@ function get_sub_dirs(string $dirname) : array {
     return $dirs;
 }
 
+/**
+ * call $fn on every dir and sub dir in the path $dirname
+ * @param string $dirname - the root directory to recurse
+ * @param callable $fn  - the function to call on each directory
+ * @param bool $root  - true if this is the root call
+ * @return array 
+ */
+function dir_recurse(string $dirname, callable $fn, bool $root = true) : array {
+    static $examined = [];
+    // reset the examined list if this is the root call
+    if ($root) { $examined = []; }
+    $examined[$dirname] = 1;
+    if (isset($examined[$dirname])) { return []; }
+    $results = [];
+
+    if (!file_exists($dirname)) { return []; }
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false) {
+            $path = $dirname . '/' . $file;
+            if (!$file || $file === '.' || $file === '..') {
+                continue;
+            }
+            if (is_dir($path)) {
+                $fn($path);
+                $results = array_merge($results, dir_recurse($path, $fn, false));
+			}
+        }
+        \closedir($dh);
+    }
+}
 
 /**
  * recursively perform a function over directory traversal.
@@ -498,7 +561,177 @@ function file_recurse(string $dirname, callable $fn, string $regex_filter = NULL
 
 
 
+/**
+ * yield all matching files in a directory recursively
+ * TODO: move to ThreadFin\File
+ * CONTINUE: truncate the index file and remove lines from the tail....
+ */
+function index_yield(string $index_file, int $max_lines = 200) : ?\Generator {
+    if (!file_exists($index_file)) { return NULL; } 
+    static $counter = 0;
+    static $yielded = 0;
+
+    $fh = fopen($index_file, "r+");
+    $size = filesize($index_file);
+    if ($size <= 2) { return NULL; }
+
+    $block_size = 256;
+    $truncate_size = 0;
+    $read_size = 0;
+    $last_read = $size;
+    $next_ptr = max(0, $size - $block_size);
+    $line = "";
+
+    $full_read = 0;
+    while($yielded < $max_lines && $next_ptr > 0 && $last_read > 0 && ++$counter < $max_lines*2) {
+        if ($next_ptr > $block_size) {
+            fseek($fh, $next_ptr, SEEK_SET);
+        }
+        $tmp = fread($fh, $block_size);
+        $idx2 = strrpos(rtrim($tmp), "\n");
+        $line = substr($tmp, $idx2);
+        $read_size = strlen($line);
+        $full_read += $read_size;
+        $full_size = strlen($tmp);
+        $next_ptr = max(0, $next_ptr - $read_size);
+
+        $line = trim($line);
+        if (!file_exists($line)) {
+            continue;
+        }
+        $yielded++;
+        yield $line;
+    }
+
+    fseek($fh, 0, SEEK_SET);
+    rewind($fh);
+    fflush($fh);
+
+    // only truncate to last newline!!
+    $r = ftruncate($fh, $size - $full_read);
+    if (!$r) {
+        error("unable to truncate index file");
+    }
+    //$r_txt = ($r) ? "TRUE" : "FALSE";
+    rewind($fh);
+    fclose($fh);
+    if ($size - $truncate_size < 256) {
+        return NULL;
+    }
+}
+
+
+/**
+ * yield all matching files in a directory recursively
+ * TODO: move to ThreadFin\File
+ */
+function file_index(string $dirname, string $include_regex_filter = NULL, callable $write_fn, bool $root = true) {
+    if (!is_dir($dirname)) { return; }
+    static $examined = [];
+    // reset the counter for root calls
+    if ($root) { $examined = []; }
+
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false) {
+            // skip "dot" files
+            if (!$file || $file === '.' || $file === '..') {
+                continue;
+            }
+            $path = $dirname . DS . $file;
+
+            // recurse if it is a directory
+            if (is_dir($path)) {
+                // disallow directory recursion loops
+                if (isset($examined[$path])) { continue; }
+                // mark this path as examined
+                $examined[$path] = 1;
+
+                file_index($path, $include_regex_filter, $write_fn, false);
+                        }
+
+            // check if the path matches the regex filter, or has no filter
+            if (($include_regex_filter != NULL && preg_match($include_regex_filter, $path)) || $include_regex_filter == NULL) {
+                //debug("yield ($yielded) [$counter] < $skip_files ($max_files)");
+                $write_fn("$path\n");
+            }
+        }
+        \closedir($dh);
+    }
+}
+
+
+
+
+/**
+ * yield all matching files in a directory recursively
+ * TODO: move to ThreadFin\File
+ */
+function file_yield(string $dirname, string $include_regex_filter = NULL, int $max_files = 20000, int $skip_files = 0, int $stop_time = 0, bool $root = true) : ?\Generator {
+    if (!is_dir($dirname)) { return; } 
+    static $examined = [];
+    static $counter = 0;
+    static $yielded = 0;
+    // reset the counter for root calls
+    if ($root) { $examined = []; $counter = 0; $yielded = 0; }
+
+    // default stop time is 45 seconds, or max-exec-time-1
+    if ($stop_time == 0) {
+        $run_time = intval(ini_get("max_execution_time"));
+        if ($run_time > 0) {
+            $run_time = max(15, min($run_time-1, 45));
+        } else {
+            $run_time = 45;
+        }
+        $stop_time = time() + $run_time;
+    }
+
+    if ($dh = \opendir($dirname)) {
+        while(($file = \readdir($dh)) !== false && $yielded < $max_files) {
+            // skip "dot" files
+            if (!$file || $file === '.' || $file === '..') {
+                continue;
+            }
+
+            $path = $dirname . DS . $file;
  
+            // recurse if it is a directory
+            if (is_dir($path)) {
+                // disallow directory recursion loops
+                if (isset($examined[$path])) { continue; }
+
+                // mark this path as examined
+                $examined[$path] = 1;
+
+                yield from file_yield($path, $include_regex_filter, $max_files, $skip_files, $stop_time, false);
+			}
+
+            // skip previous files
+            if ($counter++ < $skip_files) {
+                continue;
+            }
+
+
+
+            $yielded++;
+            // check if the path matches the regex filter, or has no filter
+            if (($include_regex_filter != NULL && preg_match($include_regex_filter, $path)) || $include_regex_filter == NULL) {
+                //debug("yield ($yielded) [$counter] < $skip_files ($max_files)");
+                yield $path;
+            } else {
+                //debug("yield ($yielded) [$counter] < $skip_files ($max_files)");
+                //yield $path;
+            }
+        }
+        \closedir($dh);
+    }
+    // return null for the end of the root node
+    if ($root == true && $file === false) {
+        //debug("YIELD NULL");
+        yield NULL;
+    }
+}
+
+
 
 
 /**
@@ -539,20 +772,7 @@ function memoize(callable $fn, string $key, int $ttl) : callable {
         if (CFG::str(CONFIG_CACHE_TYPE) !== 'nop') {
             return CacheStorage::get_instance()->load_or_cache($key, $ttl, BINDL($fn, ...$args));
         }
-        // TODO: simplify this.  we need to handle the case where we want to store reverse IP lookup data in a browser cookie when
-        // we have no server cache.  need a load_or_cache for client cookies
-        else if (CFG::enabled(CONFIG_COOKIES)) {
-            $r = \BitFire\BitFire::get_instance()->_request;
-            $maybe_cookie = \BitFireBot\get_tracking_cookie($r->ip, $r->agent);
-            $result = $maybe_cookie->extract($key);
-            if (!$result->empty()) { return $result(); }
-            $cookie = ($maybe_cookie->empty()) ? array() : $maybe_cookie->value('array');
-            $cookie[$key] = $fn(...$args);
-            $cookie_data = encrypt_ssl(CFG::str(CONFIG_ENCRYPT_KEY), en_json($cookie));
-            $_COOKIE[CFG::str(CONFIG_USER_TRACK_COOKIE)] = $cookie_data;
-            cookie(CFG::str(CONFIG_USER_TRACK_COOKIE), $cookie_data, DAY); 
-            return $cookie[$key];
-        } else {
+        else {
             debug("unable to memoize [%s]", func_name($fn));
             return $fn(...$args);
         }
@@ -579,6 +799,14 @@ function partial_right(callable $fn, ...$args) : callable {
     return function(...$x) use ($fn, $args) { return $fn(...array_merge($x, $args)); };
 }
 
+/**
+ * @use renderer
+ * chain functions together.
+ * @param callable $fn1 
+ * @param null|callable $fn2 
+ * @return callable 
+ */
+
 function chain(callable $fn1, ?callable $fn2 = NULL) : callable {
     return function (...$x) use ($fn1, $fn2) {
         $result = $fn1(...$x);
@@ -594,7 +822,12 @@ function chain(callable $fn1, ?callable $fn2 = NULL) : callable {
  */
 function header_send(string $key, ?string $value) : void {
     $content = ($value != null) ? "$key: $value"  : $key;
-    header($content);
+    if (headers_sent($file, $line)) {
+        $msg = sprintf("headers already sent in %s:%d, unable to send: [%s:%s]", $file, $line, $key, $value);
+        on_err(2, $msg, $file, $line);
+    } else {
+        header($content);
+    }
 }
 
 
@@ -630,6 +863,7 @@ class Effect {
     private $api = array();
     private $unlinks = array();
     private $errors = array();
+    private $http = array();
 
     public static function new() : Effect { assert(func_num_args() == 0, "incorrect call of Effect::new()"); return new Effect(); }
     public static $NULL;
@@ -652,6 +886,10 @@ class Effect {
         }
         if ($replace) { $this->out = $tmp; }
         else { $this->out .= $tmp; }
+        return $this;
+    }
+    public function http(string $method, string $url, $data, array $headers) {
+        $this->http[] = array($method, $url, $data, $headers);
         return $this;
     }
     // response header effect
@@ -728,6 +966,8 @@ class Effect {
     public function read_exit() : bool { return $this->exit; }
     // return the effect content
     public function read_out(bool $clear = false) : string { $t = $this->out; if ($clear) { $this->out = ""; } return $t; }
+    // return the http requests
+    public function read_http(bool $clear = false) : array { $t = $this->http; if ($clear) { $this->http = []; } return $this->http; }
     // return the effect headers
     public function read_headers() : array { return $this->headers; }
     // return the effect cookie (only 1 cookie supported)
@@ -826,6 +1066,7 @@ class Effect {
         // unknown files: (not plugins, themes or core WordPress files)
         do_for_each($this->unlinks, function ($x) {
             debug("unlink %s", $x);
+            // todo: test deleting , and remove one method from here
             recursive_delete($x);
             if (is_file($x)) {
                 if (!unlink($x)) {
@@ -858,7 +1099,18 @@ class Effect {
             else if (strlen($this->out) > 0) {
                 echo $this->out;
             }
+
+            flush();
         }
+
+        // HTTP requests
+        /*
+        if (isset($this->http[0])) {
+            $this->http = array_map(function (&$x) {
+                return http2($x[0], $x[1], $x[2], $x[3]);
+            }, $this->http);
+        }
+        */
 
         if (!empty($this->errors)) {
             debug("ERROR effect: %s", json_encode($this->errors, JSON_PRETTY_PRINT));
@@ -912,9 +1164,7 @@ function recursive_delete(string $dir) {
         }
         rmdir($dir); 
     } 
-
 }
-
 
 interface MaybeI {
     public static function of($x) : MaybeI;
@@ -1315,6 +1565,64 @@ function http2(string $method, string $url, $data = "", array $optional_headers 
     return $info;
 }
 
+function http3(string $method, string $url, $data = "", array $optional_headers = NULL) {
+    if (!isset($optional_headers['User-Agent'])) {
+		$optional_headers['User-Agent'] = "BitFire RASP https://bitfire.co/user_agent/".BITFIRE_VER;
+    }
+
+    $ch = \curl_init();
+    if (!$ch) {
+        $c = http($method, $url, $data, $optional_headers);
+        $len = strlen($c);
+        return ["content" => $c, "path" => $url, "headers" => ["http/1.1 200"], "length" => $len, "success" => ($len > 0)];
+    }
+
+    $content = (is_array($data)) ? http_build_query($data) : $data;
+    if ($method == "POST") {
+        \curl_setopt($ch, CURLOPT_POST, 1);
+        \curl_setopt($ch, CURLOPT_POSTFIELDS, $content);
+    } else {
+        $prefix = contains($url, '?') ? "&" : "?";
+        $url .= $prefix . $content;
+    }
+
+    \curl_setopt($ch, CURLOPT_URL, $url);
+    \curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+
+    if ($optional_headers != NULL) {
+        $headers = map_reduce($optional_headers, function($key, $value, $carry) { $carry[] = "$key: $value"; return $carry; }, array());
+        \curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    }
+    
+    // Receive server response ...
+    \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    \curl_setopt($ch, CURLINFO_HEADER_OUT, false);
+    \curl_setopt($ch, CURLOPT_HEADER, false);
+
+    return $ch;
+}
+
+function http_wait($mh) {
+
+    if (!empty($mh)) {
+        $active = null;
+        debug("http wait...");
+        //execute the handles
+        do {
+            $mrc = curl_multi_exec($mh, $active);
+        }
+        while ($mrc == CURLM_CALL_MULTI_PERFORM);
+
+        while ($active && $mrc == CURLM_OK) {
+            if (curl_multi_select($mh) != -1) {
+                do {
+                    $mrc = curl_multi_exec($mh, $active);
+                    usleep(10000);
+                } while ($mrc == CURLM_CALL_MULTI_PERFORM);
+            }
+        }
+    }
+}
 
 
 
@@ -1368,7 +1676,7 @@ function http(string $method, string $path, $data, ?array $optional_headers = []
     }
 
     $ctx = stream_context_create($params);
-    $response = @file_get_contents($path, false, $ctx);
+    $response = file_get_contents($path, false, $ctx);
     // log failed requests, but not failed requests to wordpress source code
 
     $m1 = microtime(true);
@@ -1423,6 +1731,7 @@ function ip_to_country(?string $ip) : int {
 	$d = file_get_contents(\BitFire\WAF_ROOT.ip_to_file($n));
 	$len = strlen($d);
 	$off = 0;
+    // binary search here. this list should be ordered
 	while ($off < $len) {
 		$data = unpack("Vs/Ve/Cc", $d, $off);
 		if ($data['s'] <= $n && $data['e'] >= $n) { return $data['c']; }
@@ -1464,8 +1773,9 @@ function trace(?string $msg = null) : string {
  * @throws RuntimeException 
  */
 function error(?string $fmt, ...$args) : void {
+    debug($fmt, ...$args);
     $line = str_replace(array("\r","\n",":"), array(" "," ",";"), sprintf($fmt, ...$args));
-    $bt = debug_backtrace(0, 1);
+    $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
     $idx = isset($bt[1]) ? 1 : 0;
     \BitFire\on_err(-1, $line, $bt[$idx]["file"], $bt[$idx]["line"]);
     if (isset($bt[2])) {
@@ -1485,6 +1795,7 @@ function format_chk(?string $fmt, int $args) : bool {
 function debug(?string $fmt, ...$args) : ?array {
     assert(class_exists('\BitFire\Config'), "programmer error, call debug() before config is loaded");
     assert(format_chk($fmt, count($args)), "programmer error, format string does not match number of arguments [$fmt]");
+    // if (!format_chk($fmt, count($args))) { debug("programmer error, format string does not match number of arguments [$fmt]"); }
 
     static $idx = 0;
     static $len = 0;
@@ -1526,8 +1837,7 @@ function debug(?string $fmt, ...$args) : ?array {
     if (CFG::enabled("debug_file")) {
         if ($idx === 0) {
             register_shutdown_function(function () {
-                $out_dir = dirname(\BitFire\WAF_INI, 1);
-                $f = $out_dir . "/debug.log";
+                $f = get_hidden_file("/debug.log");
                 $log = debug("RETURN_LOG");
                 $mode = (file_exists($f) && filesize($f) > 1024*1024*4) ? FILE_W : FILE_APPEND;
                 file_put_contents($f, join("\n", $log), $mode);
@@ -1597,26 +1907,11 @@ function file_replace(string $filename, string $find, string $replace, int $mode
 
 // boolean to string (true|false) 
 // PURE: IDEMPOTENT, REFERENTIAL INTEGRITY
+// TODO: refactor to %t render format
 function b2s(bool $input) :string {
     return ($input) ? "true" : "false";
 }
 
-
-/**
- * make the config file readable, parse it, then make it unreadable again
- * @param string $src 
- * @return callable 
- */
-function load_ini_fn(string $src) : callable {
-    // returns an array, first entry is the ini data, second is the mtime
-    return function() use ($src) : array {
-        @chmod($src, FILE_RW);
-        debug("inidisk");
-        $result = parse_ini_file($src, false, INI_SCANNER_TYPED);
-        @chmod($src, FILE_W);
-        return [$result, filemtime($src)];
-    };
-}
 
 
 /**
@@ -1651,7 +1946,8 @@ function make_config_loader() : Effect {
     // we don't know where the config is because there is no ini_info file
     // probably a first run, or a new install, lets find it
     // find all old configs
-    $config_dirs = glob("{$parent}/bitfire_*");
+    $config_dirs = glob("{$parent}/bitfire_??????????");
+
     // get the creation/modification time so we can find most recent
     $dir_with_time = array_map(function($dir) {
         return [ "dir" => $dir, "time" => filemtime($dir) ];
@@ -1677,7 +1973,18 @@ function make_config_loader() : Effect {
         $path = $parent . "/bitfire_{$secret_key}/";
         $orig_config = WAF_ROOT . "hidden_config";
         if (file_exists($orig_config)) {
-            rename($orig_config, $path);
+            $iam = whoami();
+            $script_is = fileowner($path);
+
+            $success = rename($orig_config, $path);
+            if (!$success) {
+                echo "Unable to rename $orig_config to $path\n\n";
+                echo "The $iam user needs write access to " . dirname($path) . " and $orig_config\n\n";
+                if ($iam != $script_is) {
+                    echo "Try: sudo chown -R $iam $orig_config\n\n";
+                }
+                die();
+            }
         }
     }
 
@@ -1700,43 +2007,6 @@ function make_config_loader() : Effect {
 }
 
 
-/**
- * locate the config file from the secret key
- * @param string $secret_key the secret key as stored in the ini_info.php file
- * @return string the path to the config file
- */
-/*
-function find_config_path(string $secret_key = "") : string {
-
-    $parent = dirname(WAF_ROOT, 1);
-    $path = realpath($parent . "/bitfire_{$secret_key}/");
-    $config_file = $path . "config.ini";
-
-    // load the file directly because we know the hidden path
-    if (!empty($config_file) && file_exists($config_file)) {
-        return $config_file;
-    }
-    // we don't know the hidden path, lets glob the path
-    else {
-        $parent = dirname(WAF_ROOT, 1);
-        $paths = glob("$parent/bitfire_*", GLOB_MARK);
-        $config_file = array_reduce($paths, function($carry, $path) {
-            if (empty($carry)) {
-                if (file_exists($path . "config.ini")) {
-                    return $path . "config.ini";
-                }
-            }
-        }, "");
-    }
-    if (empty($config_file)) {
-        $effect = make_config_loader()->run();
-        $config_file = $effect->read_out();
-    }
-    define("\BitFire\WAF_INI", $config_file);
-
-    return $config_file;
-}
-*/
 
 /**
  * get the path to a hidden file
@@ -1746,6 +2016,8 @@ function find_config_path(string $secret_key = "") : string {
  */
 function get_hidden_file(string $file_name, ?string $secret_key = null) : string {
     static $path = null;
+    if (php_sapi_name() === "cli") { return getcwd() . "/$file_name"; }
+
     // use the secret key passed to us
     if (!empty($secret_key)) {
         $parent = dirname(WAF_ROOT, 1);
@@ -1773,30 +2045,29 @@ function parse_ini() : array {
     $mod_time = filemtime($config_file);
 
     // load the config from the cache
-    $cache = CacheStorage::get_instance($ini_type);
     // $options is an array [$data, $mtime]
-    $options = $cache->load_or_cache("parse_ini", 600, function() use ($config_file) {
+    $cache = CacheStorage::get_instance($ini_type);
+    $config = $cache->load_or_cache("parse_ini", 3600, function() use ($config_file) {
         $config =  parse_ini_file($config_file, false, INI_SCANNER_TYPED);
-        if (count($config) > 10) { return $config; }
+        if (count($config) > 10) {
+            $config['mtime'] = time();
+            return $config;
+        }
+        return [];
     });
 
-    // if the file modification time is newer than the cached data, reload the config
-    if (!isset($options[1]) || $options[1] < $mod_time) {
-        
+    if ($config['mtime'] < $mod_time) {
         $config = parse_ini_file($config_file, false, INI_SCANNER_TYPED);
         // ensure that passwords are always hashed
         $pass = $config['password']??'disabled';
-        if (strlen($pass) < 40 && $pass != 'disabled' && $pass != 'configure') {
+        if (strlen($pass) < 39 && $pass != 'disabled' && $pass != 'configure') {
             $hashed = hash('sha3-256', $pass);
             $config['password'] = $hashed;
             require_once WAF_SRC . "server.php"; // make sure we have the correct function loaded
             update_ini_value('password', $hashed)->run();
         }
-
-        $cache->save_data('parse_ini', $config, DAY);
-    } else {
-        // the cached data is newer than the file, use the cached data
-        $config = $options[0];
+        $config['mtime'] = time();
+        $cache->save_data('parse_ini', $config, 3600);
     }
 
     // if we have a pro key, then download the latest pro version of code
@@ -1805,70 +2076,6 @@ function parse_ini() : array {
     return $config;
 }
 
-/**
- * TODO: clean up debug lines here...
- * @param string $src 
- * @return array 
- */
-function parse_ini2(string $src) : array {
-    $st = stat($src);
-    $t = $st["mtime"];
-
-    $e = file_exists("{$src}.php");
-    if ($e) {
-        $m = filemtime("{$src}.php");
-        $s = filesize("{$src}.php");
-    }
-
-    // if file is readable, make it not readable..
-    $read = $st['mode']&0x0020;
-    if ($read) { chmod($src, FILE_W); }
-
-    $config = [];
-    // we have a php file, and it's newer than the ini file, use that
-    if ($e && ($t < $m) && $s > 1024) {
-        trace("iniphp");
-        include "{$src}.php"; // this will set $config
-    }
-    // try and load from cache, if we can't load from cache. make 
-    // read the ini then protect it
-    else {
-        // BOOT STRAP THE CACHE HERE BEFORE WE HAVE CACHE CONFIG
-        $ini_type = "nop";
-        if (file_exists(WAF_ROOT . "ini_info.php")) {
-            include WAF_ROOT . "ini_info.php";
-        }
-        trace($ini_type);
-
-        $load_fn = load_ini_fn($src);
-
-        $cache = CacheStorage::get_instance($ini_type);
-        $options = $cache->load_or_cache("parse_ini2", DAY, $load_fn);
-        if (!is_array($options)) { 
-            \BitFire\on_err(PCNTL_EIO, "unable to load cached ini file", __FILE__, __LINE__);
-            // try and clean things up a bit
-            $cache->delete();
-            $options = $load_fn($src);
-            // unable to load anything.  attempt to use empty config
-            if (!is_array($options)) { 
-                \BitFire\on_err(PCNTL_EIO, "unable to load disk ini file", __FILE__, __LINE__);
-                return ["bitfire_enabled" => false, "allow_ip_block" => false, "check_domain" => false, "cache_type" => "nop"];
-            }
-        }
-
-        if (($t > $options[1]) || (!is_array($options))) {
-            $options = $load_fn();
-            $cache->save_data("parse_ini2", $options, DAY);
-        }
-        $config = $options[0];
-        //echo "<p>[$t] [$m] / [{$options[1]}] [$s]</p>\n";
-        //echo "diff $diff\n";
-        //dbg($options);
-    }
-
-    check_pro_ver($config["pro_key"]??"");
-    return $config;
-}
 
 
 /**
@@ -1882,7 +2089,7 @@ function check_pro_ver(string $pro_key) {
         trace("DWNPRO");
         $email = "unknown";
         $name = "unknown";
-        if (defined("WPINC")) {
+        if (defined("WPINC") && function_exists("wp_get_current_user")) {
             $user = \wp_get_current_user();
             $name = $user->user_firstname . " " . $user->user_lastname;
         }
@@ -1897,9 +2104,47 @@ function check_pro_ver(string $pro_key) {
             if ($content && strlen($content) > 100) {
                 if (@file_put_contents($out, $content, LOCK_EX) !== strlen($content)) { debug("unable to write [%s]", $out); };
             }
+
+            // write the command line scanner
+            if (@file_put_contents($out, $content, LOCK_EX) !== strlen($content)) { debug("unable to write [%s]", $out); };
+            $content = http("POST", "https://bitfire.co/getpro.php", array("name" => $name, "email" => $email, "release" => \BitFire\BITFIRE_VER, "key" => $pro_key, "domain" => $_SERVER['SERVER_NAME'], "file" => "scanner.php"));
+            debug("downloaded scanner code [%d] bytes", strlen($content));
+            $out = \BitFire\WAF_ROOT."scanner.php";
+            if ($content && strlen($content) > 100) {
+                if (@file_put_contents($out, $content, LOCK_EX) !== strlen($content)) { debug("unable to write [%s]", $out); };
+            }
         }
     }
 }
+
+/**
+ * take any function $fn and return a function that will accumulate a string and return the result
+ * maintain a single string state variable
+ * 
+ * passing ACTION_RETURN to the returned function will return the accumulated result
+ * passing ACTION_CLEAN to the returned function will reset the accumulator
+ * @param callable $fn - should return the string to append to the accumulator
+ * @return callable the accumulator function
+ */
+function accrue_list(callable $fn, string $catalog_name) : callable {
+    assert(is_type($catalog_name, Catalog::class), "catalog_name must be a catalog");
+    return function(...$args) use ($fn, $catalog_name) : ?Catalog {
+        static $catalog = NULL;
+        if ($catalog === NULL) { $catalog = new $catalog_name(); }
+
+        if (isset($args[0])) {
+            if ($args[0] === ACTION_RETURN) {
+                return $catalog;
+            } else if ($args[0] === ACTION_CLEAN) {
+                $catalog = new $catalog_name();
+                return NULL;
+            }
+        }
+        $catalog->add($args[0], $fn(...$args));
+        return NULL;
+    };
+}
+
 
 
 /**
@@ -1911,6 +2156,12 @@ function cache_prevent() : Effect {
     $effect->header("cache-control", "no-store, private, no-cache, max-age=0");
     $effect->header("expires", gmdate('D, d M Y H:i:s \G\M\T', 100000));
     return $effect;
+}
+
+// make sure the string $value is a type of $type
+function is_type(string $value, string $type) : bool {
+    $x = new $type();
+    return $x instanceof $value;
 }
 
 
@@ -2037,7 +2288,8 @@ function output_profile(?array $data, string $out_file = "/tmp/callgrind.out") :
 function get_public(?string $path = null) : string {
     // try and find the path to the public folder ourself (for standalone installs)
     $public = realpath(__DIR__ . "/../public/$path").DS;
-    $public = str_replace($_SERVER['DOCUMENT_ROOT']??"", "", $public);
+    $dr = realpath($_SERVER['DOCUMENT_ROOT']??".");
+    $public = str_replace($dr, "", $public);
     // if we have a cms configuration, use that
     if (CFG::enabled("cms_root")) {
         $path = ($path === null) ? "" : $path;
@@ -2049,5 +2301,45 @@ function get_public(?string $path = null) : string {
 }
 
 function _b(string $text, $before = "") : string {
-    return (string)$before . _($text);
+    return (string)$before . _t($text);
+}
+
+function _t(string $text) : string {
+    return $text;
+}
+
+/**
+ * @param mixed $data 
+ * @return array [compressed_data, uncompressed_size, type]
+ */
+function compress($data) : array {
+    $type = "serialize";
+    // we have a header we can write cache data to...
+    if (function_exists('\igbinary_serialize')) {
+        $compress = \igbinary_serialize($data);
+        $type = "igbinary";
+    } else if (function_exists('\msgpack_pack')) {
+        $compress = \msgpack_pack($data);
+        $type = "msgpack";
+    } else {
+        $compress = serialize($data);
+    }
+    return [base64_encode($compress), strlen($data), $type];
+}
+
+/**
+ * return original data from compressed data
+ * @param array $data 
+ * @return mixed 
+ */
+function uncompress(array $data) {
+    $compress = base64_decode($data[0]);
+    switch ($data[2]) {
+        case "igbinary":
+            return \igbinary_unserialize($compress);
+        case "msgpack":
+            return \msgpack_unpack($compress);
+        default:
+            return unserialize($compress);
+    }
 }

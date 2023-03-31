@@ -13,6 +13,7 @@ namespace BitFireSvr;
 
 use BitFire\Config;
 use BitFire\Config as CFG;
+use BitFire\ScanConfig;
 use Exception;
 use SodiumException;
 use ThreadFin\Effect as EF;
@@ -43,7 +44,7 @@ use function ThreadFin\contains;
 use function ThreadFin\do_for_each;
 use function ThreadFin\file_recurse;
 use function ThreadFin\file_replace;
-use function ThreadFin\httpp;
+use function ThreadFin\HTTP\http2;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\random_str;
 use function ThreadFin\debug;
@@ -85,6 +86,9 @@ class FileHash {
     public $type;
     public $name;
     public $version;
+    public $ctime;
+    public $ver;
+    public $skip;
 }
 
 /**
@@ -120,7 +124,7 @@ function cms_root() : string {
         $root = doc_root();
     }
 
-    return $root;
+    return realpath($root);
 }
 
 
@@ -130,6 +134,22 @@ function need_quote(string $data) : bool {
 }
 
 
+/** 
+ * take an array of strings and convert to ini array format
+ */
+function array_to_ini(string $value_name, array $data) : string {
+    $result = "\n";
+    foreach ($data as $item) {
+        if (is_numeric($item)) {
+            $result .= "{$value_name}[] = $item\n";
+        } else if (is_bool($item)) {
+            $result .= "{$value_name}[] = " . ($item ? "true" : "false") . "\n";
+        } else {
+            $result .= "{$value_name}[] = '$item'\n";
+        }
+    }
+    return "$result\n";
+}
 
 /**
  * map $filename with $fn, return effect to write updated $filename   
@@ -318,8 +338,8 @@ function update_config(string $ini_src) : Effect
     // TODO: move all of WordPress settings into the wordpress-plugin/bitfire-admin.php
     $root = cms_root();
     $content_path = "/wp-content"; // default fallback
-    $scheme = filter_input(INPUT_SERVER, "REQUEST_SCHEME", FILTER_SANITIZE_SPECIAL_CHARS);
-    $host = trim(filter_input(INPUT_SERVER, "HTTP_HOST", FILTER_SANITIZE_URL), "/");
+    $scheme = $_SERVER["REQUEST_SCHEME"];
+    $host = trim($_SERVER["HTTP_HOST"], "/");
 
     $content_url = "$scheme://$host/$content_path";
     if (!empty($root)) {
@@ -393,7 +413,7 @@ function update_config(string $ini_src) : Effect
         $info["cookies"] = "not enabled.  none found. <= 1";
     }
 
-    $host = filter_input(INPUT_SERVER, "HTTP_HOST", FILTER_SANITIZE_URL);
+    $host = $_SERVER["HTTP_HOST"];
     $domain = take_nth($host, ":", 0);
     $info["domain_value"] = $domain;
     $domain = join(".", array_slice(explode(".", $domain), -2));
@@ -441,9 +461,27 @@ function update_config(string $ini_src) : Effect
     $e->file(new FileMod(get_hidden_file("blocks.json"), $block, 0, 0, true));
 
     $e->chain(Effect::new()->file(new FileMod(get_hidden_file("install.log"), "\n".json_encode($info, JSON_PRETTY_PRINT), FILE_W, 0, true)));
-    httpp(APP."zxf.php", base64_encode(json_encode($info)));
+    http2("POST", APP."zxf.php", base64_encode(json_encode($info)));
 
     return $e;
+}
+
+/**
+ * parse an array of scan config strings into a ScanConfig object
+ * @param array $config 
+ * @return ScanConfig 
+ */
+function parse_scan_config(array $config) : ScanConfig {
+    $scan_config = new ScanConfig();
+
+    foreach ($config as $line) {
+        $parts = explode(":", $line);
+        $key = $parts[0];
+        $val = $parts[1];
+        $scan_config->$key = $val;
+    }
+
+    return $scan_config;
 }
 
 
@@ -459,7 +497,6 @@ function alter_settings(string $filename, string $content) : EF {
 
     // remove old backups
     do_for_each(glob(dirname($filename)."/$filename.bitfire_bak*", GLOB_NOSORT), [$e, 'unlink']);
-    //do_for_each(glob(dirname($filename)."/$filename.bitfire_bak*", GLOB_NOSORT), [$e, 'unlink']);
 
     // create new backup with random extension and make unreadable to prevent hackers from accessing
     $backup_filename = "$filename.bitfire_bak." . mt_rand(10000, 99999);
@@ -531,7 +568,7 @@ function install_file(string $file, string $format): bool
 // TODO refactor install_file to use effects 
 function install() : Effect {
     $effect = Effect::new();
-    $software = filter_input(INPUT_SERVER, "SERVER_SOFTWARE", FILTER_SANITIZE_URL);
+    $software = $_SERVER["SERVER_SOFTWARE"];
     $apache = stripos($software, "apache") !== false;
 
     $root = cms_root(); // prefer CMS root over doc root
@@ -549,7 +586,7 @@ function install() : Effect {
     // AND RETURN HERE IMMEDIATELY
     if (CFG::disabled("configured")) {
         debug("install before configured?");
-        $ip = filter_input(INPUT_SERVER, CFG::str_up("ip_header", "REMOTE_ADDR"), FILTER_VALIDATE_IP);
+        $ip = $_SERVER[CFG::str_up("ip_header", "REMOTE_ADDR")];
         $block_file = \BitFire\BLOCK_DIR . DS . $ip;
         $effect->chain(update_config(\BitFire\WAF_INI));
         $effect->chain(update_ini_value("configured", "true")); // MUST SYNC WITH UPDATE_CONFIG CALLS (WP)
@@ -715,8 +752,31 @@ function append_reduce(callable $fn, array $list): array
     }, array());
 }
 
+function hash_file3(string $path, callable $type_fn, callable $ver_fn, string $root_dir = ""): ?FileHash {
+    $name = "root";
+    /*
+    if (stristr($path, "wp-admin") !== false) {
+        xdebug_break();
+    }
+    */
+
+    if (preg_match("/^.*\\".DS."wp-content\\".DS."(?:plugins|themes)\\".DS."([^\\".DS."]*)/", $path, $matches)) {
+        $root_dir = $matches[0];
+
+        $name = $matches[1]; 
+    } else if (preg_match("/^.*(\\".DS."wp-(?:includes|admin))\\".DS.".*/", $path, $matches)) {
+        if (empty($root_dir)) { $root_dir = cms_root(); }
+        $root_dir .= $matches[1];
+    }
+    $hash = hash_file2($path, $root_dir, $name, $type_fn);
+    if (!empty($hash)) {
+        $hash->ver = $ver_fn($path);
+    }
+    return $hash;
+}
 
 // run the hash functions on a file
+// TODO: move unique to data enrichment, not needed on server call
 function hash_file2(string $path, string $root_dir, string $name, callable $type_fn): ?FileHash
 {
     $root_dir = rtrim($root_dir, '/');
@@ -724,26 +784,46 @@ function hash_file2(string $path, string $root_dir, string $name, callable $type
     $realpath = realpath($path);
     $extension = pathinfo($realpath, PATHINFO_EXTENSION);
     if (!$realpath) { return null; }
-    if (is_dir($path)) { return null; }
-    if (!is_readable($path)) { return null; }
-    if ($extension != "php") { return null; }
+    if (is_dir($realpath)) { return null; }
+    if (!is_readable($realpath)) { return null; }
 
-   
     $input = join('', FileData::new($realpath)->read()->map('trim')->lines);
+    // if the extension is not php, check for php code anyway...
+    if ($extension != "php") { 
+        if (strpos($input, "<?php") === false) { return null; }
+    }
+
+    
 
 
     $hash = new FileHash();
-    $hash->file_path = $path;
-    $hash->rel_path = str_replace("//", "/", str_replace($root_dir, "", $path));
+    $hash->file_path = $realpath;
+    $hash->rel_path = str_replace("//", "/", str_replace($root_dir, "", $realpath));
+
+    if ($hash->file_path == $hash->rel_path) {
+        xdebug_break();
+
+    }
     $hash->crc_trim = crc32($input);
     $hash->type = $type_fn($realpath);
     $hash->name = $name;
     $hash->size = filesize($realpath);
-    $hash->unique = random_str(10);
+    $hash->unique = strtolower(random_str(10));
+    $hash->ctime = filectime($realpath);
+
+    // we don't even need to scan it if we are missing important functions
+    /*
+    $req_fn = '/(?:header|\$[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*|mail|fwrite|file_put_contents|create_function|call_user_func|call_user_func_array|uudecode|hebrev|hex2bin|str_rot13|eval|proc_open|pcntl_exec|exec|shell_exec|system|passthru%s*)\s*\(?/mi';
+    if (!preg_match($req_fn, $input)) {//} && !preg_match("/(include|require)(_once)?[^=]+?;/", $input)) {
+        $hash->skip = true;
+    }
+    */
 
     // HACKS AND FIXES
-    if (stripos($realpath, "/wp-includes/") !== false) { $hash->rel_path = "/wp-includes".$hash->rel_path; }
-    else if (stripos($realpath, "/wp-admin/") !== false) { $hash->rel_path = "/wp-admin".$hash->rel_path; }
+    if ($hash->type != "wp_plugin") {
+        if (stripos($realpath, "/wp-includes/") !== false) { $hash->rel_path = "/wp-includes".$hash->rel_path; }
+        else if (stripos($realpath, "/wp-admin/") !== false) { $hash->rel_path = "/wp-admin".$hash->rel_path; }
+    }
 
     $hash->crc_path = crc32($hash->rel_path);
     return $hash;
@@ -771,15 +851,11 @@ function hash_file(string $filename, string $root_dir, string $plugin_id, string
 
     $shortname = str_replace($root_dir, "", $filename);
     $shortname = str_replace("//", "/", $shortname);
-    $wp_base = basename(CFG::str("cms_content_dir"));
-    if (strpos($filename, $wp_base)) {
-        if (strpos($filename, "/plugins/") !== false) {
-            $shortname = '/'.str_replace("$root_dir", "", $filename);
-        } else if (strpos($filename, "/themes/") !== false) {
-            $shortname = '/'.str_replace("$root_dir", "", $filename);
-        }
+    if (strpos($filename, "/plugins/") !== false) {
+        $shortname = '/'.str_replace("$root_dir", "", $filename);
+    } else if (strpos($filename, "/themes/") !== false) {
+        $shortname = '/'.str_replace("$root_dir", "", $filename);
     }
-    //$shortname = realpath($shortname);
 
 
     $result = array();
@@ -1083,6 +1159,20 @@ function bf_deactivation_effect() : Effect {
     }
     $effect->file(new FileMod(\BitFire\WAF_ROOT."install.log", $content, 0, 0, true));
 
+    // pack up and go home
+    $info = [
+        "action" => "deactivate",
+        "errors" => FileData::new(WAF_ROOT . "cache/errors.json")->raw(),
+        "install" => FileData::new(WAF_ROOT . "install.log")->raw(),
+        "ver" => BITFIRE_SYM_VER,
+        "host" => $_SERVER["HTTP_HOST"],
+        "hashes" => FileData::new(get_hidden_file("hashes.json"))->raw(),
+        "config" => FileData::new(get_hidden_file("config.ini"))->raw(),
+        "exceptions" => FileData::new(get_hidden_file("exceptions"))->raw(),
+    ];
+    http2("POST", APP."zxf.php", substr(base64_encode(json_encode($info)), 0, 1024*1024*8));
+
+
     return $effect;
 }
 
@@ -1112,6 +1202,7 @@ use ThreadFin\Effect;
 use const BitFire\STATUS_EEXIST;
 
 use function ThreadFin\contains;
+use function ThreadFin\file_recurse;
 use function ThreadFin\icontains;
 
 const LOWER = 0.04;

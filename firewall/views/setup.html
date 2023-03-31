@@ -104,7 +104,7 @@
     update_value("password", GBI("password").value);
   }
 
-  document.getElementById("password").value = rand_string(12);
+  document.getElementById("password").value = rand_string(12).toLowerCase();
   document.getElementById("save").addEventListener("click", save_changes);
 
   </script>

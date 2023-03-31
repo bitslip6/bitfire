@@ -11,10 +11,12 @@
 
 namespace BitFireHeader;
 
+use BitFire\Config;
 use BitFire\UserAgent;
 use ThreadFin\Effect;
 use ThreadFin\MaybeStr;
 
+use function ThreadFin\contains;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
 
@@ -64,7 +66,8 @@ function core_headers(?UserAgent $agent) : Effect {
     $effect = Effect::new();
 
     $effect->header("Referrer-Policy", "no-referrer-when-downgrade");
-    $effect->header("X-Frame-Options", "deny");
+    // deny i-frames if not running in wordpress admin area
+    $effect->header("X-Frame-Options", "sameorigin");
     $effect->header("X-Content-Type-Options", "nosniff");
     $effect->header("Referrer-Policy", "strict-origin-when-cross-origin");
 
@@ -93,8 +96,8 @@ function force_ssl_with_sts() : Effect {
     $scheme = ($server["HTTP_X_FORWARDED_PROTO"]??$server["REQUEST_SCHEME"]??"http");
     // force encryption
     if ($scheme === "http") {
-        $host = filter_input(INPUT_SERVER, "HTTP_HOST", FILTER_SANITIZE_URL);
-        $uri = filter_input(INPUT_SERVER, "REQUEST_URI", FILTER_SANITIZE_URL);
+        $host = $_SERVER["HTTP_HOST"];
+        $uri = $_SERVER["REQUEST_URI"];
         $effect->header("Location", "https://{$host}{$uri}");
         $effect->exit(true);
     }

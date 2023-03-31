@@ -11,8 +11,10 @@ define ("DB_HOST", "");
 define ("WP_CONTENT_DIR", "/var/www/wordpress/wp-content");
 define("ABSPATH", $_SERVER["DOCUMENT_ROOT"]);
 
-function mt_rand(int $min, int $max) : int { return 1; }
-function mt_getrandmax() : int { return 1; }
+if (!function_exists("mt_rand")) {
+    function mt_rand(int $min, int $max) : int { return 1; }
+    function mt_getrandmax() : int { return 1; }
+}
 
 function free_disk_space(string $path): int {
     return 1024*1024;

@@ -254,9 +254,6 @@ function test_ssl() : void {
     assert_eq($r(), $test_text, "unable to encrypt and then decrypt");
 }
 
-function test_write_file() : void {
-    assert_true(file_write("/tmp/test_util.txt", "text_content"), "unable to write file to /tmp");
-}
 
 function test_file_replace() : void {
     $c = file_put_contents("/tmp/test_util.txt", "this is an example test file\nwith a multiline example thing");

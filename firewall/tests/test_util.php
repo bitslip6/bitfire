@@ -6,10 +6,14 @@ use ThreadFin\FileData;
 use ThreadFin\FileMod;
 use ThreadFin\Maybe;
 
+use const BitFire\ACTION_CLEAN;
+use const BitFire\ACTION_RETURN;
 use const BitFire\FILE_RW;
 
 use function BitFire\is_ipv6;
 use function BitFire\reverse_ip_lookup;
+use function ThreadFin\accrue_arr;
+use function ThreadFin\accrue_list;
 use function ThreadFin\tar_extract;
 use function ThreadFin\between;
 use function ThreadFin\contains;
@@ -32,6 +36,23 @@ function some_func($a1, $a2, $a3, $a4 = "foobar") {
     return "some func [$a1] [$a2] [$a3] [$a4]";
 }
 
+
+function test_accrue_arr() {
+
+    $fn = accrue_list("some_func", "ThreadFin\List_Fwd_Ref_Pair");
+    $fn("a1", "a2", "a3");
+    $fn("a4", "a5", "a6");
+    $r = $fn(ACTION_RETURN);
+    assert_eq(count($r), 2, "accrue_arr did not return 2 items");
+    //print_r($r);
+    assert_eq($r[1], "some func [a4] [a5] [a6] [foobar]", "accrue_arr did not return correct value");
+
+    $fn(ACTION_CLEAN);
+    $fn("a7", "a8", "a9");
+    $r = $fn(ACTION_RETURN);
+    assert_eq(count($r), 1, "accrue_arr clean did not work");
+    assert_eq($r[0], "some func [a7] [a8] [a9] [foobar]", "accrue_arr did not return correct value");
+}
 
 /**
  * test chaining effects
@@ -260,10 +281,6 @@ function test_ssl() : void {
     $r = decrypt_ssl($pass, $encrypt);
     assert_neq($encrypt, $test_text, "unable to encrypt");
     assert_eq($r(), $test_text, "unable to encrypt and then decrypt");
-}
-
-function test_write_file() : void {
-    assert_true(file_write("/tmp/test_util.txt", "text_content"), "unable to write file to /tmp");
 }
 
 

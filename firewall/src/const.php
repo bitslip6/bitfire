@@ -15,18 +15,34 @@ const STATUS_SERVER_STATE_FAIL = -1;
 
 
 const RESTRICTED_FILES = ["wp-config", ".."];
-const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_filter_enabled', 12000 => 'web_filter_enabled', 13000 => 'web_filter_enabled', 14000 => 'sql_block', 15000 => 'web_filter_enabled', 16000 => 'web_filter_enabled', 17000 => 'web_filter_enabled', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser', 21000 => 'file_block', 22000 => 'check_domain', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit', 27000 => 'require_full_browser', 29000 => 'rasp_filesystem', 30000 => 'rasp_js', 31000 => 'whitelist_enable', 32000 => 'rasp_db', 33000 => 'rasp_network', 50000 => 'web_filter_enabled');
-const FEATURE_NAMES = array(0 => 'unknown', 10000 => 'Cross Site Scripting', 11000 => 'Generic Web Filtering', 12000 => 'Generic Web Filtering', 13000 => 'Generic Web Filtering', 14000 => 'SQL Injection', 15000 => 'Generic Web Filtering', 16000 => 'Generic Web Filtering', 17000 => 'Generic Web Filtering', 18000 => 'Spam Content', 20000 => 'JavaScript Required', 21000 => 'File Upload', 22000 => 'Domain Name Verify', 23000 => 'Domain Verify', 24000 => 'Invalid Robot Network', 25000 => 'Malicious Robot', 26000 => 'Rate Limit Exceeded', 27000 => 'JavaScript Required', 29000 => 'PHP File Lock', 30000 => 'Strict CMS Requests', 31000 => 'Invalid Robot Network', 32000 => 'Unauthorized User Edit', 33000 => 'Network RASP', 50000 => 'Generic Web Filtering');
-const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg', 16000 => 'php.svg', 17000 => 'fire.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg', 26000 => 'speed.svg', 27000 => 'robot.svg', 29000 => 'php.svg', 30000 => 'xss.svg', 31000 => 'badbot.svg', 32000 => 'sql.svg', 33000 => 'xxe.svg', 50000 => 'rule.svg');
+const FEATURE_CLASS = array(0 => 'require_full_browser', 10000 => 'xss_block', 11000 => 'web_filter_enabled', 12000 => 'web_filter_enabled', 13000 => 'web_filter_enabled',
+ 14000 => 'sql_block', 15000 => 'web_filter_enabled', 16000 => 'web_filter_enabled', 17000 => 'web_filter_enabled', 18000 => 'spam_filter_enabled', 20000 => 'require_full_browser',
+ 21000 => 'file_block', 22000 => 'check_domain', 23000 => 'check_domain', 24000 => 'whitelist_enable', 25000 => 'blacklist_enable', 26000 => 'rate_limit',
+ 27000 => 'require_full_browser', 29000 => 'rasp_filesystem', 30000 => 'rasp_js', 31000 => 'whitelist_enable', 32000 => 'rasp_db', 
+ 33000 => 'rasp_network', 34000 => 'rasp_auth', 50000 => 'web_filter_enabled');
+const FEATURE_NAMES = array(0 => 'unknown', 10000 => 'Cross Site Scripting', 11000 => 'Generic Web Filtering', 12000 => 'Generic Web Filtering', 13000 => 'Generic Web Filtering', 
+ 14000 => 'SQL Injection', 15000 => 'Generic Web Filtering', 16000 => 'Generic Web Filtering', 17000 => 'Generic Web Filtering', 18000 => 'Spam Content', 20000 => 'JavaScript Required',
+ 21000 => 'File Upload', 22000 => 'Domain Name Verify', 23000 => 'Domain Verify', 24000 => 'Invalid Robot Network', 25000 => 'Malicious Robot', 26000 => 'Rate Limit Exceeded',
+ 27000 => 'JavaScript Required', 29000 => 'PHP File Lock', 30000 => 'Strict CMS Requests', 31000 => 'Invalid Robot Network', 32000 => 'Unauthorized User Edit', 33000 => 'Network RASP', 
+ 34000 => 'Rasp Authentication', 50000 => 'Generic Web Filtering');
+const CODE_CLASS = array(0 => 'robot.svg', 10000 => 'xss.svg', 11000 => 'xxe.svg', 12000 => 'bacteria.svg', 13000 => 'fire.svg', 14000 => 'sql.svg', 15000 => 'file.svg',
+ 16000 => 'php.svg', 17000 => 'fire.svg', 18000 => 'target-account.svg', 21000 => 'php.svg', 22000 => 'robot.svg', 23000 => 'robot.svg', 24000 => 'robot.svg', 25000 => 'badbot.svg',
+ 26000 => 'speed.svg', 27000 => 'robot.svg', 29000 => 'php.svg', 30000 => 'xss.svg', 31000 => 'badbot.svg', 32000 => 'sql.svg', 33000 => 'xxe.svg', 34000 => 'target-account.svg', 50000 => 'rule.svg');
 
-const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\review', '\\BitFire\\allow', '\\BitFire\\send_mfa', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff','\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', '\\BitFire\\download', '\\BitFire\\rem_api_exception', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', '\\BitFire\\backup_database', '\\BitFire\\add_list_elm','\\BitFire\\clean_post', '\\BitFire\\scan_malware', '\\BitFire\\remove_list_elm', '\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\bot_action', '\\BitFire\\get_hr_data', '\\BitFire\\dump_hash_dir','\\BitFire\\install', '\\BitFire\\uninstall', '\\BitFire\\download', '\\BitFire\\malware_files');
-const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 29000 => 0, 70000 => 0);
+const BITFIRE_API_FN = array('\\BitFire\\dump_hashes', '\\BitFire\\review', '\\BitFire\\allow', '\\BitFire\\send_mfa', '\\BitFire\\delete', '\\BitFire\\repair', '\\BitFire\\diff',
+'\\BitFire\\SETTINGS', '\\BitFire\\MALWARESCAN', '\\BitFire\\set_pass', '\\BitFire\\clear_cache', '\\BitFire\\upgrade', '\\BitFire\\hash_diffs', '\\BitFire\\DASHBOARD', 
+'\\BitFire\\download', '\\BitFire\\rem_api_exception', '\\BitFire\\add_api_exception', '\\BitFire\\unlock_site', '\\BitFire\\lock_site', '\\BitFire\\get_block_types', 
+'\\BitFire\\backup_database', '\\BitFire\\add_list_elm','\\BitFire\\clean_post', '\\BitFire\\scan_malware', '\\BitFire\\remove_list_elm', '\\BitFire\\replace_array_value', 
+'\\BitFire\\toggle_config_value', '\\BitFire\\get_valid_data', '\\BitFire\\get_ip_data', '\\BitFire\\bot_action', '\\BitFire\\get_hr_data', '\\BitFire\\general_scan', 
+'\\BitFire\\dump_hash_dir','\\BitFire\\install', '\\BitFire\\uninstall', '\\BitFire\\download', '\\BitFire\\malware_files');
+const BITFIRE_METRICS_INIT = array('challenge' => 0, 'broken' => 0, 'invalid' => 0, 'valid' => 0, 10000 => 0, 11000 => 0, 12000 => 0, 13000 => 0, 14000 => 0, 15000 => 0, 16000 => 0, 
+17000 => 0, 18000 => 0, 19000 => 0, 20000 => 0, 21000 => 0, 22000 => 0, 23000 => 0, 24000 => 0, 25000 => 0, 26000 => 0, 29000 => 0, 70000 => 0);
 const BITFIRE_VER = 999;
 const BITFIRE_SYM_VER = "9.9.9";
 const APP = "https://bitfire.co/";
 
-const ACTION_RETURN = -9999999;
-const ACTION_CLEAN = -9999998;
+const ACTION_RETURN = -888888;
+const ACTION_CLEAN = -888887;
 
 const BITFIRE_INTERNAL_PARAM = 'BITFIRE_NONCE';
 const BITFIRE_COMMAND = "BITFIRE_API";
@@ -71,7 +87,9 @@ const THROTTLE_LOCK_FILE = ".bitfire.lock";
 
 const FAIL_NOT = 0;
 
-const PROFANITY = "anal|anus|arse|ass|asss|bastard|bitch|cock|cocksuck|coon|crap|cunt|cyberfuck|damn|dick|douche|fag|faggot|fuck|fuck\s+you|fuckhole|god damn|gook|homoerotic|hore|lesbian|mother|fucker|motherfuck|motherfucker|negro|nigger|penis|penisfucker|piss|porn|pussy|retard|sex|shit|slut|son\s+of\s\s+a\s+bitch|tits|viagra|whore";
+const PROFANITY = "anal|anus|arse|ass|asss|bastard|bitch|cock|cocksuck|coon|crap|cunt|cyberfuck|damn|dick|douche|fag|faggot|fuck|".
+"fuck\s+you|fuckhole|god damn|gook|homoerotic|hore|lesbian|mother|fucker|motherfuck|motherfucker|negro|nigger|penis|penisfucker|".
+"piss|porn|pussy|retard|sex|shit|slut|son\s+of\s\s+a\s+bitch|tits|viagra|whore";
 
 
 const FAIL_HONEYPOT=50001;
@@ -126,15 +144,8 @@ const STATUS_EACCES = 13;
 const STATUS_EEXIST = 17;
 const STATUS_ECOM = 70;
 
-// if we are installed in a web-accessible location, make files un-readable
-if (strstr( __FILE__, $_SERVER["DOCUMENT_ROOT"]) !== false) {
-    define('BitFire\FILE_W', 0664);
-    define('BitFire\FILE_R', 0664);
-}
-else {
-    define('BitFire\FILE_W', 0664);
-    define('BitFire\FILE_R', 0664);
-}
+define('BitFire\FILE_W', 0664);
+define('BitFire\FILE_R', 0664);
 const FILE_RW = 0664;
 const FILE_EX = 0775;
 

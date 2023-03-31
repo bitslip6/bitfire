@@ -16,20 +16,18 @@ use ThreadFin\CacheItem;
 
 use function BitFireBot\bot_authenticate;
 use function BitFireBot\find_ip_as;
+use function BitFireBot\is_allowed_xmlrpc;
 use function BitFireBot\send_browser_verification;
-use function BitFireBot\verify_bot_as;
-use function BitFireBot\verify_bot_ip;
 use function ThreadFin\contains;
 use function ThreadFin\dbg;
 use function ThreadFin\decrypt_tracking_cookie;
 use function ThreadFin\en_json;
-use function ThreadFin\httpg;
 use function ThreadFin\memoize;
 use function ThreadFin\str_reduce;
 use function ThreadFin\trace;
 use function ThreadFin\debug;
 use function ThreadFin\ends_with;
-use function ThreadFin\http2;
+use function ThreadFin\HTTP\http2;
 use function ThreadFin\un_json;
 use function ThreadFin\utc_date;
 
@@ -41,7 +39,6 @@ use ThreadFin\FileData;
 use ThreadFin\Maybe;
 use ThreadFin\MaybeA;
 use ThreadFin\MaybeBlock;
-use ThreadFin\MaybeI;
 use ThreadFin\MaybeStr;
 
 use const ThreadFin\DAY;
@@ -86,15 +83,27 @@ const AGENT_WORDS = [
 
 
 
+/**
+ * User Agent Model
+ * @package BitFire
+ */
 class UserAgent
 {
+    /** @var string $os */
     public $os;
+    /** @var string $whitelist */
     public $whitelist;
+    /** @var string $browser */
     public $browser;
+    /** @var string $ver */
     public $ver;
+    /** @var string $bot */
     public $bot;
+    /** @var int $trim */
     public $trim;
+    /** @var int $crc32 */
     public $crc32;
+    /** @var int $valid  0, 1, 2*/
     public $valid = 0;
 
     public function __construct(string $os, string $browser, string $ver, bool $whitelist, bool $bot)
@@ -107,6 +116,10 @@ class UserAgent
     }
 }
 
+/**
+ * JavaScript code model
+ * @package BitFire
+ */
 class JS_Fn
 {
     public $js_code;
@@ -120,6 +133,10 @@ class JS_Fn
 
 const IPData = '\BitFire\IPData';
 
+/**
+ * server side data about an IP
+ * @package BitFire
+ */
 class IPData
 {
     public $rr;
@@ -152,6 +169,10 @@ class IPData
 }
 
 // Sync with server bot_info
+/**
+ * bot info model. todo, cleanup member variables
+ * @package BitFire
+ */
 class BotInfo
 {
     public $id;
@@ -176,16 +197,24 @@ class BotInfo
     public $allowclass;
     public $mtime;
     public $trim;
+    public $time;
     public $machine_date;
     public $machine_date2;
+    public $ip_str;
+    public $last_time;
+    public $classClass;
+    public $checked;
 
-    public function __construct($agent)
-    {
+    public function __construct($agent) {
         $this->agent = $agent;
         $this->ips = [];
     }
 }
 
+/**
+ * model for JavaScript Challenge Answer
+ * @package BitFire
+ */
 class Answer
 {
     public $op1;
@@ -194,8 +223,7 @@ class Answer
     public $ans;
     public $code;
 
-    public function __construct(int $op1, int $op2, int $oper)
-    {
+    public function __construct(int $op1, int $op2, int $oper) {
         $this->op1 = $op1;
         $this->op2 = $op2;
         $this->oper = $oper;
@@ -251,7 +279,7 @@ class Challenge
 
 // 2 calls = 29: cpu
 /**
- * compare the request against the match
+ * compare the request against the match criteria
  * PURE(ish) depends on Config and Exceptions to create the block
  */
 function constraint_check(int $fail_code, MatchType $type, \BitFire\Request $request): MaybeBlock
@@ -353,7 +381,7 @@ function reverse_ip_lookup(string $ip): string
 
 /**
  * queries quad 1 for dns data over SSL or uses local DNS services
- * @returns a string with teh result, or empty string
+ * @returns a string with the result, or empty string
  */
 function ip_lookup(string $ip, string $type = "A"): string
 {
@@ -366,7 +394,8 @@ function ip_lookup(string $ip, string $type = "A"): string
     }
     try {
         $url = "https://1.1.1.1/dns-query?name=$ip&type=$type";
-        $raw = httpg($url, '', ['accept' => 'application/dns-json', 'Content-Type' => 'application/dns-json']);
+        $response = http2("GET", $url, '', ['accept' => 'application/dns-json', 'Content-Type' => 'application/dns-json']);
+        $raw = $response->content;
         if ($raw !== false) {
             $formatted = un_json($raw);
             if (isset($formatted['Authority'])) {
@@ -386,9 +415,28 @@ function ip_lookup(string $ip, string $type = "A"): string
  * memoized version of ip_lookup (1 hour)
  * NOT PURE
  */
-function fast_ip_lookup(string $ip, string $type = "A"): string
-{
+function fast_ip_lookup(string $ip, string $type = "A"): string {
     return memoize('BitFire\ip_lookup', "dns_{$type}_{$ip}", 3600)($ip, $type);
+}
+
+/**
+ * memoized version of ip_lookup (1 hour)
+ * NOT PURE
+ */
+function fast_reverse_lookup(string $ip): string {
+    return memoize('BitFire\reverse_ip_lookup', "rev_{$ip}", 3600)($ip);
+}
+
+function fast_ip_verify(string $ip): bool {
+    $ip_fn = memoize('gethostbyaddr', "ip_{$ip}", 3600);
+    $name_fn = memoize('gethostbyname', "name_{$ip}", 3600);
+
+    $fqdn = $ip_fn($ip);
+    $rip = $name_fn($fqdn);
+
+    if ($rip == $ip) {
+        return true;
+    }
 }
 
 
@@ -397,9 +445,7 @@ function fast_ip_lookup(string $ip, string $type = "A"): string
 /**
  * load the local data for the remote IP
  */
-function get_server_ip_data(string $remote_addr, string $agent): IPData
-{
-
+function get_server_ip_data(string $remote_addr, string $agent): IPData {
     $ip_key = "BITFIRE_IP_$remote_addr";
     $data = CacheStorage::get_instance()->update_data(
         $ip_key,
@@ -472,12 +518,15 @@ class BotFilter
         $block = Maybe::$FALSE;
         $this->browser = new UserAgent("bot", "bot", "1.0", false, true);
 
+
         // if XMLRPC is enabled, add /xmlrpc.php to the list of bot urls
-        if (Config::enabled("block_xmlrpc")) {
+        if (Config::disabled("block_xmlrpc")) {
             $list = Config::arr("ignore_bot_urls");
             $list[] = "/xmlrpc.php";
             Config::set_value("ignore_bot_urls", $list);
         }
+
+
 
         // ignore urls that receive consistent bot access that may be difficult to identify
         if (in_array($request->path, Config::arr("ignore_bot_urls"))) {
@@ -489,12 +538,7 @@ class BotFilter
             return $block;
         }
 
-        // 10% update failed challenge bots
-        if (\mt_rand(0, 100) < 10) {
-            $bot_file_list = glob(BLOCK_DIR . "/*.bot.txt");
-            array_map("\BitFire\bot_to_block", $bot_file_list);
-        }
-
+        
         // get details about the agent
         $this->browser = \BitFireBot\parse_agent($request->agent);
 
@@ -511,6 +555,10 @@ class BotFilter
         }
         trace("BV" . $this->browser->valid . " SV" . $this->ip_data->valid);
 
+        // browser has already been verified, dont need to do any further checking
+        if ($this->browser->valid == 2) {
+            return $block;
+        }
         
 
         // check host header is not garbage
@@ -531,165 +579,13 @@ class BotFilter
             }
 
             // only do bot checks if not already blocked by blacklist
-            if ($block->empty()) {
-                $effect = bot_authenticate($this->browser, $request->ip, $request->agent);
-                $effect->run();
+            if ($block->empty() && Config::enabled("whitelist_enable")) {
+                if (!is_allowed_xmlrpc($request)) {
+                    $effect = bot_authenticate($this->browser, $request->ip, $request->agent);
+                    $effect->run();
+                }
             }
         }
-
-        /*
-        if ($block->empty() && $this->browser->bot) {
-            $valid = UA_NO_MATCH;
-            $id = $this->browser->crc32;
-            $info_file = WAF_ROOT . "cache/bots/{$id}.json";
-            debug("bot file [%s]", $info_file);
-            $bot_data = null;
-            if (file_exists($info_file) && filemtime($info_file) > (time() - (DAY * 30))) {
-                $bot_data = unserialize(FileData::new($info_file)->raw(), ["allowed_classes" => ["BitFire\BotInfo"]]);
-                debug("loaded saved config");
-            }
-            if (empty($bot_data)) {
-                $response = http2("GET", APP . "bot_info.php", array("ip" => $request->ip, "agent" => $request->agent, "trim" => $this->browser->trim, "id" => $id));
-                if (!empty($response)) {
-                    $app_data = unserialize($response["content"]); //, ["allowed_classes" => ["BitFire\BotInfo"]]);
-                    if (!empty($app_data)) {
-                        $bot_data = $app_data;
-                        debug("loaded remote data");
-                    } else {
-                        debug("load remote bot info failed");
-                    }
-                }
-            }
-            if (!empty($bot_data)) {
-                debug("validate net");
-                $valid = UA_NET_FAIL;
-                if ($bot_data->valid >= 1 && $bot_data->net !== "!") {
-                    // all IPs are valid
-                    if ($bot_data->net === "*") {
-                        trace("BOT*");
-                        $valid = UA_NET_MATCH;
-                    }
-                    // some IPs are valid
-                    else if (isset($bot_data->ips[$request->ip])) {
-                        trace("BOT_IP");
-                        $valid = UA_NET_MATCH;
-                    }
-                    // check reverse domain lookup
-                    if ($valid == UA_NET_FAIL && !empty($bot_data->domain) && verify_bot_ip($request->ip, $bot_data->domain)) {
-                        trace("BOT_DOM");
-                        $valid = UA_NET_MATCH;
-                    }
-                    // check the AS network
-                    if ($valid == UA_NET_FAIL && !empty($bot_data->net)) {
-                        $all_as = explode($bot_data->net, ",");
-                        foreach ($all_as as $as) {
-                            if (verify_bot_as($request->ip, $as) == "yes") {
-                                $valid = UA_NET_MATCH;
-                                trace("BOT_NET");
-                                break;
-                            }
-                        }
-                    }
-                }
-                if ($valid == UA_NET_MATCH) {
-                    debug("VALIDATED!");
-                    $this->browser->whitelist = true;
-                    trace("BOT_MATCH");
-                    $bot_data->hit += ($valid == UA_NET_MATCH) ? 1 : 0;
-                }
-                // add the ip to list of allowed ips for auto learn
-                if (count($bot_data->ips) < 30 && $bot_data->category = "Auto Learn") {
-                    $bot_data->ips[] = $request->ip;
-                }
-            } else {
-                trace("BOT_NEW");
-                $bot_data = new BotInfo($request->agent);
-                $bot_data->ips = [$request->ip];
-                $bot_data->category = "Auto Learn";
-                $bot_data->home_page = "";
-                $bot_data->icon = "robot.svg";
-                $bot_data->mtime = time();
-                $host = gethostbyaddr($request->ip);
-                debug("get host addr [%s]", $host);
-                if (preg_match("/(\w+\.\w+)$/", $host, $matches)) {
-                    $bot_data->domain = $matches[1];
-                } else {
-                    $bot_data->net = "*";
-                }
-            }
-            $bot_data->id = $id;
-            if (CFG::enabled("dynamic_exceptions")) {
-                trace("DYN_EN");
-                $valid = UA_NET_MATCH;
-                $bot_data->valid = 1;
-                $bot_data->net = "*";
-                $hostname = gethostbyaddr($request->ip);
-                if (preg_match("/(\w+\.\w+)$/", $hostname, $matches)) {
-                    $bot_data->domain = $matches[1];
-                }
-            }
-
-            if ($valid != UA_NET_MATCH) {
-                die("fail");
-                if ($valid == UA_NET_FAIL) {
-                    $block = BitFire::new_block(FAIL_FAKE_WHITELIST, "user_agent", $request->agent, "origin network does not match [{$bot_data->domain}]", 0);
-                } else {
-                    $block = BitFire::new_block(FAIL_MISS_WHITELIST, "user_agent", $request->agent, "user agent not found", 0);
-                }
-            }
-            // save the bot data after page load. hopefully wordpress sets the correct http code...
-            register_shutdown_function(function () use ($info_file, $bot_data) {
-                if (http_response_code() > 400) {
-                    $bot_data->miss += 1;
-                } else {
-                    $bot_data->hit += 1;
-                }
-                file_put_contents($info_file, serialize($bot_data), LOCK_EX);
-            });
-            */
-
-            /*
-            // TODO: this can be sped up by only doing the whitelist check 
-            // when we don't have cached server data.
-            // TODO: add FileCache to the list of supported caches
-            // bot whitelist, TODO: can simplify and move agent parse and block check into a wrapper function
-            if (Config::enabled(CONFIG_WHITELIST_ENABLE) && $block->empty()) {
-                chmod(\BitFire\WAF_ROOT."cache/whitelist_agents.ini", 0664);
-                $agents = \parse_ini_file(\BitFire\WAF_ROOT."cache/whitelist_agents.ini");
-                $whitelisted = \BitFireBot\whitelist_inspection($request->agent, $request->ip,
-                    $agents['botwhitelist'], $this->browser->bot);
-
-                // only if the agent IS whitelisted
-                if ($whitelisted == UA_NET_MATCH) {
-                    trace("WHTL");
-                    // set agent whitelist status
-                    $this->browser->whitelist = true;
-                    return $block;
-                }
-                // unknown agent
-                else {
-                    // add to our list of possible bots to allow
-                    //if (CFG::int("dynamic_exceptions") > time()) {
-                    if (false) {
-                        $check_file = WAF_ROOT . "cache/bot_check.json";
-                        $bot_check = FileData::new($check_file)->read()->un_json();
-                        if (!isset($bot_check[$request->agent])) {
-                            $bot_check[$request->agent] = $request;
-                        }
-                        file_put_contents($check_file, json_encode($bot_check, JSON_PRETTY_PRINT), LOCK_EX);
-                    }
-                    // we are in full block mode, so block if the bot was unknown
-                    else {
-                        if ($whitelisted == UA_NO_MATCH && $this->browser->bot) {
-                            $block = BitFire::new_block(FAIL_MISS_WHITELIST, "user_agent", $request->agent, "whitelist user agent not found", CFG::int("block_short_time", 600));
-                        } else {
-                            $block = BitFire::new_block(FAIL_FAKE_WHITELIST, "user_agent", $this->ua_match, "whitelist user agent network does not match [{$this->ua_check}]", CFG::int("block_short_time", 600));
-                        }
-                    }
-                }
-                }
-            }
-            */
 
         
         // validate request rate, don't check for whitelist bots or admins
@@ -721,7 +617,7 @@ class BotFilter
             }
         }
 
-        // lastly verify, real browsers, don't verify bots
+        // last verify real browsers, don't verify bots
         // set browser validity to cookie value or server ip data
         if (!$this->browser->bot && CFG::is_block(CONFIG_REQUIRE_BROWSER) && (CFG::enabled('cookies_enabled') || CFG::str("cache_type") != 'nop')) {
             if (!$this->browser->whitelist && !ends_with($request->path, "admin-ajax.php")) {
@@ -729,6 +625,13 @@ class BotFilter
                 $effect->run();
             }
         }
+
+        // 5% update failed challenge bots
+        if (\mt_rand(0, 100) < 5) {
+            $bot_file_list = glob(BLOCK_DIR . "/*.bot.txt");
+            array_map("\BitFire\bot_to_block", $bot_file_list);
+        }
+
         return $block;
     }
 
@@ -741,8 +644,8 @@ class BotFilter
                 // IMPORTANT, even though we have a POST, we are going to impersonate the original request!
                 // UGLY, move this to function
                 if ($effect->read_status() == STATUS_OK) {
-                    $method = filter_input(INPUT_POST, '_bfm', FILTER_SANITIZE_URL);
-                    $uri = filter_input(INPUT_SERVER, 'REQUEST_URI');
+                    $method = $_POST['_bfm'];
+                    $uri = $_SERVER['REQUEST_URI'];
                     // reset the get, post and request method with the original page request values
                     // this allows us to recreate the original request that we intercepted to verify
                     // the browser runs JavaScript
@@ -791,6 +694,9 @@ function bot_to_block(string $file)
         $request->post = $tmp["post"] ?? [];
 
 
+        /*
+        // DNS lookups are slow, do this on the dashboard page
+        // TODO: add reverse dns lookup to dashboard
         $reverse_ip = \BitFire\reverse_ip_lookup($request->ip);
         $as = "";
         if (preg_match("/[a-z0-9][a-z0-9-]+[a-z0-9]\.[a-z]{2,}$/", $reverse_ip, $matches)) {
@@ -798,9 +704,10 @@ function bot_to_block(string $file)
         } else {
             $as = find_ip_as($request->ip);
             $match = (empty($as)) ? "no whitelist for the agent" : "AS{$as}";
-            BitFire::new_block(FAIL_FAKE_BROWSER, $request->agent, $match, "did not complete JavaScript challenge", 0, $request);
         }
-        debug("agent: \"%s\", ip: %s, reverse: %s, as: %s", $request->agent, $request->ip, $reverse_ip, $as);
+        */
+        BitFire::new_block(FAIL_FAKE_BROWSER, $request->agent, "DEFER:reverse_dns", "did not complete JavaScript challenge", 0, $request);
+        debug("agent: \"%s\", ip: %s", $request->agent, $request->ip);
         unlink($file);
     }
 }
@@ -865,6 +772,8 @@ function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, Maybe
     $answer = new Answer($ip_data->op1, $ip_data->op2, $ip_data->oper);
     $cookie_answer = $cookie->extract('a')->extract('ans');
 
+    // test verify browser needs to pass the tests...
+
     if (strlen($request->post_raw) > 20) {
         $tmp = urldecode($request->post_raw);
         $result2 = json_decode($tmp, true);
@@ -885,6 +794,7 @@ function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, Maybe
         return browser_clear($request);
     }
 
+
     // correct answer
     if ($cookie_answer->value('int') === intval($bfa) || $answer->ans == intval($bfa)) {
         debug("x-challenge: pass");
@@ -893,8 +803,8 @@ function verify_browser_effect(\BitFire\Request $request, IPData $ip_data, Maybe
         BitFire::get_instance()->bot_filter->browser->valid = 2;
 
         // increase metric counter
-        $effect->update(bot_metric_inc('valid'))
-            ->status(STATUS_OK)
+        //$effect->update(bot_metric_inc('valid'))
+        $effect->status(STATUS_OK)
             // set the response valid cookie
             ->cookie(en_json(array('ip' => crc32($request->ip), 'v' => 2, 'ua' => crc32($request->agent), 'et' => time() + 86400, 'wp' => $cookie->extract('wp')->value('int'))), "botfilter_verify")
             // update the ip_data valid state for 60 minutes, TODO: make this real func, not anon-func
@@ -933,6 +843,7 @@ use BitFire\BotInfo;
 use BitFire\Config;
 use BitFire\Config as CFG;
 use BitFire\JS_Fn;
+use BitFire\Request;
 use BitFire\UserAgent;
 use RuntimeException;
 use ThreadFin\CacheItem;
@@ -962,7 +873,7 @@ use function ThreadFin\memoize;
 use function ThreadFin\debug;
 use function ThreadFin\en_json;
 use function ThreadFin\get_hidden_file;
-use function ThreadFin\http2;
+use function ThreadFin\HTTP\http2;
 use function ThreadFin\partial as BINDL;
 use function ThreadFin\partial_right as BINDR;
 use function ThreadFin\random_str;
@@ -978,6 +889,7 @@ use const BitFire\COMMON_WORDS;
 use const BitFire\CONFIG_ENCRYPT_KEY;
 use const BitFire\CONFIG_REQUIRE_BROWSER;
 use const BitFire\CONFIG_USER_TRACK_COOKIE;
+use const BitFire\DS;
 use const BitFire\FAIL_FAKE_WHITELIST;
 use const BitFire\FAIL_HOST_TOO_LONG;
 use const BitFire\FAIL_IS_BLACKLIST;
@@ -1381,7 +1293,6 @@ function parse_agent(string $user_agent): UserAgent {
         return $carry;
     }, $agent);
 
-    // OOO check QIHU browser!
     // make sure it's not really a browser...
     if ($parsed_agent->bot) {
         $words = explode(" ", $parsed_agent->browser);
@@ -1470,7 +1381,7 @@ function make_js_script(int $op1, int $op2, int $oper, string $fn = "xhr"): stri
     $fn4 = js_int_obfuscate($op2);
     $fn5 = js_int_obfuscate(mt_rand(1000, 500000));
     $fn6 = js_int_obfuscate(mt_rand(1000, 500000));
-    $method = filter_input(INPUT_SERVER, "method", FILTER_SANITIZE_URL);
+    $method = $_SERVER["REQUEST_METHOD"];
 
     $js  = "function $fn1_name(){var _0x29a513=function(){var _0x4619fc=!![];return function(_0x579b4a,_0x4b417a){var _0x13068=_0x4619fc?function(){if(_0x4b417a){var _0x193a80=_0x4b417a['apply'](_0x579b4a,arguments);_0x4b417a=null;return _0x193a80;}}:function(){};_0x4619fc=![];return _0x13068;};}();var _0x2739c0=_0x29a513(this,function(){var _0x51ace=function(){var _0x5125f4=_0x51ace['constructor']('return\x20/\x22\x20+\x20this\x20+\x20\x22/')()['constructor']('^([^\x20]+(\x20+[^\x20]+)+)+[^\x20]}');return!_0x5125f4['test'](_0x2739c0);};return _0x51ace();});_0x2739c0();return {$fn3->fn_name}() " . oper_char($oper) . " {$fn4->fn_name}();}";
     $js .= $fn5->js_code . "\n" . $fn4->js_code . "\n" . $fn3->js_code . "\n" . $fn6->js_code . "\n";
@@ -1510,7 +1421,7 @@ ptr(window.location.href,{"_bfa":' . $fn1_name . '(),"_bfg":\'' . json_encode($_
  */
 function make_challenge_cookie($answer, string $ip, string $agent): array
 {
-    $method = filter_input(INPUT_SERVER, 'REQUEST_METHOD', FILTER_SANITIZE_URL);
+    $method = $_SERVER['REQUEST_METHOD']??'GET';
     $d = array(
         'et' => time() + 86400,
         'v' => 1,
@@ -1625,20 +1536,19 @@ function load_bot_data(string $info_file, string $ip, string $trim_agent, int $v
         $response = http2("GET", APP . "bot_info.php", array("ip" => $ip, "trim" => $trim_agent, "agent"=>$_SERVER['HTTP_USER_AGENT']));
         if (!empty($response)) {
             /** @var BotInfo $app_data */
-            $app_data = unserialize($response["content"], ["allowed_classes" => ["BitFire\BotInfo"]]);
+            $app_data = unserialize($response->content, ["allowed_classes" => ["BitFire\BotInfo"]]);
 
             if (!empty($app_data) && $app_data) {
                 if ($app_data->valid > 0) {
                     // make sure we have auth data for valid bots
-                    if ($app_data['class_id'] != 10 && empty($bot_data['net']) && empty($bot_data['domain'])) {
+                    if ($app_data->class != 10 && empty($app_data->net) && empty($app_data->domain)) {
                         $bot_data = add_net_to_bot($app_data, $ip);
                     } else {
                         $bot_data = $app_data;
                     }
                 }
-                // debug("loaded remote data [%s] [%s]", $app_data, $response['content']);
             } else {
-                debug("load remote bot info failed: [%s]", $response["content"]);
+                debug("load remote bot info failed: [%s]", $response->content);
             }
         } else {
             debug("null response from bot server");
@@ -1662,8 +1572,8 @@ function load_bot_data(string $info_file, string $ip, string $trim_agent, int $v
             $bot_data->icon = "https://cdn-icons-png.flaticon.com/512/174/174881.png";
             $bot_data->name = "WordPress Cron";
         }
-        if (CFG::enabled("dynamic_exceptions")) {
-            $bot_data = add_net_to_bot($bot_data, $ip);
+        if (time() < CFG::int("dynamic_exceptions")) {
+            $bot_data = add_net_to_bot($bot_data, $ip, true, true);
             // make sure we have a fallback way to authenticate
             if (empty($bot_data->domain) && $valid) {
                 debug("no domain found for bot [%s] [%s]", $bot_data->agent, $ip);
@@ -1692,9 +1602,10 @@ function host_to_domain(string $host) : string {
  * @param string $ip 
  * @return BotInfo 
  */
-function add_net_to_bot(BotInfo $bot_data, string $ip, bool $ensure_auth = true): BotInfo {
-    if (isset($bot_data->ips[$ip])) { return $bot_data; }
+function add_net_to_bot(BotInfo $bot_data, string $ip, bool $ensure_auth = true, bool $force_lookup = false): BotInfo {
+    if (!$force_lookup && isset($bot_data->ips[$ip])) { return $bot_data; }
 
+    $bot_data->valid = UA_NET_MATCH;
     $host = gethostbyaddr($ip);
     debug("get new bot host addr [%s]", $host);
     // add reverse IP lookup to domain check.
@@ -1737,7 +1648,7 @@ function add_net_to_bot(BotInfo $bot_data, string $ip, bool $ensure_auth = true)
     return $bot_data;
 }
 
-// TODO: update all botcrc32, to only use [a-z\s]
+// TODO: update all bot-crc32, to only use [a-z\s]
 function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Effect {
     // handle special case where we have no user agent...
     if (empty($agent->trim)) {
@@ -1747,20 +1658,22 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
     $valid = UA_NO_MATCH;
     $id = crc32($agent->trim);
     $bot_dir = get_hidden_file("bots");
-    $info_file = "{$bot_dir}/{$id}.json";
-    debug("bot file (%s) [%s] -> (%s)", $ip, $info_file, print_r($agent, true));
-    $bot_data = load_bot_data($info_file, $ip, $agent->trim, (CFG::enabled("dynamic_exceptions") ? 1 : 0));
+    $info_file = $bot_dir . DS . "{$id}.json";
+    //debug("bot file ip(%s) path[%s] -> agent(%s)", $ip, $info_file, print_r($agent, true));
+
+
+    $bot_data = load_bot_data($info_file, $ip, $agent->trim, (time() < CFG::int("dynamic_exceptions") ? 1 : 0));
     $bot_data->agent = $user_agent;
 
     // add the ip to list of allowed ips for auto learning
     // this will continue auto learning IPS for the bot until we have 30
-    if (count($bot_data->ips) < 30 && $bot_data->category == "Auto Learn") {
+    if (count($bot_data->ips) < 30 && strtolower($bot_data->category) == "auto learn") {
         $bot_data->ips[$ip] = 1;
     }
 
     debug("validate net");
     $valid = UA_NET_FAIL;
-    if ($bot_data->valid >= 1 && $bot_data->net !== "!") {
+    if ($bot_data->net !== "!") {
         // all IPs are valid
         if ($bot_data->net === "*") {
             trace("BOT*");
@@ -1789,7 +1702,7 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
                     $valid = UA_NET_MATCH;
                     debug("validate bot: domain match %s -> [%s] [%s]", $host, $domain, $domain_list);
                 }                
-                else if (CFG::enabled("dynamic_exceptions")) {
+                else if (time() < CFG::enabled("dynamic_exceptions")) {
                     $bot_data = add_net_to_bot($bot_data, $ip, false);
                 }
             }
@@ -1811,9 +1724,9 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
     $bot_data->id = $id;
 
     // if dynamic exceptions are enabled, then we will allow this bot even if we don't know who it is...
-    if ($valid != UA_NET_MATCH && CFG::enabled("dynamic_exceptions")) {
+    if ($valid != UA_NET_MATCH && time() < CFG::enabled("dynamic_exceptions")) {
         if (empty($agent->trim)) {
-            debug ("cowardly refusing to authenticate empty user agent");
+            debug ("cowardly refusing to authenticate empty user agent [%s]", $user_agent);
         } else if ($bot_data->net != "!") {
             trace("DYN_EN");
             $valid = UA_NET_MATCH;
@@ -1832,14 +1745,23 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
         }
         file_put_contents($info_file, serialize($bot_data), LOCK_EX);
 
-        // remove old bot files after 60 days every 1000 requests or so
+        // remove old bot files after 31 days of inactivity every 100 requests or so
         // CLEANING
-        if (mt_rand(0, 1000) <= 1) {
+        if (mt_rand(0, 100) <= 1) {
             $bot_dir = get_hidden_file("bots");
             $files = glob("{$bot_dir}/*.json");
             array_walk($files, function ($x) {
-                if (filemtime($x) < time() - DAY*60) {
+                // remove anything that has not been touched in a month
+                if (filemtime($x) < time() - DAY*31) {
                     unlink($x);
+                }
+                // remove anything blocked that has not been touched in a week
+                else if (filemtime($x) < time() - DAY*7) {
+                    $bot_data = unserialize(FileData::new($x)->raw(), ["allowed_classes" => ["BitFire\BotInfo"]]);
+                    if ($bot_data->net == "!") { 
+                        unlink($x);
+                    }
+                    unset ($bot_data);
                 }
             });
         }
@@ -1855,4 +1777,20 @@ function bot_authenticate(UserAgent $agent, string $ip, string $user_agent): Eff
     }
 
     return Effect::$NULL;
+}
+
+
+/**
+ * allow access for wordpress iphone and android apps
+ * @param Request $request 
+ * @return bool 
+ */
+function is_allowed_xmlrpc(Request $request) {
+    if (preg_match('/wp-(iphone|android)\/[\d\.]+$/', $request->agent)) {
+        if (in_array($request->path, array("/index.php", "/wp-login.php", "/xmlrpc.php", "/wp-admin/admin-ajax.php"))) {
+            return true;
+        }
+    }
+
+    return false;
 }

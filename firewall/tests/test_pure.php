@@ -3,6 +3,7 @@
 use ThreadFin\FileData;
 
 use function BitFire\flatten;
+use function ThreadFin\get_hidden_file;
 use function ThreadFin\tar_extract;
 
 if (!defined("\BitFire\WAF_ROOT")) {
@@ -81,7 +82,7 @@ function test_load_exceptions_unit() : void {
 {"parameter":"example", "uuid": "example_global_parameter_all_codes", "code": 0},
 {"parameter":"example", "path": "/some/path", "uuid": "example_parameter_one_url_all_codes", "code": 0}
 ]';
-    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $file = get_hidden_file("exceptions.json");
     FileData::mask_file($file, $d);
 
     $exceptions = FileData::new($file)->read()->un_json();
@@ -92,7 +93,7 @@ function test_load_exceptions_unit() : void {
  * @type integration
  */
 function test_load_exceptions_int() : void {
-    $file = \BitFire\WAF_ROOT."cache/exceptions.json";
+    $file = get_hidden_file("exceptions.json");
     $exceptions = FileData::new($file)->read()->un_json();
     assert_gt(count($exceptions()), 1, "unable to load exceptions from $file");
 }
