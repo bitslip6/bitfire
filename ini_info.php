@@ -1,1 +1,1 @@
-<?php $ini_type = "opcache";
+<?php $secret_key = 'oXbYGusO_h'; $ini_type = "shmop";

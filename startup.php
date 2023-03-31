@@ -52,10 +52,9 @@ if (function_exists('xhprof_enable') && file_exists(WAF_ROOT . "profiler.enabled
     xhprof_enable(XHPROF_FLAGS_CPU + XHPROF_FLAGS_MEMORY);
 }
 
-
 // load the firewall program code
-include \BitFire\WAF_ROOT . 'error_handler.php';
-include \BitFire\WAF_SRC . 'const.php';
+require_once \BitFire\WAF_ROOT . 'error_handler.php';
+require_once \BitFire\WAF_SRC . 'const.php';
 
 // capture any bitfire fatal errors
 // send any errors that have been queued after the page has been served
@@ -72,7 +71,7 @@ register_shutdown_function(function () {
 	    $e['id'] = $id;
         file_get_contents("https://bitfire.co/err.php?msg=".base64_encode(json_encode($e)));
 
-        echo "<h1>Fatal Error Detected.</h1><p>please contact support - info@bitfire.co.</p><p>reference: $id</p>";
+        echo "<h1>Fatal Error Detected.</h1><p>please contact support - info@bitfire.co.</p><p>reference: $id</p> <!-- ".json_encode($e, JSON_PRETTY_PRINT)." -->";
     }
 
     // send any errors that have been queued after the page has been served
@@ -101,12 +100,6 @@ try {
             if ($block instanceof MaybeBlock) { $block = $block(); }
             trace('BL1');
             $ip_data = $bitfire->bot_filter !== null ? $bitfire->bot_filter->ip_data : null;
-            register_shutdown_function(
-                '\BitFire\post_request',
-                $bitfire->_request,
-                $block,
-                $ip_data
-            );
             // block the IP (will check if IP blocks are enabled)
             \BitFire\block_ip($block, $bitfire->_request)->run();
             return $block;
@@ -193,7 +186,7 @@ if (!empty($autoload) && file_exists($autoload)) {
 }
 
 // test blocking if we are in learning mode
-if (isset($_GET['bitfire_test']) && CFG::enabled('dynamic_exceptions')) {
+if (isset($_GET['bitfire_test']) && time() < CFG::enabled('dynamic_exceptions')) {
     $code = intval($_GET['bitfire_test']);
     block_now($code, 'test_block', 'Lorem ipsum dolor sit amet, consectetur adipiscing elit,
         sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.', 'block_pattern')

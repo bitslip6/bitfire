@@ -323,6 +323,13 @@ function add_script_inline(string $handle, string $code) : string {
 }
 
 function bitfire_styles() {
+
+    if (stristr($_SERVER['REQUEST_URI'], "wp-admin/plugins.php") !== false) {
+        \wp_register_script("bitfire", plugin_dir_url(__FILE__) . "public/plugin-monitor.js", ["jquery"], "1.0", true);
+        \wp_enqueue_script("bitfire", plugin_dir_url(__FILE__) . "public/plugin-monitor.js", "1.0", false);
+        header("x-plugin: 1");
+    }
+
     // ONLY ENQUEUE ON BITFIRE PAGES
     $page = filter_input(INPUT_GET, "BITFIRE_WP_PAGE", FILTER_SANITIZE_SPECIAL_CHARS);
     if (empty($page)) {
@@ -521,31 +528,30 @@ function show_alert(string $type, string $notice, string $id="") {
 
 
 
-function upgrade($upgrade=null, $extra=null) {
-    // restore the old configurations
-    // nothing to do on upgrade now...
-    /*
-    $old_config = CFG::str("cms_content_dir") . "/bitfire/config.ini";
-    if (file_exists($old_config)) {
-        @chmod(WAF_INI, FILE_RW);
-        rename($old_config, WAF_INI);
+function upgrade($upgrade=null, $extra=null) : Effect {
+    $effect = Effect::new();
+    $ex_file = get_hidden_file("exceptions.json");
+    $exceptions = FileData::new($ex_file)->read()->un_json();
+
+    // remove any only exceptions from previous versions. (remove after everyone upgrades to 3.9.8+)
+    $removed = array_filter($exceptions(), function ($x) {
+        $rem = ($x['code'] == 24002);
+        $rem |= ($x['code'] == 25001);
+        $rem |= ($x['code'] == 27000);
+        return !$rem;
+    });
+    $effect->file(new FileMod($ex_file, json_encode($removed, JSON_PRETTY_PRINT), FILE_W));
+
+    // ensure that rasp_auth is included in all config files. (remove after 3.9.9 upgrades complete)
+    if (!isset(CFG::$_options['rasp_auth'])) {
+        $fd = FileData::new(WAF_INI)->read();
+        $fd->lines[] = "; default auth verification to off\n";
+        $fd->lines[] = "rasp_auth = false;\n";
+        $fd->lines[] = "\n";
+        $effect->file($fd->file_mod());
     }
-    $restore_list = glob(CFG::str("cms_content_dir") . "/bitfire/*");
-    if (count($restore_list) > 0) {
-        array_walk($restore_list, function($x) {
-            $n = basename($x);
-            chmod(WAF_ROOT."cache/$n", FILE_RW);
-            rename($x, WAF_ROOT."cache/$x");
-        });
-    }
-    $dir_name = CFG::str("cms_content_dir") . "/bitfire";
-    if (count($dir_name) > 0) {
-        if (file_exists($dir_name)) {
-            @chmod($dir_name, FILE_RW);
-            @rmdir($dir_name);
-        }
-    }
-    */
+
+    return $effect;
 }
 
 function user_columns($columns = []) {

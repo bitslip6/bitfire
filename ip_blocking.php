@@ -7,8 +7,8 @@ if (!defined("\BitFire\WAF_ROOT")) {
     die("ip_blocking must not be called directly");
 }
 
-$ip = filter_input(INPUT_SERVER, CFG::str_up('ip_header', 'REMOTE_ADDR'), FILTER_VALIDATE_IP);
-$myself = filter_input(INPUT_SERVER, 'SERVER_ADDR', FILTER_VALIDATE_IP);
+$ip = $_SERVER[CFG::str_up('ip_header', 'REMOTE_ADDR')]??'';
+$myself = $_SERVER['SERVER_ADDR']??'';
 if ($ip != '' && $ip != $myself) {
     $block_file = \BitFire\BLOCK_DIR . DS . $ip;
     if (file_exists($block_file)) {

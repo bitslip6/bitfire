@@ -38,6 +38,7 @@ use ThreadFin\CacheStorage;
 use ThreadFin\Effect;
 use ThreadFin\FileData;
 use ThreadFin\FileMod;
+use WP_User;
 
 use const BitFire\APP;
 use const BitFire\CONFIG_REQUIRE_BROWSER;
@@ -49,6 +50,7 @@ use const BitFire\WAF_INI;
 use const BitFire\WAF_ROOT;
 use const ThreadFin\ENCODE_RAW;
 
+use function BitFire\block_now;
 use function BitFire\make_sane_path;
 use function BitFire\verify_browser_effect;
 use function BitFireBot\send_browser_verification;
@@ -69,8 +71,7 @@ use function ThreadFin\en_json;
 use function ThreadFin\file_recurse;
 use function ThreadFin\find_const_arr;
 use function ThreadFin\find_fn;
-use function ThreadFin\http2;
-use function ThreadFin\httpp;
+use function ThreadFin\HTTP\http2;
 use function ThreadFin\icontains;
 use function ThreadFin\ip_to_country;
 use function ThreadFin\parse_ini;
@@ -216,43 +217,66 @@ function find_cms_root() : ?string {
  */
 function activate_bitfire() {
     trace("wp_act");
-    $config = parse_ini();
+
+    $check_files = [
+        __DIR__ . "/src/util.php",
+        __DIR__ . "/bitfire-plugin.php",
+        __DIR__ . "/bitfire-admin.php",
+        __DIR__ . "/src/botfilter.php",
+        __DIR__ . "/src/bitfire.php",
+        __DIR__ . "/src/cms.php",
+        __DIR__ . "/src/const.php",
+        __DIR__ . "/src/cuckoo.php",
+        __DIR__ . "/src/dashboard.php",
+        __DIR__ . "/src/db.php",
+        __DIR__ . "/src/headers.php",
+        __DIR__ . "/src/renderer.php",
+        __DIR__ . "/src/server.php",
+        __DIR__ . "/src/shmop.php",
+        __DIR__ . "/src/storage.php",
+        __DIR__ . "/src/tar.php",
+        __DIR__ . "/src/webfilter.php",
+        __DIR__ . "/src/wordpress.php"
+    ];
+
+    foreach ($check_files as $file) {
+        if (!file_exists($file) || filesize($file) < 1024) {
+            debug("missing file [%s]", $file);
+            echo "plugin install failed, missing file [$file]";
+            return;
+        }
+    }
+
+    // make sure we can parse the config file
+    parse_ini();
     include_once \plugin_dir_path(__FILE__) . "bitfire-admin.php";
-    // make sure the config loader has run
 
     $file_name = ini_get("auto_prepend_file");
     if (contains($file_name, "bitfire")) {
-        $base_dir = realpath(dirname($file_name));
         CacheStorage::get_instance()->save_data("parse_ini", null, -86400);
         \BitFireSvr\uninstall()->run();
-        sleep(1);
-        \BitFireSvr\update_ini_value("rm_bitfire", $base_dir)->hide_output()->run();
+        usleep(10000);
     }
 
     ob_start(function($x) { if(!empty($x)) { debug("PHP Warnings: [%s]\n", $x); } return $x; });
-
-    \BitfireSvr\bf_activation_effect()->hide_output()->run();
-
-    if (function_exists("BitFirePlugin\upgrade")) {
-        \BitFirePlugin\upgrade();
-    }
-
-    if (defined('WP_CONTENT_DIR') && file_exists('WP_CONTENT_DIR')) {
-        mkdir(WP_CONTENT_DIR . "/bitfire", 0775, false);
-    }
 
     // install data can be verbose, so redirect to install log
     \BitFire\Config::set_value("debug_file", true); 
     \BitFire\Config::set_value("debug_header", false);
 
+    \BitfireSvr\bf_activation_effect()->hide_output()->run();
+
+    if (!function_exists("BitFirePlugin\upgrade")) {
+        require_once __DIR__ . "/bitfire-admin.php";
+    }
+    if (function_exists("BitFirePlugin\upgrade")) {
+        \BitFirePlugin\upgrade()->run();
+    }
+
+    if (defined('WP_CONTENT_DIR') && file_exists('WP_CONTENT_DIR') && !file_exists(WP_CONTENT_DIR . "/bitfire")) {
+        mkdir(WP_CONTENT_DIR . "/bitfire", 0775, false);
+    }
     ob_end_clean();
-
-
-
-
-
-    debug(trace());
-    @chmod(\BitFire\WAF_INI, FILE_W);
 }
 
 /**
@@ -361,7 +385,7 @@ function bitfire_plugin_check() {
     @include_once WAF_ROOT . "includes.php";
     $all_dirs = malware_scan_dirs(CFG::str("cms_content"));
 
-    $plugins = [];
+    $plugins = ["slug" => $_SERVER['SERVER_NAME']];
     foreach ($all_dirs as $dir) {
         if (contains($dir, ["wp-includes", "wp-admin"])) { continue; }
         $plugin = basename($dir);
@@ -394,7 +418,7 @@ function bitfire_plugin_check() {
             $content_dir = dirname(__DIR__, 2);
         }
     }
-    $effect = Effect::new()->file(new FileMod($content_dir."/plugins/bitfire/cache/plugins.json", $result["content"], FILE_W));
+    $effect = Effect::new()->file(new FileMod($content_dir."/plugins/bitfire/cache/plugins.json", $result->content, FILE_W));
     $effect->run();
 }
 
@@ -528,8 +552,8 @@ $i = BitFire::get_instance();
 if (!$i->inspected) {
     $i->inspect();
 }
-$r = $i->_request;
 if ($i->bot_filter) {
+    $r = $i->_request;
     $br = $i->bot_filter->browser;
     /**
      * if browser verification is in reporting mode, we need to append the JavaScript
@@ -597,6 +621,14 @@ if (CFG::enabled("block_xmlrpc")) {
 
 
 
+if (function_exists('BitFirePRO\\verify_user_id') && CFG::enabled("rasp_auth")) {
+    add_action("auth_cookie_valid", "BitFirePRO\\verify_user_id", 9, 2);
+    add_filter("determine_current_user", "BitFirePRO\\verify_user_id", 65535, 1);
+    add_action("application_password_did_authenticate", "BitFirePRO\\verify_user_id", 65535, 1);
+}
+
+
+
 if (CFG::enabled("csp_policy_enabled")) {
     $nonce = CFG::str("csp_nonce", \ThreadFin\random_str(16));
     // script nonces. Prefer new attribute style for >= 5.7
@@ -612,54 +644,6 @@ if (function_exists('BitFirePRO\wp_requirement_check') && !wp_requirement_check(
     $i = BitFire::get_instance();
     $request = $i->_request;
 
-    BitFire::new_block(31001, "referer", $request->headers->referer, "new-user.php", 0);
-    die("Invalid request");
+    block_now(31001, "HTTP Referer", $request->headers->referer, $request->host, 0, null, "You may only add new users from the add new user page")->run();
 }
-
-/*
-if (isset($_GET['backup'])) {
-    $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
-    mkdir(CFG::str("cms_content_dir") . "/bitfire", 0775, true);
-    array_walk($backup_list, function($x) {
-        $dst = CFG::str("cms_content_dir") . "/bitfire/" . basename($x);
-        copy($x, $dst);
-    });
-}
-*/
-
-// todo: move to -admin
-// if the plugin is updating, make sure the files are readable and configs are backed up
-/*
-if (isset($_POST['action']) && isset($_POST['slug']) && $_POST['action'] == "update-plugin" && $_POST['slug'] == "bitfire") {
-    // only allow making files readable if upgrading and user is an admin
-    // TODO: HIDDEN FIX
-        if (is_admin()) {
-            $backup_list = [WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
-            array_walk($backup_list, function($x) {
-                $dst = CFG::str("cms_content_dir") . "/bitfire/" . basename($x);
-                copy($x, $dst);
-        });
-
-        debug("prep bitfire permissions for upgrade");
-        \ThreadFin\file_recurse(WAF_ROOT, function($file) {
-            $st = stat($file);
-            $hex = dechex($st['mode']);
-            $read = is_readable($file);
-            $write = is_writable($file);
-            if (!$read || !$write) {
-                $result = chmod($file, 0664);
-                debug("prep file [%s] = %d", $file, $result);
-            }
-        });
-
-        $backup_list = [WAF_ROOT."config.ini", WAF_ROOT . "cache/hashes.json", WAF_ROOT . "cache/blocks.json", WAF_ROOT."cache/alerts.json", WAF_ROOT."cache/exceptions.json"];
-        mkdir(CFG::str("cms_content_dir") . "/bitfire", 0775, true);
-        array_walk($backup_list, function($x) { copy($x, CFG::str("cms_content_dir") . "/bitfire/" . basename($x)); });
-
-        usleep(10000);
-    } else {
-        debug("only admins can prep bitfire permissions");
-    }
-}
-*/
 

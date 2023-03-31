@@ -4,7 +4,7 @@ Donate link: http://bitfire.co/pricing
 Tags: security, firewall, malware scanner, waf, rasp, anti-virus, antivirus, secure, virus, hacked, authentication, backups
 Requires at least: 4.0.1
 Tested up to: 6.1.1
-Stable tag: 3.6.5
+Stable tag: 3.9.9
 Requires PHP: 7.1
 License: AGPLv3 or later
 License URI: https://www.gnu.org/licenses/agpl-3.0.en.html
@@ -66,7 +66,7 @@ WordFence is the most popular choice for WordPress security.  How does BitFire c
 == Screenshots ==
 
 1. BitFire shows detailed graphs about the type of attacks your website is defending.
-2. Bot Control page allows instant authenitcation of over 600 known bots.
+2. Bot Control page allows instant authentication of over 600 known bots.
 3. Detailed malware scanner contains over 20 million data-points and scans 10,000 PHP files per minute.
 4. View detailed block and alerting information about each request, add blocking exceptions with a single click.
 5. Database malware scanner with backup and restore points can identify malware comments and posts from over 2.5 million domains.
@@ -195,6 +195,61 @@ We believe BitFire is the only plugin that can effectively protect WordPress sit
 
 
 == Changelog ==
+
+= 3.9.10 =
+ * fixed issue mixed type issue for older PHP versions (<= 7.4)
+ * begin internationalization work
+ * remove dependency on debug
+
+= 3.9.9 =
+ * Improved malware detection and removed most false positives
+ * Improved performance of quick scan mode
+ * Reduced filesystem impact of both standard and quick scans
+ * Improved Bot auto learning and dynamic domain resolution
+
+= 3.9.8 =
+ * improved malware scanning metrics
+ * bug fix for stuck malware scanner in certain corner cases 
+ * fix file download bug
+ * removed some empty index files from "unknown file" malware scan results
+ * fix bug in http request for some PHP 8.x installs
+
+
+
+= 3.9.6 =
+ * DIVI builder theme support (support self included iframes)
+ * deactivation effect
+ * bug fix for some older versions of curl 
+
+= 3.9.5 =
+ * Improved logging for download errors
+ * Fixed missing blog-header.php hash codes
+ * Added Support for command line malware scan
+ * Improved support for WPEngine 
+ * Improved order of operations to increase performance
+ * Support for XML and text data in Post Data
+ * Bypass some DNS lookups to dashboard page
+ * Improved include file malware scanning
+ * Fix stand-alone password install problem
+ * Added command line malware scanner
+
+
+= 3.9.4 =
+ * fixed compatibility problem with WPEngine
+ * improved bot blocking compatibility
+
+= 3.9.3 =
+ * improved bot detection and handling
+ * remove old bot exceptions from exception list
+ * fixed a bug on tagging and allowing unknown bots on the bot control screen
+ * removed inline svg images from malware frequency scanning
+
+= 3.9.2 =
+ * revamped malware scanning. reduces false positives for PRO and 3rd party plugins
+ * new advanced malware scanning mode with configurable scan settings
+ * async http requests on malware scanning
+
+
 
 = 3.7.1 =
  * reduce malware false positives
